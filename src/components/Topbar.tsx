@@ -3,7 +3,7 @@ import { healthApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 
 export default function Topbar({ title }: { title: string }) {
-  const { data, isError } = useQuery({ queryKey: ["health"], queryFn: healthApi.get, refetchInterval: 15000 });
+  const { data, isError } = useQuery({ queryKey: ["health", "live"], queryFn: healthApi.get, refetchInterval: 15000 });
   const { user, logout } = useAuth();
   return (
     <header className="topbar">

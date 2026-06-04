@@ -4,7 +4,7 @@ import { useAuth } from "@/auth/AuthContext";
 export default function Dashboard() {
   const { user } = useAuth();
   const agents = useQuery({ queryKey: ["agents", "available"], queryFn: agentsApi.available });
-  const tasks = useQuery({ queryKey: ["tasks"], queryFn: tasksApi.list });
+  const tasks = useQuery({ queryKey: ["tasks", "list"], queryFn: () => tasksApi.list() });
   const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
   return (
     <div className="grid">
