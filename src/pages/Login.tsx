@@ -1,5 +1,6 @@
 import { FormEvent, useState } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
+import { AxiosError } from "axios";
 import { useAuth } from "@/auth/AuthContext";
 
 export default function Login() {
@@ -7,6 +8,8 @@ export default function Login() {
   const { isAuthenticated, login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -17,10 +20,19 @@ export default function Login() {
     setError(null);
     setIsSubmitting(true);
     try {
-      await login({ email, password });
+      await login({
+        email,
+        password,
+        ...(requiresPasswordChange ? { new_password: newPassword } : {})
+      });
       navigate("/", { replace: true });
-    } catch {
-      setError("Неверный email или пароль");
+    } catch (err) {
+      if (isPasswordChangeRequired(err)) {
+        setRequiresPasswordChange(true);
+        setError("Введите новый пароль для первого входа.");
+      } else {
+        setError(getLoginError(err));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -36,12 +48,32 @@ export default function Login() {
           <input value={email} onChange={(event) => setEmail(event.target.value)} type="email" required />
         </label>
         <label>
-          Пароль
+          {requiresPasswordChange ? "Временный пароль" : "Пароль"}
           <input value={password} onChange={(event) => setPassword(event.target.value)} type="password" required />
         </label>
+        {requiresPasswordChange && (
+          <label>
+            Новый пароль
+            <input value={newPassword} onChange={(event) => setNewPassword(event.target.value)} type="password" minLength={8} required />
+          </label>
+        )}
         {error && <div className="error">{error}</div>}
-        <button disabled={isSubmitting}>{isSubmitting ? "Входим..." : "Войти"}</button>
+        <button disabled={isSubmitting}>{isSubmitting ? "Входим..." : requiresPasswordChange ? "Сменить пароль и войти" : "Войти"}</button>
       </form>
     </div>
   );
+}
+
+function isPasswordChangeRequired(error: unknown): boolean {
+  if (!(error instanceof AxiosError)) return false;
+  return error.response?.status === 428 && error.response.data?.detail?.code === "password_change_required";
+}
+
+function getLoginError(error: unknown): string {
+  if (error instanceof AxiosError) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string") return detail;
+    if (typeof detail?.message === "string") return detail.message;
+  }
+  return "Неверный email или пароль";
 }

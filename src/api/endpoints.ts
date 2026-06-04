@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type {
+  AdminUserCreate,
   Agent,
   AgentAccess,
   Department,
@@ -9,7 +10,6 @@ import type {
   Task,
   TokenResponse,
   User,
-  UserCreate,
   UserUpdate
 } from "@/types";
 
@@ -17,12 +17,15 @@ export const healthApi = { get: () => apiClient.get<HealthResponse>("/health").t
 export const authApi = {
   login: (payload: LoginPayload) => apiClient.post<TokenResponse>("/auth/login", payload).then((r) => r.data),
   me: () => apiClient.get<User>("/auth/me").then((r) => r.data),
-  logout: () => apiClient.post("/auth/logout").then((r) => r.data),
-  register: (payload: UserCreate) => apiClient.post<User>("/auth/register", payload).then((r) => r.data)
+  logout: () => apiClient.post("/auth/logout").then((r) => r.data)
+};
+export const adminUsersApi = {
+  list: () => apiClient.get<User[]>("/admin/users").then((r) => r.data),
+  create: (payload: AdminUserCreate) => apiClient.post<User>("/admin/users", payload).then((r) => r.data),
+  deactivate: (userId: string) => apiClient.post<User>(`/admin/users/${userId}/deactivate`).then((r) => r.data)
 };
 export const usersApi = {
   list: () => apiClient.get<User[]>("/users").then((r) => r.data),
-  create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
   update: (userId: string, payload: UserUpdate) => apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
   uploadAvatar: (userId: string, file: File) => {

@@ -5,7 +5,7 @@ export interface AgentAccess extends Agent { access_level: string | null; can_ru
 export interface Task { id: string; title: string; description: string | null; status: TaskStatus; task_type: string | null; requires_human_review: boolean; final_result: Record<string, unknown> | null; created_at: string; updated_at: string; }
 export interface HealthResponse { status: string; environment: string; version: string; }
 export interface TokenResponse { access_token: string; token_type: "bearer"; expires_at: string | null; }
-export interface LoginPayload { email: string; password: string; }
+export interface LoginPayload { email: string; password: string; new_password?: string; }
 export interface User {
   id: string;
   email: string;
@@ -19,6 +19,7 @@ export interface User {
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
+  must_change_password: boolean;
   department_id: string | null;
   role_id: string | null;
   avatar_bucket: string | null;
@@ -39,6 +40,22 @@ export interface UserCreate {
   position?: string;
   department_id?: string | null;
   role_id?: string | null;
+}
+export interface UserAgentGrantCreate {
+  agent_id: string;
+  access_level?: string;
+  can_run?: boolean;
+  can_view_results?: boolean;
+  can_approve?: boolean;
+  can_configure?: boolean;
+  expires_at?: string | null;
+}
+export interface AdminUserCreate extends UserCreate {
+  is_active?: boolean;
+  is_verified?: boolean;
+  is_superuser?: boolean;
+  must_change_password?: boolean;
+  agent_access?: UserAgentGrantCreate[];
 }
 export interface UserUpdate {
   email?: string;
