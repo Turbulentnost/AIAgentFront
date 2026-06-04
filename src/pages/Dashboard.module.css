@@ -1,6 +1,16 @@
 .dashboard {
+  --dashboard-gap: clamp(12px, 2vh, 18px);
+  --stat-card-height: clamp(62px, 10.6vh, 82px);
+  --stat-icon-size: clamp(38px, 5.9vh, 46px);
+  --launch-card-height: clamp(100px, 17vh, 132px);
+  --launch-art-size: clamp(70px, 12.2vh, 96px);
+  --bottom-panel-height: clamp(214px, 32vh, 252px);
+  --task-row-height: clamp(27px, 4.25vh, 34px);
+  --activity-icon-size: clamp(34px, 5.6vh, 44px);
+  --activity-row-height: clamp(31px, 4.9vh, 39px);
+  --recommended-panel-height: clamp(78px, 11vh, 88px);
   display: grid;
-  gap: 12px;
+  gap: var(--dashboard-gap);
   width: min(1320px, calc(100vw - 196px));
   min-width: 920px;
   margin: 0 auto;
@@ -8,13 +18,13 @@
 
 .hero {
   display: grid;
-  gap: 3px;
+  gap: clamp(3px, 0.6vh, 6px);
 }
 
 .hero h1 {
   margin: 0;
   color: #172033;
-  font-size: 20px;
+  font-size: clamp(20px, 3vh, 24px);
   font-weight: 800;
   line-height: 1.14;
   letter-spacing: -0.03em;
@@ -23,7 +33,7 @@
 .hero p {
   margin: 0;
   color: #64748b;
-  font-size: 11px;
+  font-size: clamp(11px, 1.55vh, 13px);
   font-weight: 500;
   line-height: 1.4;
 }
@@ -37,8 +47,8 @@
 .statCard {
   display: flex;
   align-items: center;
-  height: 62px;
-  gap: 15px;
+  height: var(--stat-card-height);
+  gap: clamp(15px, 2.4vh, 20px);
   padding: 0 clamp(18px, 1.8vw, 28px);
   background: #ffffff;
   border: 1px solid #edf1f6;
@@ -50,9 +60,9 @@
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 38px;
-  height: 38px;
-  border-radius: 8px;
+  width: var(--stat-icon-size);
+  height: var(--stat-icon-size);
+  border-radius: clamp(8px, 1.3vh, 10px);
 }
 
 .statCard > div {
@@ -64,7 +74,7 @@
 .statTitle {
   overflow: hidden;
   color: #475569;
-  font-size: 10px;
+  font-size: clamp(10px, 1.42vh, 12px);
   font-weight: 700;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -73,7 +83,7 @@
 
 .statValue {
   display: block;
-  font-size: 22px;
+  font-size: clamp(22px, 3.4vh, 28px);
   font-weight: 800;
   line-height: 1;
 }
@@ -112,13 +122,13 @@
 
 .quickLaunch {
   display: grid;
-  gap: 8px;
+  gap: clamp(8px, 1.4vh, 12px);
 }
 
 .quickLaunch h2 {
   margin: 0;
   color: #172033;
-  font-size: 13px;
+  font-size: clamp(13px, 1.9vh, 16px);
   font-weight: 800;
   line-height: 1.2;
 }
@@ -131,10 +141,10 @@
 
 .launchCard {
   display: grid;
-  grid-template-columns: 89px minmax(0, 1fr);
+  grid-template-columns: clamp(89px, 12.8vh, 112px) minmax(0, 1fr);
   align-items: center;
-  height: 100px;
-  padding: 10px clamp(12px, 1.4vw, 20px);
+  height: var(--launch-card-height);
+  padding: clamp(10px, 1.9vh, 16px) clamp(12px, 1.4vw, 20px);
   background: #ffffff;
   border: 1px solid #edf1f6;
   border-radius: 9px;
@@ -145,8 +155,8 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: 70px;
-  height: 70px;
+  width: var(--launch-art-size);
+  height: var(--launch-art-size);
   overflow: hidden;
   color: #2563eb;
   background: linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%);
@@ -193,8 +203,8 @@
   position: relative;
   display: grid;
   align-content: start;
-  gap: 6px;
-  height: 78px;
+  gap: clamp(6px, 1vh, 10px);
+  height: calc(var(--launch-card-height) - clamp(20px, 3.8vh, 32px));
   min-width: 0;
 }
 
@@ -208,7 +218,7 @@
 .launchHead h3 {
   margin: 0;
   color: #172033;
-  font-size: 12px;
+  font-size: clamp(12px, 1.72vh, 15px);
   font-weight: 800;
   line-height: 1.25;
 }
@@ -218,12 +228,12 @@
   flex: 0 0 auto;
   align-items: center;
   gap: 5px;
-  height: 18px;
+  height: clamp(18px, 2.6vh, 22px);
   padding: 0 8px;
   color: #16a34a;
   background: #eaf8ef;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: clamp(9px, 1.25vh, 11px);
   font-weight: 800;
   line-height: 1;
 }
@@ -239,7 +249,7 @@
   max-width: calc(100% - 92px);
   margin: 0;
   color: #475569;
-  font-size: 10px;
+  font-size: clamp(10px, 1.5vh, 12px);
   font-weight: 500;
   line-height: 1.45;
 }
@@ -249,15 +259,15 @@
   right: 0;
   bottom: 0;
   justify-self: end;
-  min-width: 74px;
-  height: 27px;
+  min-width: clamp(74px, 10.4vh, 88px);
+  height: clamp(27px, 4vh, 32px);
   padding: 0 14px;
   color: #ffffff;
   background: #006ee6;
   border: 0;
   border-radius: 6px;
   box-shadow: 0 5px 10px rgba(0, 110, 230, 0.24);
-  font-size: 10px;
+  font-size: clamp(10px, 1.42vh, 12px);
   font-weight: 800;
   line-height: 1;
 }
@@ -269,7 +279,7 @@
 .bottomGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.58fr) minmax(0, 1fr);
-  gap: 12px;
+  gap: var(--dashboard-gap);
 }
 
 .tasksPanel,
@@ -282,27 +292,27 @@
 }
 
 .tasksPanel {
-  height: 214px;
-  padding: 12px 16px 0;
+  height: var(--bottom-panel-height);
+  padding: clamp(12px, 1.9vh, 16px) 16px 0;
 }
 
 .activityPanel {
-  height: 214px;
-  padding: 12px 16px 0;
+  height: var(--bottom-panel-height);
+  padding: clamp(12px, 1.9vh, 16px) 16px 0;
 }
 
 .tasksPanel h2,
 .activityPanel h2 {
   margin: 0;
   color: #172033;
-  font-size: 13px;
+  font-size: clamp(13px, 1.9vh, 16px);
   font-weight: 800;
   line-height: 1.25;
 }
 
 .tasksTable {
   display: grid;
-  margin-top: 10px;
+  margin-top: clamp(10px, 1.45vh, 14px);
 }
 
 .tasksHead,
@@ -313,14 +323,14 @@
 }
 
 .tasksHead {
-  height: 24px;
+  height: clamp(24px, 3.5vh, 30px);
   color: #94a3b8;
-  font-size: 9px;
+  font-size: clamp(9px, 1.25vh, 11px);
   font-weight: 800;
 }
 
 .taskRow {
-  height: 27px;
+  height: var(--task-row-height);
   border-top: 1px solid #eef2f7;
 }
 
@@ -353,8 +363,8 @@
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: 23px;
-  height: 23px;
+  width: clamp(23px, 3.5vh, 28px);
+  height: clamp(23px, 3.5vh, 28px);
   border-radius: 6px;
 }
 
@@ -378,10 +388,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 20px;
+  height: clamp(20px, 2.95vh, 24px);
   padding: 0 10px;
   border-radius: 999px;
-  font-size: 9px;
+  font-size: clamp(9px, 1.25vh, 11px);
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -447,7 +457,7 @@
   position: relative;
   display: grid;
   gap: 0;
-  margin-top: 10px;
+  margin-top: clamp(10px, 1.5vh, 14px);
   padding-left: 0;
 }
 
@@ -466,15 +476,15 @@
   display: grid;
   grid-template-columns: 38px 18px minmax(0, 1fr);
   align-items: center;
-  min-height: 31px;
+  min-height: var(--activity-row-height);
   column-gap: 8px;
 }
 
 .activityIcon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: var(--activity-icon-size);
+  height: var(--activity-icon-size);
   border-radius: 999px;
 }
 
@@ -513,7 +523,7 @@
   margin: 0 0 3px;
   overflow: hidden;
   color: #172033;
-  font-size: 11px;
+  font-size: clamp(11px, 1.55vh, 13px);
   font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -523,9 +533,102 @@
 .activityItem p {
   margin: 0;
   color: #64748b;
-  font-size: 10px;
+  font-size: clamp(10px, 1.4vh, 12px);
   font-weight: 600;
   line-height: 1.15;
+}
+
+.recommendedPanel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 28px;
+  min-height: var(--recommended-panel-height);
+  padding: clamp(16px, 2.3vh, 22px) 20px;
+  background: #ffffff;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+}
+
+.recommendedPanel h2 {
+  flex: 0 0 auto;
+  margin: 0;
+  color: #172033;
+  font-size: clamp(13px, 1.9vh, 16px);
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.recommendedList {
+  display: flex;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  gap: 12px;
+  min-width: 0;
+}
+
+.recommendedAction {
+  display: flex;
+  flex: 1 1 0;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 280px;
+  height: clamp(44px, 6.2vh, 52px);
+  padding: 0 14px;
+  color: #172033;
+  background: #ffffff;
+  border: 1px solid #e8edf3;
+  border-radius: 9px;
+  text-decoration: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.recommendedAction:hover {
+  border-color: #d7e3f4;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+
+.recommendedIcon {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  width: clamp(34px, 4.9vh, 40px);
+  height: clamp(34px, 4.9vh, 40px);
+  border-radius: 8px;
+}
+
+.recommendedIcon.blue {
+  color: #2563eb;
+  background: #eaf2ff;
+}
+
+.recommendedIcon.green {
+  color: #16a34a;
+  background: #eaf8ef;
+}
+
+.recommendedIcon.violet {
+  color: #7c3aed;
+  background: #f2edff;
+}
+
+.recommendedLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: clamp(11px, 1.55vh, 13px);
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recommendedChevron {
+  flex: 0 0 auto;
+  color: #64748b;
 }
 
 @media (max-width: 1100px) {
@@ -555,6 +658,20 @@
     width: 74px;
     height: 74px;
   }
+
+  .recommendedPanel {
+    flex-wrap: wrap;
+    gap: 14px;
+  }
+
+  .recommendedList {
+    flex: 1 1 100%;
+    justify-content: stretch;
+  }
+
+  .recommendedAction {
+    max-width: none;
+  }
 }
 
 @media (max-width: 900px) {
@@ -568,5 +685,18 @@
   .activityPanel {
     height: auto;
     min-height: 188px;
+  }
+
+  .recommendedPanel {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .recommendedPanel h2 {
+    white-space: normal;
+  }
+
+  .recommendedList {
+    flex-direction: column;
   }
 }

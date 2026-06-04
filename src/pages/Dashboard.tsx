@@ -5,21 +5,30 @@ import {
   CheckCircle2,
   ChevronRight,
   ClipboardCheck,
+  CloudUpload,
   FileText,
   Files,
   ShoppingCart,
   TriangleAlert,
   UserRound
 } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import {
   dashboardActivities,
   dashboardStats,
   dashboardSummary,
   quickLaunchAgents,
-  recentTasks
+  recentTasks,
+  recommendedActions
 } from "@/mock-data/dashboard";
-import type { DashboardActivity, DashboardStatCard, QuickLaunchAgent, RecentTask } from "@/mock-data/dashboard";
+import type {
+  DashboardActivity,
+  DashboardStatCard,
+  QuickLaunchAgent,
+  RecentTask,
+  RecommendedAction
+} from "@/mock-data/dashboard";
 import styles from "./Dashboard.module.css";
 
 const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
@@ -45,6 +54,12 @@ const activityIcons: Record<DashboardActivity["icon"], typeof CheckCircle2> = {
   check: CheckCircle2,
   user: UserRound,
   document: FileText,
+  book: BookOpen
+};
+
+const recommendedIcons: Record<RecommendedAction["icon"], typeof ClipboardCheck> = {
+  clipboard: ClipboardCheck,
+  upload: CloudUpload,
   book: BookOpen
 };
 
@@ -191,6 +206,25 @@ export default function Dashboard() {
           </a>
         </section>
       </div>
+
+      <section className={styles.recommendedPanel} aria-labelledby="recommended-actions-title">
+        <h2 id="recommended-actions-title">Рекомендуемые действия</h2>
+        <div className={styles.recommendedList}>
+          {recommendedActions.map((action) => {
+            const Icon = recommendedIcons[action.icon];
+
+            return (
+              <Link className={styles.recommendedAction} key={action.id} to={action.href}>
+                <span className={`${styles.recommendedIcon} ${styles[action.tone]}`}>
+                  <Icon size={20} strokeWidth={2.1} aria-hidden="true" />
+                </span>
+                <span className={styles.recommendedLabel}>{action.label}</span>
+                <ChevronRight className={styles.recommendedChevron} size={18} strokeWidth={2.3} aria-hidden="true" />
+              </Link>
+            );
+          })}
+        </div>
+      </section>
     </section>
   );
 }

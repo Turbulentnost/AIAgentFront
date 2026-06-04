@@ -133,6 +133,40 @@ export const recentTasks: RecentTask[] = [
   }
 ];
 
+export type RecommendedActionTone = "blue" | "green" | "violet";
+
+export interface RecommendedAction {
+  id: string;
+  label: string;
+  href: string;
+  tone: RecommendedActionTone;
+  icon: "clipboard" | "upload" | "book";
+}
+
+export const recommendedActions: RecommendedAction[] = [
+  {
+    id: "check-results",
+    label: "Проверить результаты",
+    href: "/tasks",
+    tone: "blue",
+    icon: "clipboard"
+  },
+  {
+    id: "upload-document",
+    label: "Загрузить документ",
+    href: "/documents",
+    tone: "green",
+    icon: "upload"
+  },
+  {
+    id: "open-knowledge",
+    label: "Открыть базу знаний",
+    href: "/knowledge-base",
+    tone: "violet",
+    icon: "book"
+  }
+];
+
 export const dashboardActivities: DashboardActivity[] = [
   {
     id: "kd-finished",
