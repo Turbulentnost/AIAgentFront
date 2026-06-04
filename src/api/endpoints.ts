@@ -9,7 +9,8 @@ import type {
   Task,
   TokenResponse,
   User,
-  UserCreate
+  UserCreate,
+  UserUpdate
 } from "@/types";
 
 export const healthApi = { get: () => apiClient.get<HealthResponse>("/health").then((r) => r.data) };
@@ -22,6 +23,7 @@ export const authApi = {
 export const usersApi = {
   list: () => apiClient.get<User[]>("/users").then((r) => r.data),
   create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
+  update: (userId: string, payload: UserUpdate) => apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
   uploadAvatar: (userId: string, file: File) => {
     const formData = new FormData();

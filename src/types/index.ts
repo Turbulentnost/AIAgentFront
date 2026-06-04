@@ -21,6 +21,8 @@ export interface User {
   is_verified: boolean;
   department_id: string | null;
   role_id: string | null;
+  avatar_bucket: string | null;
+  avatar_object_name: string | null;
   avatar_url: string | null;
   last_login_at: string | null;
   created_at: string;
@@ -37,6 +39,20 @@ export interface UserCreate {
   position?: string;
   department_id?: string | null;
   role_id?: string | null;
+}
+export interface UserUpdate {
+  email?: string;
+  username?: string | null;
+  last_name?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  position?: string | null;
+  department_id?: string | null;
+  role_id?: string | null;
+  is_active?: boolean;
+  is_verified?: boolean;
 }
 export interface Department {
   id: string;
