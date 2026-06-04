@@ -147,17 +147,13 @@
 }
 
 .languageBadge {
-  display: grid;
-  width: 1.65rem;
-  height: 1.65rem;
-  place-items: center;
-  color: #ffffff;
+  flex: 0 0 auto;
+  min-width: 1.7rem;
+  color: #667085;
   font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.02em;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border-radius: 999px;
-  box-shadow: 0 0.45rem 0.9rem rgba(37, 99, 235, 0.18);
+  text-align: center;
 }
 
 .headerButton:hover {
@@ -247,6 +243,19 @@
   height: 10.65rem;
   padding: 1rem 1.1rem;
   border-radius: 1.15rem;
+  transform-origin: center bottom;
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.24s ease;
+}
+
+.featureCard:hover {
+  border-color: rgba(191, 214, 245, 0.95);
+  box-shadow:
+    0 1.55rem 3.25rem rgba(15, 23, 42, 0.13),
+    0 0.5rem 1.35rem rgba(37, 99, 235, 0.09);
+  transform: translateY(-6px);
 }
 
 .featureIcon {
@@ -339,6 +348,15 @@
   filter: drop-shadow(0 0.25rem 0.35rem rgba(37, 99, 235, 0.16));
 }
 
+.processLines .energyLine {
+  stroke-width: 5;
+  stroke-dasharray: 18 100;
+  stroke-dashoffset: 118;
+  opacity: 0;
+  mix-blend-mode: screen;
+  animation: neonCurrent 3.9s cubic-bezier(0.42, 0, 0.22, 1) infinite;
+}
+
 .blueLine {
   stroke: #2563eb;
 }
@@ -349,6 +367,29 @@
 
 .greenLine {
   stroke: #22a75a;
+}
+
+.processLines .energyBlue {
+  stroke: #5da2ff;
+  filter:
+    drop-shadow(0 0 0.28rem rgba(37, 99, 235, 0.98))
+    drop-shadow(0 0 0.78rem rgba(37, 99, 235, 0.56));
+}
+
+.processLines .energyViolet {
+  stroke: #a78bfa;
+  animation-delay: 1.22s;
+  filter:
+    drop-shadow(0 0 0.28rem rgba(124, 58, 237, 0.95))
+    drop-shadow(0 0 0.8rem rgba(124, 58, 237, 0.52));
+}
+
+.processLines .energyGreen {
+  stroke: #6ee7a0;
+  animation-delay: 1.22s;
+  filter:
+    drop-shadow(0 0 0.28rem rgba(34, 167, 90, 0.95))
+    drop-shadow(0 0 0.76rem rgba(34, 167, 90, 0.5));
 }
 
 .blueDot {
@@ -394,9 +435,22 @@
   width: 25.7%;
   min-height: 15rem;
   padding: 1.55rem 1.45rem;
+  overflow: hidden;
   grid-template-columns: 1fr;
   align-items: start;
   border-radius: 1.35rem;
+  animation: agentEnergyPulse 3.9s ease-in-out infinite;
+}
+
+.agentCard::after {
+  position: absolute;
+  inset: -35% -55%;
+  pointer-events: none;
+  content: "";
+  background: linear-gradient(110deg, transparent 36%, rgba(96, 165, 250, 0.28) 49%, transparent 62%);
+  opacity: 0;
+  transform: translateX(-42%) rotate(8deg);
+  animation: agentEnergySheen 3.9s ease-in-out infinite;
 }
 
 .regulationCard {
@@ -404,6 +458,7 @@
   right: 0.15rem;
   width: 28.7%;
   min-height: 7.05rem;
+  animation: branchEnergyPulse 3.9s ease-in-out infinite;
 }
 
 .tenderCard {
@@ -411,6 +466,7 @@
   bottom: 0;
   width: 28.7%;
   min-height: 7.05rem;
+  animation: branchEnergyPulse 3.9s ease-in-out infinite;
 }
 
 .workflowIcon {
@@ -640,14 +696,17 @@
 
 .checkbox {
   display: inline-flex;
+  flex: 0 0 auto;
   gap: 0.5rem;
   align-items: center;
   color: #344054;
   font-size: 0.8125rem;
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .checkbox input {
+  flex: 0 0 auto;
   width: 1rem;
   height: 1rem;
   accent-color: var(--login-blue);
@@ -754,6 +813,106 @@
   font-size: 0.75rem;
   font-weight: 600;
   text-align: center;
+}
+
+@keyframes neonCurrent {
+  0%,
+  13% {
+    opacity: 0;
+    stroke-dashoffset: 118;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  48% {
+    opacity: 1;
+    stroke-dashoffset: 24;
+  }
+
+  62% {
+    opacity: 0;
+    stroke-dashoffset: -18;
+  }
+
+  100% {
+    opacity: 0;
+    stroke-dashoffset: -18;
+  }
+}
+
+@keyframes agentEnergyPulse {
+  0%,
+  28%,
+  74%,
+  100% {
+    box-shadow: 0 1.25rem 2.75rem rgba(55, 86, 150, 0.17);
+  }
+
+  39%,
+  52% {
+    box-shadow:
+      0 1.25rem 2.75rem rgba(55, 86, 150, 0.17),
+      0 0 1.35rem rgba(37, 99, 235, 0.2),
+      0 0 2.4rem rgba(37, 99, 235, 0.12);
+  }
+}
+
+@keyframes agentEnergySheen {
+  0%,
+  30% {
+    opacity: 0;
+    transform: translateX(-42%) rotate(8deg);
+  }
+
+  43% {
+    opacity: 1;
+  }
+
+  58% {
+    opacity: 0;
+    transform: translateX(42%) rotate(8deg);
+  }
+
+  100% {
+    opacity: 0;
+    transform: translateX(42%) rotate(8deg);
+  }
+}
+
+@keyframes branchEnergyPulse {
+  0%,
+  50%,
+  82%,
+  100% {
+    box-shadow: 0 1.25rem 2.75rem rgba(55, 86, 150, 0.17);
+  }
+
+  63%,
+  74% {
+    box-shadow:
+      0 1.25rem 2.75rem rgba(55, 86, 150, 0.17),
+      0 0 1.15rem rgba(96, 165, 250, 0.16);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .featureCard:hover {
+    transform: none;
+  }
+
+  .processLines .energyLine,
+  .agentCard,
+  .agentCard::after,
+  .regulationCard,
+  .tenderCard {
+    animation: none;
+  }
+
+  .processLines .energyLine {
+    opacity: 0;
+  }
 }
 
 @media (max-width: 64rem) {

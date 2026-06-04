@@ -6,6 +6,7 @@ export interface DashboardStatCard {
   value: number;
   tone: DashboardStatTone;
   icon: "bot" | "clipboard" | "warning" | "check";
+  imageSrc?: string;
 }
 
 export interface QuickLaunchAgent {
@@ -48,7 +49,8 @@ export const dashboardStats: DashboardStatCard[] = [
     title: "Доступные агенты",
     value: 8,
     tone: "blue",
-    icon: "bot"
+    icon: "bot",
+    imageSrc: "/login-feature-robot.png"
   },
   {
     id: "tasks",

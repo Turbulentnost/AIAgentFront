@@ -12,7 +12,8 @@ import {
   TriangleAlert,
   UserRound
 } from "lucide-react";
-import { Link } from "react-router-dom";
+import { useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import {
   dashboardActivities,
@@ -76,9 +77,24 @@ function getGreetingName(user: ReturnType<typeof useAuth>["user"]) {
   return user.username || user.email;
 }
 
+const RECOMMENDED_SWEEP_MS = 580;
+
 export default function Dashboard() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const greetingName = getGreetingName(user);
+  const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
+
+  function handleRecommendedClick(action: RecommendedAction, event: MouseEvent<HTMLAnchorElement>) {
+    event.preventDefault();
+    if (sweepingActionId) return;
+
+    setSweepingActionId(action.id);
+    window.setTimeout(() => {
+      navigate(action.href);
+      setSweepingActionId(null);
+    }, RECOMMENDED_SWEEP_MS);
+  }
 
   return (
     <section className={styles.dashboard} aria-labelledby="dashboard-title">
@@ -96,8 +112,14 @@ export default function Dashboard() {
 
           return (
             <article className={styles.statCard} key={stat.id}>
-              <span className={`${styles.statIcon} ${styles[stat.tone]}`}>
-                <Icon size={25} strokeWidth={2.1} aria-hidden="true" />
+              <span
+                className={`${styles.statIcon} ${styles[stat.tone]} ${stat.imageSrc ? styles.statIconImage : ""}`}
+              >
+                {stat.imageSrc ? (
+                  <img src={stat.imageSrc} alt="" />
+                ) : (
+                  <Icon size={25} strokeWidth={2.1} aria-hidden="true" />
+                )}
               </span>
               <div>
                 <span className={styles.statTitle}>{stat.title}</span>
@@ -154,7 +176,7 @@ export default function Dashboard() {
                 <div className={styles.taskRow} role="row" key={task.id}>
                   <div className={styles.taskName} role="cell">
                     <span className={`${styles.taskIcon} ${styles[task.status]}`}>
-                      <Icon size={17} strokeWidth={2} aria-hidden="true" />
+                      <Icon size={19} strokeWidth={2} aria-hidden="true" />
                     </span>
                     <strong>{task.title}</strong>
                   </div>
@@ -168,7 +190,7 @@ export default function Dashboard() {
                     {task.time}
                   </span>
                   <button className={styles.rowAction} type="button" aria-label={`Открыть ${task.title}`}>
-                    <ChevronRight size={18} strokeWidth={2.4} aria-hidden="true" />
+                    <ChevronRight size={19} strokeWidth={2.4} aria-hidden="true" />
                   </button>
                 </div>
               );
@@ -176,7 +198,7 @@ export default function Dashboard() {
           </div>
           <a className={styles.panelLink} href="/tasks">
             Все задачи
-            <ChevronRight size={17} strokeWidth={2.5} aria-hidden="true" />
+            <ChevronRight size={18} strokeWidth={2.5} aria-hidden="true" />
           </a>
         </section>
 
@@ -202,7 +224,7 @@ export default function Dashboard() {
           </div>
           <a className={styles.panelLink} href="/tasks">
             Все уведомления
-            <ChevronRight size={17} strokeWidth={2.5} aria-hidden="true" />
+            <ChevronRight size={18} strokeWidth={2.5} aria-hidden="true" />
           </a>
         </section>
       </div>
@@ -214,9 +236,22 @@ export default function Dashboard() {
             const Icon = recommendedIcons[action.icon];
 
             return (
-              <Link className={styles.recommendedAction} key={action.id} to={action.href}>
-                <span className={`${styles.recommendedIcon} ${styles[action.tone]}`}>
-                  <Icon size={20} strokeWidth={2.1} aria-hidden="true" />
+              <Link
+                className={`${styles.recommendedAction} ${
+                  sweepingActionId === action.id ? styles.recommendedActionSweeping : ""
+                }`}
+                key={action.id}
+                to={action.href}
+                onClick={(event) => handleRecommendedClick(action, event)}
+              >
+                <span className={styles.recommendedIconSlot} aria-hidden="true">
+                  <span
+                    className={`${styles.recommendedIcon} ${styles[action.tone]} ${
+                      sweepingActionId === action.id ? styles.recommendedIconTraveling : ""
+                    }`}
+                  >
+                    <Icon size={20} strokeWidth={2.1} aria-hidden="true" />
+                  </span>
                 </span>
                 <span className={styles.recommendedLabel}>{action.label}</span>
                 <ChevronRight className={styles.recommendedChevron} size={18} strokeWidth={2.3} aria-hidden="true" />
