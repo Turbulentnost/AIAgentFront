@@ -1,4 +1,4 @@
-:root { font-family: Inter, Segoe UI, system-ui, sans-serif; color: #172033; background: #f5f7fb; }
+:root { --color-primary: #2563eb; --color-surface: #ffffff; --color-text: #172033; --color-muted: #64748b; --color-border: #e5e7eb; --spacing-md: 16px; font-family: Inter, Segoe UI, system-ui, sans-serif; color: var(--color-text); background: #f5f7fb; }
 * { box-sizing: border-box; }
 body { margin: 0; }
 .shell { min-height: 100vh; display: grid; grid-template-columns: 240px 1fr; }
