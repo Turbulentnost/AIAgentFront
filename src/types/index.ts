@@ -43,6 +43,37 @@ export interface AgentAccess extends Agent {
   can_approve: boolean;
   can_configure: boolean;
 }
+export interface TaskCompletingDatasetTask {
+  id: string;
+  document: string | null;
+  task: string | null;
+  task_name: string;
+  task_description: string | null;
+  executor: string | null;
+  created_at: string | null;
+  deadline: string | null;
+  is_completed: boolean;
+  completed_at: string | null;
+  color: string | null;
+  color_reason: string | null;
+  execution_result: { raw?: string | null } | null;
+  is_checked: boolean;
+  is_archived: boolean;
+  agent_check: Record<string, unknown> | null;
+}
+export interface TaskCompletingTaskListResponse {
+  active: TaskCompletingDatasetTask[];
+  archived: TaskCompletingDatasetTask[];
+  total: number;
+  unchecked_count: number;
+  archived_count: number;
+}
+export interface TaskCompletingCheckResponse {
+  task: TaskCompletingDatasetTask;
+  agent_result: Record<string, unknown>;
+  status: "archived" | "needs_review";
+  is_satisfactory: boolean;
+}
 export interface Task {
   id: string;
   title: string;
