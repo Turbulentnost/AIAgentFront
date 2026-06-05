@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   CheckCircle2,
   Database,
@@ -14,9 +15,8 @@ import {
   ShieldCheck,
   TriangleAlert
 } from "lucide-react";
-import { departmentsApi, documentsApi, knowledgeBasesApi, usersApi } from "@/api/endpoints";
+import { knowledgeBasesApi } from "@/api/endpoints";
 import type {
-  Document,
   KnowledgeBase,
   KnowledgeBaseAccessType,
   KnowledgeBaseAgentBinding,
@@ -66,11 +66,12 @@ const accessLabels: Record<KnowledgeBaseAccessType, string> = {
 
 export default function KnowledgeBasePage() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<KnowledgeBaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const stats = useQuery({ queryKey: ["knowledge-bases", "stats"], queryFn: knowledgeBasesApi.stats });
   const knowledgeBases = useQuery({
@@ -81,18 +82,19 @@ export default function KnowledgeBasePage() {
         query: searchQuery || undefined
       })
   });
-  const documents = useQuery({ queryKey: ["documents"], queryFn: documentsApi.list });
-  const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
-  const users = useQuery({ queryKey: ["users"], queryFn: usersApi.list });
-
   const selected = useMemo(
     () => knowledgeBases.data?.find((item) => item.id === selectedId) ?? knowledgeBases.data?.[0] ?? null,
     [knowledgeBases.data, selectedId]
   );
 
   useEffect(() => {
+    const requestedId = searchParams.get("kb");
+    if (requestedId && knowledgeBases.data?.some((item) => item.id === requestedId)) {
+      setSelectedId(requestedId);
+      return;
+    }
     if (!selectedId && knowledgeBases.data?.[0]) setSelectedId(knowledgeBases.data[0].id);
-  }, [knowledgeBases.data, selectedId]);
+  }, [knowledgeBases.data, searchParams, selectedId]);
 
   const sources = useQuery({
     queryKey: ["knowledge-base-sources", selected?.id],
@@ -148,7 +150,7 @@ export default function KnowledgeBasePage() {
             индексация и проверяемый RAG-поиск.
           </p>
         </div>
-        <button className={styles.primaryButton} type="button" onClick={() => setIsCreateOpen(true)}>
+        <button className={styles.primaryButton} type="button" onClick={() => navigate("/knowledge-base/create")}>
           <Plus size={16} />
           Создать базу знаний
         </button>
@@ -269,20 +271,6 @@ export default function KnowledgeBasePage() {
       </section>
 
       <Pipeline />
-
-      {isCreateOpen && (
-        <CreateKnowledgeBaseModal
-          documents={documents.data ?? []}
-          departments={departments.data ?? []}
-          users={users.data ?? []}
-          onClose={() => setIsCreateOpen(false)}
-          onCreated={(item) => {
-            setSelectedId(item.id);
-            setIsCreateOpen(false);
-            void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -486,123 +474,6 @@ function DetailTabContent(props: {
       rows={audit.map((item) => [String(item.action ?? "-"), String(item.actor_id ?? "-"), formatDate(String(item.created_at ?? ""))])}
       empty="Журнал действий пока пуст."
     />
-  );
-}
-
-function CreateKnowledgeBaseModal(props: {
-  documents: Document[];
-  departments: { id: string; name: string }[];
-  users: { id: string; full_name: string | null; email: string }[];
-  onClose: () => void;
-  onCreated: (item: KnowledgeBase) => void;
-}) {
-  const { documents, departments, users, onClose, onCreated } = props;
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
-  const [responsibleUserId, setResponsibleUserId] = useState("");
-  const [topic, setTopic] = useState("");
-  const [sourceDocumentIds, setSourceDocumentIds] = useState<string[]>([]);
-  const [accessType, setAccessType] = useState<KnowledgeBaseAccessType>("search");
-  const createMutation = useMutation({
-    mutationFn: () =>
-      knowledgeBasesApi.create({
-        name,
-        description,
-        department_id: departmentId || null,
-        responsible_user_id: responsibleUserId || null,
-        topic,
-        access_grants: [
-          {
-            grantee_type: departmentId ? "department" : "admin_only",
-            grantee_id: departmentId || null,
-            access_type: departmentId ? accessType : "admin",
-            include_child_departments: true,
-            reason: "Создание базы знаний"
-          }
-        ],
-        source_document_ids: sourceDocumentIds
-      }),
-    onSuccess: onCreated
-  });
-
-  return (
-    <div className={styles.modalBackdrop}>
-      <form
-        className={styles.modal}
-        onSubmit={(event) => {
-          event.preventDefault();
-          createMutation.mutate();
-        }}
-      >
-        <header>
-          <h2>Создать базу знаний</h2>
-          <button type="button" onClick={onClose}>Закрыть</button>
-        </header>
-        <label>
-          Название
-          <input required value={name} onChange={(event) => setName(event.target.value)} />
-        </label>
-        <label>
-          Описание
-          <textarea value={description} onChange={(event) => setDescription(event.target.value)} />
-        </label>
-        <div className={styles.formGrid}>
-          <label>
-            Подразделение-владелец
-            <select value={departmentId} onChange={(event) => setDepartmentId(event.target.value)}>
-              <option value="">Только администраторы</option>
-              {departments.map((department) => (
-                <option key={department.id} value={department.id}>{department.name}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Ответственный
-            <select value={responsibleUserId} onChange={(event) => setResponsibleUserId(event.target.value)}>
-              <option value="">Не выбран</option>
-              {users.map((user) => (
-                <option key={user.id} value={user.id}>{user.full_name || user.email}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label>
-          Тематика или процесс
-          <input value={topic} onChange={(event) => setTopic(event.target.value)} placeholder="Например, совещания и протоколы" />
-        </label>
-        <label>
-          Тип доступа
-          <select value={accessType} onChange={(event) => setAccessType(event.target.value as KnowledgeBaseAccessType)} disabled={!departmentId}>
-            {Object.entries(accessLabels).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <div className={styles.sourcePicker}>
-          <strong>Документы-источники</strong>
-          {documents.slice(0, 8).map((document) => (
-            <label key={document.id}>
-              <input
-                type="checkbox"
-                checked={sourceDocumentIds.includes(document.id)}
-                onChange={(event) => {
-                  setSourceDocumentIds((ids) =>
-                    event.target.checked ? [...ids, document.id] : ids.filter((id) => id !== document.id)
-                  );
-                }}
-              />
-              {document.title} <span>{document.original_filename}</span>
-            </label>
-          ))}
-          {!documents.length && <small>Документы появятся после загрузки в разделе «Документы».</small>}
-        </div>
-        {createMutation.isError && <div className={styles.error}>Не удалось создать базу знаний</div>}
-        <button className={styles.primaryButton} type="submit" disabled={createMutation.isPending || !name.trim()}>
-          {createMutation.isPending ? "Создаём..." : "Создать"}
-        </button>
-      </form>
-    </div>
   );
 }
 
