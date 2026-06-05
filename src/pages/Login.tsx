@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
+import ThemeToggle from "@/components/ThemeToggle";
 import styles from "./Login.module.css";
 
 interface FeatureCard {
@@ -146,6 +147,7 @@ export default function Login() {
               </div>
             )}
           </div>
+          <ThemeToggle />
           <span className={styles.headerDivider} aria-hidden="true" />
           <button className={styles.headerButton} type="button">
             <CircleHelp aria-hidden="true" className={styles.headerIcon} size={16} strokeWidth={2} />

@@ -3,6 +3,7 @@ import { Bell, ChevronDown, Search } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { nav } from "./Sidebar";
+import ThemeToggle from "./ThemeToggle";
 
 export default function Topbar({ title }: { title: string }) {
   const { user, logout } = useAuth();
@@ -51,6 +52,8 @@ export default function Topbar({ title }: { title: string }) {
           <Bell aria-hidden="true" size={22} strokeWidth={1.9} />
           <span className="notification-badge">{notificationCount}</span>
         </button>
+
+        <ThemeToggle />
 
         <div className="profile-menu">
           <button

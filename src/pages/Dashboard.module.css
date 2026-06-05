@@ -25,7 +25,7 @@
 
 .hero h1 {
   margin: 0;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(20px, 3vh, 24px);
   font-weight: 800;
   line-height: 1.14;
@@ -34,7 +34,7 @@
 
 .hero p {
   margin: 0;
-  color: #64748b;
+  color: var(--color-muted);
   font-size: clamp(11px, 1.55vh, 13px);
   font-weight: 500;
   line-height: 1.4;
@@ -52,10 +52,10 @@
   height: var(--stat-card-height);
   gap: clamp(15px, 2.4vh, 20px);
   padding: 0 clamp(18px, 1.8vw, 28px);
-  background: #ffffff;
-  border: 1px solid #edf1f6;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 9px;
-  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 9px 22px var(--shadow-lg);
 }
 
 .statIcon {
@@ -81,7 +81,7 @@
 }
 
 .statIconImage.blue {
-  background: #eaf2ff;
+  background: var(--color-blue-soft);
 }
 
 .statIconImage.blue img {
@@ -98,7 +98,7 @@
 
 .statTitle {
   overflow: hidden;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: clamp(10px, 1.42vh, 12px);
   font-weight: 700;
   line-height: 1.2;
@@ -114,35 +114,35 @@
 }
 
 .blue {
-  color: #2563eb;
+  color: var(--color-primary);
 }
 
 .green {
-  color: #16a34a;
+  color: var(--color-success);
 }
 
 .orange {
-  color: #f59e0b;
+  color: var(--color-warning);
 }
 
 .violet {
-  color: #7c3aed;
+  color: var(--color-violet);
 }
 
 .statIcon.blue {
-  background: #eaf2ff;
+  background: var(--color-blue-soft);
 }
 
 .statIcon.green {
-  background: #eaf8ef;
+  background: var(--color-green-soft);
 }
 
 .statIcon.orange {
-  background: #fff5e8;
+  background: var(--color-amber-soft);
 }
 
 .statIcon.violet {
-  background: #f2edff;
+  background: var(--color-violet-soft);
 }
 
 .quickLaunch {
@@ -152,7 +152,7 @@
 
 .quickLaunch h2 {
   margin: 0;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(13px, 1.9vh, 16px);
   font-weight: 800;
   line-height: 1.2;
@@ -170,10 +170,10 @@
   align-items: center;
   height: var(--launch-card-height);
   padding: clamp(10px, 1.9vh, 16px) clamp(12px, 1.4vw, 20px);
-  background: #ffffff;
-  border: 1px solid #edf1f6;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 9px;
-  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 9px 22px var(--shadow-lg);
   transform-origin: center bottom;
   transition:
     transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
@@ -182,10 +182,10 @@
 }
 
 .launchCard:hover {
-  border-color: #d7e3f4;
+  border-color: var(--color-border-card-hover);
   box-shadow:
-    0 14px 30px rgba(15, 23, 42, 0.12),
-    0 4px 14px rgba(37, 99, 235, 0.07);
+    0 14px 30px var(--color-shadow-12),
+    0 4px 14px var(--color-primary-alpha-07);
   transform: translateY(-5px);
 }
 
@@ -196,8 +196,8 @@
   width: var(--launch-art-size);
   height: var(--launch-art-size);
   overflow: hidden;
-  color: #2563eb;
-  background: linear-gradient(145deg, #eff6ff 0%, #dbeafe 100%);
+  color: var(--color-primary);
+  background: linear-gradient(145deg, var(--color-login-hover) 0%, var(--color-primary-tint) 100%);
   border-radius: 9px;
 }
 
@@ -205,7 +205,7 @@
   position: absolute;
   inset: 9px;
   content: "";
-  background: rgba(37, 99, 235, 0.1);
+  background: var(--color-primary-alpha-10);
   border-radius: 12px;
   transform: rotate(-6deg);
 }
@@ -217,24 +217,24 @@
   width: 46px;
   height: 46px;
   content: "";
-  background: rgba(37, 99, 235, 0.14);
+  background: var(--color-primary-alpha-14);
   border-radius: 999px;
 }
 
 .launchArt svg {
   position: relative;
   z-index: 1;
-  filter: drop-shadow(0 10px 14px rgba(37, 99, 235, 0.22));
+  filter: drop-shadow(0 10px 14px var(--color-primary-alpha-22));
 }
 
 .launchArt.documents {
-  color: #2563eb;
-  background: linear-gradient(145deg, #eef5ff 0%, #dbeafe 100%);
+  color: var(--color-primary);
+  background: linear-gradient(145deg, var(--color-gradient-launch-b) 0%, var(--color-primary-tint) 100%);
 }
 
 .launchArt.chart {
-  color: #2563eb;
-  background: linear-gradient(145deg, #eef6ff 0%, #e0edff 100%);
+  color: var(--color-primary);
+  background: linear-gradient(145deg, var(--color-gradient-launch-c) 0%, var(--color-gradient-launch-d) 100%);
 }
 
 .launchBody {
@@ -256,7 +256,7 @@
 
 .launchHead h3 {
   margin: 0;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(12px, 1.72vh, 15px);
   font-weight: 800;
   line-height: 1.25;
@@ -269,8 +269,8 @@
   gap: 5px;
   height: clamp(18px, 2.6vh, 22px);
   padding: 0 8px;
-  color: #16a34a;
-  background: #eaf8ef;
+  color: var(--color-success);
+  background: var(--color-green-soft);
   border-radius: 999px;
   font-size: clamp(9px, 1.25vh, 11px);
   font-weight: 800;
@@ -287,7 +287,7 @@
 .launchBody p {
   max-width: calc(100% - 92px);
   margin: 0;
-  color: #475569;
+  color: var(--color-text-secondary);
   font-size: clamp(10px, 1.5vh, 12px);
   font-weight: 500;
   line-height: 1.45;
@@ -301,18 +301,18 @@
   min-width: clamp(74px, 10.4vh, 88px);
   height: clamp(27px, 4vh, 32px);
   padding: 0 14px;
-  color: #ffffff;
-  background: #006ee6;
+  color: var(--color-surface);
+  background: var(--color-cta);
   border: 0;
   border-radius: 6px;
-  box-shadow: 0 5px 10px rgba(0, 110, 230, 0.24);
+  box-shadow: 0 5px 10px var(--color-cta-alpha-24);
   font-size: clamp(10px, 1.42vh, 12px);
   font-weight: 800;
   line-height: 1;
 }
 
 .launchBody button:hover {
-  background: #005fd1;
+  background: var(--color-cta-hover);
 }
 
 .bottomGrid {
@@ -324,10 +324,10 @@
 .tasksPanel,
 .activityPanel {
   overflow: hidden;
-  background: #ffffff;
-  border: 1px solid #edf1f6;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 9px 22px var(--shadow-lg);
 }
 
 .tasksPanel {
@@ -343,7 +343,7 @@
 .tasksPanel h2,
 .activityPanel h2 {
   margin: 0;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(13px, 1.9vh, 16px);
   font-weight: 800;
   line-height: 1.25;
@@ -363,14 +363,14 @@
 
 .tasksHead {
   height: clamp(24px, 3.3vh, 29px);
-  color: #94a3b8;
+  color: var(--color-placeholder);
   font-size: clamp(10px, 1.35vh, 12px);
   font-weight: 800;
 }
 
 .taskRow {
   height: var(--task-row-height);
-  border-top: 1px solid #eef2f7;
+  border-top: 1px solid var(--color-border-soft);
 }
 
 .taskName {
@@ -384,7 +384,7 @@
 .taskAgent,
 .taskTime {
   overflow: hidden;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(11px, 1.45vh, 12px);
   font-weight: 800;
   line-height: 1.2;
@@ -394,7 +394,7 @@
 
 .taskAgent,
 .taskTime {
-  color: #334155;
+  color: var(--color-slate);
   font-weight: 700;
 }
 
@@ -409,18 +409,18 @@
 
 .taskIcon.needs_clarification,
 .taskIcon.running {
-  color: #2563eb;
-  background: #eaf2ff;
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
 }
 
 .taskIcon.completed {
-  color: #16a34a;
-  background: #eaf8ef;
+  color: var(--color-success);
+  background: var(--color-green-soft);
 }
 
 .taskIcon.approval {
-  color: #7c3aed;
-  background: #f2edff;
+  color: var(--color-violet);
+  background: var(--color-violet-soft);
 }
 
 .taskStatus {
@@ -437,23 +437,23 @@
 }
 
 .taskStatus.needs_clarification {
-  color: #d97706;
-  background: #fff3df;
+  color: var(--color-warning-dark);
+  background: var(--color-warning-surface);
 }
 
 .taskStatus.completed {
-  color: #16a34a;
-  background: #e9f9ef;
+  color: var(--color-success);
+  background: var(--color-success-surface);
 }
 
 .taskStatus.approval {
-  color: #2563eb;
-  background: #eaf2ff;
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
 }
 
 .taskStatus.running {
-  color: #2563eb;
-  background: #edf3ff;
+  color: var(--color-primary);
+  background: var(--color-info-surface);
 }
 
 .rowAction {
@@ -462,15 +462,15 @@
   width: 26px;
   height: 26px;
   padding: 0;
-  color: #64748b;
+  color: var(--color-muted);
   background: transparent;
   border: 0;
   border-radius: 999px;
 }
 
 .rowAction:hover {
-  color: #2563eb;
-  background: #f8fafc;
+  color: var(--color-primary);
+  background: var(--color-hover);
 }
 
 .panelLink {
@@ -480,8 +480,8 @@
   gap: 8px;
   height: 36px;
   margin: 1px -16px 0;
-  color: #2563eb;
-  border-top: 1px solid #eef2f7;
+  color: var(--color-primary);
+  border-top: 1px solid var(--color-border-soft);
   font-size: 12px;
   font-weight: 800;
   line-height: 1;
@@ -489,7 +489,7 @@
 }
 
 .panelLink:hover {
-  color: #1d4ed8;
+  color: var(--color-primary-hover);
 }
 
 .timeline {
@@ -507,7 +507,7 @@
   left: calc(38px + 8px + 9px + var(--timeline-dot-offset));
   width: 1px;
   content: "";
-  background: #e2e8f0;
+  background: var(--color-avatar-placeholder);
 }
 
 .activityItem {
@@ -528,23 +528,23 @@
 }
 
 .activityIcon.green {
-  color: #16a34a;
-  background: #def8e7;
+  color: var(--color-success);
+  background: var(--color-timeline-success);
 }
 
 .activityIcon.orange {
-  color: #f59e0b;
-  background: #fff0d9;
+  color: var(--color-warning);
+  background: var(--color-timeline-warning);
 }
 
 .activityIcon.blue {
-  color: #2563eb;
-  background: #e5f0ff;
+  color: var(--color-primary);
+  background: var(--color-info-surface-strong);
 }
 
 .activityIcon.violet {
-  color: #7c3aed;
-  background: #f0e8ff;
+  color: var(--color-violet);
+  background: var(--color-violet-surface);
 }
 
 .timelineDot {
@@ -553,24 +553,24 @@
   justify-self: center;
   width: var(--timeline-dot-size);
   height: var(--timeline-dot-size);
-  background: #cbd5e1;
-  border: 2px solid #ffffff;
+  background: var(--color-border-strong);
+  border: 2px solid var(--color-surface);
   border-radius: 999px;
   transform: translateX(var(--timeline-dot-offset));
 }
 
 .activityItem:first-child .timelineDot {
-  background: #def8e7;
+  background: var(--color-timeline-success);
 }
 
 .activityItem:first-child .timelineDot {
-  background: #def8e7;
+  background: var(--color-timeline-success);
 }
 
 .activityItem h3 {
   margin: 0 0 3px;
   overflow: hidden;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(11px, 1.55vh, 13px);
   font-weight: 800;
   line-height: 1.2;
@@ -580,7 +580,7 @@
 
 .activityItem p {
   margin: 0;
-  color: #64748b;
+  color: var(--color-muted);
   font-size: clamp(10px, 1.4vh, 12px);
   font-weight: 600;
   line-height: 1.15;
@@ -593,16 +593,16 @@
   gap: 22px;
   min-height: var(--recommended-panel-height);
   padding: clamp(11px, 1.55vh, 14px) 16px;
-  background: #ffffff;
-  border: 1px solid #edf1f6;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
-  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 9px 22px var(--shadow-lg);
 }
 
 .recommendedPanel h2 {
   flex: 0 0 auto;
   margin: 0;
-  color: #172033;
+  color: var(--color-text);
   font-size: clamp(13px, 1.9vh, 16px);
   font-weight: 800;
   line-height: 1.25;
@@ -629,9 +629,9 @@
   height: clamp(42px, 5.8vh, 48px);
   padding: 0 14px 0 5px;
   overflow: hidden;
-  color: #172033;
-  background: #ffffff;
-  border: 1px solid #e8edf3;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-card);
   border-radius: 9px;
   text-decoration: none;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
@@ -645,8 +645,8 @@
 }
 
 .recommendedAction:hover {
-  border-color: #d7e3f4;
-  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border-color: var(--color-border-card-hover);
+  box-shadow: 0 4px 12px var(--color-shadow-06);
 }
 
 .recommendedIconSlot {
@@ -673,30 +673,30 @@
 }
 
 .recommendedIcon.blue {
-  color: #2563eb;
-  background: #eaf2ff;
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
 }
 
 .recommendedIconTraveling.blue {
-  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+  box-shadow: 0 4px 14px var(--color-primary-alpha-28);
 }
 
 .recommendedIcon.green {
-  color: #16a34a;
-  background: #eaf8ef;
+  color: var(--color-success);
+  background: var(--color-green-soft);
 }
 
 .recommendedIconTraveling.green {
-  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.24);
+  box-shadow: 0 4px 14px var(--color-success-alpha-24);
 }
 
 .recommendedIcon.violet {
-  color: #7c3aed;
-  background: #f2edff;
+  color: var(--color-violet);
+  background: var(--color-violet-soft);
 }
 
 .recommendedIconTraveling.violet {
-  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.26);
+  box-shadow: 0 4px 14px var(--color-violet-alpha-26);
 }
 
 @keyframes recommendedIconTravel {
@@ -722,7 +722,7 @@
 
 .recommendedChevron {
   flex: 0 0 auto;
-  color: #64748b;
+  color: var(--color-muted);
 }
 
 @media (prefers-reduced-motion: reduce) {
