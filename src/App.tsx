@@ -6,6 +6,7 @@ import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
 import Tasks from "./pages/Tasks";
 import KnowledgeBase from "./pages/KnowledgeBase";
+import KnowledgeBaseCreate from "./pages/KnowledgeBaseCreate";
 import Documents from "./pages/Documents";
 import Monitoring from "./pages/Monitoring";
 import Login from "./pages/Login";
@@ -28,6 +29,7 @@ export default function App() {
       <Route path="/agents" element={<ProtectedRoute><Layout title="Агенты"><Agents /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />
+      <Route path="/knowledge-base/create" element={<ProtectedRoute><Layout title="Создание базы знаний"><KnowledgeBaseCreate /></Layout></ProtectedRoute>} />
       <Route path="/documents" element={<ProtectedRoute><Layout title="Документы"><Documents /></Layout></ProtectedRoute>} />
       <Route path="/users" element={<ProtectedRoute><Layout title="Пользователи"><Users /></Layout></ProtectedRoute>} />
       <Route path="/departments" element={<ProtectedRoute><Layout title="Подразделения"><Departments /></Layout></ProtectedRoute>} />

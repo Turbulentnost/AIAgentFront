@@ -181,12 +181,15 @@ export interface Document {
   original_filename: string | null;
   content_type: string | null;
   file_size: number | null;
+  department_id: string | null;
   document_type: DocumentType;
   processing_status: DocumentProcessingStatus;
   is_knowledge_base: boolean;
   is_indexed: boolean;
   text_extract_status: TextExtractStatus;
   version: number;
+  source_url?: string | null;
+  metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
 }
@@ -277,6 +280,7 @@ export interface KnowledgeBaseCreate {
   topic?: string | null;
   process_slug?: string | null;
   embedding_model?: string | null;
+  metadata?: Record<string, unknown> | null;
   access_grants: KnowledgeBaseAccessGrantInput[];
   source_document_ids?: string[];
 }

@@ -1,0 +1,527 @@
+.page {
+  display: grid;
+  gap: 16px;
+  width: min(1380px, calc(100vw - 72px));
+  min-width: 1040px;
+  margin: 0 auto;
+}
+
+.header {
+  display: grid;
+  gap: 12px;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.headerRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.header h1,
+.stepTitle h2,
+.summaryCard h2 {
+  margin: 0;
+  color: #172033;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.header h1 {
+  font-size: 24px;
+}
+
+.header p,
+.stepTitle p,
+.uploadBox p {
+  margin: 5px 0 0;
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.headerActions,
+.footerNav > div {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 330px;
+  gap: 14px;
+  align-items: start;
+}
+
+.stepsCard,
+.contentCard,
+.summaryCard,
+.footerNav {
+  background: #ffffff;
+  border: 1px solid #edf1f6;
+  border-radius: 12px;
+  box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+}
+
+.stepsCard {
+  display: grid;
+  gap: 6px;
+  min-height: 560px;
+  padding: 16px;
+}
+
+.stepsCard button {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+  padding: 12px 10px;
+  color: #475569;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.stepsCard button > span,
+.progressDots span {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  color: #64748b;
+  background: #f1f5f9;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.stepsCard strong {
+  display: block;
+  color: #172033;
+  font-size: 12px;
+}
+
+.stepsCard small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.stepsCard .activeStep {
+  background: #eff6ff;
+}
+
+.stepsCard .activeStep > span,
+.progressDots .doneDot {
+  color: #ffffff;
+  background: #2563eb;
+}
+
+.contentCard {
+  min-height: 560px;
+  padding: 18px;
+}
+
+.summaryCard {
+  min-height: 560px;
+  padding: 16px;
+}
+
+.stepBody {
+  display: grid;
+  gap: 16px;
+}
+
+.stepTitle {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.stepTitle > span {
+  display: grid;
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  color: #2563eb;
+  background: #eff6ff;
+  border-radius: 11px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.formGrid label,
+.processingGrid label {
+  display: grid;
+  gap: 7px;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.formGrid input,
+.formGrid select,
+.formGrid textarea,
+.sourceToolbar input,
+.sourceToolbar select,
+.processingGrid input,
+.uploadBox input,
+.agentGrid select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 11px;
+  color: #172033;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+  outline: none;
+}
+
+.formGrid textarea {
+  min-height: 88px;
+  padding: 10px 11px;
+  resize: vertical;
+}
+
+.wideField {
+  grid-column: 1 / -1;
+}
+
+.primaryButton,
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primaryButton {
+  color: #ffffff;
+  background: #2563eb;
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.18);
+}
+
+.secondaryButton {
+  color: #2563eb;
+  background: #eff6ff;
+}
+
+.primaryButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.infoCallout,
+.warningCallout {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.infoCallout {
+  color: #1e40af;
+  background: #eff6ff;
+}
+
+.warningCallout {
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.sourceToolbar {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) repeat(4, minmax(130px, 0.6fr));
+  gap: 9px;
+}
+
+.sourceToolbar label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 9px;
+}
+
+.sourceToolbar label input {
+  padding: 0;
+  border: 0;
+}
+
+.sourcesTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.sourcesTable th,
+.sourcesTable td {
+  padding: 10px 8px;
+  border-bottom: 1px solid #eef2f7;
+  color: #334155;
+  font-size: 11px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.sourcesTable th {
+  color: #64748b;
+  font-weight: 900;
+}
+
+.sourcesTable strong {
+  display: block;
+  color: #172033;
+  font-size: 12px;
+}
+
+.sourcesTable small {
+  color: #64748b;
+}
+
+.emptyCell {
+  padding: 22px;
+  color: #64748b;
+  text-align: center;
+}
+
+.uploadBox {
+  display: grid;
+  grid-template-columns: auto minmax(220px, 1fr) minmax(160px, 0.5fr) minmax(170px, 0.7fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #edf1f6;
+  border-radius: 11px;
+}
+
+.checkList {
+  display: grid;
+  gap: 10px;
+}
+
+.checkList article {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 10px;
+}
+
+.checkList strong {
+  display: block;
+  margin-bottom: 3px;
+}
+
+.checkList p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.check_ok {
+  color: #166534;
+  background: #f0fdf4;
+}
+
+.check_warning {
+  color: #92400e;
+  background: #fffbeb;
+}
+
+.check_error {
+  color: #991b1b;
+  background: #fef2f2;
+}
+
+.processingGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.toggleCard {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+}
+
+.toggleCard span {
+  display: grid;
+  gap: 3px;
+}
+
+.toggleCard small {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.accessModes {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.accessModes button {
+  min-height: 52px;
+  padding: 8px;
+  color: #475569;
+  background: #f8fafc;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.accessModes .selectedMode {
+  color: #2563eb;
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+
+.checkboxLine {
+  grid-column: 1 / -1;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.selectableList {
+  display: grid;
+  gap: 10px;
+}
+
+.selectableList h3,
+.summaryBlock h3 {
+  margin: 0;
+  color: #172033;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.selectableList > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+
+.selectableList label,
+.agentGrid article {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  background: #f8fafc;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+}
+
+.selectableList span,
+.agentGrid span {
+  display: grid;
+  gap: 3px;
+}
+
+.selectableList small,
+.agentGrid small {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.agentGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.agentGrid article {
+  display: grid;
+  grid-template-columns: 1fr 190px;
+}
+
+.agentGrid label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.selectedAgent {
+  border-color: #bfdbfe !important;
+  background: #eff6ff !important;
+}
+
+.previewGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.summaryBlock {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+}
+
+.summaryBlock div {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.75fr) minmax(0, 1fr);
+  gap: 10px;
+  color: #64748b;
+  font-size: 11px;
+}
+
+.summaryBlock strong {
+  overflow-wrap: anywhere;
+  color: #172033;
+  font-weight: 800;
+}
+
+.footerNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.progressDots {
+  display: flex;
+  gap: 42px;
+  align-items: center;
+}
