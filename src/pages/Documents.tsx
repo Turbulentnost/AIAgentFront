@@ -15,7 +15,6 @@ export default function Documents() {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState("");
   const [documentType, setDocumentType] = useState<DocumentType>("other");
-  const [isKnowledgeBase, setIsKnowledgeBase] = useState(false);
   const [uploaded, setUploaded] = useState<Document | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,8 +22,7 @@ export default function Documents() {
     mutationFn: () =>
       documentsApi.upload(file!, {
         title: title || undefined,
-        document_type: documentType,
-        is_knowledge_base: isKnowledgeBase
+        document_type: documentType
       }),
     onSuccess: (doc) => {
       setUploaded(doc);
@@ -49,7 +47,7 @@ export default function Documents() {
     <div className="grid two-columns">
       <form className="card form-card" onSubmit={handleSubmit}>
         <h2>Загрузка документа</h2>
-        <p>PDF, DOCX, XLSX — хранение в MinIO, индексация в Qdrant.</p>
+        <p>PDF, DOCX, XLSX — хранение исходных файлов в реестре документов. В базу знаний документ добавляется отдельно после обработки.</p>
         <input
           type="file"
           accept=".pdf,.doc,.docx,.xls,.xlsx"
@@ -64,10 +62,6 @@ export default function Documents() {
             </option>
           ))}
         </select>
-        <label>
-          <input type="checkbox" checked={isKnowledgeBase} onChange={(e) => setIsKnowledgeBase(e.target.checked)} />
-          {" "}Добавить в базу знаний
-        </label>
         {error && <div className="error">{error}</div>}
         <button disabled={uploadMutation.isPending}>{uploadMutation.isPending ? "Загружаем..." : "Загрузить"}</button>
       </form>
@@ -85,8 +79,8 @@ export default function Documents() {
             <dd>{uploaded.processing_status}</dd>
             <dt>Индексация</dt>
             <dd>{uploaded.is_indexed ? "Да" : "Нет"}</dd>
-            <dt>База знаний</dt>
-            <dd>{uploaded.is_knowledge_base ? "Да" : "Нет"}</dd>
+            <dt>Следующий шаг</dt>
+            <dd>Добавьте документ как источник в разделе «База знаний» после извлечения текста.</dd>
           </dl>
         )}
       </div>
