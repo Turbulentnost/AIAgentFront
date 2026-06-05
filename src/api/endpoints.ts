@@ -1,6 +1,5 @@
 import { apiClient } from "./client";
 import type {
-  AdminUserCreate,
   Agent,
   AgentAccess,
   ChunkSearchHit,
@@ -12,15 +11,12 @@ import type {
   HealthResponse,
   LoginPayload,
   Task,
-  TaskCompletingBatchCheckResponse,
-  TaskCompletingCheckResponse,
-  TaskCompletingTaskListResponse,
   TaskCreate,
   TaskResult,
   TaskStep,
   TokenResponse,
   User,
-  UserUpdate
+  UserCreate
 } from "@/types";
 
 export const healthApi = {
@@ -30,17 +26,13 @@ export const healthApi = {
 export const authApi = {
   login: (payload: LoginPayload) => apiClient.post<TokenResponse>("/auth/login", payload).then((r) => r.data),
   me: () => apiClient.get<User>("/auth/me").then((r) => r.data),
-  logout: () => apiClient.post("/auth/logout").then((r) => r.data)
-};
-export const adminUsersApi = {
-  list: () => apiClient.get<User[]>("/admin/users").then((r) => r.data),
-  create: (payload: AdminUserCreate) => apiClient.post<User>("/admin/users", payload).then((r) => r.data),
-  deactivate: (userId: string) => apiClient.post<User>(`/admin/users/${userId}/deactivate`).then((r) => r.data)
+  logout: () => apiClient.post("/auth/logout").then((r) => r.data),
+  register: (payload: UserCreate) => apiClient.post<User>("/auth/register", payload).then((r) => r.data)
 };
 export const usersApi = {
   list: () => apiClient.get<User[]>("/users").then((r) => r.data),
   get: (userId: string) => apiClient.get<User>(`/users/${userId}`).then((r) => r.data),
-  update: (userId: string, payload: UserUpdate) => apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
+  create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
   uploadAvatar: (userId: string, file: File) => {
     const formData = new FormData();
@@ -55,21 +47,6 @@ export const departmentsApi = {
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),
   available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data)
-};
-export const taskCompletingAgentApi = {
-  tasks: () => apiClient.get<TaskCompletingTaskListResponse>("/agents/task-compliting/tasks").then((r) => r.data),
-  checkTask: (taskId: string) =>
-    apiClient
-      .post<TaskCompletingCheckResponse>(`/agents/task-compliting/tasks/${taskId}/check`, undefined, {
-        timeout: 120000
-      })
-      .then((r) => r.data),
-  checkAll: () =>
-    apiClient
-      .post<TaskCompletingBatchCheckResponse>("/agents/task-compliting/tasks/check-all", undefined, {
-        timeout: 600000
-      })
-      .then((r) => r.data)
 };
 export const tasksApi = {
   list: (params?: { limit?: number; offset?: number }) =>

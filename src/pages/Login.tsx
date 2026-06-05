@@ -13,8 +13,8 @@ import {
   Scale,
   UserRound
 } from "lucide-react";
-import { Navigate, useNavigate } from "react-router-dom";
 import { AxiosError } from "axios";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import styles from "./Login.module.css";
 
@@ -76,9 +76,11 @@ export default function Login() {
   const emailId = useId();
   const passwordId = useId();
   const newPasswordId = useId();
+  const confirmPasswordId = useId();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("ru");
@@ -93,20 +95,24 @@ export default function Login() {
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    if (requiresPasswordChange && newPassword !== confirmPassword) {
+      setError("Новый пароль и подтверждение не совпадают");
+      return;
+    }
     setIsSubmitting(true);
     try {
       await login({
         email,
         password,
-        ...(requiresPasswordChange ? { new_password: newPassword } : {})
+        new_password: requiresPasswordChange ? newPassword : undefined
       });
       navigate("/", { replace: true });
     } catch (err) {
-      if (isPasswordChangeRequired(err)) {
+      if (err instanceof AxiosError && err.response?.status === 428) {
         setRequiresPasswordChange(true);
-        setError("Введите новый пароль для первого входа.");
+        setError("Для первого входа задайте новый пароль");
       } else {
-        setError(getLoginError(err));
+        setError(requiresPasswordChange ? "Не удалось изменить пароль" : "Неверный email или пароль");
       }
     } finally {
       setIsSubmitting(false);
@@ -320,13 +326,13 @@ export default function Login() {
             </label>
 
             <label className={styles.field} htmlFor={passwordId}>
-              <span>{requiresPasswordChange ? "Временный пароль" : "Пароль"}</span>
+              <span>Пароль</span>
               <div className={styles.inputShell}>
                 <LockKeyhole className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
                 <input
                   id={passwordId}
                   autoComplete="current-password"
-                  placeholder={requiresPasswordChange ? "Введите временный пароль" : "Введите пароль"}
+                  placeholder="Введите пароль"
                   type={isPasswordVisible ? "text" : "password"}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -348,22 +354,41 @@ export default function Login() {
             </label>
 
             {requiresPasswordChange && (
-              <label className={styles.field} htmlFor={newPasswordId}>
-                <span>Новый пароль</span>
-                <div className={styles.inputShell}>
-                  <LockKeyhole className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
-                  <input
-                    id={newPasswordId}
-                    autoComplete="new-password"
-                    minLength={8}
-                    placeholder="Введите новый пароль"
-                    type={isPasswordVisible ? "text" : "password"}
-                    value={newPassword}
-                    onChange={(event) => setNewPassword(event.target.value)}
-                    required
-                  />
-                </div>
-              </label>
+              <>
+                <label className={styles.field} htmlFor={newPasswordId}>
+                  <span>Новый пароль</span>
+                  <div className={styles.inputShell}>
+                    <LockKeyhole className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
+                    <input
+                      id={newPasswordId}
+                      autoComplete="new-password"
+                      minLength={8}
+                      placeholder="Задайте новый пароль"
+                      type={isPasswordVisible ? "text" : "password"}
+                      value={newPassword}
+                      onChange={(event) => setNewPassword(event.target.value)}
+                      required
+                    />
+                  </div>
+                </label>
+
+                <label className={styles.field} htmlFor={confirmPasswordId}>
+                  <span>Повторите новый пароль</span>
+                  <div className={styles.inputShell}>
+                    <LockKeyhole className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
+                    <input
+                      id={confirmPasswordId}
+                      autoComplete="new-password"
+                      minLength={8}
+                      placeholder="Повторите новый пароль"
+                      type={isPasswordVisible ? "text" : "password"}
+                      value={confirmPassword}
+                      onChange={(event) => setConfirmPassword(event.target.value)}
+                      required
+                    />
+                  </div>
+                </label>
+              </>
             )}
 
             <div className={styles.formMeta}>
@@ -380,7 +405,7 @@ export default function Login() {
             {error && <div className={styles.errorMessage}>{error}</div>}
 
             <button className={styles.submitButton} disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Входим..." : requiresPasswordChange ? "Сменить пароль и войти" : "Войти"}
+              {isSubmitting ? "Входим..." : requiresPasswordChange ? "Сохранить пароль и войти" : "Войти"}
             </button>
 
             <a className={styles.forgotLink} href="/login">
@@ -409,18 +434,4 @@ export default function Login() {
       </main>
     </div>
   );
-}
-
-function isPasswordChangeRequired(error: unknown): boolean {
-  if (!(error instanceof AxiosError)) return false;
-  return error.response?.status === 428 && error.response.data?.detail?.code === "password_change_required";
-}
-
-function getLoginError(error: unknown): string {
-  if (error instanceof AxiosError) {
-    const detail = error.response?.data?.detail;
-    if (typeof detail === "string") return detail;
-    if (typeof detail?.message === "string") return detail.message;
-  }
-  return "Неверный email или пароль";
 }

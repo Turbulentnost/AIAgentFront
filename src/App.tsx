@@ -12,7 +12,6 @@ import Login from "./pages/Login";
 import Profile from "./pages/Profile";
 import Users from "./pages/Users";
 import Departments from "./pages/Departments";
-import TaskCompletingAgent from "./pages/TaskCompletingAgent";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -27,7 +26,6 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Layout title="Дашборд"><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/agents" element={<ProtectedRoute><Layout title="Агенты"><Agents /></Layout></ProtectedRoute>} />
-      <Route path="/agents/task-compliting" element={<ProtectedRoute><Layout title="Агент контроля исполнения"><TaskCompletingAgent /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />
       <Route path="/documents" element={<ProtectedRoute><Layout title="Документы"><Documents /></Layout></ProtectedRoute>} />

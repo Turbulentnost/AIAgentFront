@@ -2,7 +2,6 @@ export type AgentStatus = "draft" | "testing" | "ope" | "refinement" | "active" 
 export type TaskStatus = "pending" | "planning" | "running" | "waiting_human" | "completed" | "completed_with_issues" | "failed" | "cancelled";
 export type TaskStepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
 export type DocumentType =
-  | "task_input"
   | "regulation"
   | "tz"
   | "pmi"
@@ -42,50 +41,6 @@ export interface AgentAccess extends Agent {
   can_view_results: boolean;
   can_approve: boolean;
   can_configure: boolean;
-}
-export interface TaskCompletingDatasetTask {
-  id: string;
-  document: string | null;
-  task: string | null;
-  task_name: string;
-  task_description: string | null;
-  executor: string | null;
-  created_at: string | null;
-  deadline: string | null;
-  is_completed: boolean;
-  completed_at: string | null;
-  color: string | null;
-  color_reason: string | null;
-  execution_result: { raw?: string | null } | null;
-  is_checked: boolean;
-  is_archived: boolean;
-  agent_check: Record<string, unknown> | null;
-}
-export interface TaskCompletingTaskListResponse {
-  active: TaskCompletingDatasetTask[];
-  archived: TaskCompletingDatasetTask[];
-  total: number;
-  unchecked_count: number;
-  archived_count: number;
-}
-export interface TaskCompletingCheckResponse {
-  task: TaskCompletingDatasetTask;
-  agent_result: Record<string, unknown>;
-  status: "archived" | "needs_review";
-  is_satisfactory: boolean;
-}
-export interface TaskCompletingBatchCheckItem {
-  task_id: string;
-  status: "archived" | "needs_review";
-  is_satisfactory: boolean;
-  agent_result: Record<string, unknown>;
-}
-export interface TaskCompletingBatchCheckResponse {
-  total: number;
-  batch_size: number;
-  archived_count: number;
-  needs_review_count: number;
-  items: TaskCompletingBatchCheckItem[];
 }
 export interface Task {
   id: string;
@@ -186,8 +141,6 @@ export interface User {
   must_change_password: boolean;
   department_id: string | null;
   role_id: string | null;
-  avatar_bucket: string | null;
-  avatar_object_name: string | null;
   avatar_url: string | null;
   last_login_at: string | null;
   created_at: string;
@@ -204,36 +157,6 @@ export interface UserCreate {
   position?: string;
   department_id?: string | null;
   role_id?: string | null;
-}
-export interface UserAgentGrantCreate {
-  agent_id: string;
-  access_level?: string;
-  can_run?: boolean;
-  can_view_results?: boolean;
-  can_approve?: boolean;
-  can_configure?: boolean;
-  expires_at?: string | null;
-}
-export interface AdminUserCreate extends UserCreate {
-  is_active?: boolean;
-  is_verified?: boolean;
-  is_superuser?: boolean;
-  must_change_password?: boolean;
-  agent_access?: UserAgentGrantCreate[];
-}
-export interface UserUpdate {
-  email?: string;
-  username?: string | null;
-  last_name?: string | null;
-  first_name?: string | null;
-  middle_name?: string | null;
-  full_name?: string | null;
-  phone?: string | null;
-  position?: string | null;
-  department_id?: string | null;
-  role_id?: string | null;
-  is_active?: boolean;
-  is_verified?: boolean;
 }
 export interface Department {
   id: string;

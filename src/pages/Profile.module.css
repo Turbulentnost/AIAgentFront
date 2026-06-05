@@ -287,14 +287,6 @@
   text-align: center;
 }
 
-.errorMessage {
-  grid-column: 1 / -1;
-  color: #dc2626;
-  font-size: 12px;
-  font-weight: 800;
-  text-align: center;
-}
-
 .infoCard {
   min-height: 190px;
   padding: 18px 26px;
@@ -317,38 +309,6 @@
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 13px 44px;
   margin: 18px 0 0;
-}
-
-.editForm {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 18px;
-  margin-top: 18px;
-}
-
-.editForm label {
-  display: grid;
-  gap: 7px;
-  color: #475569;
-  font-size: 12px;
-  font-weight: 800;
-}
-
-.editForm input {
-  width: 100%;
-  min-width: 0;
-  height: 36px;
-  padding: 0 12px;
-  color: #172033;
-  background: #ffffff;
-  border: 1px solid #dbe6f6;
-  border-radius: 8px;
-  font: inherit;
-  font-weight: 650;
-}
-
-.editForm button {
-  justify-self: start;
 }
 
 .infoGrid div {

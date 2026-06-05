@@ -14,23 +14,22 @@ import {
 } from "lucide-react";
 import { useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import { agentsApi, taskCompletingAgentApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
   dashboardActivities,
   dashboardStats,
   dashboardSummary,
+  quickLaunchAgents,
   recentTasks,
   recommendedActions
 } from "@/mock-data/dashboard";
 import type {
   DashboardActivity,
   DashboardStatCard,
+  QuickLaunchAgent,
   RecentTask,
   RecommendedAction
 } from "@/mock-data/dashboard";
-import type { AgentAccess } from "@/types";
 import styles from "./Dashboard.module.css";
 
 const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
@@ -38,6 +37,12 @@ const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
   clipboard: ClipboardCheck,
   warning: TriangleAlert,
   check: CheckCircle2
+};
+
+const launchIcons: Record<QuickLaunchAgent["icon"], typeof ClipboardCheck> = {
+  clipboard: ClipboardCheck,
+  documents: Files,
+  chart: BarChart3
 };
 
 const taskIcons: Record<RecentTask["icon"], typeof ClipboardCheck> = {
@@ -59,8 +64,6 @@ const recommendedIcons: Record<RecommendedAction["icon"], typeof ClipboardCheck>
   book: BookOpen
 };
 
-const RECOMMENDED_SWEEP_MS = 580;
-
 function getGreetingName(user: ReturnType<typeof useAuth>["user"]) {
   if (!user) return "пользователь";
   const firstName = user.first_name?.trim();
@@ -74,49 +77,13 @@ function getGreetingName(user: ReturnType<typeof useAuth>["user"]) {
   return user.username || user.email;
 }
 
-function iconForAgent(agent: AgentAccess) {
-  if (agent.slug === "task_compliting_agent") return ClipboardCheck;
-  if (agent.slug.includes("document") || agent.slug.includes("nd")) return Files;
-  if (agent.slug.includes("report") || agent.slug.includes("analytics")) return BarChart3;
-  return Bot;
-}
-
-function routeForAgent(agent: AgentAccess) {
-  if (agent.slug === "task_compliting_agent") return "/agents/task-compliting";
-  return "/agents";
-}
+const RECOMMENDED_SWEEP_MS = 580;
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const [expandingAgentId, setExpandingAgentId] = useState<string | null>(null);
-  const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
   const greetingName = getGreetingName(user);
-
-  const { data: availableAgents = [], isPending: isAgentsPending } = useQuery({
-    queryKey: ["agents", "available"],
-    queryFn: agentsApi.available
-  });
-  const { data: taskCompletingSummary } = useQuery({
-    queryKey: ["task-compliting", "tasks", "summary"],
-    queryFn: taskCompletingAgentApi.tasks,
-    enabled: availableAgents.some((agent) => agent.slug === "task_compliting_agent")
-  });
-
-  const activeReviewTasks = taskCompletingSummary?.active.length ?? dashboardSummary.reviewRequired;
-  const completedByAgent = taskCompletingSummary?.archived_count ?? dashboardSummary.completed;
-  const stats: DashboardStatCard[] = dashboardStats.map((stat) => {
-    if (stat.id === "agents") return { ...stat, value: availableAgents.length };
-    if (stat.id === "decisions") return { ...stat, value: activeReviewTasks };
-    if (stat.id === "completed") return { ...stat, value: completedByAgent };
-    if (stat.id === "tasks") return { ...stat, value: taskCompletingSummary?.total ?? dashboardSummary.activeTasks };
-    return stat;
-  });
-
-  function handleLaunch(agent: AgentAccess) {
-    setExpandingAgentId(agent.id);
-    window.setTimeout(() => navigate(routeForAgent(agent)), 520);
-  }
+  const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
 
   function handleRecommendedClick(action: RecommendedAction, event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -131,17 +98,16 @@ export default function Dashboard() {
 
   return (
     <section className={styles.dashboard} aria-labelledby="dashboard-title">
-      {expandingAgentId && <div className={styles.launchOverlay} aria-hidden="true" />}
       <div className={styles.hero}>
         <h1 id="dashboard-title">Добро пожаловать, {greetingName}</h1>
         <p>
-          Сегодня: {taskCompletingSummary?.total ?? dashboardSummary.activeTasks} задач в доступных агентских сценариях,{" "}
-          {activeReviewTasks} требуют проверки, {completedByAgent} в архиве
+          Сегодня: {dashboardSummary.activeTasks} активные задачи, {dashboardSummary.reviewRequired} требуют
+          проверки, {dashboardSummary.completed} завершена
         </p>
       </div>
 
       <div className={styles.statsGrid} aria-label="Сводка по задачам и агентам">
-        {stats.map((stat) => {
+        {dashboardStats.map((stat) => {
           const Icon = statIcons[stat.icon];
 
           return (
@@ -165,36 +131,26 @@ export default function Dashboard() {
       </div>
 
       <section className={styles.quickLaunch} aria-labelledby="quick-launch-title">
-        <h2 id="quick-launch-title">Быстрый запуск ({availableAgents.length})</h2>
+        <h2 id="quick-launch-title">Быстрый запуск</h2>
         <div className={styles.launchGrid}>
-          {isAgentsPending && <article className={styles.launchCard}>Загружаем агентов...</article>}
-          {!isAgentsPending && !availableAgents.length && (
-            <article className={styles.launchCard}>Нет агентов, доступных текущему пользователю.</article>
-          )}
-          {availableAgents.map((agent) => {
-            const Icon = iconForAgent(agent);
+          {quickLaunchAgents.map((agent) => {
+            const Icon = launchIcons[agent.icon];
 
             return (
               <article className={styles.launchCard} key={agent.id}>
-                <div className={`${styles.launchArt} ${styles.documents}`}>
+                <div className={`${styles.launchArt} ${styles[agent.icon]}`}>
                   <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
                 </div>
                 <div className={styles.launchBody}>
                   <div className={styles.launchHead}>
-                    <h3>{agent.name}</h3>
+                    <h3>{agent.title}</h3>
                     <span className={styles.status}>
                       <span aria-hidden="true" />
                       Активен
                     </span>
                   </div>
-                  <p>{agent.purpose || agent.slug}</p>
-                  <button
-                    type="button"
-                    onClick={() => handleLaunch(agent)}
-                    disabled={!agent.can_run || expandingAgentId === agent.id}
-                  >
-                    {expandingAgentId === agent.id ? "Открываем..." : "Запустить"}
-                  </button>
+                  <p>{agent.description}</p>
+                  <button type="button">Запустить</button>
                 </div>
               </article>
             );

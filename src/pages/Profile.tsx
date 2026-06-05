@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { ChangeEvent, useMemo, useRef, useState } from "react";
 import {
   BriefcaseBusiness,
   Building2,
@@ -14,7 +14,6 @@ import {
   Monitor,
   Phone,
   Play,
-  Save,
   ShieldCheck,
   ShoppingCart,
   Trophy,
@@ -24,7 +23,6 @@ import {
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
-import { AxiosError } from "axios";
 import { agentsApi, departmentsApi, tasksApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
@@ -35,33 +33,8 @@ import {
   roleNameById
 } from "@/mock-data/profile";
 import type { ProfileActivityItem, ProfileAgentCard, ProfileAgentIcon } from "@/mock-data/profile";
-import type { AgentAccess, Task, UserUpdate } from "@/types";
+import type { AgentAccess, Task } from "@/types";
 import styles from "./Profile.module.css";
-
-const AVATAR_MAX_SIZE_BYTES = 5 * 1024 * 1024;
-const AVATAR_ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-
-interface ProfileFormState {
-  email: string;
-  username: string;
-  last_name: string;
-  first_name: string;
-  middle_name: string;
-  full_name: string;
-  phone: string;
-  position: string;
-}
-
-const emptyForm: ProfileFormState = {
-  email: "",
-  username: "",
-  last_name: "",
-  first_name: "",
-  middle_name: "",
-  full_name: "",
-  phone: "",
-  position: ""
-};
 
 const agentIcons: Record<ProfileAgentIcon, typeof FileText> = {
   document: FileText,
@@ -118,11 +91,6 @@ function accessLabel(agent: AgentAccess) {
   return "Просмотр";
 }
 
-function routeForAgent(agent: AgentAccess) {
-  if (agent.slug === "task_compliting_agent") return "/agents/task-compliting";
-  return "/agents";
-}
-
 function toneForIndex(index: number): ProfileAgentCard["tone"] {
   return (["blue", "green", "violet", "orange", "slate"] as const)[index] ?? "blue";
 }
@@ -139,7 +107,7 @@ function toProfileAgent(agent: AgentAccess, index: number): ProfileAgentCard {
     tone: toneForIndex(index),
     icon: iconForIndex(index),
     accessLabel: accessLabel(agent),
-    href: routeForAgent(agent),
+    href: "/agents",
     isLocked: !agent.can_run && !agent.can_view_results
   };
 }
@@ -159,33 +127,9 @@ function toActivityFromTask(task: Task, index: number): ProfileActivityItem {
 export default function Profile() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [form, setForm] = useState<ProfileFormState>(emptyForm);
   const [message, setMessage] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCameraBouncing, setIsCameraBouncing] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
-
-  useEffect(() => {
-    if (!user) return;
-    setForm({
-      email: user.email,
-      username: user.username ?? "",
-      last_name: user.last_name ?? "",
-      first_name: user.first_name ?? "",
-      middle_name: user.middle_name ?? "",
-      full_name: user.full_name ?? "",
-      phone: user.phone ?? "",
-      position: user.position ?? ""
-    });
-  }, [user]);
-
-  useEffect(() => {
-    return () => {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    };
-  }, [avatarPreview]);
 
   const departmentsQuery = useQuery({
     queryKey: ["departments"],
@@ -205,40 +149,13 @@ export default function Profile() {
     enabled: Boolean(user)
   });
 
-  const updateProfileMutation = useMutation({
-    mutationFn: (payload: UserUpdate) => usersApi.update(user!.id, payload),
-    onSuccess: async (updatedUser) => {
-      setMessage("Профиль обновлён");
-      setError(null);
-      setIsEditing(false);
-      queryClient.setQueryData(["auth", "me"], updatedUser);
-      await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-    },
-    onError: (err) => {
-      setMessage(null);
-      setError(getApiErrorMessage(err, "Не удалось обновить профиль"));
-    }
-  });
-
   const uploadMutation = useMutation({
     mutationFn: (file: File) => usersApi.uploadAvatar(user!.id, file),
-    onSuccess: async (updatedUser) => {
+    onSuccess: async () => {
       setMessage("Аватар обновлён");
-      setError(null);
-      if (avatarPreview) {
-        URL.revokeObjectURL(avatarPreview);
-        setAvatarPreview(null);
-      }
-      queryClient.setQueryData(["auth", "me"], updatedUser);
       await queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
-    },
-    onError: (err) => {
-      setMessage(null);
-      setError(getApiErrorMessage(err, "Не удалось загрузить аватар"));
     }
   });
-
-  const avatarSrc = useMemo(() => avatarPreview || user?.avatar_url || null, [avatarPreview, user?.avatar_url]);
 
   if (!user) return <div className="card">Профиль не загружен</div>;
 
@@ -268,38 +185,9 @@ export default function Profile() {
     return [...fromApi, ...mockProfileActivities.slice(fromApi.length)].slice(0, 3);
   }, [tasksQuery.data]);
 
-  function handleFieldChange(field: keyof ProfileFormState, value: string) {
-    setForm((current) => ({ ...current, [field]: value }));
-  }
-
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setMessage(null);
-    setError(null);
-    updateProfileMutation.mutate(toUserUpdate(form));
-  }
-
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
-    if (!file) return;
-    setMessage(null);
-    setError(null);
-
-    if (!AVATAR_ALLOWED_TYPES.includes(file.type)) {
-      setError("Можно загрузить только JPEG, PNG или WEBP");
-      event.target.value = "";
-      return;
-    }
-
-    if (file.size > AVATAR_MAX_SIZE_BYTES) {
-      setError("Размер аватара не должен превышать 5 МБ");
-      event.target.value = "";
-      return;
-    }
-
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    setAvatarPreview(URL.createObjectURL(file));
-    uploadMutation.mutate(file);
+    if (file) uploadMutation.mutate(file);
   }
 
   function handleCameraClick() {
@@ -315,17 +203,17 @@ export default function Profile() {
           <h1 id="profile-title">Профиль пользователя</h1>
           <p>Управление учетной записью, доступами и персональными настройками</p>
         </div>
-        <button className={styles.editButton} type="button" onClick={() => setIsEditing((current) => !current)}>
+        <button className={styles.editButton} type="button">
           <Edit3 size={18} strokeWidth={2.2} aria-hidden="true" />
-          {isEditing ? "Скрыть форму" : "Редактировать профиль"}
+          Редактировать профиль
         </button>
       </div>
 
       <div className={styles.topGrid}>
         <article className={`${styles.card} ${styles.identityCard}`}>
           <div className={styles.avatarWrap}>
-            {avatarSrc ? (
-              <img className={styles.avatar} src={avatarSrc} alt="" />
+            {user.avatar_url ? (
+              <img className={styles.avatar} src={user.avatar_url} alt="" />
             ) : (
               <span className={styles.avatarFallback}>{initials}</span>
             )}
@@ -362,16 +250,14 @@ export default function Profile() {
             ref={fileInputRef}
             className={styles.fileInput}
             type="file"
-            accept={AVATAR_ALLOWED_TYPES.join(",")}
+            accept="image/png,image/jpeg,image/webp"
             onChange={handleFileChange}
-            disabled={uploadMutation.isPending}
           />
           <button className={styles.uploadButton} type="button" onClick={() => fileInputRef.current?.click()}>
             <Upload size={18} strokeWidth={2.1} aria-hidden="true" />
             {uploadMutation.isPending ? "Загрузка..." : "Загрузить новое фото"}
           </button>
           {message && <div className={styles.successMessage}>{message}</div>}
-          {error && <div className={styles.errorMessage}>{error}</div>}
         </article>
 
         <article className={`${styles.card} ${styles.infoCard}`}>
@@ -441,50 +327,6 @@ export default function Profile() {
           </dl>
         </article>
       </div>
-
-      {isEditing && (
-        <article className={`${styles.card} ${styles.infoCard}`}>
-          <h2>Редактирование данных</h2>
-          <form className={styles.editForm} onSubmit={handleSubmit}>
-            <label>
-              Email
-              <input type="email" value={form.email} onChange={(event) => handleFieldChange("email", event.target.value)} required />
-            </label>
-            <label>
-              Логин
-              <input value={form.username} onChange={(event) => handleFieldChange("username", event.target.value)} />
-            </label>
-            <label>
-              Фамилия
-              <input value={form.last_name} onChange={(event) => handleFieldChange("last_name", event.target.value)} />
-            </label>
-            <label>
-              Имя
-              <input value={form.first_name} onChange={(event) => handleFieldChange("first_name", event.target.value)} />
-            </label>
-            <label>
-              Отчество
-              <input value={form.middle_name} onChange={(event) => handleFieldChange("middle_name", event.target.value)} />
-            </label>
-            <label>
-              Полное имя
-              <input value={form.full_name} onChange={(event) => handleFieldChange("full_name", event.target.value)} />
-            </label>
-            <label>
-              Телефон
-              <input value={form.phone} onChange={(event) => handleFieldChange("phone", event.target.value)} />
-            </label>
-            <label>
-              Должность
-              <input value={form.position} onChange={(event) => handleFieldChange("position", event.target.value)} />
-            </label>
-            <button className={styles.editButton} type="submit" disabled={updateProfileMutation.isPending}>
-              <Save size={18} strokeWidth={2.1} aria-hidden="true" />
-              {updateProfileMutation.isPending ? "Сохраняем..." : "Сохранить профиль"}
-            </button>
-          </form>
-        </article>
-      )}
 
       <section className={`${styles.card} ${styles.agentsPanel}`} aria-labelledby="profile-agents-title">
         <div className={styles.sectionHead}>
@@ -572,31 +414,4 @@ export default function Profile() {
       </div>
     </section>
   );
-}
-
-function toUserUpdate(form: ProfileFormState): UserUpdate {
-  return {
-    email: form.email.trim(),
-    username: nullable(form.username),
-    last_name: nullable(form.last_name),
-    first_name: nullable(form.first_name),
-    middle_name: nullable(form.middle_name),
-    full_name: nullable(form.full_name),
-    phone: nullable(form.phone),
-    position: nullable(form.position)
-  };
-}
-
-function nullable(value: string): string | null {
-  const trimmed = value.trim();
-  return trimmed ? trimmed : null;
-}
-
-function getApiErrorMessage(error: unknown, fallback: string): string {
-  if (error instanceof AxiosError) {
-    const detail = error.response?.data?.detail;
-    if (typeof detail === "string") return detail;
-    if (Array.isArray(detail)) return detail.map((item) => item?.msg || String(item)).join("; ");
-  }
-  return fallback;
 }
