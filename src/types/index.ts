@@ -206,4 +206,206 @@ export interface ChunkSearchHit {
 export interface ChunkSearchQuery {
   query: string;
   top_k?: number;
+  knowledge_base_id?: string;
+  agent_id?: string;
+}
+
+export type KnowledgeBaseStatus = "draft" | "processing" | "needs_review" | "ready" | "updating" | "error" | "archived";
+export type KnowledgeBaseSourceStatus = KnowledgeBaseStatus;
+export type KnowledgeBaseAccessType =
+  | "read"
+  | "search"
+  | "use_via_agent"
+  | "manage_sources"
+  | "reindex"
+  | "manage_access"
+  | "admin";
+export type KnowledgeBaseGrantType = "user" | "department" | "agent" | "admin_only";
+export type KnowledgeBaseAgentAccessMode = "search_only" | "search_and_cite" | "decision" | "auto_action";
+export type KnowledgeBaseIndexJobType = "full" | "source" | "chunk" | "embeddings" | "access_reindex";
+export type KnowledgeBaseIndexJobStatus = "queued" | "running" | "completed" | "failed" | "partial";
+
+export interface KnowledgeBase {
+  id: string;
+  name: string;
+  description: string | null;
+  department_id: string | null;
+  owner_user_id: string | null;
+  responsible_user_id: string | null;
+  topic: string | null;
+  process_slug: string | null;
+  status: KnowledgeBaseStatus;
+  embedding_model: string | null;
+  vector_store: string;
+  qdrant_collection: string;
+  last_indexed_at: string | null;
+  is_public: boolean;
+  sources_count: number;
+  fragments_count: number;
+  storage_bytes: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseStats {
+  total_bases: number;
+  active_bases: number;
+  documents_in_bases: number;
+  fragments_count: number;
+  storage_bytes: number;
+  successful_indexing_percent: number;
+  errors_count: number;
+  needs_review_count: number;
+}
+
+export interface KnowledgeBaseAccessGrantInput {
+  grantee_type: KnowledgeBaseGrantType;
+  grantee_id?: string | null;
+  access_type: KnowledgeBaseAccessType;
+  include_child_departments?: boolean;
+  expires_at?: string | null;
+  reason?: string | null;
+  comment?: string | null;
+  responsible_user_id?: string | null;
+}
+
+export interface KnowledgeBaseCreate {
+  name: string;
+  description?: string | null;
+  department_id?: string | null;
+  responsible_user_id?: string | null;
+  topic?: string | null;
+  process_slug?: string | null;
+  embedding_model?: string | null;
+  access_grants: KnowledgeBaseAccessGrantInput[];
+  source_document_ids?: string[];
+}
+
+export interface KnowledgeBaseSource {
+  id: string;
+  knowledge_base_id: string;
+  document_id: string;
+  document_version_id: string;
+  added_by_user_id: string | null;
+  added_at: string;
+  processing_status: KnowledgeBaseSourceStatus;
+  last_indexed_at: string | null;
+  fragments_count: number;
+  file_size: number | null;
+  access_snapshot: Record<string, unknown> | null;
+  document_title?: string | null;
+  original_filename?: string | null;
+  extension?: string | null;
+  department_id?: string | null;
+  linked_agents_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseChunk {
+  id: string;
+  knowledge_base_id: string;
+  source_id: string;
+  document_chunk_id: string;
+  is_excluded_from_search: boolean;
+  exclusion_reason: string | null;
+  indexed_at: string | null;
+  embedding_status: string;
+  clause_number: string | null;
+  fragment_type: string | null;
+  access_snapshot: Record<string, unknown> | null;
+  text?: string | null;
+  document_id?: string | null;
+  document_title?: string | null;
+  page_number?: number | null;
+  section_title?: string | null;
+}
+
+export interface KnowledgeBaseRule {
+  id: string;
+  knowledge_base_id: string;
+  text: string;
+  scope: string | null;
+  condition: string | null;
+  agent_action: string | null;
+  priority: number;
+  status: string;
+  responsible_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseAgentBinding {
+  id: string;
+  knowledge_base_id: string;
+  agent_id: string;
+  access_mode: KnowledgeBaseAgentAccessMode;
+  expires_at: string | null;
+  is_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseAgentBindingInput {
+  agent_id: string;
+  access_mode: KnowledgeBaseAgentAccessMode;
+  expires_at?: string | null;
+  is_enabled?: boolean;
+}
+
+export interface KnowledgeBaseIndexingJob {
+  id: string;
+  knowledge_base_id: string;
+  job_type: KnowledgeBaseIndexJobType;
+  status: KnowledgeBaseIndexJobStatus;
+  target_source_id: string | null;
+  processed_sources_count: number;
+  created_fragments_count: number;
+  updated_fragments_count: number;
+  errors_count: number;
+  duration_ms: number | null;
+  started_by_user_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  embedding_model: string | null;
+  vector_store: string;
+  qdrant_collection: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseIndexingError {
+  id: string;
+  job_id: string;
+  knowledge_base_id: string;
+  source_id: string | null;
+  error_type: string;
+  technical_message: string | null;
+  user_message: string | null;
+  recommended_action: string | null;
+  is_resolved: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface KnowledgeBaseSearchHit {
+  content: string;
+  score: number;
+  accessible: boolean;
+  access_reason: string;
+  knowledge_base_id: string;
+  knowledge_base_chunk_id: string | null;
+  document_id: string | null;
+  document_version_id: string | null;
+  chunk_id: string | null;
+  document_title: string | null;
+  page_number: number | null;
+  section_title: string | null;
+  clause_number: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface KnowledgeBaseTestSearchResponse {
+  hits: KnowledgeBaseSearchHit[];
+  answer_preview: string | null;
 }
