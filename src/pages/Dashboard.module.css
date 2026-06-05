@@ -2,13 +2,15 @@
   --dashboard-gap: clamp(12px, 2vh, 18px);
   --stat-card-height: clamp(62px, 10.6vh, 82px);
   --stat-icon-size: clamp(38px, 5.9vh, 46px);
-  --launch-card-height: clamp(100px, 17vh, 132px);
-  --launch-art-size: clamp(70px, 12.2vh, 96px);
-  --bottom-panel-height: clamp(214px, 32vh, 252px);
-  --task-row-height: clamp(27px, 4.25vh, 34px);
-  --activity-icon-size: clamp(34px, 5.6vh, 44px);
-  --activity-row-height: clamp(31px, 4.9vh, 39px);
-  --recommended-panel-height: clamp(78px, 11vh, 88px);
+  --launch-card-height: clamp(106px, 18vh, 144px);
+  --launch-art-size: clamp(76px, 13vh, 104px);
+  --bottom-panel-height: clamp(232px, 34.5vh, 270px);
+  --task-row-height: clamp(33px, 5.05vh, 40px);
+  --activity-icon-size: clamp(34px, 5.2vh, 42px);
+  --activity-row-height: clamp(34px, 5.2vh, 42px);
+  --timeline-dot-size: 10px;
+  --timeline-dot-offset: 2px;
+  --recommended-panel-height: clamp(72px, 10vh, 82px);
   display: grid;
   gap: var(--dashboard-gap);
   width: min(1320px, calc(100vw - 196px));
@@ -89,6 +91,29 @@
   border-radius: clamp(8px, 1.3vh, 10px);
 }
 
+.statIconImage {
+  overflow: hidden;
+  box-shadow: none;
+}
+
+.statIconImage img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: inherit;
+}
+
+.statIconImage.blue {
+  background: #eaf2ff;
+}
+
+.statIconImage.blue img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 .statCard > div {
   display: grid;
   gap: 4px;
@@ -165,7 +190,7 @@
 
 .launchCard {
   display: grid;
-  grid-template-columns: clamp(89px, 12.8vh, 112px) minmax(0, 1fr);
+  grid-template-columns: clamp(94px, 13.5vh, 118px) minmax(0, 1fr);
   align-items: center;
   height: var(--launch-card-height);
   padding: clamp(10px, 1.9vh, 16px) clamp(12px, 1.4vw, 20px);
@@ -173,6 +198,19 @@
   border: 1px solid #edf1f6;
   border-radius: 9px;
   box-shadow: 0 9px 22px rgba(15, 23, 42, 0.08);
+  transform-origin: center bottom;
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    border-color 0.22s ease;
+}
+
+.launchCard:hover {
+  border-color: #d7e3f4;
+  box-shadow:
+    0 14px 30px rgba(15, 23, 42, 0.12),
+    0 4px 14px rgba(37, 99, 235, 0.07);
+  transform: translateY(-5px);
 }
 
 .launchArt {
@@ -227,9 +265,10 @@
   position: relative;
   display: grid;
   align-content: start;
-  gap: clamp(6px, 1vh, 10px);
+  gap: 0;
   height: calc(var(--launch-card-height) - clamp(20px, 3.8vh, 32px));
   min-width: 0;
+  padding-left: 5px;
 }
 
 .launchHead {
@@ -317,12 +356,12 @@
 
 .tasksPanel {
   height: var(--bottom-panel-height);
-  padding: clamp(12px, 1.9vh, 16px) 16px 0;
+  padding: clamp(11px, 1.7vh, 14px) 16px 0;
 }
 
 .activityPanel {
   height: var(--bottom-panel-height);
-  padding: clamp(12px, 1.9vh, 16px) 16px 0;
+  padding: clamp(11px, 1.7vh, 14px) 16px 0;
 }
 
 .tasksPanel h2,
@@ -336,20 +375,20 @@
 
 .tasksTable {
   display: grid;
-  margin-top: clamp(10px, 1.45vh, 14px);
+  margin-top: clamp(8px, 1.2vh, 11px);
 }
 
 .tasksHead,
 .taskRow {
   display: grid;
-  grid-template-columns: minmax(180px, 1.35fr) minmax(140px, 0.9fr) 132px 70px 24px;
+  grid-template-columns: minmax(170px, 1.25fr) minmax(128px, 0.85fr) 142px 76px 26px;
   align-items: center;
 }
 
 .tasksHead {
-  height: clamp(24px, 3.5vh, 30px);
+  height: clamp(24px, 3.3vh, 29px);
   color: #94a3b8;
-  font-size: clamp(9px, 1.25vh, 11px);
+  font-size: clamp(10px, 1.35vh, 12px);
   font-weight: 800;
 }
 
@@ -370,7 +409,7 @@
 .taskTime {
   overflow: hidden;
   color: #172033;
-  font-size: 10px;
+  font-size: clamp(11px, 1.45vh, 12px);
   font-weight: 800;
   line-height: 1.2;
   text-overflow: ellipsis;
@@ -387,8 +426,8 @@
   display: grid;
   flex: 0 0 auto;
   place-items: center;
-  width: clamp(23px, 3.5vh, 28px);
-  height: clamp(23px, 3.5vh, 28px);
+  width: clamp(28px, 4.25vh, 34px);
+  height: clamp(28px, 4.25vh, 34px);
   border-radius: 6px;
 }
 
@@ -412,10 +451,10 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: clamp(20px, 2.95vh, 24px);
-  padding: 0 10px;
+  height: clamp(23px, 3.35vh, 27px);
+  padding: 0 12px;
   border-radius: 999px;
-  font-size: clamp(9px, 1.25vh, 11px);
+  font-size: clamp(10px, 1.35vh, 12px);
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
@@ -444,8 +483,8 @@
 .rowAction {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   padding: 0;
   color: #64748b;
   background: transparent;
@@ -463,11 +502,11 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  height: 33px;
+  height: 36px;
   margin: 1px -16px 0;
   color: #2563eb;
   border-top: 1px solid #eef2f7;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 800;
   line-height: 1;
   text-decoration: none;
@@ -480,16 +519,16 @@
 .timeline {
   position: relative;
   display: grid;
-  gap: 0;
-  margin-top: clamp(10px, 1.5vh, 14px);
+  gap: 6px;
+  margin-top: clamp(8px, 1.2vh, 11px);
   padding-left: 0;
 }
 
 .timeline::before {
   position: absolute;
-  top: 14px;
-  bottom: 14px;
-  left: 47px;
+  top: calc((var(--activity-icon-size) - var(--timeline-dot-size)) / 2 + (var(--timeline-dot-size) / 2));
+  bottom: calc((var(--activity-icon-size) - var(--timeline-dot-size)) / 2 + (var(--timeline-dot-size) / 2));
+  left: calc(38px + 8px + 9px + var(--timeline-dot-offset));
   width: 1px;
   content: "";
   background: #e2e8f0;
@@ -536,11 +575,20 @@
   position: relative;
   z-index: 1;
   justify-self: center;
-  width: 7px;
-  height: 7px;
+  width: var(--timeline-dot-size);
+  height: var(--timeline-dot-size);
   background: #cbd5e1;
   border: 2px solid #ffffff;
   border-radius: 999px;
+  transform: translateX(var(--timeline-dot-offset));
+}
+
+.activityItem:first-child .timelineDot {
+  background: #def8e7;
+}
+
+.activityItem:first-child .timelineDot {
+  background: #def8e7;
 }
 
 .activityItem h3 {
@@ -566,9 +614,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 28px;
+  gap: 22px;
   min-height: var(--recommended-panel-height);
-  padding: clamp(16px, 2.3vh, 22px) 20px;
+  padding: clamp(11px, 1.55vh, 14px) 16px;
   background: #ffffff;
   border: 1px solid #edf1f6;
   border-radius: 10px;
@@ -594,14 +642,17 @@
 }
 
 .recommendedAction {
+  --recommended-icon-size: clamp(34px, 4.9vh, 40px);
+  position: relative;
   display: flex;
   flex: 1 1 0;
   align-items: center;
   gap: 12px;
   min-width: 0;
   max-width: 280px;
-  height: clamp(44px, 6.2vh, 52px);
-  padding: 0 14px;
+  height: clamp(42px, 5.8vh, 48px);
+  padding: 0 14px 0 5px;
+  overflow: hidden;
   color: #172033;
   background: #ffffff;
   border: 1px solid #e8edf3;
@@ -610,18 +661,39 @@
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
+.recommendedActionSweeping .recommendedLabel,
+.recommendedActionSweeping .recommendedChevron {
+  position: relative;
+  z-index: 0;
+  opacity: 0.72;
+}
+
 .recommendedAction:hover {
   border-color: #d7e3f4;
   box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
 }
 
+.recommendedIconSlot {
+  flex: 0 0 auto;
+  width: var(--recommended-icon-size);
+  height: var(--recommended-icon-size);
+}
+
 .recommendedIcon {
   display: grid;
-  flex: 0 0 auto;
   place-items: center;
-  width: clamp(34px, 4.9vh, 40px);
-  height: clamp(34px, 4.9vh, 40px);
+  width: var(--recommended-icon-size);
+  height: var(--recommended-icon-size);
   border-radius: 8px;
+}
+
+.recommendedIconTraveling {
+  position: absolute;
+  top: 50%;
+  left: 5px;
+  z-index: 2;
+  transform: translateY(-50%);
+  animation: recommendedIconTravel 0.58s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
 .recommendedIcon.blue {
@@ -629,14 +701,36 @@
   background: #eaf2ff;
 }
 
+.recommendedIconTraveling.blue {
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.28);
+}
+
 .recommendedIcon.green {
   color: #16a34a;
   background: #eaf8ef;
 }
 
+.recommendedIconTraveling.green {
+  box-shadow: 0 4px 14px rgba(22, 163, 74, 0.24);
+}
+
 .recommendedIcon.violet {
   color: #7c3aed;
   background: #f2edff;
+}
+
+.recommendedIconTraveling.violet {
+  box-shadow: 0 4px 14px rgba(124, 58, 237, 0.26);
+}
+
+@keyframes recommendedIconTravel {
+  from {
+    left: 5px;
+  }
+
+  to {
+    left: calc(100% - var(--recommended-icon-size) - 5px);
+  }
 }
 
 .recommendedLabel {
@@ -653,6 +747,17 @@
 .recommendedChevron {
   flex: 0 0 auto;
   color: #64748b;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .launchCard:hover {
+    transform: none;
+  }
+
+  .recommendedIconTraveling {
+    animation: none;
+    left: calc(100% - var(--recommended-icon-size) - 5px);
+  }
 }
 
 @media (max-width: 1100px) {
@@ -674,13 +779,13 @@
   }
 
   .launchCard {
-    grid-template-columns: 88px minmax(0, 1fr);
+    grid-template-columns: 92px minmax(0, 1fr);
     padding: 12px;
   }
 
   .launchArt {
-    width: 74px;
-    height: 74px;
+    width: 80px;
+    height: 80px;
   }
 
   .recommendedPanel {

@@ -4,6 +4,7 @@ import {
   BrainCircuit,
   Check,
   ChevronDown,
+  CircleHelp,
   Eye,
   EyeOff,
   FileText,
@@ -160,7 +161,7 @@ export default function Login() {
           </div>
           <span className={styles.headerDivider} aria-hidden="true" />
           <button className={styles.headerButton} type="button">
-            <img className={styles.helpIcon} src="/login-help-icon.png" alt="" width={17} height={17} />
+            <CircleHelp aria-hidden="true" className={styles.headerIcon} size={16} strokeWidth={2} />
             Справка
           </button>
         </nav>
@@ -206,6 +207,21 @@ export default function Login() {
               <path className={styles.blueLine} d="M278 124 C318 124 324 132 356 132" />
               <path className={styles.violetLine} d="M600 108 C660 108 638 46 694 46" />
               <path className={styles.greenLine} d="M600 182 C658 182 640 226 694 226" />
+              <path
+                className={`${styles.energyLine} ${styles.energyBlue}`}
+                d="M278 124 C318 124 324 132 356 132"
+                pathLength="100"
+              />
+              <path
+                className={`${styles.energyLine} ${styles.energyViolet}`}
+                d="M600 108 C660 108 638 46 694 46"
+                pathLength="100"
+              />
+              <path
+                className={`${styles.energyLine} ${styles.energyGreen}`}
+                d="M600 182 C658 182 640 226 694 226"
+                pathLength="100"
+              />
               <circle className={styles.blueDot} cx="278" cy="124" r="5.5" />
               <circle className={styles.blueDot} cx="356" cy="132" r="5.5" />
               <circle className={styles.violetDot} cx="600" cy="108" r="5.5" />
