@@ -12,6 +12,7 @@ import type {
   HealthResponse,
   LoginPayload,
   Task,
+  TaskCompletingBatchCheckResponse,
   TaskCompletingCheckResponse,
   TaskCompletingTaskListResponse,
   TaskCreate,
@@ -61,6 +62,12 @@ export const taskCompletingAgentApi = {
     apiClient
       .post<TaskCompletingCheckResponse>(`/agents/task-compliting/tasks/${taskId}/check`, undefined, {
         timeout: 120000
+      })
+      .then((r) => r.data),
+  checkAll: () =>
+    apiClient
+      .post<TaskCompletingBatchCheckResponse>("/agents/task-compliting/tasks/check-all", undefined, {
+        timeout: 600000
       })
       .then((r) => r.data)
 };

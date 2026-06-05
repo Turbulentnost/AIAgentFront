@@ -34,6 +34,7 @@ export default function TaskCompletingAgent() {
   const queryClient = useQueryClient();
   const [expandedTaskId, setExpandedTaskId] = useState<string | null>(null);
   const [progressIndex, setProgressIndex] = useState(0);
+  const [batchRunningIds, setBatchRunningIds] = useState<Set<string>>(new Set());
   const { data, isError, isPending } = useQuery({
     queryKey: ["task-compliting", "tasks"],
     queryFn: taskCompletingAgentApi.tasks
@@ -52,13 +53,36 @@ export default function TaskCompletingAgent() {
     }
   });
 
+  const batchCheckMutation = useMutation({
+    mutationFn: taskCompletingAgentApi.checkAll,
+    onMutate: () => {
+      const ids = new Set(
+        (data?.active ?? [])
+          .filter((task) => !task.is_checked)
+          .map((task) => task.id)
+      );
+      setExpandedTaskId(null);
+      setProgressIndex(1);
+      setBatchRunningIds(ids);
+    },
+    onSuccess: async () => {
+      setProgressIndex(progressSteps.length - 1);
+      setBatchRunningIds(new Set());
+      await queryClient.invalidateQueries({ queryKey: ["task-compliting", "tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["task-compliting", "tasks", "summary"] });
+    },
+    onError: () => {
+      setBatchRunningIds(new Set());
+    }
+  });
+
   useEffect(() => {
-    if (!checkMutation.isPending) return;
+    if (!checkMutation.isPending && !batchCheckMutation.isPending) return;
     const intervalId = window.setInterval(() => {
       setProgressIndex((current) => Math.min(current + 1, progressSteps.length - 2));
     }, 850);
     return () => window.clearInterval(intervalId);
-  }, [checkMutation.isPending]);
+  }, [checkMutation.isPending, batchCheckMutation.isPending]);
 
   const selectedTask = useMemo(
     () => data?.active.find((task) => task.id === expandedTaskId) ?? data?.archived.find((task) => task.id === expandedTaskId),
@@ -87,8 +111,33 @@ export default function TaskCompletingAgent() {
         <section className={styles.panel} aria-labelledby="active-tasks-title">
           <div className={styles.panelHead}>
             <h2 id="active-tasks-title">Активные задачи</h2>
-            <span>{data.active.length}</span>
+            <div className={styles.panelActions}>
+              <button
+                className={styles.totalCheckButton}
+                type="button"
+                onClick={() => batchCheckMutation.mutate()}
+                disabled={batchCheckMutation.isPending || checkMutation.isPending || data.unchecked_count === 0}
+              >
+                {batchCheckMutation.isPending && <Loader2 className={styles.spin} size={15} aria-hidden="true" />}
+                Тотальная проверка
+              </button>
+              <span>{data.active.length}</span>
+            </div>
           </div>
+          {(batchCheckMutation.isPending || batchCheckMutation.data) && (
+            <div className={styles.batchProgress}>
+              <strong>
+                {batchCheckMutation.isPending
+                  ? `Тотальная проверка: батчи по 6 задач`
+                  : `Тотальная проверка завершена: ${batchCheckMutation.data?.total ?? 0}`}
+              </strong>
+              <p>
+                {batchCheckMutation.isPending
+                  ? `В очереди ${batchRunningIds.size} непроверенных задач. Внутри одного батча одновременно работают 6 проверок.`
+                  : `Размер батча: ${batchCheckMutation.data?.batch_size ?? 6}. В архив: ${batchCheckMutation.data?.archived_count ?? 0}. Нужна ручная проверка: ${batchCheckMutation.data?.needs_review_count ?? 0}.`}
+              </p>
+            </div>
+          )}
           <div className={styles.taskTableScroll}>
             {data.active.length === 0 ? (
               <div className={styles.emptyState}>Все подходящие задачи уже проверены или перенесены в архив.</div>
@@ -110,7 +159,11 @@ export default function TaskCompletingAgent() {
                       key={task.id}
                       task={task}
                       isExpanded={expandedTaskId === task.id}
-                      isChecking={checkMutation.isPending && checkMutation.variables === task.id}
+                      isChecking={
+                        (checkMutation.isPending && checkMutation.variables === task.id)
+                        || batchRunningIds.has(task.id)
+                      }
+                      isDisabled={batchCheckMutation.isPending || checkMutation.isPending}
                       progressIndex={progressIndex}
                       onCheck={() => checkMutation.mutate(task.id)}
                     />
@@ -144,7 +197,7 @@ export default function TaskCompletingAgent() {
         </aside>
       </div>
 
-      {checkMutation.isError && (
+      {(checkMutation.isError || batchCheckMutation.isError) && (
         <div className={styles.errorBox}>Не удалось выполнить проверку. Проверьте доступность backend и Claude.</div>
       )}
       {checkMutation.data && selectedTask && (
@@ -162,12 +215,14 @@ function TaskRow({
   task,
   isExpanded,
   isChecking,
+  isDisabled,
   progressIndex,
   onCheck
 }: {
   task: TaskCompletingDatasetTask;
   isExpanded: boolean;
   isChecking: boolean;
+  isDisabled: boolean;
   progressIndex: number;
   onCheck: () => void;
 }) {
@@ -197,7 +252,7 @@ function TaskRow({
           <span className={`${styles.statusPill} ${styles[status.tone]}`}>{status.label}</span>
         </td>
         <td className={styles.actionCell}>
-          <button className={`${styles.checkButton} ${styles[status.tone]}`} type="button" onClick={onCheck} disabled={isChecking}>
+          <button className={`${styles.checkButton} ${styles[status.tone]}`} type="button" onClick={onCheck} disabled={isDisabled}>
             {isChecking && <Loader2 className={styles.spin} size={15} aria-hidden="true" />}
             {isChecking ? "Проверяем" : "Проверить"}
           </button>

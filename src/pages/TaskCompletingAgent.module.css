@@ -111,6 +111,51 @@
   font-weight: 800;
 }
 
+.panelActions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.totalCheckButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  color: #ffffff;
+  background: #7c3aed;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 900;
+  box-shadow: 0 8px 18px rgba(124, 58, 237, 0.2);
+}
+
+.totalCheckButton:hover:not(:disabled) {
+  background: #6d28d9;
+}
+
+.batchProgress {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  color: #3730a3;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  border-radius: 12px;
+}
+
+.batchProgress strong {
+  font-size: 13px;
+}
+
+.batchProgress p {
+  margin: 0;
+  color: #475569;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .taskTableScroll {
   max-height: calc(100vh - 270px);
   overflow: auto;

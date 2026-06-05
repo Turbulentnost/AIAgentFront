@@ -74,6 +74,19 @@ export interface TaskCompletingCheckResponse {
   status: "archived" | "needs_review";
   is_satisfactory: boolean;
 }
+export interface TaskCompletingBatchCheckItem {
+  task_id: string;
+  status: "archived" | "needs_review";
+  is_satisfactory: boolean;
+  agent_result: Record<string, unknown>;
+}
+export interface TaskCompletingBatchCheckResponse {
+  total: number;
+  batch_size: number;
+  archived_count: number;
+  needs_review_count: number;
+  items: TaskCompletingBatchCheckItem[];
+}
 export interface Task {
   id: string;
   title: string;
