@@ -1,4 +1,4 @@
-import { apiClient } from "./client";
+import { apiClient, longRunningApiClient } from "./client";
 import type {
   Agent,
   AgentAccess,
@@ -38,7 +38,13 @@ import type {
   TaskStep,
   TokenResponse,
   User,
-  UserCreate
+  UserCreate,
+  AgentBlueprint,
+  AgentBuilderSession,
+  AgentBuilderSessionDetail,
+  AgentBuilderPlan,
+  AgentBuilderAttempt,
+  AgentBuilderToolCatalogItem
 } from "@/types";
 
 export const healthApi = {
@@ -141,6 +147,35 @@ export const knowledgeBasesApi = {
     apiClient.post<KnowledgeBaseTestSearchResponse>(`/knowledge-bases/${knowledgeBaseId}/test-search`, payload).then((r) => r.data),
   audit: (knowledgeBaseId: string) =>
     apiClient.get<Record<string, unknown>[]>(`/knowledge-bases/${knowledgeBaseId}/audit`).then((r) => r.data)
+};
+
+export const agentBuilderApi = {
+  listSessions: () => apiClient.get<AgentBuilderSession[]>("/agent-builder/sessions").then((r) => r.data),
+  createSession: (payload: { goal: string }) =>
+    apiClient.post<AgentBuilderSession>("/agent-builder/sessions", payload).then((r) => r.data),
+  getSession: (sessionId: string) =>
+    apiClient.get<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}`).then((r) => r.data),
+  deleteSession: (sessionId: string) =>
+    apiClient.delete(`/agent-builder/sessions/${sessionId}`).then((r) => r.data),
+  startSession: (sessionId: string) =>
+    longRunningApiClient.post<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}/start`).then((r) => r.data),
+  sendMessage: (sessionId: string, payload: { message: string }) =>
+    longRunningApiClient
+      .post<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}/message`, payload)
+      .then((r) => r.data),
+  getPlan: (sessionId: string) =>
+    apiClient.get<AgentBuilderPlan | null>(`/agent-builder/sessions/${sessionId}/plan`).then((r) => r.data),
+  getAttempts: (sessionId: string) =>
+    apiClient.get<AgentBuilderAttempt[]>(`/agent-builder/sessions/${sessionId}/attempts`).then((r) => r.data),
+  getBlueprint: (sessionId: string) =>
+    apiClient.get<AgentBlueprint | null>(`/agent-builder/sessions/${sessionId}/blueprint`).then((r) => r.data),
+  approveBlueprint: (sessionId: string) =>
+    longRunningApiClient.post<AgentBlueprint>(`/agent-builder/sessions/${sessionId}/approve-blueprint`).then((r) => r.data),
+  regenerate: (sessionId: string) =>
+    longRunningApiClient.post<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}/regenerate`).then((r) => r.data),
+  runPreview: (sessionId: string) =>
+    longRunningApiClient.post<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}/preview`).then((r) => r.data),
+  listTools: () => apiClient.get<AgentBuilderToolCatalogItem[]>("/agent-builder/tools").then((r) => r.data)
 };
 
 export const ndChangeRequestsApi = {

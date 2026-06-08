@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { agentsApi } from "@/api/endpoints";
 export default function Agents() {
@@ -5,7 +6,10 @@ export default function Agents() {
   if (isError) return <div className="card">Не удалось загрузить агентов</div>;
   return (
     <div className="card">
-      <h2>Доступные агенты</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <h2>Доступные агенты</h2>
+        <Link to="/agent-builder" className="pill">Создать агента</Link>
+      </div>
       {!data?.length ? <p>Нет агентов, доступных текущему пользователю.</p> : (
         <table>
           <tbody>

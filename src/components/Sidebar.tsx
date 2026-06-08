@@ -2,13 +2,14 @@ import { NavLink } from "react-router-dom";
 export const nav = [
   ["/", "Дашборд"],
   ["/agents", "Агенты"],
+  ["/agent-builder", "Конструктор агентов"],
   ["/tasks", "Задачи"],
   ["/knowledge-base", "База знаний"],
   ["/documents", "Документы"],
   ["/users", "Пользователи"],
   ["/departments", "Подразделения"],
   ["/profile", "Профиль"],
-  ["/monitoring", "Мониторинг"]
+  // ["/monitoring", "Мониторинг"]
 ] as const;
 
 export default function Sidebar() {

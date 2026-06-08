@@ -635,3 +635,136 @@ export interface KnowledgeBaseTestSearchResponse {
   hits: KnowledgeBaseSearchHit[];
   answer_preview: string | null;
 }
+
+export type AgentBuilderSessionStatus =
+  | "draft"
+  | "planning"
+  | "executing"
+  | "needs_clarification"
+  | "generated"
+  | "needs_user_review"
+  | "approved"
+  | "failed"
+  | "archived";
+
+export type AgentBuilderPlanStepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+export type AgentBlueprintStatus =
+  | "draft"
+  | "planning"
+  | "generated"
+  | "needs_user_review"
+  | "approved"
+  | "in_development"
+  | "implemented"
+  | "archived";
+
+export interface AgentBuilderPlanStep {
+  id: string;
+  step_order: number;
+  title: string;
+  description?: string | null;
+  status: AgentBuilderPlanStepStatus;
+  started_at?: string | null;
+  finished_at?: string | null;
+  result?: Record<string, unknown> | null;
+  error_message?: string | null;
+}
+
+export interface AgentBuilderPlan {
+  id: string;
+  goal: string;
+  status: string;
+  steps: AgentBuilderPlanStep[];
+}
+
+export interface AgentBuilderAttempt {
+  id: string;
+  attempt_number: number;
+  goal?: string | null;
+  success: boolean;
+  result_summary?: string | null;
+  failure_reason?: string | null;
+  created_at: string;
+}
+
+export interface AgentBlueprint {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  status: AgentBlueprintStatus;
+  version: number;
+  input_schema?: Record<string, unknown> | null;
+  output_schema?: Record<string, unknown> | null;
+  tools?: string[] | null;
+  knowledge_bases?: string[] | null;
+  workflow_graph?: { nodes: Array<{ id: string; label: string; type?: string }>; edges: Array<{ source: string; target: string; label?: string }> } | null;
+  human_approval_rules?: Array<Record<string, unknown>> | null;
+  prompts?: Record<string, string> | null;
+  test_cases?: Array<Record<string, unknown>> | null;
+  report_template?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AgentBuilderSession {
+  id: string;
+  goal: string;
+  current_stage?: string | null;
+  status: AgentBuilderSessionStatus;
+  collected_requirements?: Record<string, unknown> | null;
+  validation_result?: { valid: boolean; errors: string[]; warnings: string[] } | null;
+  proposed_agent_structure?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentBuilderDesignStage {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "completed";
+}
+
+export interface AgentBuilderRequiredElement {
+  key: string;
+  label: string;
+  question?: string | null;
+  required?: boolean;
+  value?: string | null;
+  status?: "pending" | "filled";
+}
+
+export interface AgentBuilderRequirementsValidation {
+  valid: boolean;
+  errors?: string[];
+  missing?: string[];
+  elements?: AgentBuilderRequiredElement[];
+}
+
+export interface AgentBuilderPreview {
+  success: boolean;
+  preview_type?: string | null;
+  output_text?: string | null;
+  city?: string | null;
+  source?: string | null;
+  source_url?: string | null;
+  error?: string | null;
+}
+
+export interface AgentBuilderSessionDetail extends AgentBuilderSession {
+  plan?: AgentBuilderPlan | null;
+  attempts: AgentBuilderAttempt[];
+  blueprint?: AgentBlueprint | null;
+  assistant_messages: string[];
+  clarifying_questions: string[];
+  design_stages: AgentBuilderDesignStage[];
+  required_elements: AgentBuilderRequiredElement[];
+  requirements_validation?: AgentBuilderRequirementsValidation | null;
+  preview_result?: AgentBuilderPreview | null;
+}
+
+export interface AgentBuilderToolCatalogItem {
+  name: string;
+  description: string;
+  implemented: boolean;
+  required_permissions: string[];
+}
