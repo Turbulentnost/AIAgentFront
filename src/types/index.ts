@@ -165,6 +165,8 @@ export interface Department {
   description: string | null;
   parent_id: string | null;
   is_active: boolean;
+  source_system: string | null;
+  external_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -174,6 +176,21 @@ export interface DepartmentCreate {
   description?: string;
   parent_id?: string | null;
   is_active?: boolean;
+}
+export interface DepartmentSyncStatus {
+  key: string;
+  source_system: string;
+  resource: string;
+  last_synced_at: string | null;
+  next_allowed_at: string | null;
+  status: string;
+  items_count: number;
+  error_message: string | null;
+  payload?: Record<string, unknown> | null;
+  created_count?: number;
+  updated_count?: number;
+  deactivated_count?: number;
+  synced_count?: number;
 }
 export interface Document {
   id: string;

@@ -6,6 +6,7 @@ import type {
   ChunkSearchQuery,
   Department,
   DepartmentCreate,
+  DepartmentSyncStatus,
   Document,
   DocumentUploadOptions,
   HealthResponse,
@@ -56,7 +57,9 @@ export const usersApi = {
 };
 export const departmentsApi = {
   list: () => apiClient.get<Department[]>("/departments").then((r) => r.data),
-  create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data)
+  create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data),
+  syncStatus: () => apiClient.get<DepartmentSyncStatus>("/departments/sync/status").then((r) => r.data),
+  syncFrom1C: () => apiClient.post<DepartmentSyncStatus>("/departments/sync").then((r) => r.data)
 };
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),

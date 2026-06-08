@@ -9,10 +9,17 @@ export default function Departments() {
   const queryClient = useQueryClient();
   const [form, setForm] = useState<DepartmentCreate>({ name: "", slug: "", description: "" });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
+  const syncStatusQuery = useQuery({ queryKey: ["departments", "sync-status"], queryFn: departmentsApi.syncStatus });
   const createMutation = useMutation({
     mutationFn: departmentsApi.create,
     onSuccess: async () => {
       setForm({ name: "", slug: "", description: "" });
+      await queryClient.invalidateQueries({ queryKey: ["departments"] });
+    }
+  });
+  const syncMutation = useMutation({
+    mutationFn: departmentsApi.syncFrom1C,
+    onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["departments"] });
     }
   });
@@ -35,6 +42,14 @@ export default function Departments() {
       )}
       <div className="card">
         <h2>Подразделения</h2>
+        {user?.is_superuser && (
+          <p>
+            Последнее обновление из 1С: {syncStatusQuery.data?.last_synced_at ? new Date(syncStatusQuery.data.last_synced_at).toLocaleString("ru-RU") : "не выполнялось"}{" "}
+            <button className="secondary-button" onClick={() => syncMutation.mutate()} disabled={syncMutation.isPending || !canSync(syncStatusQuery.data?.next_allowed_at)}>
+              {syncMutation.isPending ? "Обновляем..." : "Обновить базу подразделений"}
+            </button>
+          </p>
+        )}
         {departmentsQuery.isError && <p className="error">Не удалось загрузить подразделения.</p>}
         {!departmentsQuery.data?.length ? <p>Подразделения ещё не созданы.</p> : (
           <table>
@@ -52,4 +67,8 @@ export default function Departments() {
       </div>
     </div>
   );
+}
+
+function canSync(nextAllowedAt?: string | null) {
+  return !nextAllowedAt || new Date(nextAllowedAt) <= new Date();
 }

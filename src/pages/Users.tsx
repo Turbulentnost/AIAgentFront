@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { departmentsApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
+import DepartmentSelect from "@/components/DepartmentSelect";
 import type { UserCreate } from "@/types";
 
 const emptyForm: UserCreate = {
@@ -60,10 +61,12 @@ export default function Users() {
         <input placeholder="Отчество" value={form.middle_name} onChange={(event) => setForm({ ...form, middle_name: event.target.value })} />
         <input placeholder="Должность" value={form.position} onChange={(event) => setForm({ ...form, position: event.target.value })} />
         <input placeholder="Телефон" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} />
-        <select value={form.department_id || ""} onChange={(event) => setForm({ ...form, department_id: event.target.value || null })}>
-          <option value="">Без подразделения</option>
-          {departmentsQuery.data?.map((department) => <option key={department.id} value={department.id}>{department.name}</option>)}
-        </select>
+        <DepartmentSelect
+          value={form.department_id || ""}
+          onChange={(value) => setForm({ ...form, department_id: value || null })}
+          departments={departmentsQuery.data ?? []}
+          placeholder="Без подразделения"
+        />
         <button disabled={createMutation.isPending}>{createMutation.isPending ? "Создаём..." : "Создать"}</button>
       </form>
       <div className="card">
