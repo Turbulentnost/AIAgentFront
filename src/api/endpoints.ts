@@ -2,6 +2,8 @@ import { apiClient } from "./client";
 import type {
   Agent,
   AgentAccess,
+  BrowserRun,
+  BrowserRunResult,
   ChunkSearchHit,
   ChunkSearchQuery,
   Department,
@@ -72,6 +74,12 @@ export const tasksApi = {
   create: (payload: TaskCreate) => apiClient.post<Task>("/tasks", payload).then((r) => r.data),
   steps: (taskId: string) => apiClient.get<TaskStep[]>(`/tasks/${taskId}/steps`).then((r) => r.data),
   result: (taskId: string) => apiClient.get<TaskResult>(`/tasks/${taskId}/result`).then((r) => r.data)
+};
+export const browserRunsApi = {
+  pending: () => apiClient.get<BrowserRun[]>("/browser-runs/pending").then((r) => r.data),
+  submitResult: (runId: string, payload: BrowserRunResult) =>
+    apiClient.post<BrowserRun>(`/browser-runs/${runId}/result`, payload).then((r) => r.data),
+  get: (runId: string) => apiClient.get<BrowserRun>(`/browser-runs/${runId}`).then((r) => r.data)
 };
 export const documentsApi = {
   upload: (file: File, options: DocumentUploadOptions = {}) => {

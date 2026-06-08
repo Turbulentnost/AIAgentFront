@@ -192,6 +192,43 @@ export interface DepartmentSyncStatus {
   deactivated_count?: number;
   synced_count?: number;
 }
+export type BrowserRunStatus = "pending" | "running" | "completed" | "failed" | "timeout" | "cancelled";
+export type BrowserExtractMode = "text" | "html" | "screenshot" | "table";
+export interface BrowserRunTable {
+  headers: string[];
+  rows: string[][];
+}
+export interface BrowserRun {
+  id: string;
+  requested_by_agent_id: string | null;
+  requested_by_user_id: string;
+  task_id: string | null;
+  url: string;
+  method: string;
+  extract_mode: BrowserExtractMode | string;
+  status: BrowserRunStatus;
+  timeout_seconds: number;
+  title: string | null;
+  result_text: string | null;
+  result_html: string | null;
+  result_tables: BrowserRunTable[] | null;
+  screenshot_object_name: string | null;
+  error_message: string | null;
+  finished_at: string | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+export interface BrowserRunResult {
+  status?: BrowserRunStatus;
+  title?: string | null;
+  text?: string | null;
+  html?: string | null;
+  tables?: BrowserRunTable[];
+  screenshot_data_url?: string | null;
+  error_message?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
 export interface Document {
   id: string;
   title: string;
