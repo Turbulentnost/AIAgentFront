@@ -15,10 +15,12 @@ import {
   ShieldCheck,
   Upload
 } from "lucide-react";
+import { isAxiosError } from "axios";
 import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, usersApi } from "@/api/endpoints";
+import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
 import type {
-  Agent,
+  AgentAccess,
   Department,
   Document,
   DocumentType,
@@ -27,6 +29,7 @@ import type {
   KnowledgeBaseCreate,
   User
 } from "@/types";
+import { filterActiveDepartments } from "@/utils/departments";
 import styles from "./KnowledgeBaseCreate.module.css";
 
 type StepId = "main" | "sources" | "readiness" | "processing" | "access" | "agents" | "preview";
@@ -39,8 +42,6 @@ interface ProcessingSettings {
   tableExtraction: boolean;
   preserveStructure: boolean;
   chunking: boolean;
-  chunkSize: number;
-  chunkOverlap: number;
   embeddings: boolean;
   qdrantIndexing: boolean;
   manualReview: boolean;
@@ -87,8 +88,6 @@ const defaultProcessing: ProcessingSettings = {
   tableExtraction: true,
   preserveStructure: true,
   chunking: true,
-  chunkSize: 800,
-  chunkOverlap: 100,
   embeddings: true,
   qdrantIndexing: true,
   manualReview: true
@@ -97,6 +96,7 @@ const defaultProcessing: ProcessingSettings = {
 export default function KnowledgeBaseCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { user: currentUser } = useAuth();
   const [stepIndex, setStepIndex] = useState(0);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -125,8 +125,9 @@ export default function KnowledgeBaseCreate() {
   const documents = useQuery({ queryKey: ["documents"], queryFn: documentsApi.list });
   const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
   const users = useQuery({ queryKey: ["users"], queryFn: usersApi.list });
-  const agents = useQuery({ queryKey: ["agents"], queryFn: agentsApi.list });
+  const agents = useQuery({ queryKey: ["agents", "available"], queryFn: agentsApi.available });
 
+  const activeDepartments = useMemo(() => filterActiveDepartments(departments.data ?? []), [departments.data]);
   const activeStep = steps[stepIndex];
   const selectedDocuments = useMemo(
     () => (documents.data ?? []).filter((document) => selectedSourceIds.includes(document.id)),
@@ -177,15 +178,18 @@ export default function KnowledgeBaseCreate() {
   });
 
   const canGoNext = validateStep(activeStep.id);
+  const canCreateDraft = validateStep("main");
+  const canCreateFull = validateCreate();
 
   function buildCreatePayload(): KnowledgeBaseCreate {
+    const trimmedTopic = topic.trim();
     return {
-      name,
-      description,
-      department_id: departmentId,
-      responsible_user_id: responsibleUserId,
-      topic,
-      process_slug: topic.toLowerCase().replace(/\s+/g, "-"),
+      name: name.trim(),
+      description: description.trim() || null,
+      department_id: optionalUuid(departmentId),
+      responsible_user_id: optionalUuid(responsibleUserId),
+      topic: trimmedTopic || null,
+      process_slug: trimmedTopic ? trimmedTopic.toLowerCase().replace(/\s+/g, "-") : null,
       access_grants: buildAccessGrants(),
       source_document_ids: selectedSourceIds,
       metadata: {
@@ -241,6 +245,10 @@ export default function KnowledgeBaseCreate() {
     return true;
   }
 
+  function validateCreate() {
+    return validateStep("main") && validateStep("sources") && validateStep("access");
+  }
+
   function goNext() {
     if (canGoNext) setStepIndex((index) => Math.min(index + 1, steps.length - 1));
   }
@@ -262,7 +270,7 @@ export default function KnowledgeBaseCreate() {
             <p>Пошагово настройте источники, обработку данных, права доступа и подключение агентов.</p>
           </div>
           <div className={styles.headerActions}>
-            <button type="button" className={styles.secondaryButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: false })} disabled={!validateStep("main") || createKnowledgeBase.isPending}>
+            <button type="button" className={styles.secondaryButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: false })} disabled={!canCreateDraft || createKnowledgeBase.isPending}>
               Сохранить как черновик
             </button>
             <button type="button" className={styles.primaryButton} onClick={goNext} disabled={!canGoNext || stepIndex === steps.length - 1}>
@@ -296,7 +304,7 @@ export default function KnowledgeBaseCreate() {
               responsibleUserId={responsibleUserId}
               topic={topic}
               comment={comment}
-              departments={departments.data ?? []}
+              departments={activeDepartments}
               users={users.data ?? []}
               onName={setName}
               onDescription={setDescription}
@@ -317,7 +325,9 @@ export default function KnowledgeBaseCreate() {
               sourceDepartmentFilter={sourceDepartmentFilter}
               sourceStatusFilter={sourceStatusFilter}
               extensionFilter={extensionFilter}
-              departments={departments.data ?? []}
+              departments={activeDepartments}
+              users={users.data ?? []}
+              currentUserId={currentUser?.id}
               uploadFile={uploadFile}
               uploadTitle={uploadTitle}
               uploadPending={uploadDocument.isPending}
@@ -328,6 +338,16 @@ export default function KnowledgeBaseCreate() {
               onExtensionFilter={setExtensionFilter}
               onToggleSource={(id) =>
                 setSelectedSourceIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))
+              }
+              onSelectAllVisible={() => {
+                const visibleIds = filteredDocuments.map((document) => document.id);
+                const allSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedSourceIds.includes(id));
+                setSelectedSourceIds((ids) =>
+                  allSelected ? ids.filter((id) => !visibleIds.includes(id)) : [...new Set([...ids, ...visibleIds])]
+                );
+              }}
+              allVisibleSelected={
+                filteredDocuments.length > 0 && filteredDocuments.every((document) => selectedSourceIds.includes(document.id))
               }
               onUploadFile={setUploadFile}
               onUploadTitle={setUploadTitle}
@@ -343,7 +363,7 @@ export default function KnowledgeBaseCreate() {
               includeChildren={includeChildren}
               accessReason={accessReason}
               users={users.data ?? []}
-              departments={departments.data ?? []}
+              departments={activeDepartments}
               selectedUserIds={selectedUserIds}
               selectedDepartmentIds={selectedDepartmentIds}
               selectedDocuments={selectedDocuments}
@@ -353,6 +373,8 @@ export default function KnowledgeBaseCreate() {
               onReason={setAccessReason}
               onToggleUser={(id) => setSelectedUserIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))}
               onToggleDepartment={(id) => setSelectedDepartmentIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))}
+              onSelectDepartments={(ids) => setSelectedDepartmentIds((current) => [...new Set([...current, ...ids])])}
+              onDeselectDepartments={(ids) => setSelectedDepartmentIds((current) => current.filter((id) => !ids.includes(id)))}
             />
           )}
           {activeStep.id === "agents" && (
@@ -363,8 +385,9 @@ export default function KnowledgeBaseCreate() {
               name={name}
               description={description}
               baseKind={baseKind}
-              department={departments.data?.find((item) => item.id === departmentId)}
+              department={activeDepartments.find((item) => item.id === departmentId)}
               responsible={users.data?.find((item) => item.id === responsibleUserId)}
+              users={users.data ?? []}
               topic={topic}
               selectedDocuments={selectedDocuments}
               processing={processing}
@@ -381,10 +404,11 @@ export default function KnowledgeBaseCreate() {
           <Summary
             name={name}
             baseKind={baseKind}
-            department={departments.data?.find((item) => item.id === departmentId)}
+            department={activeDepartments.find((item) => item.id === departmentId)}
             responsible={users.data?.find((item) => item.id === responsibleUserId)}
             topic={topic}
             selectedDocuments={selectedDocuments}
+            users={users.data ?? []}
             processing={processing}
             accessMode={accessMode}
             selectedAgents={selectedAgents}
@@ -392,6 +416,10 @@ export default function KnowledgeBaseCreate() {
           />
         </aside>
       </main>
+
+      {createKnowledgeBase.isError && (
+        <div className={styles.createError}>{formatApiError(createKnowledgeBase.error)}</div>
+      )}
 
       <footer className={styles.footerNav}>
         <ProgressDots activeIndex={stepIndex} />
@@ -407,10 +435,10 @@ export default function KnowledgeBaseCreate() {
           ) : (
             <>
               <button type="button" className={styles.secondaryButton} onClick={() => navigate("/knowledge-base")}>Отмена</button>
-              <button type="button" className={styles.secondaryButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: false })} disabled={createKnowledgeBase.isPending}>
+              <button type="button" className={styles.secondaryButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: false })} disabled={!canCreateDraft || createKnowledgeBase.isPending}>
                 Сохранить как черновик
               </button>
-              <button type="button" className={styles.primaryButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: true })} disabled={createKnowledgeBase.isPending}>
+              <button type="button" className={styles.primaryButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: true })} disabled={!canCreateFull || createKnowledgeBase.isPending}>
                 Создать и запустить индексацию
               </button>
             </>
@@ -505,15 +533,19 @@ function StepSources(props: {
   sourceStatusFilter: string;
   extensionFilter: string;
   departments: Department[];
+  users: User[];
+  currentUserId?: string;
   uploadFile: File | null;
   uploadTitle: string;
   uploadPending: boolean;
+  allVisibleSelected: boolean;
   onSearch: (value: string) => void;
   onTypeFilter: (value: DocumentType | "all") => void;
   onDepartmentFilter: (value: string) => void;
   onStatusFilter: (value: string) => void;
   onExtensionFilter: (value: string) => void;
   onToggleSource: (id: string) => void;
+  onSelectAllVisible: () => void;
   onUploadFile: (file: File | null) => void;
   onUploadTitle: (value: string) => void;
   onUpload: () => void;
@@ -521,7 +553,24 @@ function StepSources(props: {
   const extensions = [...new Set(props.allDocuments.map((document) => getExtension(document.original_filename)).filter(Boolean))];
   return (
     <div className={styles.stepBody}>
-      <StepTitle icon={FileText} title="Выбор источников" text="Выберите один или несколько документов из раздела «Документы» или загрузите новый файл в реестр." />
+      <StepTitle icon={FileText} title="Выбор источников" text="Выберите документы из реестра или загрузите новые файлы. Загрузивший документ всегда сохраняет доступ к базе знаний." />
+      <div className={styles.uploadPanel}>
+        <div className={styles.uploadPanelHeader}>
+          <Upload size={18} />
+          <div>
+            <strong>Загрузить новый документ</strong>
+            <p>Файл попадёт в реестр документов и сразу будет выбран источником этой базы знаний.</p>
+          </div>
+        </div>
+        <div className={styles.uploadPanelFields}>
+          <input value={props.uploadTitle} onChange={(event) => props.onUploadTitle(event.target.value)} placeholder="Название документа (необязательно)" />
+          <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={(event) => props.onUploadFile(event.target.files?.[0] ?? null)} />
+          <button type="button" className={styles.primaryButton} onClick={props.onUpload} disabled={!props.uploadFile || props.uploadPending}>
+            {props.uploadPending ? "Загружаем..." : "Загрузить и выбрать"}
+          </button>
+        </div>
+        {props.uploadFile && <small className={styles.uploadHint}>Выбран файл: {props.uploadFile.name}</small>}
+      </div>
       <div className={styles.sourceToolbar}>
         <label>
           <Search size={15} />
@@ -556,59 +605,43 @@ function StepSources(props: {
           ))}
         </select>
       </div>
-      <table className={styles.sourcesTable}>
-        <thead>
-          <tr>
-            <th />
-            <th>Название документа</th>
-            <th>Расширение</th>
-            <th>Версия</th>
-            <th>Статус</th>
-            <th>Подразделение</th>
-            <th>Дата актуальности</th>
-            <th>Размер</th>
-            <th>Доступ</th>
-            <th>Агенты</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.documents.map((document) => (
-            <tr key={document.id}>
-              <td>
-                <input type="checkbox" checked={props.selectedSourceIds.includes(document.id)} onChange={() => props.onToggleSource(document.id)} />
-              </td>
-              <td>
-                <strong>{document.title}</strong>
-                <small>{document.original_filename}</small>
-              </td>
-              <td>{getExtension(document.original_filename) || "-"}</td>
-              <td>{document.version || "1.0"}</td>
-              <td>{documentStatusLabel(document)}</td>
-              <td>{departmentName(props.departments, document.department_id)}</td>
-              <td>{document.metadata?.actual_until ? String(document.metadata.actual_until) : "31.12.2026"}</td>
-              <td>{formatBytes(document.file_size)}</td>
-              <td>{document.metadata?.access_scope ? String(document.metadata.access_scope) : "По подразделению"}</td>
-              <td>Будет задано на шаге 6</td>
-            </tr>
-          ))}
-          {!props.documents.length && (
-            <tr>
-              <td colSpan={10} className={styles.emptyCell}>Документы не найдены.</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-      <div className={styles.uploadBox}>
-        <Upload size={18} />
-        <div>
-          <strong>Загрузить новый документ</strong>
-          <p>Файл сначала попадёт в раздел «Документы», получит статус обработки, а затем будет выбран источником базы знаний.</p>
-        </div>
-        <input value={props.uploadTitle} onChange={(event) => props.onUploadTitle(event.target.value)} placeholder="Название документа" />
-        <input type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt" onChange={(event) => props.onUploadFile(event.target.files?.[0] ?? null)} />
-        <button type="button" className={styles.secondaryButton} onClick={props.onUpload} disabled={!props.uploadFile || props.uploadPending}>
-          {props.uploadPending ? "Загружаем..." : "Загрузить и выбрать"}
+      <div className={styles.sourceListHeader}>
+        <span>Найдено: {props.documents.length} · Выбрано: {props.selectedSourceIds.length}</span>
+        <button type="button" className={styles.linkButton} onClick={props.onSelectAllVisible} disabled={!props.documents.length}>
+          {props.allVisibleSelected ? "Снять выделение с видимых" : "Выбрать все видимые"}
         </button>
+      </div>
+      <div className={styles.sourceCards}>
+        {props.documents.map((document) => {
+          const selected = props.selectedSourceIds.includes(document.id);
+          const extension = getExtension(document.original_filename);
+          return (
+            <article key={document.id} className={selected ? styles.sourceCardSelected : styles.sourceCard}>
+              <label className={styles.sourceCardCheck}>
+                <input type="checkbox" checked={selected} onChange={() => props.onToggleSource(document.id)} />
+              </label>
+              <div className={styles.sourceCardBody}>
+                <div className={styles.sourceCardTitleRow}>
+                  <strong>{document.title}</strong>
+                  <span className={styles.sourceBadge}>{extension || "файл"}</span>
+                  <span className={styles[`sourceStatus_${document.processing_status}`] ?? styles.sourceStatus_default}>
+                    {documentStatusLabel(document)}
+                  </span>
+                </div>
+                {document.original_filename && document.original_filename !== document.title && (
+                  <small className={styles.sourceFilename}>{document.original_filename}</small>
+                )}
+                <div className={styles.sourceMeta}>
+                  <span>Загрузил: {userName(props.users, document.uploaded_by_user_id, props.currentUserId)}</span>
+                  <span>Подразделение: {departmentName(props.departments, document.department_id)}</span>
+                  <span>Размер: {formatBytes(document.file_size)}</span>
+                  <span>Версия: {document.version || 1}</span>
+                </div>
+              </div>
+            </article>
+          );
+        })}
+        {!props.documents.length && <div className={styles.emptyCell}>Документы не найдены. Измените фильтры или загрузите новый файл.</div>}
       </div>
     </div>
   );
@@ -662,14 +695,6 @@ function StepProcessing({ settings, onChange }: { settings: ProcessingSettings; 
             </span>
           </label>
         ))}
-        <label>
-          Размер chunk
-          <input type="number" min={100} max={4000} value={settings.chunkSize} onChange={(event) => onChange({ ...settings, chunkSize: Number(event.target.value) })} />
-        </label>
-        <label>
-          Перекрытие chunk
-          <input type="number" min={0} max={1000} value={settings.chunkOverlap} onChange={(event) => onChange({ ...settings, chunkOverlap: Number(event.target.value) })} />
-        </label>
       </div>
     </div>
   );
@@ -691,6 +716,8 @@ function StepAccess(props: {
   onReason: (value: string) => void;
   onToggleUser: (id: string) => void;
   onToggleDepartment: (id: string) => void;
+  onSelectDepartments: (ids: string[]) => void;
+  onDeselectDepartments: (ids: string[]) => void;
 }) {
   return (
     <div className={styles.stepBody}>
@@ -746,6 +773,11 @@ function StepAccess(props: {
           items={props.departments.map((department) => ({ id: department.id, title: department.name, subtitle: department.description || "Без описания" }))}
           selectedIds={props.selectedDepartmentIds}
           onToggle={props.onToggleDepartment}
+          enableSearch
+          searchPlaceholder="Найти подразделение"
+          enableSelectAll
+          onSelectAll={props.onSelectDepartments}
+          onDeselectAll={props.onDeselectDepartments}
         />
       )}
       {props.selectedDocuments.length > 0 && (
@@ -755,10 +787,10 @@ function StepAccess(props: {
   );
 }
 
-function StepAgents({ agents, selectedAgents, onChange }: { agents: Agent[]; selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>; onChange: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void }) {
+function StepAgents({ agents, selectedAgents, onChange }: { agents: AgentAccess[]; selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>; onChange: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void }) {
   return (
     <div className={styles.stepBody}>
-      <StepTitle icon={Bot} title="Подключение ИИ-агентов" text="Выберите агентов и режим использования базы. Агент всё равно увидит только фрагменты, доступные пользователю." />
+      <StepTitle icon={Bot} title="Подключение ИИ-агентов" text="Выберите агентов из доступных вам и режим использования базы. Загрузивший источники может ограничить список агентов." />
       <div className={styles.agentGrid}>
         {agents.map((agent) => {
           const selected = selectedAgents[agent.id];
@@ -807,6 +839,7 @@ function StepPreview(props: {
   responsible?: User;
   topic: string;
   selectedDocuments: Document[];
+  users: User[];
   processing: ProcessingSettings;
   accessMode: AccessMode;
   selectedUserIds: string[];
@@ -819,8 +852,8 @@ function StepPreview(props: {
       <StepTitle icon={ShieldCheck} title="Предпросмотр и подтверждение" text="Проверьте итоговую сводку перед созданием базы знаний." />
       <div className={styles.previewGrid}>
         <SummaryBlock title="Основные сведения" rows={[["Название", props.name], ["Описание", props.description], ["Тип", baseKindLabels[props.baseKind]], ["Подразделение", props.department?.name || "-"], ["Ответственный", props.responsible?.full_name || props.responsible?.email || "-"], ["Тематика", props.topic || "-"]]} />
-        <SummaryBlock title="Источники" rows={[["Документов", String(props.selectedDocuments.length)], ...props.selectedDocuments.slice(0, 5).map((document) => [document.title, getExtension(document.original_filename) || "-"] as [string, string])]} />
-        <SummaryBlock title="Обработка" rows={[["OCR", yesNo(props.processing.ocr)], ["Chunks", `${props.processing.chunkSize} / overlap ${props.processing.chunkOverlap}`], ["Embeddings", yesNo(props.processing.embeddings)], ["Qdrant", yesNo(props.processing.qdrantIndexing)], ["Ручная проверка", yesNo(props.processing.manualReview)]]} />
+        <SummaryBlock title="Источники" rows={[["Документов", String(props.selectedDocuments.length)], ...props.selectedDocuments.slice(0, 5).map((document) => [document.title, userName(props.users, document.uploaded_by_user_id)] as [string, string])]} />
+        <SummaryBlock title="Обработка" rows={[["OCR", yesNo(props.processing.ocr)], ["Разбиение на фрагменты", yesNo(props.processing.chunking)], ["Embeddings", yesNo(props.processing.embeddings)], ["Qdrant", yesNo(props.processing.qdrantIndexing)], ["Ручная проверка", yesNo(props.processing.manualReview)]]} />
         <SummaryBlock title="Доступ" rows={[["Режим", accessModeLabel(props.accessMode)], ["Пользователей", String(props.selectedUserIds.length)], ["Подразделений", String(props.selectedDepartmentIds.length)]]} />
         <SummaryBlock title="Агенты" rows={[["Подключено", String(Object.keys(props.selectedAgents).length)], ...Object.values(props.selectedAgents).slice(0, 4).map((mode, index) => [`Агент ${index + 1}`, agentModeLabels[mode]] as [string, string])]} />
         <SummaryBlock title="Предупреждения" rows={props.warnings.length ? props.warnings.map((warning) => [warning.document.title, warning.message] as [string, string]) : [["Ошибки", "Нет критичных предупреждений"]]} />
@@ -836,6 +869,7 @@ function Summary(props: {
   responsible?: User;
   topic: string;
   selectedDocuments: Document[];
+  users: User[];
   processing: ProcessingSettings;
   accessMode: AccessMode;
   selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
@@ -845,8 +879,8 @@ function Summary(props: {
     <div>
       <h2>Сводка создаваемой базы</h2>
       <SummaryBlock title="Основные сведения" rows={[["Название", props.name || "Не заполнено"], ["Тип", baseKindLabels[props.baseKind]], ["Тематика", props.topic || "-"], ["Подразделение", props.department?.name || "Не выбрано"], ["Ответственный", props.responsible?.full_name || props.responsible?.email || "Не выбран"]]} />
-      <SummaryBlock title="Источники" rows={[["Документы", String(props.selectedDocuments.length)], ["Фрагментов (прогноз)", String(props.selectedDocuments.length * 120)]]} />
-      <SummaryBlock title="Обработка" rows={[["OCR", yesNo(props.processing.ocr)], ["Извлечение таблиц", yesNo(props.processing.tableExtraction)], ["Размер chunk", `${props.processing.chunkSize} токенов`], ["Векторное хранилище", "Qdrant"]]} />
+      <SummaryBlock title="Источники" rows={[["Документы", String(props.selectedDocuments.length)], ...props.selectedDocuments.slice(0, 3).map((document) => [document.title, userName(props.users, document.uploaded_by_user_id)] as [string, string])]} />
+      <SummaryBlock title="Обработка" rows={[["OCR", yesNo(props.processing.ocr)], ["Извлечение таблиц", yesNo(props.processing.tableExtraction)], ["Индексация", yesNo(props.processing.qdrantIndexing)], ["Векторное хранилище", "Qdrant"]]} />
       <SummaryBlock title="Доступ" rows={[["Тип доступа", accessModeLabel(props.accessMode)], ["Предупреждения", String(props.warningsCount)]]} />
       <SummaryBlock title="Агенты" rows={[["Подключено агентов", String(Object.keys(props.selectedAgents).length)]]} />
       {props.warningsCount > 0 && <WarningCallout text="База знаний будет доступна агентам только после завершения индексации и настройки прав доступа." />}
@@ -866,12 +900,62 @@ function StepTitle({ icon: Icon, title, text }: { icon: typeof FileText; title: 
   );
 }
 
-function SelectableList({ title, items, selectedIds, onToggle }: { title: string; items: { id: string; title: string; subtitle: string }[]; selectedIds: string[]; onToggle: (id: string) => void }) {
+function SelectableList({
+  title,
+  items,
+  selectedIds,
+  onToggle,
+  enableSearch = false,
+  searchPlaceholder = "Поиск",
+  enableSelectAll = false,
+  onSelectAll,
+  onDeselectAll
+}: {
+  title: string;
+  items: { id: string; title: string; subtitle: string }[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  enableSearch?: boolean;
+  searchPlaceholder?: string;
+  enableSelectAll?: boolean;
+  onSelectAll?: (ids: string[]) => void;
+  onDeselectAll?: (ids: string[]) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => `${item.title} ${item.subtitle}`.toLowerCase().includes(query));
+  }, [items, search]);
+  const allVisibleSelected = filteredItems.length > 0 && filteredItems.every((item) => selectedIds.includes(item.id));
+
   return (
     <section className={styles.selectableList}>
-      <h3>{title}</h3>
+      <div className={styles.selectableListHeader}>
+        <h3>{title}</h3>
+        {enableSelectAll && (
+          <button
+            type="button"
+            className={styles.linkButton}
+            disabled={!filteredItems.length}
+            onClick={() => {
+              const ids = filteredItems.map((item) => item.id);
+              if (allVisibleSelected) onDeselectAll?.(ids);
+              else onSelectAll?.(ids);
+            }}
+          >
+            {allVisibleSelected ? "Снять выделение" : "Выбрать все"}
+          </button>
+        )}
+      </div>
+      {enableSearch && (
+        <label className={styles.selectableSearch}>
+          <Search size={15} />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={searchPlaceholder} />
+        </label>
+      )}
       <div>
-        {items.map((item) => (
+        {filteredItems.map((item) => (
           <label key={item.id}>
             <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => onToggle(item.id)} />
             <span>
@@ -880,6 +964,7 @@ function SelectableList({ title, items, selectedIds, onToggle }: { title: string
             </span>
           </label>
         ))}
+        {!filteredItems.length && <div className={styles.emptyCell}>Ничего не найдено.</div>}
       </div>
     </section>
   );
@@ -945,6 +1030,29 @@ function documentStatusLabel(document: Document) {
 
 function departmentName(departments: Department[], departmentId?: string | null) {
   return departments.find((department) => department.id === departmentId)?.name || "-";
+}
+
+function userName(users: User[], userId?: string | null, currentUserId?: string) {
+  if (!userId) return "Не указан";
+  if (currentUserId && userId === currentUserId) return "Вы";
+  const user = users.find((item) => item.id === userId);
+  return user?.full_name || user?.email || "Пользователь";
+}
+
+function optionalUuid(value: string): string | null {
+  const trimmed = value.trim();
+  return trimmed || null;
+}
+
+function formatApiError(error: unknown) {
+  if (!isAxiosError(error)) return "Не удалось создать базу знаний.";
+  const detail = error.response?.data?.detail;
+  if (typeof detail === "string") return detail;
+  if (Array.isArray(detail)) {
+    return detail.map((item) => (typeof item === "object" && item && "msg" in item ? String(item.msg) : String(item))).join("; ");
+  }
+  if (detail && typeof detail === "object" && "message" in detail) return String(detail.message);
+  return error.message || "Не удалось создать базу знаний.";
 }
 
 function formatBytes(value?: number | null) {

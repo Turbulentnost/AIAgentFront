@@ -242,6 +242,7 @@ export interface Document {
   is_indexed: boolean;
   text_extract_status: TextExtractStatus;
   version: number;
+  uploaded_by_user_id?: string | null;
   source_url?: string | null;
   metadata?: Record<string, unknown> | null;
   created_at: string;
