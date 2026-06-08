@@ -2,10 +2,13 @@ import { apiClient } from "./client";
 import type {
   Agent,
   AgentAccess,
+  BrowserRun,
+  BrowserRunResult,
   ChunkSearchHit,
   ChunkSearchQuery,
   Department,
   DepartmentCreate,
+  DepartmentSyncStatus,
   Document,
   DocumentUploadOptions,
   HealthResponse,
@@ -56,7 +59,9 @@ export const usersApi = {
 };
 export const departmentsApi = {
   list: () => apiClient.get<Department[]>("/departments").then((r) => r.data),
-  create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data)
+  create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data),
+  syncStatus: () => apiClient.get<DepartmentSyncStatus>("/departments/sync/status").then((r) => r.data),
+  syncFrom1C: () => apiClient.post<DepartmentSyncStatus>("/departments/sync").then((r) => r.data)
 };
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),
@@ -69,6 +74,12 @@ export const tasksApi = {
   create: (payload: TaskCreate) => apiClient.post<Task>("/tasks", payload).then((r) => r.data),
   steps: (taskId: string) => apiClient.get<TaskStep[]>(`/tasks/${taskId}/steps`).then((r) => r.data),
   result: (taskId: string) => apiClient.get<TaskResult>(`/tasks/${taskId}/result`).then((r) => r.data)
+};
+export const browserRunsApi = {
+  pending: () => apiClient.get<BrowserRun[]>("/browser-runs/pending").then((r) => r.data),
+  submitResult: (runId: string, payload: BrowserRunResult) =>
+    apiClient.post<BrowserRun>(`/browser-runs/${runId}/result`, payload).then((r) => r.data),
+  get: (runId: string) => apiClient.get<BrowserRun>(`/browser-runs/${runId}`).then((r) => r.data)
 };
 export const documentsApi = {
   upload: (file: File, options: DocumentUploadOptions = {}) => {

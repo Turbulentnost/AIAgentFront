@@ -16,6 +16,7 @@ import {
   Upload
 } from "lucide-react";
 import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, usersApi } from "@/api/endpoints";
+import DepartmentSelect from "@/components/DepartmentSelect";
 import type {
   Agent,
   Department,
@@ -460,12 +461,12 @@ function StepMain(props: {
         </label>
         <label>
           Подразделение-владелец *
-          <select value={props.departmentId} onChange={(event) => props.onDepartment(event.target.value)}>
-            <option value="">Выберите подразделение</option>
-            {props.departments.map((department) => (
-              <option key={department.id} value={department.id}>{department.name}</option>
-            ))}
-          </select>
+          <DepartmentSelect
+            value={props.departmentId}
+            onChange={props.onDepartment}
+            departments={props.departments}
+            placeholder="Выберите подразделение"
+          />
         </label>
         <label>
           Ответственный *
@@ -533,12 +534,14 @@ function StepSources(props: {
           <option value="specification">Спецификация</option>
           <option value="other">Прочее</option>
         </select>
-        <select value={props.sourceDepartmentFilter} onChange={(event) => props.onDepartmentFilter(event.target.value)}>
-          <option value="all">Все подразделения</option>
-          {props.departments.map((department) => (
-            <option key={department.id} value={department.id}>{department.name}</option>
-          ))}
-        </select>
+        <DepartmentSelect
+          value={props.sourceDepartmentFilter}
+          onChange={props.onDepartmentFilter}
+          departments={props.departments}
+          allowEmpty={false}
+          allValue="all"
+          allLabel="Все подразделения"
+        />
         <select value={props.sourceStatusFilter} onChange={(event) => props.onStatusFilter(event.target.value)}>
           <option value="all">Все статусы</option>
           <option value="indexed">Обработан</option>
