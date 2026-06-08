@@ -23,6 +23,36 @@ export type DocumentProcessingStatus =
   | "indexed"
   | "failed";
 export type TextExtractStatus = "not_started" | "processing" | "extracted" | "failed";
+export type NdChangeRequestStatus =
+  | "draft"
+  | "submitted"
+  | "detecting_document"
+  | "requires_manual_document_selection"
+  | "document_selected"
+  | "locating_change_place"
+  | "requires_manual_location_selection"
+  | "applying_changes"
+  | "ready_for_user_review"
+  | "sent_to_approval"
+  | "approved"
+  | "rejected"
+  | "completed"
+  | "failed";
+export type NdChangeLocationStatus = "found" | "candidate" | "ambiguous" | "not_found" | "confirmed";
+export type NdChangeOperationType =
+  | "replace_section"
+  | "replace_paragraph"
+  | "insert_after"
+  | "insert_before"
+  | "delete_section"
+  | "update_table"
+  | "add_table_row"
+  | "replace_appendix"
+  | "update_reference"
+  | "annul_document"
+  | "replace_document"
+  | "manual_review";
+export type NdChangeApprovalStatus = "draft" | "sent" | "approved" | "rejected" | "completed";
 
 export interface Agent {
   id: string;
@@ -254,6 +284,143 @@ export interface DocumentUploadOptions {
   department_id?: string;
   task_id?: string;
   is_knowledge_base?: boolean;
+}
+
+export interface NdChangeRequestCreate {
+  reason: string;
+  release_date?: string | null;
+  effective_date?: string | null;
+  change_text: string;
+  department_id?: string | null;
+  assumed_document_id?: string | null;
+  assumed_document_code?: string | null;
+  attachments?: string[];
+  distribution_list?: string[];
+  initiator_comment?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface NdChangeRequest {
+  id: string;
+  number: string;
+  reason: string;
+  release_date: string | null;
+  effective_date: string | null;
+  change_text: string;
+  initiator_user_id: string | null;
+  department_id: string | null;
+  status: NdChangeRequestStatus;
+  selected_document_id: string | null;
+  selected_document_version_id: string | null;
+  detection_confidence: number | null;
+  requires_manual_document_selection: boolean;
+  requires_manual_location_selection: boolean;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NdChangeCandidateDocument {
+  id: string;
+  change_request_id: string;
+  document_id: string;
+  document_version_id: string | null;
+  score: number;
+  rank: number;
+  match_reason: string | null;
+  matched_fragments: Array<Record<string, unknown>> | null;
+  is_selected: boolean;
+  document_title?: string | null;
+  document_code?: string | null;
+}
+
+export interface NdChangeTargetLocation {
+  id: string;
+  change_request_id: string;
+  document_id: string;
+  document_version_id: string | null;
+  section_number: string | null;
+  section_title: string | null;
+  page_number: number | null;
+  chunk_id: string | null;
+  location_type: string;
+  current_text: string | null;
+  confidence: number | null;
+  status: NdChangeLocationStatus;
+}
+
+export interface NdChangeOperation {
+  id: string;
+  change_request_id: string;
+  target_location_id: string | null;
+  operation_type: NdChangeOperationType;
+  old_text: string | null;
+  new_text: string | null;
+  diff: Array<{ section_number?: string | null; old_text?: string; new_text?: string }> | null;
+  status: string;
+  requires_manual_review: boolean;
+}
+
+export interface NdChangeDraftFile {
+  id: string;
+  change_request_id: string;
+  document_id: string | null;
+  source_document_version_id: string | null;
+  draft_bucket: string;
+  draft_object_name: string;
+  original_filename: string | null;
+  generated_filename: string;
+  file_type: string;
+  status: string;
+  file_size: number | null;
+  created_at: string;
+}
+
+export interface NdChangeApprovalParticipant {
+  id: string;
+  approval_route_id: string;
+  user_id: string | null;
+  role_name: string | null;
+  approval_order: number;
+  status: NdChangeApprovalStatus;
+  comment: string | null;
+  approved_at: string | null;
+}
+
+export interface NdChangeApprovalRoute {
+  id: string;
+  change_request_id: string;
+  status: NdChangeApprovalStatus;
+  created_by_user_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  participants: NdChangeApprovalParticipant[];
+}
+
+export interface NdChangeResult {
+  id: string;
+  change_request_id: string;
+  agent_id: string | null;
+  status: string;
+  summary: string | null;
+  confidence: number | null;
+  selected_document_id: string | null;
+  draft_file_id: string | null;
+  change_notice_file_id: string | null;
+  warnings: string[] | null;
+  actions: Array<Record<string, unknown>> | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface NdChangePreview {
+  request: NdChangeRequest;
+  candidates: NdChangeCandidateDocument[];
+  target_locations: NdChangeTargetLocation[];
+  operations: NdChangeOperation[];
+  draft_files: NdChangeDraftFile[];
+  approval_routes: NdChangeApprovalRoute[];
+  result: NdChangeResult | null;
 }
 export interface ChunkSearchHit {
   content: string;

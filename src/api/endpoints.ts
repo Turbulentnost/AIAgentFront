@@ -27,6 +27,11 @@ import type {
   KnowledgeBaseStatus,
   KnowledgeBaseTestSearchResponse,
   LoginPayload,
+  NdChangeCandidateDocument,
+  NdChangePreview,
+  NdChangeRequest,
+  NdChangeRequestCreate,
+  NdChangeTargetLocation,
   Task,
   TaskCreate,
   TaskResult,
@@ -136,4 +141,25 @@ export const knowledgeBasesApi = {
     apiClient.post<KnowledgeBaseTestSearchResponse>(`/knowledge-bases/${knowledgeBaseId}/test-search`, payload).then((r) => r.data),
   audit: (knowledgeBaseId: string) =>
     apiClient.get<Record<string, unknown>[]>(`/knowledge-bases/${knowledgeBaseId}/audit`).then((r) => r.data)
+};
+
+export const ndChangeRequestsApi = {
+  list: () => apiClient.get<NdChangeRequest[]>("/nd-change-requests").then((r) => r.data),
+  create: (payload: NdChangeRequestCreate) => apiClient.post<NdChangeRequest>("/nd-change-requests", payload).then((r) => r.data),
+  get: (requestId: string) => apiClient.get<NdChangePreview>(`/nd-change-requests/${requestId}`).then((r) => r.data),
+  detectDocument: (requestId: string) =>
+    apiClient.post<NdChangeCandidateDocument[]>(`/nd-change-requests/${requestId}/detect-document`).then((r) => r.data),
+  selectDocument: (requestId: string, payload: { document_id: string; document_version_id?: string | null }) =>
+    apiClient.post<NdChangeRequest>(`/nd-change-requests/${requestId}/select-document`, payload).then((r) => r.data),
+  findLocation: (requestId: string, payload: { document_id?: string | null; document_version_id?: string | null } = {}) =>
+    apiClient.post<NdChangeTargetLocation[]>(`/nd-change-requests/${requestId}/find-location`, payload).then((r) => r.data),
+  applyChanges: (requestId: string, payload: { location_id?: string | null; mark_user_reviewed?: boolean; approval_user_ids?: string[] } = {}) =>
+    apiClient.post<NdChangePreview>(`/nd-change-requests/${requestId}/apply-changes`, payload).then((r) => r.data),
+  preview: (requestId: string) => apiClient.get<NdChangePreview>(`/nd-change-requests/${requestId}/preview`).then((r) => r.data),
+  sendApproval: (requestId: string, payload: { approval_user_ids: string[]; mark_user_reviewed?: boolean }) =>
+    apiClient.post(`/nd-change-requests/${requestId}/send-approval`, payload).then((r) => r.data),
+  downloadDraft: (requestId: string) =>
+    apiClient.get<Blob>(`/nd-change-requests/${requestId}/download-draft`, { responseType: "blob" }).then((r) => r.data),
+  downloadNotice: (requestId: string) =>
+    apiClient.get<Blob>(`/nd-change-requests/${requestId}/download-notice`, { responseType: "blob" }).then((r) => r.data)
 };

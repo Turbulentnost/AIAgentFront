@@ -12,24 +12,25 @@ import {
   TriangleAlert,
   UserRound
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
 import { useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
   dashboardActivities,
   dashboardStats,
   dashboardSummary,
-  quickLaunchAgents,
   recentTasks,
   recommendedActions
 } from "@/mock-data/dashboard";
 import type {
   DashboardActivity,
   DashboardStatCard,
-  QuickLaunchAgent,
   RecentTask,
   RecommendedAction
 } from "@/mock-data/dashboard";
+import type { AgentAccess } from "@/types";
 import styles from "./Dashboard.module.css";
 
 const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
@@ -39,7 +40,9 @@ const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
   check: CheckCircle2
 };
 
-const launchIcons: Record<QuickLaunchAgent["icon"], typeof ClipboardCheck> = {
+type LaunchIconKey = "clipboard" | "documents" | "chart";
+
+const launchIcons: Record<LaunchIconKey, typeof ClipboardCheck> = {
   clipboard: ClipboardCheck,
   documents: Files,
   chart: BarChart3
@@ -84,6 +87,12 @@ export default function Dashboard() {
   const { user } = useAuth();
   const greetingName = getGreetingName(user);
   const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
+  const availableAgents = useQuery({
+    queryKey: ["agents", "available"],
+    queryFn: agentsApi.available
+  });
+  const agents = availableAgents.data ?? [];
+  const stats = dashboardStats.map((stat) => (stat.id === "agents" ? { ...stat, value: agents.length } : stat));
 
   function handleRecommendedClick(action: RecommendedAction, event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -107,7 +116,7 @@ export default function Dashboard() {
       </div>
 
       <div className={styles.statsGrid} aria-label="Сводка по задачам и агентам">
-        {dashboardStats.map((stat) => {
+        {stats.map((stat) => {
           const Icon = statIcons[stat.icon];
 
           return (
@@ -133,24 +142,32 @@ export default function Dashboard() {
       <section className={styles.quickLaunch} aria-labelledby="quick-launch-title">
         <h2 id="quick-launch-title">Быстрый запуск</h2>
         <div className={styles.launchGrid}>
-          {quickLaunchAgents.map((agent) => {
-            const Icon = launchIcons[agent.icon];
+          {availableAgents.isPending && <div className={styles.launchState}>Загружаем доступных агентов...</div>}
+          {availableAgents.isError && <div className={styles.launchState}>Не удалось загрузить список агентов.</div>}
+          {!availableAgents.isPending && !availableAgents.isError && !agents.length && (
+            <div className={styles.launchState}>У вас пока нет доступных агентов.</div>
+          )}
+          {agents.map((agent) => {
+            const icon = getAgentIcon(agent);
+            const Icon = launchIcons[icon];
 
             return (
               <article className={styles.launchCard} key={agent.id}>
-                <div className={`${styles.launchArt} ${styles[agent.icon]}`}>
+                <div className={`${styles.launchArt} ${styles[icon]}`}>
                   <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
                 </div>
                 <div className={styles.launchBody}>
                   <div className={styles.launchHead}>
-                    <h3>{agent.title}</h3>
+                    <h3>{agent.name}</h3>
                     <span className={styles.status}>
                       <span aria-hidden="true" />
-                      Активен
+                      {agent.can_run ? "Доступен" : "Просмотр"}
                     </span>
                   </div>
-                  <p>{agent.description}</p>
-                  <button type="button">Запустить</button>
+                  <p>{agent.purpose || agent.slug}</p>
+                  <button type="button" onClick={() => navigate("/tasks")}>
+                    Запустить
+                  </button>
                 </div>
               </article>
             );
@@ -262,4 +279,11 @@ export default function Dashboard() {
       </section>
     </section>
   );
+}
+
+function getAgentIcon(agent: AgentAccess): LaunchIconKey {
+  const source = `${agent.slug} ${agent.name} ${agent.purpose ?? ""}`.toLowerCase();
+  if (source.includes("нд") || source.includes("document") || source.includes("документ")) return "documents";
+  if (source.includes("тендер") || source.includes("закуп")) return "chart";
+  return "clipboard";
 }
