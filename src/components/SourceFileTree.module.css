@@ -1,0 +1,189 @@
+.tree {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.rootList,
+.children {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folderBlock {
+  display: grid;
+  gap: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 12px 16px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 8px 2px 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button.row:hover,
+.row:focus-visible {
+  background: var(--color-hover-strong);
+  outline: none;
+}
+
+li.row {
+  cursor: default;
+}
+
+li.row:hover {
+  background: var(--color-hover-strong);
+}
+
+.chevronSpacer,
+.chevronWrap {
+  display: grid;
+  width: 12px;
+  height: 16px;
+  place-items: center;
+}
+
+.chevron {
+  color: var(--color-muted);
+  transition: transform 0.16s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.iconCell {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.iconCell svg {
+  display: block;
+}
+
+.folderIcon {
+  color: var(--tree-directory-icon-color);
+}
+
+.fileIcon {
+  color: var(--tree-file-icon-default);
+}
+
+.fileIcon_pdf {
+  color: var(--tree-file-icon-pdf);
+}
+
+.fileIcon_doc,
+.fileIcon_docx,
+.fileIcon_rtf,
+.fileIcon_odt {
+  color: var(--tree-file-icon-word);
+}
+
+.fileIcon_xls,
+.fileIcon_xlsx,
+.fileIcon_csv,
+.fileIcon_ods {
+  color: var(--tree-file-icon-sheet);
+}
+
+.fileIcon_ppt,
+.fileIcon_pptx,
+.fileIcon_odp {
+  color: var(--tree-file-icon-slide);
+}
+
+.fileIcon_md,
+.fileIcon_txt {
+  color: var(--tree-file-icon-text);
+}
+
+.fileIcon_json {
+  color: var(--tree-file-icon-code);
+}
+
+.fileIcon_js,
+.fileIcon_jsx,
+.fileIcon_ts,
+.fileIcon_tsx,
+.fileIcon_py,
+.fileIcon_go,
+.fileIcon_rs,
+.fileIcon_java,
+.fileIcon_html,
+.fileIcon_css,
+.fileIcon_scss,
+.fileIcon_vue {
+  color: var(--tree-file-icon-code);
+}
+
+.fileIcon_png,
+.fileIcon_jpg,
+.fileIcon_jpeg,
+.fileIcon_gif,
+.fileIcon_svg,
+.fileIcon_webp,
+.fileIcon_ico {
+  color: var(--tree-file-icon-media);
+}
+
+.fileIcon_zip,
+.fileIcon_rar,
+.fileIcon_7z,
+.fileIcon_tar,
+.fileIcon_gz {
+  color: var(--tree-file-icon-archive);
+}
+
+.fileIcon_default {
+  color: var(--tree-file-icon-default);
+}
+
+.nodeName {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeMeta {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

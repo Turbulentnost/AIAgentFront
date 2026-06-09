@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  ClipboardList,
   Cog,
   Database,
   FilePlus2,
@@ -27,13 +28,17 @@ import {
   Sparkles,
   SplitSquareHorizontal,
   Table2,
+  PanelLeft,
   Upload,
   X
 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, usersApi } from "@/api/endpoints";
+import { collectDroppedSourceFiles } from "@/utils/collectDroppedEntries";
+import { buildSourceFileTree, type SourceTreeRoot } from "@/utils/sourceFileTree";
 import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
+import SourceFileTree from "@/components/SourceFileTree";
 import { FormAutocomplete, FormSelect, SourceFilterBar, Switch } from "@/components/form-controls";
 import type {
   AgentAccess,
@@ -202,9 +207,12 @@ const documentTypeLabels: Partial<Record<DocumentType, string>> = {
 const sourceAcceptExtensions = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx", ".txt"];
 const sourceAcceptAttr = sourceAcceptExtensions.join(",");
 
+const RIGHT_SIDEBAR_FLIP_MS = 540;
+
 interface StagedSourceFile {
   id: string;
   file: File;
+  relativePath: string;
 }
 
 const documentTypeFilterOptions: { value: DocumentType; label: string }[] = [
@@ -298,6 +306,36 @@ export default function KnowledgeBaseCreate() {
   const [sourceOnlyCurrent, setSourceOnlyCurrent] = useState(true);
   const [stagedDropFiles, setStagedDropFiles] = useState<StagedSourceFile[]>([]);
   const [uploadingStagedIds, setUploadingStagedIds] = useState<string[]>([]);
+  const [rightSidebarView, setRightSidebarView] = useState<"summary" | "tree">("summary");
+  const [isRightSidebarAnimating, setIsRightSidebarAnimating] = useState(false);
+  const [isRightSidebarExpanded, setIsRightSidebarExpanded] = useState(false);
+  const stagedDropCountRef = useRef(0);
+  const rightSidebarFlipTimerRef = useRef<number | null>(null);
+
+  const beginRightSidebarFlip = useCallback(() => {
+    setIsRightSidebarAnimating(true);
+    if (rightSidebarFlipTimerRef.current) window.clearTimeout(rightSidebarFlipTimerRef.current);
+    rightSidebarFlipTimerRef.current = window.setTimeout(() => {
+      setIsRightSidebarAnimating(false);
+      rightSidebarFlipTimerRef.current = null;
+    }, RIGHT_SIDEBAR_FLIP_MS);
+  }, []);
+
+  const showRightSidebarPanel = useCallback(
+    (view: "summary" | "tree") => {
+      if (view === rightSidebarView) return;
+      beginRightSidebarFlip();
+      setRightSidebarView(view);
+    },
+    [beginRightSidebarFlip, rightSidebarView]
+  );
+
+  useEffect(
+    () => () => {
+      if (rightSidebarFlipTimerRef.current) window.clearTimeout(rightSidebarFlipTimerRef.current);
+    },
+    []
+  );
 
   const documents = useQuery({ queryKey: ["documents"], queryFn: documentsApi.list });
   const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
@@ -313,8 +351,49 @@ export default function KnowledgeBaseCreate() {
     setResponsibleUserId(currentUser.id);
   }, [currentUser, responsibleUserId]);
 
+  const stagedFileTree = useMemo(
+    () =>
+      buildSourceFileTree(
+        stagedDropFiles.map((item) => ({
+          id: item.id,
+          relativePath: item.relativePath,
+          fileSize: item.file.size
+        }))
+      ),
+    [stagedDropFiles]
+  );
+
   const activeDepartments = useMemo(() => filterActiveDepartments(departments.data ?? []), [departments.data]);
   const activeStep = steps[stepIndex];
+
+  const canFlipRightSidebar =
+    stagedDropFiles.length > 0 && (activeStep.id === "sources" || activeStep.id === "readiness");
+
+  const showRightSidebarExpand = activeStep.id === "sources" || activeStep.id === "readiness";
+
+  useEffect(() => {
+    if (!canFlipRightSidebar) {
+      setRightSidebarView("summary");
+      stagedDropCountRef.current = stagedDropFiles.length;
+      return;
+    }
+
+    if (activeStep.id === "sources" && stagedDropFiles.length > stagedDropCountRef.current) {
+      beginRightSidebarFlip();
+      setRightSidebarView("tree");
+    }
+
+    if (stagedDropFiles.length === 0) {
+      setRightSidebarView("summary");
+    }
+
+    stagedDropCountRef.current = stagedDropFiles.length;
+  }, [activeStep.id, beginRightSidebarFlip, canFlipRightSidebar, stagedDropFiles.length]);
+
+  useEffect(() => {
+    if (!showRightSidebarExpand) setIsRightSidebarExpanded(false);
+  }, [showRightSidebarExpand]);
+
   const activeSidebarIndex = getSidebarActiveIndex(stepIndex);
   const selectedDocuments = useMemo(
     () => (documents.data ?? []).filter((document) => selectedSourceIds.includes(document.id)),
@@ -348,18 +427,32 @@ export default function KnowledgeBaseCreate() {
     }
   });
 
-  const stageDropFiles = useCallback((files: FileList | File[]) => {
-    const incoming = [...files].filter(isAcceptedSourceFile);
-    if (!incoming.length) return;
+  const stageDroppedEntries = useCallback((entries: Array<{ file: File; relativePath: string }>) => {
+    if (!entries.length) return;
     setStagedDropFiles((current) => {
       const next = [...current];
-      for (const file of incoming) {
-        const duplicate = next.some((item) => item.file.name === file.name && item.file.size === file.size);
-        if (!duplicate) next.push({ id: crypto.randomUUID(), file });
+      for (const entry of entries) {
+        const duplicate = next.some(
+          (item) => item.relativePath === entry.relativePath && item.file.size === entry.file.size
+        );
+        if (!duplicate) {
+          next.push({ id: crypto.randomUUID(), file: entry.file, relativePath: entry.relativePath });
+        }
       }
       return next;
     });
   }, []);
+
+  const stageDropFiles = useCallback((files: FileList | File[]) => {
+    stageDroppedEntries(
+      [...files]
+        .filter(isAcceptedSourceFile)
+        .map((file) => ({
+          file,
+          relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
+        }))
+    );
+  }, [stageDroppedEntries]);
 
   const removeStagedFile = useCallback((id: string) => {
     setStagedDropFiles((current) => current.filter((item) => item.id !== id));
@@ -530,7 +623,11 @@ export default function KnowledgeBaseCreate() {
         </div>
       </header>
 
-      <main className={styles.layout}>
+      <main
+        className={`${styles.layout} ${
+          showRightSidebarExpand && isRightSidebarExpanded ? styles.layoutRightSidebarExpanded : ""
+        }`.trim()}
+      >
         <aside className={styles.stepsCard} aria-label="Этапы создания базы знаний">
           <div className={styles.stepsList} role="list">
             {sidebarSteps.map((step, index) => (
@@ -600,6 +697,7 @@ export default function KnowledgeBaseCreate() {
               stagedFiles={stagedDropFiles}
               uploadingStagedIds={uploadingStagedIds}
               onStageFiles={stageDropFiles}
+              onStageDroppedEntries={stageDroppedEntries}
               onRemoveStaged={removeStagedFile}
               onUploadStaged={uploadStagedFile}
               onUploadAllStaged={uploadAllStagedFiles}
@@ -651,28 +749,104 @@ export default function KnowledgeBaseCreate() {
           )}
         </section>
 
-        <aside className={styles.summaryCard}>
-          <Summary
-            stepIndex={stepIndex}
-            name={name}
-            baseKind={baseKind}
-            department={activeDepartments.find((item) => item.id === departmentId)}
-            responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
-            topic={topic}
-            selectedDocuments={selectedDocuments}
-            stagedDropCount={stagedDropFiles.length}
-            readiness={readiness}
-            users={usersQuery.data ?? []}
-            processing={processing}
-            accessMode={accessMode}
-            selectedAgents={selectedAgents}
-            warningsCount={warnings.length}
-            onNavigateToStep={(index) => {
-              setNavError(null);
-              setStepIndex(index);
-            }}
-          />
-        </aside>
+        <div className={styles.summaryCardShell}>
+          <aside
+            className={`${styles.summaryCard} ${canFlipRightSidebar ? styles.summaryCardFlipHost : ""} ${
+              canFlipRightSidebar && rightSidebarView === "tree" ? styles.summaryCardShowingTree : ""
+            } ${isRightSidebarAnimating ? styles.summaryCardAnimating : ""} ${
+              isRightSidebarExpanded ? styles.summaryCardExpanded : ""
+            } ${showRightSidebarExpand || canFlipRightSidebar ? styles.summaryCardWithControls : ""}`.trim()}
+          >
+            {showRightSidebarExpand ? (
+              <button
+                type="button"
+                className={styles.summaryWidthToggle}
+                aria-label={isRightSidebarExpanded ? "Сузить правую панель" : "Развернуть правую панель"}
+                aria-expanded={isRightSidebarExpanded}
+                onClick={() => setIsRightSidebarExpanded((current) => !current)}
+              >
+                <PanelLeft size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+            ) : null}
+            {canFlipRightSidebar ? (
+              <>
+                <div
+                  className={`${styles.summaryFlipInner} ${rightSidebarView === "tree" ? styles.summaryFlipInnerFlipped : ""}`}
+                >
+                  <div className={styles.summaryFlipFront}>
+                    <Summary
+                      stepIndex={stepIndex}
+                      name={name}
+                      baseKind={baseKind}
+                      department={activeDepartments.find((item) => item.id === departmentId)}
+                      responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
+                      topic={topic}
+                      selectedDocuments={selectedDocuments}
+                      stagedDropCount={stagedDropFiles.length}
+                      stagedFileTree={stagedFileTree}
+                      readiness={readiness}
+                      users={usersQuery.data ?? []}
+                      processing={processing}
+                      accessMode={accessMode}
+                      selectedAgents={selectedAgents}
+                      warningsCount={warnings.length}
+                      onNavigateToStep={(index) => {
+                        setNavError(null);
+                        setStepIndex(index);
+                      }}
+                    />
+                  </div>
+                  <div className={styles.summaryFlipBack}>
+                    <SourceTreeSidebarPanel tree={stagedFileTree} />
+                  </div>
+                </div>
+                <div className={styles.summarySidebarFooter}>
+                  {rightSidebarView === "summary" ? (
+                    <button
+                      type="button"
+                      className={styles.summarySidebarNavButton}
+                      onClick={() => showRightSidebarPanel("tree")}
+                    >
+                      <ListTree size={16} strokeWidth={2} aria-hidden="true" />
+                      Структура загрузки ({stagedFileTree.fileCount})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.summarySidebarNavButton}
+                      onClick={() => showRightSidebarPanel("summary")}
+                    >
+                      <ClipboardList size={16} strokeWidth={2} aria-hidden="true" />
+                      Сводка
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <Summary
+                stepIndex={stepIndex}
+                name={name}
+                baseKind={baseKind}
+                department={activeDepartments.find((item) => item.id === departmentId)}
+                responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
+                topic={topic}
+                selectedDocuments={selectedDocuments}
+                stagedDropCount={stagedDropFiles.length}
+                stagedFileTree={stagedFileTree}
+                readiness={readiness}
+                users={usersQuery.data ?? []}
+                processing={processing}
+                accessMode={accessMode}
+                selectedAgents={selectedAgents}
+                warningsCount={warnings.length}
+                onNavigateToStep={(index) => {
+                  setNavError(null);
+                  setStepIndex(index);
+                }}
+              />
+            )}
+          </aside>
+        </div>
       </main>
 
       {createKnowledgeBase.isError && (
@@ -874,6 +1048,7 @@ function StepSources(props: {
   onUploadTitle: (value: string) => void;
   onUpload: () => void;
   onStageFiles: (files: FileList | File[]) => void;
+  onStageDroppedEntries: (entries: Array<{ file: File; relativePath: string }>) => void;
   onRemoveStaged: (id: string) => void;
   onUploadStaged: (id: string) => void;
   onUploadAllStaged: () => void;
@@ -904,14 +1079,15 @@ function StepSources(props: {
   }, []);
 
   const handleDrop = useCallback(
-    (event: DragEvent) => {
+    async (event: DragEvent) => {
       event.preventDefault();
       event.stopPropagation();
       dragDepthRef.current = 0;
       setIsDragOver(false);
-      if (event.dataTransfer.files.length) props.onStageFiles(event.dataTransfer.files);
+      const dropped = await collectDroppedSourceFiles(event.dataTransfer, isAcceptedSourceFile);
+      if (dropped.length) props.onStageDroppedEntries(dropped);
     },
-    [props.onStageFiles]
+    [props.onStageDroppedEntries]
   );
 
   return (
@@ -951,8 +1127,8 @@ function StepSources(props: {
         {isDragOver ? (
           <div className={styles.sourcesDropOverlay} aria-hidden="true">
             <span className={styles.sourcesDropOverlayIcon}><Upload size={28} strokeWidth={2} /></span>
-            <strong>Отпустите файлы для добавления</strong>
-            <span>PDF, DOCX, XLSX, PPTX, TXT</span>
+            <strong>Отпустите файлы или папку для добавления</strong>
+            <span>PDF, DOCX, XLSX, PPTX, TXT — с сохранением вложенных папок</span>
           </div>
         ) : null}
         <table className={styles.sourcesTable}>
@@ -1077,7 +1253,7 @@ function StepSources(props: {
                     {(extKey || "file").slice(0, 4)}
                   </span>
                   <div className={styles.sourcesStagedCopy}>
-                    <strong title={staged.file.name}>{shortFileName(staged.file.name)}</strong>
+                    <strong title={staged.relativePath}>{staged.relativePath}</strong>
                     <small>{formatBytes(staged.file.size)}</small>
                   </div>
                   <button
@@ -1489,6 +1665,7 @@ function Summary(props: {
   topic: string;
   selectedDocuments: Document[];
   stagedDropCount: number;
+  stagedFileTree: SourceTreeRoot;
   readiness: ReturnType<typeof checkDocumentReadiness>[];
   users: User[];
   processing: ProcessingSettings;
@@ -1540,6 +1717,7 @@ function Summary(props: {
         rows: [
           ["Выбрано документов", String(props.selectedDocuments.length)],
           ["Новых загрузок", String(props.stagedDropCount)],
+          ["Папок", String(props.stagedFileTree.folderCount)],
           ["Всего файлов", String(props.selectedDocuments.length + props.stagedDropCount)],
           ["Общий размер", formatBytes(selectedSize)]
         ] as [string, string][],
@@ -1598,6 +1776,7 @@ function Summary(props: {
       props.selectedAgents,
       props.selectedDocuments.length,
       props.stagedDropCount,
+      props.stagedFileTree.folderCount,
       props.topic,
       props.warningsCount,
       selectedSize,
@@ -1657,6 +1836,22 @@ function Summary(props: {
         <WarningCallout text="База знаний будет доступна агентам только после завершения индексации и настройки прав доступа." />
       ) : null}
     </div>
+  );
+}
+
+function SourceTreeSidebarPanel({ tree }: { tree: SourceTreeRoot }) {
+  return (
+    <section className={styles.sourceTreeSidebar} aria-label="Структура загруженных файлов">
+      <div className={styles.sourceTreeHead}>
+        <h3 className={styles.sourceTreeTitle}>Структура загрузки</h3>
+        <p className={styles.sourceTreeMeta}>
+          {tree.fileCount} файлов · {tree.folderCount} папок
+        </p>
+      </div>
+      <div className={styles.sourceTreeBody}>
+        <SourceFileTree tree={tree} defaultExpandAll />
+      </div>
+    </section>
   );
 }
 
