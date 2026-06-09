@@ -2,11 +2,34 @@ import { FormEvent, MouseEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { isAxiosError } from "axios";
 import { agentBuilderApi } from "@/api/endpoints";
+import WorkflowGraphView from "@/components/WorkflowGraphView";
+import SandboxTrace from "@/components/SandboxTrace";
 import type {
   AgentBuilderSession,
-  AgentBuilderSessionDetail
+  AgentBuilderSessionDetail,
+  AgentType,
+  SandboxRun
 } from "@/types";
 import styles from "./AgentBuilder.module.css";
+
+const AGENT_TYPE_OPTIONS: Array<{ value: AgentType; label: string; disabled?: boolean }> = [
+  { value: "consultant", label: "Консультант" },
+  { value: "action", label: "Действие", disabled: true }
+];
+
+function agentTypeLabel(value: string | null | undefined): string {
+  if (value === "consultant") return "Консультант";
+  if (value === "action") return "Действие";
+  return "—";
+}
+
+function resolveProposedAgentType(detail: AgentBuilderSessionDetail | undefined): AgentType | null {
+  const fromProposal = detail?.agent_type_proposal?.proposed_agent_type;
+  if (fromProposal === "consultant" || fromProposal === "action") return fromProposal;
+  if (detail?.agent_type === "consultant" || detail?.agent_type === "action") return detail.agent_type;
+  if (detail?.current_stage === "classify_agent_type") return "consultant";
+  return null;
+}
 
 const stepClass: Record<string, string> = {
   pending: styles.stepPending,
@@ -23,6 +46,8 @@ export default function AgentBuilder() {
   const [message, setMessage] = useState("");
   const [chat, setChat] = useState<Array<{ role: "user" | "assistant"; text: string }>>([]);
   const [error, setError] = useState<string | null>(null);
+  const [selectedAgentType, setSelectedAgentType] = useState<AgentType>("consultant");
+  const [testQuery, setTestQuery] = useState("");
 
   const sessionsQuery = useQuery({
     queryKey: ["agent-builder", "sessions"],
@@ -41,6 +66,15 @@ export default function AgentBuilder() {
     if (!detail?.id) return;
     setChat(buildChatFromDetail(detail));
   }, [detail?.id, detail?.updated_at, detail?.collected_requirements]);
+
+  const proposedAgentType = resolveProposedAgentType(detail);
+
+  useEffect(() => {
+    const nextType = detail?.agent_type ?? detail?.agent_type_proposal?.proposed_agent_type ?? proposedAgentType;
+    if (nextType === "consultant" || nextType === "action") {
+      setSelectedAgentType(nextType);
+    }
+  }, [detail?.id, detail?.agent_type, detail?.agent_type_proposal?.proposed_agent_type, proposedAgentType]);
 
   const createMutation = useMutation({
     mutationFn: () => agentBuilderApi.createSession({ goal: goal.trim() }),
@@ -121,6 +155,30 @@ export default function AgentBuilder() {
     onError: (err) => setError(extractError(err))
   });
 
+  const sandboxQuery = useQuery({
+    queryKey: ["agent-builder", "sandbox", selectedSessionId],
+    queryFn: () => agentBuilderApi.getLatestSandboxRun(selectedSessionId!),
+    enabled: Boolean(selectedSessionId) && Boolean(detail?.blueprint),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status === "running" || status === "pending" ? 1500 : false;
+    }
+  });
+
+  const sandboxRun: SandboxRun | null = sandboxQuery.data ?? null;
+  const sandboxRunning = sandboxRun?.status === "running" || sandboxRun?.status === "pending";
+
+  const startSandboxMutation = useMutation({
+    mutationFn: ({ sessionId, testQuery }: { sessionId: string; testQuery: string }) =>
+      agentBuilderApi.startSandboxRun(sessionId, { test_query: testQuery || null }),
+    onSuccess: (data) => {
+      setError(null);
+      queryClient.setQueryData(["agent-builder", "sandbox", data.session_id], data);
+      queryClient.invalidateQueries({ queryKey: ["agent-builder", "sandbox", data.session_id] });
+    },
+    onError: (err) => setError(extractError(err))
+  });
+
   const isThinking =
     startMutation.isPending ||
     messageMutation.isPending ||
@@ -130,15 +188,28 @@ export default function AgentBuilder() {
   const canApprove = useMemo(() => {
     const status = detail?.blueprint?.status;
     const previewOk = detail?.preview_result?.success === true && Boolean(detail.preview_result.output_text);
-    return previewOk && (status === "generated" || status === "needs_user_review");
-  }, [detail?.blueprint?.status, detail?.preview_result]);
+    const sandboxOk = sandboxRun?.status === "succeeded";
+    return (previewOk || sandboxOk) && (status === "generated" || status === "needs_user_review");
+  }, [detail?.blueprint?.status, detail?.preview_result, sandboxRun?.status]);
 
   const needsClarification = detail?.status === "needs_clarification";
+  const typeConfirmed = Boolean(detail?.agent_type) || Boolean(detail?.agent_type_proposal?.confirmed);
+  const showAgentTypePanel = Boolean(
+    selectedSessionId &&
+      (detail?.agent_type ||
+        detail?.agent_type_proposal?.proposed_agent_type ||
+        detail?.current_stage === "classify_agent_type")
+  );
+  const showTypeConfirmation =
+    showAgentTypePanel && needsClarification && !typeConfirmed;
   const requirementsComplete = detail?.requirements_validation?.valid === true;
   const showRequiredElements =
-    needsClarification && !requirementsComplete && (detail?.required_elements?.length ?? 0) > 0;
+    needsClarification &&
+    typeConfirmed &&
+    !requirementsComplete &&
+    (detail?.required_elements?.length ?? 0) > 0;
   const showClarifyingQuestions =
-    needsClarification && !isThinking && (detail?.clarifying_questions?.length ?? 0) > 0;
+    needsClarification && !isThinking && !showTypeConfirmation && (detail?.clarifying_questions?.length ?? 0) > 0;
   const hasBlueprint = Boolean(detail?.blueprint);
   const inputDisabled =
     !selectedSessionId || isThinking || detail?.status === "needs_user_review" || detail?.status === "approved";
@@ -161,11 +232,34 @@ export default function AgentBuilder() {
     startMutation.mutate(selectedSessionId);
   }
 
+  function handleStartSandbox() {
+    if (!selectedSessionId) return;
+    const query = testQuery.trim() || detail?.goal || "";
+    startSandboxMutation.mutate({ sessionId: selectedSessionId, testQuery: query });
+  }
+
   function handleSendMessage(event: FormEvent) {
     event.preventDefault();
     if (!selectedSessionId || !message.trim()) return;
     messageMutation.mutate({ sessionId: selectedSessionId, text: message.trim() });
   }
+
+  function handleConfirmAgentType() {
+    if (!selectedSessionId || selectedAgentType !== "consultant") return;
+    messageMutation.mutate({ sessionId: selectedSessionId, text: "Подтверждаю тип Консультант" });
+  }
+
+  const recordedAgentType = detail?.agent_type ?? (typeConfirmed ? selectedAgentType : proposedAgentType);
+  const typeReasoning =
+    detail?.agent_type_proposal?.reasoning ??
+    (detail?.current_stage === "classify_agent_type"
+      ? chat.filter((item) => item.role === "assistant").at(-1)?.text
+      : null);
+  const typeHintText = typeConfirmed
+    ? `Тип агента зафиксирован: «${agentTypeLabel(recordedAgentType)}».`
+    : proposedAgentType
+      ? `Система определила тип агента как «${agentTypeLabel(proposedAgentType)}». Подтвердите выбор в списке или уточните в чате.`
+      : "Выберите тип агента для продолжения проектирования.";
 
   function handleDeleteSession(sessionId: string, event: MouseEvent) {
     event.stopPropagation();
@@ -245,6 +339,60 @@ export default function AgentBuilder() {
             {detail?.current_stage ? <span className={styles.statusPill}>{detail.current_stage}</span> : null}
           </div>
 
+          {showAgentTypePanel ? (
+            <div className={styles.typePanel}>
+              <h2>Тип агента</h2>
+              <p className={styles.typeHint}>{typeHintText}</p>
+              <label className={styles.typeSelectLabel} htmlFor="agent-type-select">
+                Записанный тип
+              </label>
+              <select
+                id="agent-type-select"
+                className={styles.typeSelect}
+                value={typeConfirmed ? (detail?.agent_type ?? selectedAgentType) : selectedAgentType}
+                disabled={typeConfirmed || isThinking}
+                onChange={(event) => setSelectedAgentType(event.target.value as AgentType)}
+              >
+                {AGENT_TYPE_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                    {option.disabled ? " (пока недоступен)" : ""}
+                  </option>
+                ))}
+              </select>
+              {detail?.agent_type_proposal?.confidence != null ? (
+                <p className={styles.typeMeta}>
+                  Уверенность классификации: {Math.round(detail.agent_type_proposal.confidence * 100)}%
+                </p>
+              ) : null}
+              {typeReasoning ? (
+                <div className={styles.typeExplanation}>
+                  <strong>Пояснение</strong>
+                  <p>{typeReasoning}</p>
+                </div>
+              ) : null}
+              {showTypeConfirmation ? (
+                <div className={styles.actions}>
+                  <button
+                    className={styles.primaryBtn}
+                    type="button"
+                    disabled={isThinking || selectedAgentType !== "consultant"}
+                    onClick={handleConfirmAgentType}
+                  >
+                    Подтвердить тип
+                  </button>
+                  {selectedAgentType === "action" ? (
+                    <p className={styles.typeWarning}>
+                      Тип «Действие» пока не поддерживается. Выберите «Консультант» для продолжения.
+                    </p>
+                  ) : null}
+                </div>
+              ) : (
+                <p className={styles.typeMeta}>Тип подтверждён и сохранён в сессии.</p>
+              )}
+            </div>
+          ) : null}
+
           {detail?.design_stages?.length ? (
             <div className={styles.designStages}>
               <h2>Этапы проектирования</h2>
@@ -266,34 +414,33 @@ export default function AgentBuilder() {
             </div>
           ) : null}
 
-          {detail?.preview_result?.success && detail.preview_result.output_text ? (
+          {hasBlueprint ? (
             <div className={styles.previewResult}>
-              <strong>Результат пробного запуска</strong>
-              {detail.preview_result.city ? (
-                <p className={styles.previewMeta}>
-                  {detail.preview_result.city}
-                  {detail.preview_result.source ? ` · ${detail.preview_result.source}` : ""}
-                </p>
-              ) : null}
-              <pre className={styles.previewText}>{detail.preview_result.output_text}</pre>
-              {detail.preview_result.source_url ? (
-                <a href={detail.preview_result.source_url} target="_blank" rel="noreferrer">
-                  Открыть источник
-                </a>
-              ) : null}
-            </div>
-          ) : detail?.preview_result && !detail.preview_result.success ? (
-            <div className={styles.previewError}>
-              Пробный запуск не удался: {detail.preview_result.error ?? "неизвестная ошибка"}
-            </div>
-          ) : null}
-
-          {hasBlueprint && !detail?.preview_result?.success ? (
-            <div className={styles.resultBanner}>
-              <strong>Blueprint готов — выполняется пробный запуск...</strong>
-              <p>
-                {detail?.blueprint?.name} — после пробного запуска здесь появится результат работы агента.
+              <strong>Пробный запуск (Sandbox)</strong>
+              <p className={styles.previewMeta}>
+                Агент реально выполнит шаги blueprint. Для получения данных с внешних сайтов держите вкладку открытой —
+                страницы откроются в вашем браузере.
               </p>
+              <textarea
+                className={styles.messageInput}
+                value={testQuery}
+                onChange={(e) => setTestQuery(e.target.value)}
+                placeholder={detail?.goal ?? "Тестовый запрос для агента"}
+                disabled={sandboxRunning || startSandboxMutation.isPending}
+              />
+              <button
+                className={styles.secondaryBtn}
+                type="button"
+                disabled={!selectedSessionId || sandboxRunning || startSandboxMutation.isPending}
+                onClick={handleStartSandbox}
+              >
+                {sandboxRunning || startSandboxMutation.isPending
+                  ? "Выполняется пробный запуск…"
+                  : sandboxRun
+                    ? "Запустить заново"
+                    : "Запустить пробный запуск"}
+              </button>
+              {sandboxRun ? <SandboxTrace run={sandboxRun} /> : null}
             </div>
           ) : null}
 
@@ -400,11 +547,10 @@ export default function AgentBuilder() {
                 ))}
               </div>
               <h3>Workflow</h3>
-              <div className={styles.workflowGraph}>
-                {(detail.blueprint.workflow_graph?.nodes ?? []).map((node) => (
-                  <div key={node.id} className={styles.workflowNode}>{node.label}</div>
-                ))}
-              </div>
+              <WorkflowGraphView
+                nodes={detail.blueprint.workflow_graph?.nodes}
+                edges={detail.blueprint.workflow_graph?.edges}
+              />
               {detail.validation_result ? (
                 <p>{detail.validation_result.valid ? "Blueprint валиден" : detail.validation_result.errors.join(", ")}</p>
               ) : null}
@@ -436,8 +582,8 @@ export default function AgentBuilder() {
               disabled={!selectedSessionId || !canApprove || approveMutation.isPending}
               onClick={() => selectedSessionId && approveMutation.mutate(selectedSessionId)}
               title={
-                !detail?.preview_result?.success
-                  ? "Сначала дождитесь результата пробного запуска"
+                !canApprove
+                  ? "Сначала дождитесь успешного пробного запуска (Sandbox)"
                   : undefined
               }
             >

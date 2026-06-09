@@ -44,7 +44,8 @@ import type {
   AgentBuilderSessionDetail,
   AgentBuilderPlan,
   AgentBuilderAttempt,
-  AgentBuilderToolCatalogItem
+  AgentBuilderToolCatalogItem,
+  SandboxRun
 } from "@/types";
 
 export const healthApi = {
@@ -175,6 +176,12 @@ export const agentBuilderApi = {
     longRunningApiClient.post<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}/regenerate`).then((r) => r.data),
   runPreview: (sessionId: string) =>
     longRunningApiClient.post<AgentBuilderSessionDetail>(`/agent-builder/sessions/${sessionId}/preview`).then((r) => r.data),
+  startSandboxRun: (sessionId: string, payload: { test_query?: string | null }) =>
+    apiClient.post<SandboxRun>(`/agent-builder/sessions/${sessionId}/sandbox-run`, payload).then((r) => r.data),
+  getLatestSandboxRun: (sessionId: string) =>
+    apiClient.get<SandboxRun | null>(`/agent-builder/sessions/${sessionId}/sandbox-run`).then((r) => r.data),
+  getSandboxRun: (sessionId: string, runId: string) =>
+    apiClient.get<SandboxRun>(`/agent-builder/sessions/${sessionId}/sandbox-run/${runId}`).then((r) => r.data),
   listTools: () => apiClient.get<AgentBuilderToolCatalogItem[]>("/agent-builder/tools").then((r) => r.data)
 };
 

@@ -687,18 +687,41 @@ export interface AgentBuilderAttempt {
   created_at: string;
 }
 
+export type AgentType = "consultant" | "action";
+
+export interface WorkflowGraphNode {
+  id: string;
+  label: string;
+  type?: string;
+  capability?: string | null;
+  goal?: string | null;
+  node_kind?: string | null;
+  status?: string | null;
+}
+
+export interface AgentTypeProposal {
+  proposed_agent_type?: string | null;
+  confidence?: number | null;
+  reasoning?: string | null;
+  confirmed: boolean;
+}
+
 export interface AgentBlueprint {
   id: string;
   name: string;
   code: string;
   description?: string | null;
+  agent_type?: string | null;
   status: AgentBlueprintStatus;
   version: number;
   input_schema?: Record<string, unknown> | null;
   output_schema?: Record<string, unknown> | null;
   tools?: string[] | null;
   knowledge_bases?: string[] | null;
-  workflow_graph?: { nodes: Array<{ id: string; label: string; type?: string }>; edges: Array<{ source: string; target: string; label?: string }> } | null;
+  workflow_graph?: {
+    nodes: WorkflowGraphNode[];
+    edges: Array<{ source: string; target: string; label?: string }>;
+  } | null;
   human_approval_rules?: Array<Record<string, unknown>> | null;
   prompts?: Record<string, string> | null;
   test_cases?: Array<Record<string, unknown>> | null;
@@ -760,6 +783,8 @@ export interface AgentBuilderSessionDetail extends AgentBuilderSession {
   required_elements: AgentBuilderRequiredElement[];
   requirements_validation?: AgentBuilderRequirementsValidation | null;
   preview_result?: AgentBuilderPreview | null;
+  agent_type?: string | null;
+  agent_type_proposal?: AgentTypeProposal | null;
 }
 
 export interface AgentBuilderToolCatalogItem {
@@ -767,4 +792,40 @@ export interface AgentBuilderToolCatalogItem {
   description: string;
   implemented: boolean;
   required_permissions: string[];
+}
+
+export interface SandboxStep {
+  id: string;
+  order_index: number;
+  title?: string | null;
+  capability?: string | null;
+  tool_name?: string | null;
+  status: string;
+  request?: Record<string, unknown> | null;
+  result_summary?: Record<string, unknown> | null;
+  duration_ms?: number | null;
+  error_message?: string | null;
+}
+
+export interface SandboxRunStats {
+  total_steps?: number;
+  success_steps?: number;
+  error_steps?: number;
+  avg_duration_ms?: number;
+  total_duration_ms?: number;
+}
+
+export interface SandboxRun {
+  id: string;
+  session_id: string;
+  status: string;
+  test_query?: string | null;
+  final_answer?: string | null;
+  stats?: SandboxRunStats | null;
+  executed_graph?: {
+    nodes: WorkflowGraphNode[];
+    edges: Array<{ source: string; target: string; label?: string }>;
+  } | null;
+  error_message?: string | null;
+  steps: SandboxStep[];
 }
