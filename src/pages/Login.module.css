@@ -1,19 +1,15 @@
 .page {
-  --login-blue: #2563eb;
-  --login-blue-dark: #1d4ed8;
-  --login-violet: #7c3aed;
-  --login-green: #16a34a;
-  --login-ink: #07152f;
-  --login-muted: #667085;
-  --login-border: #dbe5f3;
-  --login-surface: rgba(255, 255, 255, 0.92);
+  --login-blue: var(--color-primary);
+  --login-blue-dark: var(--color-primary-hover);
+  --login-violet: var(--color-violet);
+  --login-green: var(--color-success);
   min-height: 100vh;
   overflow: hidden;
   color: var(--login-ink);
   background:
-    radial-gradient(circle at 12% 100%, rgba(37, 99, 235, 0.2), transparent 34%),
-    radial-gradient(circle at 50% 88%, rgba(20, 184, 166, 0.13), transparent 34%),
-    linear-gradient(135deg, #f9fbff 0%, #f3f7ff 48%, #eef5ff 100%);
+    radial-gradient(circle at 12% 100%, var(--login-glow-blue), transparent 34%),
+    radial-gradient(circle at 50% 88%, var(--login-glow-teal), transparent 34%),
+    linear-gradient(135deg, var(--login-bg-start) 0%, var(--login-bg-mid) 48%, var(--login-bg-end) 100%);
 }
 
 .page::before {
@@ -23,8 +19,8 @@
   pointer-events: none;
   content: "";
   background:
-    linear-gradient(115deg, transparent 0 14%, rgba(37, 99, 235, 0.18) 14.2% 14.6%, transparent 14.8% 32%, rgba(37, 99, 235, 0.16) 32.2% 32.6%, transparent 32.8%),
-    radial-gradient(circle, rgba(37, 99, 235, 0.46) 0 2px, transparent 3px);
+    linear-gradient(115deg, transparent 0 14%, var(--login-line-blue) 14.2% 14.6%, transparent 14.8% 32%, var(--color-primary-alpha-16) 32.2% 32.6%, transparent 32.8%),
+    radial-gradient(circle, var(--login-dot-blue) 0 2px, transparent 3px);
   background-size: 100% 100%, 32px 32px;
   mask-image: linear-gradient(to top, #000 0%, transparent 82%);
 }
@@ -37,8 +33,8 @@
   justify-content: space-between;
   height: 3.25rem;
   padding: 0 1.75rem;
-  background: rgba(255, 255, 255, 0.82);
-  border-bottom: 1px solid rgba(219, 229, 243, 0.78);
+  background: var(--login-surface-soft);
+  border-bottom: 1px solid var(--color-border-glass);
   backdrop-filter: blur(18px);
 }
 
@@ -65,12 +61,12 @@
 
 .headerIcon {
   flex-shrink: 0;
-  color: #667085;
+  color: var(--login-muted);
 }
 
 .headerChevron {
   flex-shrink: 0;
-  color: #98a2b3;
+  color: var(--color-login-icon);
   transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
@@ -100,7 +96,7 @@
   gap: 0.375rem;
   align-items: center;
   padding: 0.375rem 0.5rem;
-  color: #344054;
+  color: var(--color-login-label);
   font-size: 0.8125rem;
   font-weight: 600;
   background: transparent;
@@ -117,10 +113,10 @@
   display: grid;
   min-width: 10.5rem;
   padding: 0.45rem;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid rgba(219, 229, 243, 0.98);
+  background: var(--login-surface-strong);
+  border: 1px solid var(--color-login-card-border);
   border-radius: 0.875rem;
-  box-shadow: 0 1.25rem 2.5rem rgba(15, 23, 42, 0.14);
+  box-shadow: 0 1.25rem 2.5rem var(--shadow-xl);
   backdrop-filter: blur(18px);
 }
 
@@ -130,7 +126,7 @@
   align-items: center;
   width: 100%;
   padding: 0.55rem 0.65rem;
-  color: #344054;
+  color: var(--color-login-label);
   font-size: 0.8125rem;
   font-weight: 650;
   text-align: left;
@@ -143,13 +139,13 @@
 .languageOption:hover,
 .languageOption[aria-selected="true"] {
   color: var(--login-blue);
-  background: #eff6ff;
+  background: var(--color-login-hover);
 }
 
 .languageBadge {
   flex: 0 0 auto;
   min-width: 1.7rem;
-  color: #667085;
+  color: var(--login-muted);
   font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.02em;
@@ -158,7 +154,7 @@
 
 .headerButton:hover {
   color: var(--login-blue);
-  background: rgba(37, 99, 235, 0.08);
+  background: var(--color-login-hover-soft);
 }
 
 .headerButton:focus-visible,
@@ -167,7 +163,7 @@
 .iconButton:focus-visible,
 .forgotLink:focus-visible,
 .logo:focus-visible {
-  outline: 3px solid rgba(37, 99, 235, 0.24);
+  outline: 3px solid var(--color-primary-alpha-24);
   outline-offset: 3px;
 }
 
@@ -204,7 +200,7 @@
 
 .hero h1 {
   margin: 0;
-  color: #061a3a;
+  color: var(--color-login-heading);
   font-size: clamp(2.5rem, 5vw, 3.65rem);
   font-weight: 700;
   line-height: 0.98;
@@ -214,7 +210,7 @@
 .heroText {
   max-width: 34rem;
   margin: 1rem 0 2.5rem;
-  color: #40506a;
+  color: var(--color-login-subheading);
   font-size: 0.9375rem;
   line-height: 1.7;
 }
@@ -230,8 +226,8 @@
 .processCard,
 .form {
   background: var(--login-surface);
-  border: 1px solid rgba(219, 229, 243, 0.88);
-  box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.08);
+  border: 1px solid var(--color-login-card-border-soft);
+  box-shadow: 0 1rem 2.5rem var(--shadow-lg);
   backdrop-filter: blur(16px);
 }
 
@@ -251,10 +247,10 @@
 }
 
 .featureCard:hover {
-  border-color: rgba(191, 214, 245, 0.95);
+  border-color: var(--color-login-card-border-hover);
   box-shadow:
-    0 1.55rem 3.25rem rgba(15, 23, 42, 0.13),
-    0 0.5rem 1.35rem rgba(37, 99, 235, 0.09);
+    0 1.55rem 3.25rem var(--color-shadow-13),
+    0 0.5rem 1.35rem var(--color-primary-alpha-07);
   transform: translateY(-6px);
 }
 
@@ -265,10 +261,10 @@
   width: 3.75rem;
   height: 3.75rem;
   place-items: center;
-  color: #ffffff;
+  color: var(--color-surface);
   overflow: hidden;
   border-radius: 0.95rem;
-  box-shadow: 0 0.8rem 1.45rem rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0.8rem 1.45rem var(--color-primary-alpha-28);
 }
 
 .featureIcon img {
@@ -299,7 +295,7 @@
 
 .featureSubtitle,
 .featureTitle {
-  color: #1f2a44;
+  color: var(--color-login-body);
   font-size: 0.88rem;
   font-weight: 800;
   line-height: 1.16;
@@ -345,7 +341,7 @@
   fill: none;
   stroke-width: 3;
   stroke-linecap: round;
-  filter: drop-shadow(0 0.25rem 0.35rem rgba(37, 99, 235, 0.16));
+  filter: drop-shadow(0 0.25rem 0.35rem var(--color-primary-alpha-16));
 }
 
 .processLines .energyLine {
@@ -358,53 +354,53 @@
 }
 
 .blueLine {
-  stroke: #2563eb;
+  stroke: var(--color-primary);
 }
 
 .violetLine {
-  stroke: #7c3aed;
+  stroke: var(--color-violet);
 }
 
 .greenLine {
-  stroke: #22a75a;
+  stroke: var(--color-login-green-stroke);
 }
 
 .processLines .energyBlue {
-  stroke: #5da2ff;
+  stroke: var(--color-login-blue-stroke);
   filter:
-    drop-shadow(0 0 0.28rem rgba(37, 99, 235, 0.98))
-    drop-shadow(0 0 0.78rem rgba(37, 99, 235, 0.56));
+    drop-shadow(0 0 0.28rem var(--color-primary-alpha-98))
+    drop-shadow(0 0 0.78rem var(--color-primary-alpha-56));
 }
 
 .processLines .energyViolet {
-  stroke: #a78bfa;
+  stroke: var(--color-login-violet-stroke);
   animation-delay: 1.22s;
   filter:
-    drop-shadow(0 0 0.28rem rgba(124, 58, 237, 0.95))
-    drop-shadow(0 0 0.8rem rgba(124, 58, 237, 0.52));
+    drop-shadow(0 0 0.28rem var(--color-violet-alpha-95))
+    drop-shadow(0 0 0.8rem var(--color-violet-alpha-52));
 }
 
 .processLines .energyGreen {
-  stroke: #6ee7a0;
+  stroke: var(--color-login-mint-stroke);
   animation-delay: 1.22s;
   filter:
-    drop-shadow(0 0 0.28rem rgba(34, 167, 90, 0.95))
-    drop-shadow(0 0 0.76rem rgba(34, 167, 90, 0.5));
+    drop-shadow(0 0 0.28rem var(--color-success-alpha-95))
+    drop-shadow(0 0 0.76rem var(--color-success-alpha-50));
 }
 
 .blueDot {
-  fill: #2563eb;
-  filter: drop-shadow(0 0 0.45rem rgba(37, 99, 235, 0.58));
+  fill: var(--color-primary);
+  filter: drop-shadow(0 0 0.45rem var(--color-primary-alpha-58));
 }
 
 .violetDot {
-  fill: #7c3aed;
-  filter: drop-shadow(0 0 0.45rem rgba(124, 58, 237, 0.58));
+  fill: var(--color-violet);
+  filter: drop-shadow(0 0 0.45rem var(--color-violet-alpha-58));
 }
 
 .greenDot {
-  fill: #22a75a;
-  filter: drop-shadow(0 0 0.45rem rgba(34, 167, 90, 0.52));
+  fill: var(--color-login-green-stroke);
+  filter: drop-shadow(0 0 0.45rem var(--color-success-alpha-52));
 }
 
 .workflowCard {
@@ -415,10 +411,10 @@
   gap: 0.78rem 1rem;
   align-items: center;
   padding: 1.05rem 1.2rem;
-  background: rgba(255, 255, 255, 0.93);
-  border: 1px solid rgba(230, 236, 247, 0.92);
+  background: var(--color-login-glass);
+  border: 1px solid var(--color-login-glass-border);
   border-radius: 1.15rem;
-  box-shadow: 0 1.25rem 2.75rem rgba(55, 86, 150, 0.17);
+  box-shadow: 0 1.25rem 2.75rem var(--color-login-card-shadow);
   backdrop-filter: blur(18px);
 }
 
@@ -447,7 +443,7 @@
   inset: -35% -55%;
   pointer-events: none;
   content: "";
-  background: linear-gradient(110deg, transparent 36%, rgba(96, 165, 250, 0.28) 49%, transparent 62%);
+  background: linear-gradient(110deg, transparent 36%, var(--color-login-shine) 49%, transparent 62%);
   opacity: 0;
   transform: translateX(-42%) rotate(8deg);
   animation: agentEnergySheen 3.9s ease-in-out infinite;
@@ -476,23 +472,23 @@
   width: clamp(3.15rem, 5.8vw, 3.7rem);
   height: clamp(3.15rem, 5.8vw, 3.7rem);
   place-items: center;
-  color: #ffffff;
+  color: var(--color-surface);
   border-radius: 0.95rem;
-  box-shadow: 0 0.85rem 1.35rem rgba(37, 99, 235, 0.28);
+  box-shadow: 0 0.85rem 1.35rem var(--color-primary-alpha-28);
 }
 
 .workflowBlue {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
+  background: linear-gradient(135deg, var(--color-gradient-login-blue-a), var(--color-primary));
 }
 
 .workflowViolet {
-  background: linear-gradient(135deg, #8b5cf6, #6d5dfc);
-  box-shadow: 0 0.85rem 1.35rem rgba(124, 58, 237, 0.24);
+  background: linear-gradient(135deg, var(--color-violet), var(--color-gradient-login-violet-b));
+  box-shadow: 0 0.85rem 1.35rem var(--color-violet-alpha-24);
 }
 
 .workflowGreen {
-  background: linear-gradient(135deg, #4ade80, #22a75a);
-  box-shadow: 0 0.85rem 1.35rem rgba(34, 167, 90, 0.22);
+  background: linear-gradient(135deg, var(--color-gradient-icon-green-a), var(--color-login-green-stroke));
+  box-shadow: 0 0.85rem 1.35rem var(--color-success-alpha-24);
 }
 
 .workflowContent {
@@ -504,7 +500,7 @@
 .workflowContent h3,
 .agentHeader h3 {
   margin: 0;
-  color: #1f2a44;
+  color: var(--color-login-body);
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1.2;
@@ -522,13 +518,13 @@
 }
 
 .statusDone {
-  color: #22a75a;
-  background: rgba(34, 167, 90, 0.12);
+  color: var(--color-login-green-stroke);
+  background: var(--color-login-green-bg);
 }
 
 .statusWork {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning);
+  background: var(--color-login-amber-bg);
 }
 
 .workflowProgress {
@@ -536,14 +532,14 @@
   grid-column: 1 / 3;
   height: 0.33rem;
   overflow: hidden;
-  background: #dce6f7;
+  background: var(--color-login-divider);
   border-radius: 999px;
 }
 
 .progressBar {
   display: block;
   height: 100%;
-  background: linear-gradient(90deg, #2563eb 0%, #2f72ff 100%);
+  background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-gradient-login-progress) 100%);
   border-radius: inherit;
 }
 
@@ -551,7 +547,7 @@
   grid-row: 2;
   grid-column: 3;
   align-self: center;
-  color: #2d3850;
+  color: var(--color-gradient-login-subtitle);
   font-size: 0.9rem;
   font-weight: 600;
 }
@@ -565,7 +561,7 @@
 
 .agentHeader p {
   margin: 0.42rem 0 0;
-  color: #667085;
+  color: var(--login-muted);
   font-size: 0.84rem;
   font-weight: 600;
 }
@@ -582,7 +578,7 @@
   display: flex;
   gap: 0.7rem;
   align-items: center;
-  color: #667085;
+  color: var(--login-muted);
   font-size: 0.84rem;
   font-weight: 700;
 }
@@ -592,8 +588,8 @@
   width: 1.35rem;
   height: 1.35rem;
   place-items: center;
-  color: #6ea0ff;
-  border: 2px solid #8bb3ff;
+  color: var(--color-login-ring-text);
+  border: 2px solid var(--color-login-ring);
   border-radius: 999px;
 }
 
@@ -610,7 +606,7 @@
 
 .formTitle {
   margin: 0 0 1.5rem;
-  color: #061a3a;
+  color: var(--color-login-heading);
   font-size: 1.375rem;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -619,7 +615,7 @@
 .field {
   display: grid;
   gap: 0.5rem;
-  color: #344054;
+  color: var(--color-login-label);
   font-size: 0.875rem;
   font-weight: 650;
 }
@@ -632,28 +628,28 @@
   width: 100%;
   height: 2.9rem;
   padding: 0 3rem 0 3rem;
-  color: #101828;
+  color: var(--color-login-title);
   font: inherit;
   font-weight: 500;
-  background: rgba(255, 255, 255, 0.96);
-  border: 1px solid #d8e0ee;
+  background: var(--login-surface-strong);
+  border: 1px solid var(--color-border-input);
   border-radius: 0.72rem;
-  box-shadow: 0 0.05rem 0.1rem rgba(15, 23, 42, 0.04), inset 0 0 0 1px rgba(219, 229, 243, 0.32);
+  box-shadow: 0 0.05rem 0.1rem var(--shadow-sm), inset 0 0 0 1px var(--color-login-card-border-soft);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .field input::placeholder {
-  color: #a7b2c4;
+  color: var(--color-login-placeholder);
 }
 
 .field input:hover {
-  border-color: #b8c7dc;
+  border-color: var(--color-border-input-hover);
 }
 
 .field input:focus {
   border-color: var(--login-blue);
   outline: 0;
-  box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+  box-shadow: 0 0 0 4px var(--color-login-focus);
 }
 
 .fieldIcon {
@@ -661,7 +657,7 @@
   top: 50%;
   left: 1rem;
   z-index: 1;
-  color: #667085;
+  color: var(--login-muted);
   pointer-events: none;
   transform: translateY(-50%);
 }
@@ -675,7 +671,7 @@
   height: 1.75rem;
   place-items: center;
   padding: 0;
-  color: #667085;
+  color: var(--login-muted);
   background: transparent;
   border: 0;
   border-radius: 999px;
@@ -685,7 +681,7 @@
 
 .iconButton:hover {
   color: var(--login-blue);
-  background: #eff6ff;
+  background: var(--color-login-hover);
 }
 
 .formMeta {
@@ -701,7 +697,7 @@
   flex-wrap: nowrap;
   gap: 0.5rem;
   align-items: center;
-  color: #344054;
+  color: var(--color-login-label);
   font-size: 0.8125rem;
   font-weight: 700;
   white-space: nowrap;
@@ -723,11 +719,11 @@
 
 .errorMessage {
   padding: 0.75rem 0.875rem;
-  color: #b42318;
+  color: var(--color-danger-text);
   font-size: 0.8125rem;
   font-weight: 700;
-  background: #fff1f0;
-  border: 1px solid #ffccc7;
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
   border-radius: 0.75rem;
 }
 
@@ -741,10 +737,10 @@
 }
 
 .submitButton {
-  color: #ffffff;
+  color: var(--color-surface);
   background: linear-gradient(135deg, var(--login-blue), var(--login-blue-dark));
   border: 0;
-  box-shadow: 0 0.75rem 1.5rem rgba(37, 99, 235, 0.24);
+  box-shadow: 0 0.75rem 1.5rem var(--color-primary-alpha-24);
 }
 
 .submitButton:hover:not(:disabled) {
@@ -776,7 +772,7 @@
   grid-template-columns: 1fr auto 1fr;
   gap: 0.75rem;
   align-items: center;
-  color: #98a2b3;
+  color: var(--color-login-icon);
   font-size: 0.75rem;
   font-weight: 700;
 }
@@ -794,8 +790,8 @@
   align-items: center;
   justify-content: center;
   color: var(--login-blue);
-  background: #ffffff;
-  border: 1px solid #93b8ff;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-accent);
 }
 
 .ssoIcon {
@@ -811,7 +807,7 @@
 }
 
 .ssoButton:hover {
-  color: #ffffff;
+  color: var(--color-surface);
   background: var(--login-blue);
   border-color: var(--login-blue);
 }
@@ -856,15 +852,15 @@
   28%,
   74%,
   100% {
-    box-shadow: 0 1.25rem 2.75rem rgba(55, 86, 150, 0.17);
+    box-shadow: 0 1.25rem 2.75rem var(--color-login-card-shadow);
   }
 
   39%,
   52% {
     box-shadow:
-      0 1.25rem 2.75rem rgba(55, 86, 150, 0.17),
-      0 0 1.35rem rgba(37, 99, 235, 0.2),
-      0 0 2.4rem rgba(37, 99, 235, 0.12);
+      0 1.25rem 2.75rem var(--color-login-card-shadow),
+      0 0 1.35rem var(--login-glow-blue),
+      0 0 2.4rem var(--color-login-focus);
   }
 }
 
@@ -895,14 +891,14 @@
   50%,
   82%,
   100% {
-    box-shadow: 0 1.25rem 2.75rem rgba(55, 86, 150, 0.17);
+    box-shadow: 0 1.25rem 2.75rem var(--color-login-card-shadow);
   }
 
   63%,
   74% {
     box-shadow:
-      0 1.25rem 2.75rem rgba(55, 86, 150, 0.17),
-      0 0 1.15rem rgba(96, 165, 250, 0.16);
+      0 1.25rem 2.75rem var(--color-login-card-shadow),
+      0 0 1.15rem var(--color-login-shine);
   }
 }
 

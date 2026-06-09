@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { departmentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
+import FormAutocomplete from "@/components/form-controls/FormAutocomplete";
 import type { Department } from "@/types";
 
 const SYNC_VALUE = "__sync_departments_from_1c__";
@@ -13,7 +14,10 @@ export default function DepartmentSelect({
   allowEmpty = true,
   emptyLabel = "Без подразделения",
   allValue,
-  allLabel = "Все подразделения"
+  allLabel = "Все подразделения",
+  className,
+  compact = false,
+  ariaLabel = "Подразделение"
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -23,6 +27,9 @@ export default function DepartmentSelect({
   emptyLabel?: string;
   allValue?: string;
   allLabel?: string;
+  className?: string;
+  compact?: boolean;
+  ariaLabel?: string;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -37,27 +44,35 @@ export default function DepartmentSelect({
   const canSync = Boolean(user?.is_superuser) && (!nextAllowedAt || nextAllowedAt <= new Date());
   const syncLabel = buildSyncLabel(syncStatus.data?.last_synced_at, syncStatus.data?.next_allowed_at, user?.is_superuser);
 
-  function handleChange(nextValue: string) {
-    if (nextValue === SYNC_VALUE) {
-      if (canSync && !syncMutation.isPending) syncMutation.mutate();
-      return;
-    }
-    onChange(nextValue);
-  }
+  const options = [
+    ...(allValue !== undefined ? [{ value: allValue, label: allLabel }] : []),
+    ...departments.map((department) => ({ value: department.id, label: department.name }))
+  ];
 
   return (
-    <select value={value} onChange={(event) => handleChange(event.target.value)}>
-      {allValue !== undefined && <option value={allValue}>{allLabel}</option>}
-      {allowEmpty && <option value="">{placeholder || emptyLabel}</option>}
-      {departments.map((department) => (
-        <option key={department.id} value={department.id}>
-          {department.name}
-        </option>
-      ))}
-      <option value={SYNC_VALUE} disabled={!canSync || syncMutation.isPending}>
-        {syncMutation.isPending ? "Обновляем подразделения из 1С..." : syncLabel}
-      </option>
-    </select>
+    <FormAutocomplete
+      className={className}
+      compact={compact}
+      value={value}
+      onChange={onChange}
+      options={options}
+      placeholder={placeholder}
+      ariaLabel={ariaLabel}
+      emptyValue={allowEmpty ? "" : undefined}
+      emptyLabel={emptyLabel}
+      footerOptions={[
+        {
+          value: SYNC_VALUE,
+          label: syncMutation.isPending ? "Обновляем подразделения из 1С..." : syncLabel,
+          disabled: !canSync || syncMutation.isPending
+        }
+      ]}
+      onFooterSelect={(nextValue) => {
+        if (nextValue === SYNC_VALUE && canSync && !syncMutation.isPending) {
+          syncMutation.mutate();
+        }
+      }}
+    />
   );
 }
 

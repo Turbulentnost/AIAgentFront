@@ -47,7 +47,7 @@ export const dashboardStats: DashboardStatCard[] = [
   {
     id: "agents",
     title: "Доступные агенты",
-    value: 8,
+    value: 0,
     tone: "blue",
     icon: "bot",
     imageSrc: "/login-feature-robot.png"
@@ -72,27 +72,6 @@ export const dashboardStats: DashboardStatCard[] = [
     value: 9,
     tone: "violet",
     icon: "check"
-  }
-];
-
-export const quickLaunchAgents: QuickLaunchAgent[] = [
-  {
-    id: "op-check",
-    title: "Агент проверки ОП",
-    description: "Проверка полноты и корректности опросных листов",
-    icon: "clipboard"
-  },
-  {
-    id: "kd-td",
-    title: "Агент КД/ТД",
-    description: "Проверка комплектности и актуальности документации",
-    icon: "documents"
-  },
-  {
-    id: "tenders",
-    title: "Агент тендеров",
-    description: "Анализ закупок и подготовка заявки",
-    icon: "chart"
   }
 ];
 

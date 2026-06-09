@@ -13,7 +13,7 @@ import {
   UserRound
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { useState, type MouseEvent } from "react";
+import { useMemo, useState, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
@@ -27,10 +27,11 @@ import {
 import type {
   DashboardActivity,
   DashboardStatCard,
+  QuickLaunchAgent,
   RecentTask,
   RecommendedAction
 } from "@/mock-data/dashboard";
-import type { AgentAccess } from "@/types";
+import type { AgentAccess, AgentStatus } from "@/types";
 import styles from "./Dashboard.module.css";
 
 const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
@@ -40,9 +41,7 @@ const statIcons: Record<DashboardStatCard["icon"], typeof Bot> = {
   check: CheckCircle2
 };
 
-type LaunchIconKey = "clipboard" | "documents" | "chart";
-
-const launchIcons: Record<LaunchIconKey, typeof ClipboardCheck> = {
+const launchIcons: Record<QuickLaunchAgent["icon"], typeof ClipboardCheck> = {
   clipboard: ClipboardCheck,
   documents: Files,
   chart: BarChart3
@@ -82,17 +81,61 @@ function getGreetingName(user: ReturnType<typeof useAuth>["user"]) {
 
 const RECOMMENDED_SWEEP_MS = 580;
 
+const agentStatusLabels: Record<AgentStatus, string> = {
+  active: "Активен",
+  draft: "Черновик",
+  testing: "Тестирование",
+  ope: "ОПЭ",
+  refinement: "Доработка",
+  suspended: "Приостановлен",
+  archived: "Архив"
+};
+
+function getAgentLaunchIcon(agent: AgentAccess): QuickLaunchAgent["icon"] {
+  const key = `${agent.slug} ${agent.name} ${agent.purpose ?? ""}`.toLowerCase();
+  if (key.includes("tender") || key.includes("тендер") || key.includes("закуп")) return "chart";
+  if (
+    key.includes("kd") ||
+    key.includes("td") ||
+    key.includes("кд") ||
+    key.includes("нд") ||
+    key.includes("document") ||
+    key.includes("документ")
+  ) {
+    return "documents";
+  }
+  return "clipboard";
+}
+
+function pickLaunchAgents(agents: AgentAccess[]) {
+  const runnable = agents.filter((agent) => agent.can_run);
+  const source = runnable.length ? runnable : agents;
+  return source.slice(0, 3);
+}
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const greetingName = getGreetingName(user);
   const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
-  const availableAgents = useQuery({
+
+  const agentsQuery = useQuery({
     queryKey: ["agents", "available"],
     queryFn: agentsApi.available
   });
-  const agents = availableAgents.data ?? [];
-  const stats = dashboardStats.map((stat) => (stat.id === "agents" ? { ...stat, value: agents.length } : stat));
+
+  const launchAgents = useMemo(
+    () => pickLaunchAgents(agentsQuery.data ?? []),
+    [agentsQuery.data]
+  );
+
+  const stats = useMemo(
+    () =>
+      dashboardStats.map((stat) =>
+        stat.id === "agents" ? { ...stat, value: agentsQuery.data?.length ?? 0 } : stat
+      ),
+    [agentsQuery.data]
+  );
 
   function handleRecommendedClick(action: RecommendedAction, event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -141,38 +184,45 @@ export default function Dashboard() {
 
       <section className={styles.quickLaunch} aria-labelledby="quick-launch-title">
         <h2 id="quick-launch-title">Быстрый запуск</h2>
-        <div className={styles.launchGrid}>
-          {availableAgents.isPending && <div className={styles.launchState}>Загружаем доступных агентов...</div>}
-          {availableAgents.isError && <div className={styles.launchState}>Не удалось загрузить список агентов.</div>}
-          {!availableAgents.isPending && !availableAgents.isError && !agents.length && (
-            <div className={styles.launchState}>У вас пока нет доступных агентов.</div>
-          )}
-          {agents.map((agent) => {
-            const icon = getAgentIcon(agent);
-            const Icon = launchIcons[icon];
+        {agentsQuery.isPending ? (
+          <div className={styles.launchState}>Загружаем доступных агентов...</div>
+        ) : agentsQuery.isError ? (
+          <div className={styles.launchState}>Не удалось загрузить список агентов.</div>
+        ) : !launchAgents.length ? (
+          <div className={styles.launchState}>У вас пока нет доступных агентов.</div>
+        ) : (
+          <div className={styles.launchGrid}>
+            {launchAgents.map((agent) => {
+              const icon = getAgentLaunchIcon(agent);
+              const Icon = launchIcons[icon];
 
-            return (
-              <article className={styles.launchCard} key={agent.id}>
-                <div className={`${styles.launchArt} ${styles[icon]}`}>
-                  <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
-                </div>
-                <div className={styles.launchBody}>
-                  <div className={styles.launchHead}>
-                    <h3>{agent.name}</h3>
-                    <span className={styles.status}>
-                      <span aria-hidden="true" />
-                      {agent.can_run ? "Доступен" : "Просмотр"}
-                    </span>
+              return (
+                <article className={styles.launchCard} key={agent.id}>
+                  <div className={`${styles.launchArt} ${styles[icon]}`}>
+                    <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
                   </div>
-                  <p>{agent.purpose || agent.slug}</p>
-                  <button type="button" onClick={() => navigate("/tasks")}>
-                    Запустить
-                  </button>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+                  <div className={styles.launchBody}>
+                    <div className={styles.launchHead}>
+                      <h3>{agent.name}</h3>
+                      <span className={styles.status}>
+                        <span aria-hidden="true" />
+                        {agentStatusLabels[agent.status]}
+                      </span>
+                    </div>
+                    <p>{agent.purpose || agent.slug}</p>
+                    <button
+                      type="button"
+                      disabled={!agent.can_run}
+                      onClick={() => navigate("/tasks", { state: { agentId: agent.id, agentName: agent.name } })}
+                    >
+                      {agent.can_run ? "Запустить" : "Нет доступа"}
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <div className={styles.bottomGrid}>
@@ -279,11 +329,4 @@ export default function Dashboard() {
       </section>
     </section>
   );
-}
-
-function getAgentIcon(agent: AgentAccess): LaunchIconKey {
-  const source = `${agent.slug} ${agent.name} ${agent.purpose ?? ""}`.toLowerCase();
-  if (source.includes("нд") || source.includes("document") || source.includes("документ")) return "documents";
-  if (source.includes("тендер") || source.includes("закуп")) return "chart";
-  return "clipboard";
 }

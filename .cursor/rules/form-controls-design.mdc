@@ -1,0 +1,306 @@
+---
+description: Стандарты полей форм, badge, callout и иконок внутри контролов (без заголовков секций)
+globs: src/pages/**/*.tsx, src/pages/**/*.module.css, src/components/**/*.tsx, src/components/**/*.module.css
+alwaysApply: false
+---
+
+# Поля форм и контролы (эталон — «Основные сведения»)
+
+Эталон реализации: `KnowledgeBaseCreate.tsx` → `StepMain`, стили — `KnowledgeBaseCreate.module.css`.  
+**Токены:** `src/styles/tokens.css` — префикс `--form-*`. В CSS модуле использовать `var(--form-…)`, не хардкод hex.
+
+**Не входит в это правило:** заголовки секций (`StepTitle`, `h1`–`h3`, подзаголовки блоков).
+
+---
+
+## CSS-токены (`--form-*`)
+
+| Токен | Значение (light) | Назначение |
+|-------|------------------|------------|
+| `--form-grid-gap-y` | `20px` | Вертикальный отступ между строками сетки |
+| `--form-grid-gap-x` | `24px` | Горизонтальный отступ между колонками |
+| `--form-field-gap` | `8px` | Расстояние label → control внутри `.field` |
+| `--form-label-color` | `#334155` | Цвет подписи поля |
+| `--form-label-size` | `14px` | Размер шрифта label |
+| `--form-label-weight` | `600` | Толщина label (semi-bold) |
+| `--form-label-line-height` | `1.3` | Межстрочный интервал label |
+| `--form-required-color` | `#ef4444` | Цвет звёздочки `*` |
+| `--form-required-weight` | `600` | Толщина звёздочки |
+| `--form-control-min-height` | `46px` | Минимальная высота input/select |
+| `--form-control-padding-y` | `12px` | Вертикальный padding контрола |
+| `--form-control-padding-x` | `16px` | Горизонтальный padding (базовый) |
+| `--form-control-padding-right-icon` | `40px` | Padding справа под chevron |
+| `--form-control-padding-left-search` | `38px` | Padding слева под иконку поиска |
+| `--form-control-padding-right-clear` | `58px` | Padding справа при кнопке × + chevron |
+| `--form-control-text-color` | `#111827` | Цвет введённого текста |
+| `--form-control-font-size` | `14px` | Размер текста в контроле |
+| `--form-control-font-weight` | `400` | Толщина текста (regular) |
+| `--form-control-line-height` | `1.4` | Межстрочный интервал текста |
+| `--form-control-bg` | `#ffffff` | Фон поля |
+| `--form-control-border-color` | `#e2e8f0` | Цвет рамки |
+| `--form-control-border-width` | `1px` | Толщина рамки |
+| `--form-control-border-radius` | `8px` | Скругление углов |
+| `--form-control-placeholder-color` | `#9ca3af` | Цвет `::placeholder` |
+| `--form-control-placeholder-size` | `14px` | Размер placeholder |
+| `--form-control-placeholder-weight` | `400` | Толщина placeholder |
+| `--form-control-placeholder-opacity` | `1` | Непрозрачность (Firefox) |
+| `--form-control-focus-border-color` | `#93c5fd` | Рамка в `:focus` |
+| `--form-control-focus-ring` | `0 0 0 3px rgba(59,130,246,0.12)` | Свечение в `:focus` |
+| `--form-control-transition` | `border-color 0.15s, box-shadow 0.15s` | Анимация focus |
+| `--form-icon-color` | `#9ca3af` | Цвет Search/Chevron/× |
+| `--form-icon-hover-color` | `#64748b` | Hover кнопки очистки |
+| `--form-icon-offset-x` | `14px` | Отступ иконок от края (left/right) |
+| `--form-icon-clear-offset-x` | `36px` | Позиция × от правого края |
+| `--form-icon-clear-button-size` | `20px` | Размер hit-area кнопки × |
+| `--form-textarea-min-height` | `112px` | Высота textarea «Описание» |
+| `--form-textarea-short-min-height` | `88px` | Высота textarea «Комментарий» |
+| `--form-status-badge-*` | см. tokens.css | Цвета/размеры badge «Черновик» |
+| `--form-callout-*` | см. tokens.css | Info-баннер внизу формы |
+
+Dark-тема: те же имена, значения переопределены в `[data-theme="dark"]`.
+
+### Summary panel (`--summary-*`) — боковая «Сводка»
+
+| Токен | Light | Назначение |
+|-------|-------|------------|
+| `--summary-card-padding` | 24px | Padding карточки сводки |
+| `--summary-card-radius` | 16px | Скругление карточки |
+| `--summary-sections-gap` | 12px | Отступ между секциями |
+| `--summary-title-*` | 21px / 700 / #0f172a | Заголовок «Сводка создаваемой базы» |
+| `--summary-block-*` | bg #f8fafc, radius 12px, padding 16px | Фон секции |
+| `--summary-section-title-*` | 16px / 700 | Заголовок секции («Основные сведения») |
+| `--summary-label-*` | 14px / 400 / #94a3b8 | Ключ строки (слева) |
+| `--summary-value-*` | 14px / 700 / #0f172a | Значение (справа, bold) |
+| `--summary-rows-gap` | 8px | Отступ между строками |
+
+Классы: `.summaryPanel`, `.summaryTitle`, `.summarySections`, `.summaryBlock`, `.summaryBlockTitle`, `.summaryRows`, `.summaryRow`, `.summaryLabel`, `.summaryValue`.
+
+### Footer navigation (`--nav-*`)
+
+| Токен | Light | Назначение |
+|-------|-------|------------|
+| `--nav-button-min-height` | 46px | Высота кнопок (как у `.control`) |
+| `--nav-button-font-size/weight` | 14px / 600 | Типографика кнопок |
+| `--nav-button-radius` | 8px | Скругление (как у form control) |
+| `--nav-button-primary-*` | синий фон + белый текст | «Далее: …», primary actions |
+| `--nav-button-secondary-*` | `#eff6ff` + синий текст | «Назад: …», secondary |
+| `--nav-step-dot-*` | 28px круги | Индикатор этапов по центру футера |
+
+Классы футера: `.footerNav`, `.footerNavSide`, `.footerNavSideRight`, `.navBackButton`, `.navNextButton`, `.progressDots`, `.progressDot`.
+
+Левая панель степпера — **только индикатор** (`div`, не `button`), навигация через футер.
+
+---
+
+## Разметка
+
+```tsx
+<label className={styles.field}>
+  <span className={styles.fieldLabel}>
+    Название <span className={styles.required}>*</span>
+  </span>
+  <input className={styles.control} placeholder="…" />
+</label>
+
+<div className={styles.selectField}>
+  <Search className={styles.selectSearch} size={16} strokeWidth={2} aria-hidden="true" />
+  <select className={styles.control}>…</select>
+  <ChevronDown className={styles.selectChevron} size={16} strokeWidth={2} aria-hidden="true" />
+</div>
+```
+
+- Поле — `label.field` или `div.field`, **не** текст напрямую внутри `label`.
+- Обязательность — отдельный `<span className={styles.required}>*</span>`, не часть строки label без обёртки.
+- Select / combobox — всегда обёртка `.selectField`; chevron — **DOM-элемент** (Lucide), не CSS-pseudo.
+- Статус — `<span className={styles.statusBadge}>`, **не** `readOnly input`.
+
+---
+
+## Сетка формы
+
+| Свойство | Значение |
+|----------|----------|
+| Контейнер | `.formGrid` — `grid`, 2 колонки `repeat(2, minmax(0, 1fr))` |
+| Отступы между полями | `gap: 20px 24px` (вертикаль × горизонталь) |
+| Полная ширина | `.wideField` — `grid-column: 1 / -1` |
+| Поле `.field` | `display: flex; flex-direction: column; gap: 8px` |
+| Отступ label → control | **8px** (через `gap` у `.field`) |
+
+**Конфликт с global.css:** глобально `label { display: grid }` — переопределять через `label.field { display: flex; … }` с достаточной специфичностью.
+
+---
+
+## Label (`.fieldLabel`)
+
+| Свойство | Значение |
+|----------|----------|
+| `color` | `#334155` |
+| `font-size` | `14px` |
+| `font-weight` | `600` (semi-bold) |
+| `line-height` | `1.3` |
+
+### Маркер обязательности (`.required`)
+
+| Свойство | Значение |
+|----------|----------|
+| `color` | `#ef4444` |
+| `font-weight` | `600` |
+| Позиция | сразу после текста label, через пробел в разметке |
+
+---
+
+## Базовый контрол (`.control`) — input, select, textarea
+
+| Свойство | Значение |
+|----------|----------|
+| `width` | `100%` |
+| `min-height` | `46px` |
+| `padding` | `12px 16px` |
+| `color` (значение) | `#111827` |
+| `font-size` | `14px` |
+| `font-weight` | `400` |
+| `line-height` | `1.4` |
+| `background` | `#ffffff` |
+| `border` | `1px solid #e2e8f0` |
+| `border-radius` | `8px` |
+| `outline` | `none` |
+| `transition` | `border-color 0.15s ease, box-shadow 0.15s ease` |
+
+**Конфликт с global.css:** глобальные `input, select, textarea` — переопределять классом `.control` (класс побеждает по специфичности).
+
+### Псевдоэлемент `::placeholder`
+
+| Свойство | Значение |
+|----------|----------|
+| `color` | `#9ca3af` |
+| `font-size` | `14px` |
+| `font-weight` | `400` |
+| `opacity` | `1` (**обязательно** — иначе Firefox делает placeholder бледнее) |
+
+Примеры placeholder-текстов: «Совещания и протоколы», «Для чего нужна база и какие вопросы она закрывает», «Выберите подразделение», «Дополнительная информация».
+
+### Состояние `:focus`
+
+| Свойство | Значение |
+|----------|----------|
+| `border-color` | `#93c5fd` |
+| `box-shadow` | `0 0 0 3px rgba(59, 130, 246, 0.12)` |
+
+---
+
+## Select в обёртке (`.selectField`)
+
+Обёртка: `position: relative; display: flex; align-items: center`.
+
+Контрол внутри:
+
+| Свойство | Значение |
+|----------|----------|
+| `padding` (базовый) | `12px 40px 12px 16px` — место под chevron справа |
+| `appearance` | `none` + `-webkit-appearance: none` |
+| Остальное | как `.control` |
+
+### Варианты padding
+
+| Вариант | Условие | Padding |
+|---------|---------|---------|
+| С иконкой поиска | `.selectField:has(.selectSearch)` | `padding-left: 38px` |
+| С кнопкой очистки | `.selectField:has(.clearButton)` | `padding-right: 58px` |
+
+### Иконка поиска (`.selectSearch`)
+
+| Свойство | Значение |
+|----------|----------|
+| Lucide `Search` | `size={16}`, `strokeWidth={2}` |
+| `color` | `#9ca3af` |
+| Позиция | `left: 14px`, `top: 50%`, `transform: translateY(-50%)` |
+| `pointer-events` | `none` |
+| `z-index` | `1` |
+
+### Chevron (`.selectChevron`)
+
+| Свойство | Значение |
+|----------|----------|
+| Lucide `ChevronDown` | `size={16}`, `strokeWidth={2}` |
+| `color` | `#9ca3af` |
+| Позиция | `right: 14px`, вертикально по центру |
+| `pointer-events` | `none` |
+
+### Кнопка очистки (`.clearButton`)
+
+| Свойство | Значение |
+|----------|----------|
+| Lucide `X` | `size={14}`, `strokeWidth={2.2}` |
+| Размер кнопки | `20×20px`, `padding: 0` |
+| `color` | `#9ca3af` |
+| `:hover` | `#64748b` |
+| Позиция | `right: 36px` (между текстом и chevron) |
+| `z-index` | `2` |
+| Фон / border | `transparent`, `border: 0` |
+
+---
+
+## Textarea
+
+Базовый класс: `.control.textarea`.
+
+| Вариант | `min-height` | Назначение |
+|---------|--------------|------------|
+| `.textarea` | `112px` | Описание (основное поле) |
+| `.textarea.textareaShort` | `88px` | Комментарий |
+| `padding` | `12px 16px` | |
+| `resize` | `vertical` | |
+
+Placeholder — те же правила `::placeholder`, что у input.
+
+---
+
+## Badge статуса (`.statusBadge`) — не input
+
+| Свойство | Значение |
+|----------|----------|
+| `display` | `inline-flex` |
+| `width` | `fit-content` |
+| `min-height` | `28px` |
+| `padding` | `4px 12px` |
+| `color` | `#3182ce` |
+| `background` | `#ebf8ff` |
+| `border-radius` | `999px` |
+| `font-size` | `13px` |
+| `font-weight` | `600` |
+| `line-height` | `1.2` |
+
+---
+
+## Info-callout (`.infoCallout`)
+
+| Свойство | Значение |
+|----------|----------|
+| `display` | `flex` |
+| `gap` | `12px` |
+| `align-items` | `flex-start` |
+| `padding` | `14px 16px` |
+| `border-radius` | `8px` |
+| `background` | `#eff6ff` |
+| `color` (текст) | `#1e40af` |
+| `font-size` | `13px` |
+| `font-weight` | `500` |
+| `line-height` | `1.5` |
+
+Иконка `Info`: `size={18}`, `strokeWidth={2.1}`, `color: #3b82f6`, `margin-top: 1px`, `flex-shrink: 0`.
+
+Текст — в `<p>` с `margin: 0`.
+
+---
+
+## Чеклист перед merge
+
+- [ ] Стили через `var(--form-*)`, не хардкод
+- [ ] Label 14px / 600, gap до control 8px
+- [ ] Control 46px высота, border через `--form-control-border-color`, radius 8px
+- [ ] Placeholder через `--form-control-placeholder-*`, `opacity: 1`
+- [ ] Focus ring через `--form-control-focus-*`
+- [ ] Select без нативной стрелки + Lucide chevron 16px справа
+- [ ] Searchable select: иконка Search слева, `padding-left: var(--form-control-padding-left-search)`
+- [ ] Статус — badge, не disabled input
+- [ ] `label.field` переопределяет глобальный `label { display: grid }`
