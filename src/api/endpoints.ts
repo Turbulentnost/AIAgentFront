@@ -9,6 +9,7 @@ import type {
   Department,
   DepartmentCreate,
   DepartmentSyncStatus,
+  EmployeeSyncResult,
   Document,
   DocumentUploadOptions,
   HealthResponse,
@@ -27,6 +28,8 @@ import type {
   KnowledgeBaseStatus,
   KnowledgeBaseTestSearchResponse,
   LoginPayload,
+  OneCLoginResponse,
+  OneCSession,
   NdChangeCandidateDocument,
   NdChangePreview,
   NdChangeRequest,
@@ -37,6 +40,7 @@ import type {
   TaskResult,
   TaskStep,
   TokenResponse,
+  ResponsibleUser,
   User,
   UserCreate,
   AgentBlueprint,
@@ -54,12 +58,18 @@ export const healthApi = {
 };
 export const authApi = {
   login: (payload: LoginPayload) => apiClient.post<TokenResponse>("/auth/login", payload).then((r) => r.data),
+  loginWith1C: (payload: { fio: string; password: string }) =>
+    longRunningApiClient.post<OneCLoginResponse>("/auth/onec/login", payload).then((r) => r.data),
+  getOneCSession: () => apiClient.get<OneCSession>("/auth/onec/session").then((r) => r.data),
   me: () => apiClient.get<User>("/auth/me").then((r) => r.data),
   logout: () => apiClient.post("/auth/logout").then((r) => r.data),
   register: (payload: UserCreate) => apiClient.post<User>("/auth/register", payload).then((r) => r.data)
 };
 export const usersApi = {
   list: () => apiClient.get<User[]>("/users").then((r) => r.data),
+  listResponsibleCandidates: () =>
+    apiClient.get<ResponsibleUser[]>("/users/responsible-candidates").then((r) => r.data),
+  syncFrom1C: () => apiClient.post<EmployeeSyncResult>("/users/sync").then((r) => r.data),
   get: (userId: string) => apiClient.get<User>(`/users/${userId}`).then((r) => r.data),
   create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
@@ -101,6 +111,7 @@ export const documentsApi = {
     if (options.document_type) formData.append("document_type", options.document_type);
     if (options.department_id) formData.append("department_id", options.department_id);
     if (options.task_id) formData.append("task_id", options.task_id);
+    if (options.relative_path) formData.append("relative_path", options.relative_path);
     return apiClient.post<Document>("/documents/upload", formData).then((r) => r.data);
   },
   list: () => apiClient.get<Document[]>("/documents").then((r) => r.data),
@@ -116,6 +127,8 @@ export const documentsApi = {
 
 export const knowledgeBasesApi = {
   stats: () => apiClient.get<KnowledgeBaseStats>("/knowledge-bases/stats").then((r) => r.data),
+  listResponsibleUsers: () =>
+    apiClient.get<ResponsibleUser[]>("/knowledge-bases/responsible-users").then((r) => r.data),
   list: (params?: { status?: KnowledgeBaseStatus; query?: string }) =>
     apiClient.get<KnowledgeBase[]>("/knowledge-bases", { params }).then((r) => r.data),
   get: (knowledgeBaseId: string) => apiClient.get<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}`).then((r) => r.data),

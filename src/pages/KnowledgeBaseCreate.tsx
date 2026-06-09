@@ -43,9 +43,15 @@ import type {
   KnowledgeBaseAccessType,
   KnowledgeBaseAgentAccessMode,
   KnowledgeBaseCreate,
-  User
+  ResponsibleUser
 } from "@/types";
 import { filterActiveDepartments } from "@/utils/departments";
+import {
+  collectFilesFromDataTransfer,
+  collectFilesFromFileList,
+  titleFromRelativePath,
+  type FolderUploadFile
+} from "@/utils/folderUpload";
 import styles from "./KnowledgeBaseCreate.module.css";
 
 type StepId = "main" | "sources" | "readiness" | "processing" | "access" | "agents" | "preview";
@@ -205,6 +211,7 @@ const sourceAcceptAttr = sourceAcceptExtensions.join(",");
 interface StagedSourceFile {
   id: string;
   file: File;
+  relativePath: string;
 }
 
 const documentTypeFilterOptions: { value: DocumentType; label: string }[] = [
@@ -269,7 +276,8 @@ const defaultProcessing: ProcessingSettings = {
 export default function KnowledgeBaseCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAuthenticated, isLoading: authLoading } = useAuth();
+  const canLoadReferenceData = isAuthenticated && !authLoading;
   const [stepIndex, setStepIndex] = useState(0);
   const [navError, setNavError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -299,10 +307,34 @@ export default function KnowledgeBaseCreate() {
   const [stagedDropFiles, setStagedDropFiles] = useState<StagedSourceFile[]>([]);
   const [uploadingStagedIds, setUploadingStagedIds] = useState<string[]>([]);
 
-  const documents = useQuery({ queryKey: ["documents"], queryFn: documentsApi.list });
-  const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
-  const users = useQuery({ queryKey: ["users"], queryFn: usersApi.list });
-  const agents = useQuery({ queryKey: ["agents", "available"], queryFn: agentsApi.available });
+  const documents = useQuery({
+    queryKey: ["documents"],
+    queryFn: documentsApi.list,
+    enabled: canLoadReferenceData
+  });
+  const departments = useQuery({
+    queryKey: ["departments"],
+    queryFn: departmentsApi.list,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
+  const users = useQuery({
+    queryKey: ["users", "responsible-candidates"],
+    queryFn: usersApi.listResponsibleCandidates,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
+  const responsibleCandidates = useQuery({
+    queryKey: ["knowledge-bases", "responsible-users"],
+    queryFn: knowledgeBasesApi.listResponsibleUsers,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
+  const agents = useQuery({
+    queryKey: ["agents", "available"],
+    queryFn: agentsApi.available,
+    enabled: canLoadReferenceData
+  });
 
   const activeDepartments = useMemo(() => filterActiveDepartments(departments.data ?? []), [departments.data]);
   const activeStep = steps[stepIndex];
@@ -339,18 +371,27 @@ export default function KnowledgeBaseCreate() {
     }
   });
 
-  const stageDropFiles = useCallback((files: FileList | File[]) => {
-    const incoming = [...files].filter(isAcceptedSourceFile);
-    if (!incoming.length) return;
+  const stageIncomingFiles = useCallback((incoming: FolderUploadFile[]) => {
+    const accepted = incoming.filter((item) => isAcceptedSourceFile(item.file));
+    if (!accepted.length) return;
     setStagedDropFiles((current) => {
       const next = [...current];
-      for (const file of incoming) {
-        const duplicate = next.some((item) => item.file.name === file.name && item.file.size === file.size);
-        if (!duplicate) next.push({ id: crypto.randomUUID(), file });
+      for (const item of accepted) {
+        const duplicate = next.some(
+          (existing) => existing.relativePath === item.relativePath && existing.file.size === item.file.size
+        );
+        if (!duplicate) next.push({ id: crypto.randomUUID(), file: item.file, relativePath: item.relativePath });
       }
       return next;
     });
   }, []);
+
+  const stageDropFiles = useCallback(
+    (files: FileList | File[]) => {
+      stageIncomingFiles(collectFilesFromFileList(files));
+    },
+    [stageIncomingFiles]
+  );
 
   const removeStagedFile = useCallback((id: string) => {
     setStagedDropFiles((current) => current.filter((item) => item.id !== id));
@@ -362,8 +403,12 @@ export default function KnowledgeBaseCreate() {
       if (!staged || uploadingStagedIds.includes(id)) return;
       setUploadingStagedIds((ids) => [...ids, id]);
       try {
-        const title = staged.file.name.replace(/\.[^.]+$/, "") || staged.file.name;
-        const document = await documentsApi.upload(staged.file, { title, document_type: "other" });
+        const title = titleFromRelativePath(staged.relativePath);
+        const document = await documentsApi.upload(staged.file, {
+          title,
+          document_type: "other",
+          relative_path: staged.relativePath
+        });
         setSelectedSourceIds((ids) => [...new Set([...ids, document.id])]);
         setStagedDropFiles((current) => current.filter((item) => item.id !== id));
         await queryClient.invalidateQueries({ queryKey: ["documents"] });
@@ -552,7 +597,11 @@ export default function KnowledgeBaseCreate() {
               topic={topic}
               comment={comment}
               departments={activeDepartments}
-              users={users.data ?? []}
+              departmentsLoading={departments.isPending}
+              departmentsError={departments.isError}
+              responsibleUsers={responsibleCandidates.data ?? []}
+              responsibleUsersLoading={responsibleCandidates.isPending}
+              responsibleUsersError={responsibleCandidates.isError}
               onName={setName}
               onDescription={setDescription}
               onBaseKind={setBaseKind}
@@ -590,6 +639,7 @@ export default function KnowledgeBaseCreate() {
               stagedFiles={stagedDropFiles}
               uploadingStagedIds={uploadingStagedIds}
               onStageFiles={stageDropFiles}
+              onStageIncoming={stageIncomingFiles}
               onRemoveStaged={removeStagedFile}
               onUploadStaged={uploadStagedFile}
               onUploadAllStaged={uploadAllStagedFiles}
@@ -627,7 +677,7 @@ export default function KnowledgeBaseCreate() {
               description={description}
               baseKind={baseKind}
               department={activeDepartments.find((item) => item.id === departmentId)}
-              responsible={users.data?.find((item) => item.id === responsibleUserId)}
+              responsible={responsibleCandidates.data?.find((item) => item.id === responsibleUserId)}
               users={users.data ?? []}
               topic={topic}
               selectedDocuments={selectedDocuments}
@@ -647,7 +697,7 @@ export default function KnowledgeBaseCreate() {
             name={name}
             baseKind={baseKind}
             department={activeDepartments.find((item) => item.id === departmentId)}
-            responsible={users.data?.find((item) => item.id === responsibleUserId)}
+            responsible={responsibleCandidates.data?.find((item) => item.id === responsibleUserId)}
             topic={topic}
             selectedDocuments={selectedDocuments}
             stagedDropCount={stagedDropFiles.length}
@@ -717,7 +767,11 @@ function StepMain(props: {
   topic: string;
   comment: string;
   departments: Department[];
-  users: User[];
+  departmentsLoading?: boolean;
+  departmentsError?: boolean;
+  responsibleUsers: ResponsibleUser[];
+  responsibleUsersLoading?: boolean;
+  responsibleUsersError?: boolean;
   onName: (value: string) => void;
   onDescription: (value: string) => void;
   onBaseKind: (value: BaseKind) => void;
@@ -797,10 +851,21 @@ function StepMain(props: {
             value={props.departmentId}
             onChange={props.onDepartment}
             departments={props.departments}
-            placeholder="Выберите подразделение"
+            placeholder={
+              props.departmentsLoading
+                ? "Загружаем подразделения..."
+                : props.departmentsError
+                  ? "Не удалось загрузить подразделения"
+                  : props.departments.length
+                    ? "Выберите подразделение"
+                    : "Список подразделений пуст"
+            }
             allowEmpty={false}
             ariaLabel="Подразделение-владелец"
           />
+          {props.departmentsError ? (
+            <p className={styles.fieldHint}>Не удалось загрузить подразделения. Обновите страницу или обратитесь к администратору.</p>
+          ) : null}
         </label>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>
@@ -809,15 +874,25 @@ function StepMain(props: {
           <FormAutocomplete
             value={props.responsibleUserId}
             onChange={props.onResponsible}
-            options={props.users.map((user) => ({
+            options={props.responsibleUsers.map((user) => ({
               value: user.id,
-              label: user.full_name || user.email || "Пользователь"
+              label: formatResponsibleUserLabel(user)
             }))}
-            placeholder="Выберите пользователя"
-            emptyValue=""
-            emptyLabel="Выберите пользователя"
+            placeholder={
+              props.responsibleUsersLoading
+                ? "Загружаем сотрудников из оргструктуры..."
+                : props.responsibleUsersError
+                  ? "Не удалось загрузить список сотрудников"
+                  : props.responsibleUsers.length
+                    ? "Начните вводить ФИО, должность или отдел"
+                    : "Список сотрудников пуст — выполните синхронизацию из 1С"
+            }
+            noResultsText="Сотрудник не найден"
             ariaLabel="Ответственный"
           />
+          {props.responsibleUsersError ? (
+            <p className={styles.fieldHint}>Не удалось загрузить сотрудников. Обновите страницу или обратитесь к администратору.</p>
+          ) : null}
         </label>
         <div className={`${styles.field} ${styles.wideField}`}>
           <span className={styles.fieldLabel}>Статус</span>
@@ -863,6 +938,7 @@ function StepSources(props: {
   onUploadTitle: (value: string) => void;
   onUpload: () => void;
   onStageFiles: (files: FileList | File[]) => void;
+  onStageIncoming: (files: FolderUploadFile[]) => void;
   onRemoveStaged: (id: string) => void;
   onUploadStaged: (id: string) => void;
   onUploadAllStaged: () => void;
@@ -893,14 +969,16 @@ function StepSources(props: {
   }, []);
 
   const handleDrop = useCallback(
-    (event: DragEvent) => {
+    async (event: DragEvent) => {
       event.preventDefault();
       event.stopPropagation();
       dragDepthRef.current = 0;
       setIsDragOver(false);
-      if (event.dataTransfer.files.length) props.onStageFiles(event.dataTransfer.files);
+      if (!event.dataTransfer.files.length && !event.dataTransfer.items?.length) return;
+      const incoming = await collectFilesFromDataTransfer(event.dataTransfer);
+      if (incoming.length) props.onStageIncoming(incoming);
     },
-    [props.onStageFiles]
+    [props.onStageIncoming]
   );
 
   return (
@@ -940,8 +1018,8 @@ function StepSources(props: {
         {isDragOver ? (
           <div className={styles.sourcesDropOverlay} aria-hidden="true">
             <span className={styles.sourcesDropOverlayIcon}><Upload size={28} strokeWidth={2} /></span>
-            <strong>Отпустите файлы для добавления</strong>
-            <span>PDF, DOCX, XLSX, PPTX, TXT</span>
+            <strong>Отпустите файлы или папку для добавления</strong>
+            <span>PDF, DOCX, XLSX, PPTX, TXT — структура папок сохранится</span>
           </div>
         ) : null}
         <table className={styles.sourcesTable}>
@@ -1037,6 +1115,20 @@ function StepSources(props: {
           Выбрать файл
           <input type="file" accept={sourceAcceptAttr} onChange={(event) => props.onUploadFile(event.target.files?.[0] ?? null)} />
         </label>
+        <label className={styles.sourcesFileButton}>
+          Выбрать папку
+          <input
+            type="file"
+            multiple
+            // @ts-expect-error non-standard directory picker attributes
+            webkitdirectory=""
+            directory=""
+            onChange={(event) => {
+              if (event.target.files?.length) props.onStageFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
+        </label>
         <button type="button" className={styles.navNextButton} onClick={props.onUpload} disabled={!props.uploadFile || props.uploadPending}>
           {props.uploadPending ? "Загружаем..." : "Загрузить и добавить"}
         </button>
@@ -1066,8 +1158,11 @@ function StepSources(props: {
                     {(extKey || "file").slice(0, 4)}
                   </span>
                   <div className={styles.sourcesStagedCopy}>
-                    <strong title={staged.file.name}>{shortFileName(staged.file.name)}</strong>
-                    <small>{formatBytes(staged.file.size)}</small>
+                    <strong title={staged.relativePath}>{shortFileName(staged.relativePath)}</strong>
+                    <small>
+                      {staged.relativePath.includes("/") ? staged.relativePath : formatBytes(staged.file.size)}
+                      {staged.relativePath.includes("/") ? ` · ${formatBytes(staged.file.size)}` : null}
+                    </small>
                   </div>
                   <button
                     type="button"
@@ -1310,7 +1405,7 @@ function StepAccess(props: {
   accessType: KnowledgeBaseAccessType;
   includeChildren: boolean;
   accessReason: string;
-  users: User[];
+  users: ResponsibleUser[];
   departments: Department[];
   selectedUserIds: string[];
   selectedDepartmentIds: string[];
@@ -1365,8 +1460,8 @@ function StepAccess(props: {
           title="Пользователи"
           items={props.users.map((user) => ({
             id: user.id,
-            title: user.full_name || user.email,
-            subtitle: `${user.email} · ${user.position || "Должность не указана"}`
+            title: user.full_name || "Пользователь",
+            subtitle: [user.position, user.department_name].filter(Boolean).join(" · ") || "Должность не указана"
           }))}
           selectedIds={props.selectedUserIds}
           onToggle={props.onToggleUser}
@@ -1441,10 +1536,10 @@ function StepPreview(props: {
   description: string;
   baseKind: BaseKind;
   department?: Department;
-  responsible?: User;
+  responsible?: ResponsibleUser;
   topic: string;
   selectedDocuments: Document[];
-  users: User[];
+  users: ResponsibleUser[];
   processing: ProcessingSettings;
   accessMode: AccessMode;
   selectedUserIds: string[];
@@ -1456,7 +1551,7 @@ function StepPreview(props: {
     <div className={styles.stepBody}>
       <StepTitle icon={ShieldCheck} title="Предпросмотр и подтверждение" text="Проверьте итоговую сводку перед созданием базы знаний." />
       <div className={styles.previewGrid}>
-        <SummaryBlock title="Основные сведения" rows={[["Название", props.name], ["Описание", props.description], ["Тип", baseKindLabels[props.baseKind]], ["Подразделение", props.department?.name || "-"], ["Ответственный", formatShortPersonName(props.responsible?.full_name, props.responsible?.email)], ["Тематика", props.topic || "-"]]} />
+        <SummaryBlock title="Основные сведения" rows={[["Название", props.name], ["Описание", props.description], ["Тип", baseKindLabels[props.baseKind]], ["Подразделение", props.department?.name || "-"], ["Ответственный", props.responsible ? formatResponsibleUserLabel(props.responsible) : "-"], ["Тематика", props.topic || "-"]]} />
         <SummaryBlock title="Источники" rows={[["Документов", String(props.selectedDocuments.length)], ...props.selectedDocuments.slice(0, 5).map((document) => [document.title, userName(props.users, document.uploaded_by_user_id)] as [string, string])]} />
         <section className={styles.summaryBlock}>
           <ProcessingChecklistCard title="Обработка" subtitle="Текущие настройки" items={buildProcessingChecklist(props.processing)} />
@@ -1474,12 +1569,12 @@ function Summary(props: {
   name: string;
   baseKind: BaseKind;
   department?: Department;
-  responsible?: User;
+  responsible?: ResponsibleUser;
   topic: string;
   selectedDocuments: Document[];
   stagedDropCount: number;
   readiness: ReturnType<typeof checkDocumentReadiness>[];
-  users: User[];
+  users: ResponsibleUser[];
   processing: ProcessingSettings;
   accessMode: AccessMode;
   selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
@@ -1514,7 +1609,7 @@ function Summary(props: {
           ["Тип", baseKindLabels[props.baseKind]],
           ["Тематика", props.topic || "-"],
           ["Подразделение", props.department?.name || "Не выбрано"],
-          ["Ответственный", formatShortPersonName(props.responsible?.full_name, props.responsible?.email)]
+          ["Ответственный", props.responsible ? formatResponsibleUserLabel(props.responsible) : "Не выбран"]
         ] as [string, string][],
         statusBadge: "Черновик"
       },
@@ -1981,11 +2076,11 @@ function departmentName(departments: Department[], departmentId?: string | null)
   return departments.find((department) => department.id === departmentId)?.name || "-";
 }
 
-function userName(users: User[], userId?: string | null, currentUserId?: string) {
+function userName(users: ResponsibleUser[], userId?: string | null, currentUserId?: string) {
   if (!userId) return "Не указан";
   if (currentUserId && userId === currentUserId) return "Вы";
   const user = users.find((item) => item.id === userId);
-  return user?.full_name || user?.email || "Пользователь";
+  return user?.full_name || "Пользователь";
 }
 
 function optionalUuid(value: string): string | null {
@@ -2072,6 +2167,16 @@ function shortFileName(name: string, maxLength = 24) {
   const base = dotIndex > 0 ? name.slice(0, dotIndex) : name;
   const keep = Math.max(8, maxLength - extension.length - 1);
   return `${base.slice(0, keep)}…${extension}`;
+}
+
+function formatResponsibleUserLabel(user: ResponsibleUser) {
+  const name = user.full_name?.trim() || "Пользователь";
+  const position = user.position?.trim();
+  const department = user.department_name?.trim();
+  if (position && department) return `${name} — ${position} (${department})`;
+  if (position) return `${name} — ${position}`;
+  if (department) return `${name} (${department})`;
+  return name;
 }
 
 function formatShortPersonName(fullName?: string | null, fallback?: string | null) {

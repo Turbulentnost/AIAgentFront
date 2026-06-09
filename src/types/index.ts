@@ -103,6 +103,36 @@ export interface TaskCreate {
   requires_human_review?: boolean;
   task_metadata?: Record<string, unknown>;
 }
+
+export interface OneCSession {
+  token: string;
+  fio: string;
+  expires_at: string | null;
+  resolved_user: string | null;
+  resolved_user_source?: string | null;
+  token_created_at?: string;
+  reused?: boolean;
+}
+
+export interface OneCTask {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  created_at: string | null;
+  author: string | null;
+  completed: boolean;
+}
+
+export interface OneCTasksResponse {
+  token: string;
+  count: number;
+  cached: boolean;
+  task_object?: string;
+  query?: string;
+  resolved_user: string;
+  tasks: OneCTask[];
+}
 export interface TaskStep {
   id: string;
   task_id: string;
@@ -145,6 +175,13 @@ export interface HealthResponse {
   version: string;
   checks?: Record<string, string> | null;
 }
+export interface OneCLoginResponse extends TokenResponse {
+  user: User;
+  is_created_via_1c: boolean;
+  onec_session: OneCSession;
+  token_reused?: boolean;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: "bearer";
@@ -155,6 +192,31 @@ export interface LoginPayload {
   password: string;
   new_password?: string;
 }
+export interface ResponsibleUser {
+  id: string;
+  full_name: string | null;
+  position: string | null;
+  department_id: string | null;
+  department_name: string | null;
+}
+
+export interface EmployeeSyncResult {
+  key: string;
+  source_system: string;
+  resource: string;
+  last_synced_at: string | null;
+  next_allowed_at: string | null;
+  status: string;
+  items_count: number;
+  error_message: string | null;
+  created_count: number;
+  updated_count: number;
+  deactivated_count: number;
+  skipped_count: number;
+  missing_department_count: number;
+  synced_count: number;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -165,6 +227,9 @@ export interface User {
   full_name: string | null;
   phone: string | null;
   position: string | null;
+  source_system?: string | null;
+  external_id?: string | null;
+  is_created_via_1c?: boolean;
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
@@ -284,6 +349,7 @@ export interface DocumentUploadOptions {
   department_id?: string;
   task_id?: string;
   is_knowledge_base?: boolean;
+  relative_path?: string;
 }
 
 export interface NdChangeRequestCreate {

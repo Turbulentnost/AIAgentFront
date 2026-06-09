@@ -84,7 +84,9 @@ export default function FormAutocomplete({
 
   function openList() {
     setOpen(true);
-    setQuery(selected?.label ?? "");
+    // Не подставляем label пустой опции («Выберите…») в поиск — иначе фильтр скрывает всех кандидатов.
+    const hasSelection = Boolean(value) && (emptyValue === undefined || value !== emptyValue);
+    setQuery(hasSelection ? selected?.label ?? "" : "");
     window.requestAnimationFrame(() => inputRef.current?.select());
   }
 
@@ -107,7 +109,8 @@ export default function FormAutocomplete({
     inputRef.current?.blur();
   }
 
-  const inputValue = open ? query : selected?.label ?? "";
+  const hasRealSelection = Boolean(value) && (emptyValue === undefined || value !== emptyValue);
+  const inputValue = open ? query : hasRealSelection ? selected?.label ?? "" : "";
 
   return (
     <div
