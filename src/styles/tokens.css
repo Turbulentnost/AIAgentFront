@@ -356,6 +356,28 @@
   --kb-pending-dot-ring: rgba(96, 165, 250, 0.28);
   --kb-pending-text: #64748b;
   --kb-page-sources-max-width: 1600px;
+
+  /* ── Agents catalog page ── */
+  --agents-card-bg: #f0f7ff;
+  --agents-card-border: transparent;
+  --agents-card-radius: 12px;
+  --agents-card-padding: 20px;
+  --agents-card-gap: 14px;
+  --agents-sidebar-bg: #f0f7ff;
+  --agents-sidebar-radius: 12px;
+  --agents-sidebar-padding: 16px;
+  --agents-compact-bg: #ffffff;
+  --agents-compact-radius: 12px;
+  --agents-compact-padding: 14px;
+  --agents-art-bg: #ffffff;
+  --agents-art-radius: 12px;
+  --agents-art-size: 112px;
+  --agents-compact-art-size: 88px;
+  --agents-tag-color: #64748b;
+  --agents-status-blocked-bg: #fee2e2;
+  --agents-status-blocked-color: #b42318;
+  --agents-status-inactive-bg: #ffedd5;
+  --agents-status-inactive-color: #c2410c;
 }
 
 [data-theme="dark"] {
@@ -707,6 +729,28 @@
   --kb-pending-dot-ring: rgba(88, 166, 255, 0.28);
   --kb-pending-text: #8b949e;
   --kb-page-sources-max-width: 1600px;
+
+  /* ── Agents catalog page ── */
+  --agents-card-bg: rgba(56, 139, 253, 0.1);
+  --agents-card-border: rgba(56, 139, 253, 0.14);
+  --agents-card-radius: 12px;
+  --agents-card-padding: 20px;
+  --agents-card-gap: 14px;
+  --agents-sidebar-bg: rgba(56, 139, 253, 0.1);
+  --agents-sidebar-radius: 12px;
+  --agents-sidebar-padding: 16px;
+  --agents-compact-bg: #161b22;
+  --agents-compact-radius: 12px;
+  --agents-compact-padding: 14px;
+  --agents-art-bg: #ffffff;
+  --agents-art-radius: 12px;
+  --agents-art-size: 112px;
+  --agents-compact-art-size: 88px;
+  --agents-tag-color: #8b949e;
+  --agents-status-blocked-bg: rgba(248, 81, 73, 0.15);
+  --agents-status-blocked-color: #ff7b72;
+  --agents-status-inactive-bg: rgba(210, 153, 34, 0.15);
+  --agents-status-inactive-color: #e3b341;
 }
 
 ::view-transition-old(root) {

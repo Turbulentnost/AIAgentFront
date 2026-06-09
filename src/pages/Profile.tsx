@@ -1,13 +1,16 @@
-import { ChangeEvent, useMemo, useRef, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   BriefcaseBusiness,
   Building2,
   CalendarDays,
   Camera,
   ChevronRight,
+  Circle,
   ClipboardCheck,
   Clock3,
   Edit3,
+  Eye,
+  EyeOff,
   FileText,
   Lock,
   Mail,
@@ -19,15 +22,16 @@ import {
   Trophy,
   Upload,
   UserRoundCog,
-  UsersRound
+  UsersRound,
+  X
 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { agentsApi, departmentsApi, tasksApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
+import formStyles from "@/components/form-controls/form-controls.module.css";
 import {
   mockProfileActivities,
-  mockProfileAgents,
   mockSecurityItems,
   profileFallbacks,
   roleNameById
@@ -95,17 +99,38 @@ function toneForIndex(index: number): ProfileAgentCard["tone"] {
   return (["blue", "green", "violet", "orange", "slate"] as const)[index] ?? "blue";
 }
 
-function iconForIndex(index: number): ProfileAgentIcon {
-  return (["document", "clipboard", "analysis", "cart", "trophy"] as const)[index] ?? "document";
+function iconForAgent(agent: AgentAccess): ProfileAgentIcon {
+  const key = `${agent.slug} ${agent.name} ${agent.purpose ?? ""}`.toLowerCase();
+  if (key.includes("tender") || key.includes("тендер")) return "trophy";
+  if (key.includes("закуп") || key.includes("purchase") || key.includes("procurement")) return "cart";
+  if (
+    key.includes("kd") ||
+    key.includes("td") ||
+    key.includes("кд") ||
+    key.includes("document") ||
+    key.includes("документ")
+  ) {
+    return "document";
+  }
+  if (key.includes("ol") || key.includes("опрос") || key.includes("анализ") || key.includes("analysis")) {
+    return "analysis";
+  }
+  return "clipboard";
+}
+
+function pickProfileAgents(agents: AgentAccess[]) {
+  const accessible = agents.filter((agent) => agent.can_run || agent.can_view_results);
+  const source = accessible.length ? accessible : agents;
+  return source.slice(0, 5);
 }
 
 function toProfileAgent(agent: AgentAccess, index: number): ProfileAgentCard {
   return {
     id: agent.id,
     title: agent.name,
-    description: agent.purpose || mockProfileAgents[index]?.description || "Доступный ИИ-агент платформы",
+    description: agent.purpose?.trim() || "Доступный ИИ-агент платформы",
     tone: toneForIndex(index),
-    icon: iconForIndex(index),
+    icon: iconForAgent(agent),
     accessLabel: accessLabel(agent),
     href: "/agents",
     isLocked: !agent.can_run && !agent.can_view_results
@@ -124,10 +149,40 @@ function toActivityFromTask(task: Task, index: number): ProfileActivityItem {
   };
 }
 
+type PasswordFieldKey = "newPassword" | "confirmPassword";
+
+type PasswordVisibility = Record<PasswordFieldKey, boolean>;
+
+type PasswordChangeForm = {
+  email: string;
+  newPassword: string;
+  confirmPassword: string;
+};
+
+const emptyPasswordVisibility: PasswordVisibility = {
+  newPassword: false,
+  confirmPassword: false
+};
+
+const PASSWORD_MODAL_CLOSE_MS = 260;
+
+const emptyPasswordForm: PasswordChangeForm = {
+  email: "",
+  newPassword: "",
+  confirmPassword: ""
+};
+
 export default function Profile() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [message, setMessage] = useState<string | null>(null);
+  const [isTwoFactorEnabled, setIsTwoFactorEnabled] = useState(false);
+  const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
+  const [isPasswordModalClosing, setIsPasswordModalClosing] = useState(false);
+  const [passwordForm, setPasswordForm] = useState<PasswordChangeForm>(emptyPasswordForm);
+  const [passwordFormError, setPasswordFormError] = useState<string | null>(null);
+  const [passwordVisibility, setPasswordVisibility] = useState<PasswordVisibility>(emptyPasswordVisibility);
+  const passwordModalCloseTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isCameraBouncing, setIsCameraBouncing] = useState(false);
 
@@ -157,6 +212,68 @@ export default function Profile() {
     }
   });
 
+  const finishPasswordModalClose = useCallback(() => {
+    setIsPasswordModalOpen(false);
+    setIsPasswordModalClosing(false);
+    setPasswordForm(emptyPasswordForm);
+    setPasswordFormError(null);
+    setPasswordVisibility(emptyPasswordVisibility);
+  }, []);
+
+  const requestClosePasswordModal = useCallback(() => {
+    if (isPasswordModalClosing) return;
+
+    setIsPasswordModalClosing(true);
+    if (passwordModalCloseTimerRef.current) {
+      window.clearTimeout(passwordModalCloseTimerRef.current);
+    }
+    passwordModalCloseTimerRef.current = window.setTimeout(() => {
+      finishPasswordModalClose();
+      passwordModalCloseTimerRef.current = null;
+    }, PASSWORD_MODAL_CLOSE_MS);
+  }, [finishPasswordModalClose, isPasswordModalClosing]);
+
+  const openPasswordModal = useCallback(() => {
+    if (!user) return;
+
+    if (passwordModalCloseTimerRef.current) {
+      window.clearTimeout(passwordModalCloseTimerRef.current);
+      passwordModalCloseTimerRef.current = null;
+    }
+
+    setPasswordForm({
+      email: user.email,
+      newPassword: "",
+      confirmPassword: ""
+    });
+    setPasswordFormError(null);
+    setPasswordVisibility(emptyPasswordVisibility);
+    setIsPasswordModalClosing(false);
+    setIsPasswordModalOpen(true);
+  }, [user]);
+
+  useEffect(() => {
+    if (!isPasswordModalOpen || isPasswordModalClosing) return;
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") requestClosePasswordModal();
+    }
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [isPasswordModalClosing, isPasswordModalOpen, requestClosePasswordModal]);
+
+  useEffect(
+    () => () => {
+      if (passwordModalCloseTimerRef.current) {
+        window.clearTimeout(passwordModalCloseTimerRef.current);
+      }
+    },
+    []
+  );
+
+  const isPasswordModalVisible = isPasswordModalOpen || isPasswordModalClosing;
+
   if (!user) return <div className="card">Профиль не загружен</div>;
 
   const displayName = getDisplayName(user);
@@ -173,11 +290,10 @@ export default function Profile() {
   const createdAt = user.created_at || profileFallbacks.createdAt;
   const lastLoginAt = user.last_login_at || profileFallbacks.lastLoginAt;
 
-  const profileAgents = useMemo(() => {
-    const fromApi = agentsQuery.data?.slice(0, 5).map(toProfileAgent) ?? [];
-    if (fromApi.length >= 5) return fromApi;
-    return [...fromApi, ...mockProfileAgents.slice(fromApi.length)].slice(0, 5);
-  }, [agentsQuery.data]);
+  const profileAgents = useMemo(
+    () => pickProfileAgents(agentsQuery.data ?? []).map(toProfileAgent),
+    [agentsQuery.data]
+  );
 
   const profileActivities = useMemo(() => {
     const fromApi = tasksQuery.data?.slice(0, 3).map(toActivityFromTask) ?? [];
@@ -196,6 +312,29 @@ export default function Profile() {
     window.setTimeout(() => setIsCameraBouncing(false), 450);
   }
 
+  function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!passwordForm.email.trim()) {
+      setPasswordFormError("Укажите электронную почту");
+      return;
+    }
+
+    if (!passwordForm.newPassword) {
+      setPasswordFormError("Укажите новый пароль");
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordFormError("Пароли не совпадают");
+      return;
+    }
+
+    setPasswordFormError(null);
+    setMessage("Новый пароль сохранён локально — подключение к API будет добавлено позже");
+    requestClosePasswordModal();
+  }
+
   return (
     <section className={styles.profile} aria-labelledby="profile-title">
       <div className={styles.header}>
@@ -203,10 +342,10 @@ export default function Profile() {
           <h1 id="profile-title">Профиль пользователя</h1>
           <p>Управление учетной записью, доступами и персональными настройками</p>
         </div>
-        <button className={styles.editButton} type="button">
+        <Link className={styles.editButton} to="/profile/edit">
           <Edit3 size={18} strokeWidth={2.2} aria-hidden="true" />
           Редактировать профиль
-        </button>
+        </Link>
       </div>
 
       <div className={styles.topGrid}>
@@ -286,7 +425,7 @@ export default function Profile() {
             </div>
             <div>
               <dt>
-                <span className={styles.statusDot} aria-hidden="true" />
+                <Circle size={18} strokeWidth={2} aria-hidden="true" />
                 Статус
               </dt>
               <dd>
@@ -340,28 +479,36 @@ export default function Profile() {
           </Link>
         </div>
         <div className={styles.agentGrid}>
-          {profileAgents.map((agent) => {
-            const Icon = agentIcons[agent.icon];
+          {agentsQuery.isPending ? (
+            <p className={styles.agentsEmpty}>Загружаем агентов…</p>
+          ) : agentsQuery.isError ? (
+            <p className={styles.agentsEmpty}>Не удалось загрузить агентов</p>
+          ) : !profileAgents.length ? (
+            <p className={styles.agentsEmpty}>Нет доступных агентов для вашей роли.</p>
+          ) : (
+            profileAgents.map((agent) => {
+              const Icon = agentIcons[agent.icon];
 
-            return (
-              <Link
-                className={`${styles.agentCard} ${agent.isLocked ? styles.locked : ""}`}
-                key={agent.id}
-                to={agent.href}
-              >
-                <span className={`${styles.agentIcon} ${styles[agent.tone]}`}>
-                  <Icon size={24} strokeWidth={1.9} aria-hidden="true" />
-                </span>
-                <div>
-                  <h3>{agent.title}</h3>
-                  <p>{agent.description}</p>
-                  <span className={`${styles.accessBadge} ${styles[agent.tone]}`}>{agent.accessLabel}</span>
-                </div>
-                <ChevronRight className={styles.agentChevron} size={18} strokeWidth={2.3} aria-hidden="true" />
-                {agent.isLocked && <Lock className={styles.agentLock} size={18} strokeWidth={2.2} aria-hidden="true" />}
-              </Link>
-            );
-          })}
+              return (
+                <Link
+                  className={`${styles.agentCard} ${agent.isLocked ? styles.locked : ""}`}
+                  key={agent.id}
+                  to={agent.href}
+                >
+                  <span className={`${styles.agentIcon} ${styles[agent.tone]}`}>
+                    <Icon size={24} strokeWidth={1.9} aria-hidden="true" />
+                  </span>
+                  <div>
+                    <h3>{agent.title}</h3>
+                    <p>{agent.description}</p>
+                    <span className={`${styles.accessBadge} ${styles[agent.tone]}`}>{agent.accessLabel}</span>
+                  </div>
+                  <ChevronRight className={styles.agentChevron} size={18} strokeWidth={2.3} aria-hidden="true" />
+                  {agent.isLocked && <Lock className={styles.agentLock} size={18} strokeWidth={2.2} aria-hidden="true" />}
+                </Link>
+              );
+            })
+          )}
         </div>
       </section>
 
@@ -371,15 +518,43 @@ export default function Profile() {
           <div className={styles.securityList}>
             {mockSecurityItems.map((item) => {
               const Icon = securityIcons[item.icon];
+              const isMfa = item.id === "mfa";
+              const isPassword = item.id === "password";
+              const subtitle = isMfa
+                ? isTwoFactorEnabled
+                  ? "Подключена"
+                  : "Не подключена"
+                : item.subtitle;
+              const actionLabel = isMfa ? (isTwoFactorEnabled ? "Отключить" : "Подключить") : item.actionLabel;
 
               return (
                 <article className={styles.securityItem} key={item.id}>
-                  <Icon size={24} strokeWidth={1.9} aria-hidden="true" />
+                  <Icon
+                    className={isMfa && isTwoFactorEnabled ? styles.securityIconEnabled : undefined}
+                    size={24}
+                    strokeWidth={1.9}
+                    aria-hidden="true"
+                  />
                   <div>
                     <h3>{item.title}</h3>
-                    <p>{item.subtitle}</p>
+                    <p className={isMfa && isTwoFactorEnabled ? styles.securityStatusEnabled : undefined}>
+                      {subtitle}
+                    </p>
                   </div>
-                  <button type="button">{item.actionLabel}</button>
+                  <button
+                    type="button"
+                    className={isMfa && isTwoFactorEnabled ? styles.securityActionDisable : undefined}
+                    aria-pressed={isMfa ? isTwoFactorEnabled : undefined}
+                    onClick={
+                      isPassword
+                        ? openPasswordModal
+                        : isMfa
+                          ? () => setIsTwoFactorEnabled((current) => !current)
+                          : undefined
+                    }
+                  >
+                    {actionLabel}
+                  </button>
                 </article>
               );
             })}
@@ -412,6 +587,136 @@ export default function Profile() {
           </Link>
         </section>
       </div>
+
+      {isPasswordModalVisible ? (
+        <div
+          className={`${styles.modalBackdrop} ${
+            isPasswordModalClosing ? styles.modalBackdropClosing : styles.modalBackdropOpening
+          }`}
+          role="presentation"
+          onClick={requestClosePasswordModal}
+        >
+          <div
+            className={`${styles.card} ${styles.passwordModal} ${
+              isPasswordModalClosing ? styles.passwordModalClosing : styles.passwordModalOpening
+            }`}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="password-modal-title"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className={styles.modalHeader}>
+              <div>
+                <h2 id="password-modal-title">Смена пароля</h2>
+                <p>Укажите почту и новый пароль. Данные пока сохраняются только локально.</p>
+              </div>
+              <button
+                type="button"
+                className={styles.modalCloseButton}
+                aria-label="Закрыть"
+                onClick={requestClosePasswordModal}
+              >
+                <X size={18} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+            </header>
+
+            <form className={styles.modalForm} onSubmit={handlePasswordSubmit}>
+              <label className={styles.modalField}>
+                <span className={styles.modalFieldLabel}>Электронная почта</span>
+                <input
+                  className={formStyles.control}
+                  type="email"
+                  autoComplete="email"
+                  placeholder="name@company.com"
+                  value={passwordForm.email}
+                  onChange={(event) =>
+                    setPasswordForm((current) => ({ ...current, email: event.target.value }))
+                  }
+                />
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalFieldLabel}>Новый пароль</span>
+                <div className={styles.passwordField}>
+                  <input
+                    className={`${formStyles.control} ${styles.passwordInput}`}
+                    type={passwordVisibility.newPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Введите новый пароль"
+                    value={passwordForm.newPassword}
+                    onChange={(event) =>
+                      setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={styles.passwordToggle}
+                    aria-label={passwordVisibility.newPassword ? "Скрыть пароль" : "Показать пароль"}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() =>
+                      setPasswordVisibility((current) => ({
+                        ...current,
+                        newPassword: !current.newPassword
+                      }))
+                    }
+                  >
+                    {passwordVisibility.newPassword ? (
+                      <EyeOff size={16} strokeWidth={2} aria-hidden="true" />
+                    ) : (
+                      <Eye size={16} strokeWidth={2} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </label>
+
+              <label className={styles.modalField}>
+                <span className={styles.modalFieldLabel}>Подтверждение пароля</span>
+                <div className={styles.passwordField}>
+                  <input
+                    className={`${formStyles.control} ${styles.passwordInput}`}
+                    type={passwordVisibility.confirmPassword ? "text" : "password"}
+                    autoComplete="new-password"
+                    placeholder="Повторите новый пароль"
+                    value={passwordForm.confirmPassword}
+                    onChange={(event) =>
+                      setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={styles.passwordToggle}
+                    aria-label={passwordVisibility.confirmPassword ? "Скрыть пароль" : "Показать пароль"}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() =>
+                      setPasswordVisibility((current) => ({
+                        ...current,
+                        confirmPassword: !current.confirmPassword
+                      }))
+                    }
+                  >
+                    {passwordVisibility.confirmPassword ? (
+                      <EyeOff size={16} strokeWidth={2} aria-hidden="true" />
+                    ) : (
+                      <Eye size={16} strokeWidth={2} aria-hidden="true" />
+                    )}
+                  </button>
+                </div>
+              </label>
+
+              {passwordFormError ? <p className={styles.modalError}>{passwordFormError}</p> : null}
+
+              <div className={styles.modalActions}>
+                <button type="button" className={styles.modalCancelButton} onClick={requestClosePasswordModal}>
+                  Отмена
+                </button>
+                <button type="submit" className={styles.modalSubmitButton}>
+                  Сохранить пароль
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      ) : null}
     </section>
   );
 }

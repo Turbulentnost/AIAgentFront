@@ -233,15 +233,17 @@
   gap: 11px;
   margin: 0 0 8px;
   color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.2;
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
+  line-height: var(--form-control-line-height);
 }
 
 .identityInfo p svg,
 .infoGrid dt svg {
-  flex: 0 0 auto;
-  color: var(--color-muted);
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--form-icon-color);
 }
 
 .statusBadge,
@@ -254,14 +256,13 @@
   color: var(--color-success);
   background: var(--color-green-soft);
   border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: var(--form-status-badge-font-size);
+  font-weight: var(--form-status-badge-font-weight);
   line-height: 1;
 }
 
 .statusBadge span,
-.inlineStatus span,
-.statusDot {
+.inlineStatus span {
   width: 9px;
   height: 9px;
   background: currentColor;
@@ -297,18 +298,17 @@
 .securityPanel h2,
 .activityPanel h2 {
   margin: 0;
-  color: var(--color-text-strong);
-  font-size: 17px;
-  font-weight: 850;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
+  color: var(--summary-section-title-color);
+  font-size: var(--summary-section-title-size);
+  font-weight: var(--summary-section-title-weight);
+  line-height: var(--summary-section-title-line-height);
 }
 
 .infoGrid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 13px 44px;
-  margin: 18px 0 0;
+  gap: 10px 44px;
+  margin: 14px 0 0;
 }
 
 .infoGrid div {
@@ -321,29 +321,23 @@
 .infoGrid dt {
   display: flex;
   align-items: center;
-  gap: 14px;
-  color: var(--color-text-secondary);
-  font-size: 13px;
-  font-weight: 700;
+  gap: 11px;
+  color: var(--summary-label-color);
+  font-size: var(--summary-label-size);
+  font-weight: var(--summary-label-weight);
+  line-height: var(--summary-label-line-height);
 }
 
 .infoGrid dd {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  color: var(--color-slate);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.25;
+  color: var(--color-text-secondary);
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
+  line-height: var(--form-control-line-height);
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.inlineStatus {
-  height: auto;
-  padding: 0;
-  background: transparent;
-  font-size: 14px;
 }
 
 .agentsPanel {
@@ -376,6 +370,15 @@
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 16px;
+}
+
+.agentsEmpty {
+  grid-column: 1 / -1;
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .agentCard {
@@ -533,32 +536,62 @@
 }
 
 .securityItem > svg {
-  color: var(--color-muted);
+  color: var(--form-icon-color);
 }
 
-.securityItem h3,
-.activityItem h3 {
-  margin: 0 0 3px;
-  color: var(--color-text-strong);
-  font-size: 13px;
-  font-weight: 850;
-  line-height: 1.15;
+.securityItem > svg.securityIconEnabled {
+  color: var(--color-success-text);
+  filter: drop-shadow(0 0 5px var(--color-success-alpha-50));
 }
 
-.securityItem p,
-.activityItem p {
+.securityItem h3 {
+  margin: 0 0 4px;
+  color: var(--summary-section-title-color);
+  font-size: var(--summary-section-title-size);
+  font-weight: var(--summary-section-title-weight);
+  line-height: var(--summary-section-title-line-height);
+}
+
+.securityItem p {
   margin: 0;
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 650;
-  line-height: 1.2;
+  color: var(--summary-label-color);
+  font-size: var(--summary-label-size);
+  font-weight: var(--summary-label-weight);
+  line-height: var(--summary-label-line-height);
 }
 
 .securityItem button {
   justify-self: end;
   width: 154px;
   height: 34px;
-  font-size: 12px;
+  font-size: var(--nav-button-font-size);
+  font-weight: var(--nav-button-font-weight);
+  line-height: var(--nav-button-line-height);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.securityItem button.securityActionDisable {
+  color: var(--color-danger-text);
+  background: var(--color-surface);
+  border-color: var(--color-danger-text);
+  box-shadow: 0 2px 10px rgba(180, 35, 24, 0.22);
+}
+
+.securityItem button.securityActionDisable:hover {
+  color: var(--color-danger-text);
+  background: var(--color-surface);
+  border-color: var(--color-danger-text);
+  box-shadow: 0 4px 14px rgba(180, 35, 24, 0.28);
+}
+
+.securityStatusEnabled {
+  color: var(--color-success-text);
+  font-weight: var(--form-label-weight);
 }
 
 .activityItem {
@@ -568,6 +601,22 @@
   gap: 16px;
   min-height: 44px;
   border-bottom: 1px solid var(--color-border-soft);
+}
+
+.activityItem h3 {
+  margin: 0 0 3px;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 850;
+  line-height: 1.15;
+}
+
+.activityItem p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
 }
 
 .activityIcon {
@@ -610,6 +659,293 @@
   font-size: 12px;
   font-weight: 850;
   text-decoration: none;
+}
+
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--color-overlay);
+  backdrop-filter: blur(0);
+}
+
+.modalBackdropOpening {
+  animation: modalBackdropIn 0.32s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.modalBackdropClosing {
+  animation: modalBackdropOut 0.24s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.passwordModal {
+  width: min(480px, calc(100vw - 40px));
+  max-height: calc(100vh - 64px);
+  overflow: auto;
+  padding: 20px 22px 22px;
+  transform-origin: center center;
+  will-change: opacity, transform, filter;
+}
+
+.passwordModalOpening {
+  animation: modalPanelIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.passwordModalClosing {
+  animation: modalPanelOut 0.24s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+
+@keyframes modalBackdropIn {
+  from {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+
+  to {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+}
+
+@keyframes modalBackdropOut {
+  from {
+    opacity: 1;
+    backdrop-filter: blur(8px);
+  }
+
+  to {
+    opacity: 0;
+    backdrop-filter: blur(0);
+  }
+}
+
+@keyframes modalPanelIn {
+  from {
+    opacity: 0;
+    filter: blur(6px);
+    transform: scale(0.92);
+  }
+
+  to {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+}
+
+@keyframes modalPanelOut {
+  from {
+    opacity: 1;
+    filter: blur(0);
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    filter: blur(4px);
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modalBackdropOpening,
+  .modalBackdropClosing,
+  .passwordModalOpening,
+  .passwordModalClosing {
+    animation: none;
+  }
+}
+
+.modalHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.modalHeader h2 {
+  margin: 0;
+  color: var(--summary-section-title-color);
+  font-size: var(--summary-title-size);
+  font-weight: var(--summary-title-weight);
+  line-height: var(--summary-title-line-height);
+}
+
+.modalHeader p {
+  margin: 6px 0 0;
+  color: var(--summary-label-color);
+  font-size: var(--summary-label-size);
+  font-weight: var(--summary-label-weight);
+  line-height: var(--summary-label-line-height);
+}
+
+.modalCloseButton {
+  display: grid;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-card);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: var(--form-control-transition);
+}
+
+.modalCloseButton:hover {
+  color: var(--color-text-secondary);
+  border-color: var(--color-border-card-hover);
+}
+
+.modalCloseButton:focus-visible {
+  outline: none;
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.modalForm {
+  display: grid;
+  gap: var(--form-grid-gap-y);
+}
+
+.modalField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-field-gap);
+}
+
+.modalFieldLabel {
+  color: var(--form-label-color);
+  font-size: var(--form-label-size);
+  font-weight: var(--form-label-weight);
+  line-height: var(--form-label-line-height);
+}
+
+.passwordField {
+  position: relative;
+}
+
+.passwordInput {
+  padding-right: var(--form-control-padding-right-icon);
+}
+
+.passwordInput::-ms-reveal,
+.passwordInput::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.passwordInput::-webkit-credentials-auto-fill-button,
+.passwordInput::-webkit-strong-password-auto-fill-button,
+.passwordInput::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+  position: absolute;
+  right: 0;
+}
+
+.passwordInput::-webkit-password-reveal-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none !important;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.passwordToggle {
+  position: absolute;
+  top: 50%;
+  right: var(--form-icon-offset-x);
+  z-index: 2;
+  display: grid;
+  width: var(--form-icon-clear-button-size);
+  height: var(--form-icon-clear-button-size);
+  padding: 0;
+  color: var(--form-icon-color);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-50%);
+  transition: opacity 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+
+.passwordField:focus-within .passwordToggle {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.passwordToggle:hover {
+  color: var(--form-icon-hover-color);
+}
+
+.passwordToggle:focus-visible {
+  outline: none;
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.modalError {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-radius: var(--form-control-border-radius);
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
+  line-height: var(--form-control-line-height);
+}
+
+.modalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.modalCancelButton,
+.modalSubmitButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--nav-button-min-height);
+  padding: 0 var(--nav-button-padding-x);
+  border: 1px solid transparent;
+  border-radius: var(--nav-button-radius);
+  font-size: var(--nav-button-font-size);
+  font-weight: var(--nav-button-font-weight);
+  line-height: var(--nav-button-line-height);
+  cursor: pointer;
+  transition: var(--nav-button-transition);
+}
+
+.modalCancelButton {
+  color: var(--nav-button-secondary-color);
+  background: var(--nav-button-secondary-bg);
+  border-color: var(--nav-button-secondary-border);
+}
+
+.modalSubmitButton {
+  color: var(--nav-button-primary-color);
+  background: var(--nav-button-primary-bg);
+  box-shadow: var(--nav-button-primary-shadow);
+}
+
+.modalCancelButton:focus-visible,
+.modalSubmitButton:focus-visible {
+  outline: none;
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
 }
 
 @media (max-width: 1100px) {

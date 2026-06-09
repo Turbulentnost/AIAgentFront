@@ -301,8 +301,17 @@ export default function KnowledgeBaseCreate() {
 
   const documents = useQuery({ queryKey: ["documents"], queryFn: documentsApi.list });
   const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
-  const users = useQuery({ queryKey: ["users"], queryFn: usersApi.list });
+  const usersQuery = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.list({ limit: 1000, offset: 0 }),
+    enabled: Boolean(currentUser?.is_superuser)
+  });
   const agents = useQuery({ queryKey: ["agents", "available"], queryFn: agentsApi.available });
+
+  useEffect(() => {
+    if (!currentUser || responsibleUserId) return;
+    setResponsibleUserId(currentUser.id);
+  }, [currentUser, responsibleUserId]);
 
   const activeDepartments = useMemo(() => filterActiveDepartments(departments.data ?? []), [departments.data]);
   const activeStep = steps[stepIndex];
@@ -552,7 +561,8 @@ export default function KnowledgeBaseCreate() {
               topic={topic}
               comment={comment}
               departments={activeDepartments}
-              users={users.data ?? []}
+              users={usersQuery.data ?? []}
+              currentUserId={currentUser?.id}
               onName={setName}
               onDescription={setDescription}
               onBaseKind={setBaseKind}
@@ -603,7 +613,7 @@ export default function KnowledgeBaseCreate() {
               accessType={accessType}
               includeChildren={includeChildren}
               accessReason={accessReason}
-              users={users.data ?? []}
+              users={usersQuery.data ?? []}
               departments={activeDepartments}
               selectedUserIds={selectedUserIds}
               selectedDepartmentIds={selectedDepartmentIds}
@@ -627,8 +637,8 @@ export default function KnowledgeBaseCreate() {
               description={description}
               baseKind={baseKind}
               department={activeDepartments.find((item) => item.id === departmentId)}
-              responsible={users.data?.find((item) => item.id === responsibleUserId)}
-              users={users.data ?? []}
+              responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
+              users={usersQuery.data ?? []}
               topic={topic}
               selectedDocuments={selectedDocuments}
               processing={processing}
@@ -647,12 +657,12 @@ export default function KnowledgeBaseCreate() {
             name={name}
             baseKind={baseKind}
             department={activeDepartments.find((item) => item.id === departmentId)}
-            responsible={users.data?.find((item) => item.id === responsibleUserId)}
+            responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
             topic={topic}
             selectedDocuments={selectedDocuments}
             stagedDropCount={stagedDropFiles.length}
             readiness={readiness}
-            users={users.data ?? []}
+            users={usersQuery.data ?? []}
             processing={processing}
             accessMode={accessMode}
             selectedAgents={selectedAgents}
@@ -718,6 +728,7 @@ function StepMain(props: {
   comment: string;
   departments: Department[];
   users: User[];
+  currentUserId?: string;
   onName: (value: string) => void;
   onDescription: (value: string) => void;
   onBaseKind: (value: BaseKind) => void;
@@ -811,7 +822,7 @@ function StepMain(props: {
             onChange={props.onResponsible}
             options={props.users.map((user) => ({
               value: user.id,
-              label: user.full_name || user.email || "Пользователь"
+              label: getUserPickerLabel(user, props.currentUserId)
             }))}
             placeholder="Выберите пользователя"
             emptyValue=""
@@ -1979,6 +1990,15 @@ function documentStatusLabel(document: Document) {
 
 function departmentName(departments: Department[], departmentId?: string | null) {
   return departments.find((department) => department.id === departmentId)?.name || "-";
+}
+
+function getUserPickerLabel(user: User, currentUserId?: string) {
+  const label =
+    user.full_name?.trim() ||
+    [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") ||
+    user.email ||
+    "Пользователь";
+  return currentUserId && user.id === currentUserId ? `${label} (вы)` : label;
 }
 
 function userName(users: User[], userId?: string | null, currentUserId?: string) {

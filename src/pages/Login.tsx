@@ -344,6 +344,7 @@ export default function Login() {
                   aria-label={isPasswordVisible ? "Скрыть пароль" : "Показать пароль"}
                   className={styles.iconButton}
                   type="button"
+                  onMouseDown={(event) => event.preventDefault()}
                   onClick={() => setIsPasswordVisible((value) => !value)}
                 >
                   {isPasswordVisible ? (

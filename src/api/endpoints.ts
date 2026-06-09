@@ -33,7 +33,8 @@ import type {
   TaskStep,
   TokenResponse,
   User,
-  UserCreate
+  UserCreate,
+  UserUpdate
 } from "@/types";
 
 export const healthApi = {
@@ -47,9 +48,12 @@ export const authApi = {
   register: (payload: UserCreate) => apiClient.post<User>("/auth/register", payload).then((r) => r.data)
 };
 export const usersApi = {
-  list: () => apiClient.get<User[]>("/users").then((r) => r.data),
+  list: (params?: { limit?: number; offset?: number }) =>
+    apiClient.get<User[]>("/users", { params }).then((r) => r.data),
   get: (userId: string) => apiClient.get<User>(`/users/${userId}`).then((r) => r.data),
   create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
+  update: (userId: string, payload: UserUpdate) =>
+    apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
   uploadAvatar: (userId: string, file: File) => {
     const formData = new FormData();

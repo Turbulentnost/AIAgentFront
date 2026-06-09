@@ -675,8 +675,39 @@
   background: transparent;
   border: 0;
   border-radius: 999px;
+  opacity: 0;
+  pointer-events: none;
   transform: translateY(-50%);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.inputShell:focus-within .iconButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.inputShell input[type="password"]::-ms-reveal,
+.inputShell input[type="password"]::-ms-clear {
+  display: none;
+  width: 0;
+  height: 0;
+}
+
+.inputShell input[type="password"]::-webkit-credentials-auto-fill-button,
+.inputShell input[type="password"]::-webkit-strong-password-auto-fill-button,
+.inputShell input[type="password"]::-webkit-contacts-auto-fill-button {
+  visibility: hidden;
+  display: none !important;
+  pointer-events: none;
+}
+
+.inputShell input[type="password"]::-webkit-password-reveal-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none !important;
+  width: 0;
+  height: 0;
+  pointer-events: none;
 }
 
 .iconButton:hover {

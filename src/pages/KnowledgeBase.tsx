@@ -11,11 +11,11 @@ import {
   Play,
   Plus,
   RefreshCw,
-  Search,
   ShieldCheck,
   TriangleAlert
 } from "lucide-react";
 import { knowledgeBasesApi } from "@/api/endpoints";
+import { FormSearchInput, FormSelect } from "@/components/form-controls";
 import type {
   KnowledgeBase,
   KnowledgeBaseAccessType,
@@ -161,20 +161,21 @@ export default function KnowledgeBasePage() {
       <section className={styles.workspace}>
         <div className={styles.listPanel}>
           <div className={styles.filters}>
-            <label>
-              <Search size={15} />
-              <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Поиск базы знаний" />
-            </label>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as KnowledgeBaseStatus | "all")}>
-              <option value="all">Все статусы</option>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+            <FormSearchInput
+              className={styles.filterSearch}
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Поиск базы знаний"
+            />
+            <FormSelect
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value as KnowledgeBaseStatus | "all")}
+              placeholder="Все статусы"
+              options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
+              ariaLabel="Фильтр по статусу"
+            />
             <button type="button" className={styles.secondaryButton}>
-              <Filter size={15} />
+              <Filter size={15} strokeWidth={2} aria-hidden="true" />
               Фильтры
             </button>
           </div>
@@ -446,14 +447,19 @@ function DetailTabContent(props: {
     return (
       <div className={styles.testSearch}>
         <form
+          className={styles.testSearchForm}
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             if (testQuery.trim()) testSearch.mutate(testQuery.trim());
           }}
         >
-          <input value={testQuery} onChange={(event) => setTestQuery(event.target.value)} placeholder="Введите тестовый вопрос" />
-          <button type="submit" disabled={testSearch.isPending}>
-            <Play size={15} />
+          <FormSearchInput
+            value={testQuery}
+            onChange={setTestQuery}
+            placeholder="Введите тестовый вопрос"
+          />
+          <button type="submit" className={styles.primaryButton} disabled={testSearch.isPending}>
+            <Play size={15} strokeWidth={2} aria-hidden="true" />
             Проверить
           </button>
         </form>

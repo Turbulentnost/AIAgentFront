@@ -84,8 +84,8 @@ export default function FormAutocomplete({
 
   function openList() {
     setOpen(true);
-    setQuery(selected?.label ?? "");
-    window.requestAnimationFrame(() => inputRef.current?.select());
+    setQuery("");
+    window.requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function closeList() {
@@ -107,7 +107,8 @@ export default function FormAutocomplete({
     inputRef.current?.blur();
   }
 
-  const inputValue = open ? query : selected?.label ?? "";
+  const isEmptySelection = emptyValue !== undefined && value === emptyValue;
+  const inputValue = open ? query : isEmptySelection ? "" : selected?.label ?? "";
 
   return (
     <div

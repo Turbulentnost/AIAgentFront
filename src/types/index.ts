@@ -158,6 +158,18 @@ export interface UserCreate {
   department_id?: string | null;
   role_id?: string | null;
 }
+export interface UserUpdate {
+  email?: string;
+  username?: string | null;
+  last_name?: string | null;
+  first_name?: string | null;
+  middle_name?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  position?: string | null;
+  department_id?: string | null;
+  role_id?: string | null;
+}
 export interface Department {
   id: string;
   name: string;
