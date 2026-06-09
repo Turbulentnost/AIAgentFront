@@ -1,3 +1,4 @@
+export { default as FormCheckbox } from "./FormCheckbox";
 export { default as Switch } from "./Switch";
 export { default as FormSearchInput } from "./FormSearchInput";
 export { default as FormSelect } from "./FormSelect";

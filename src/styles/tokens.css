@@ -188,6 +188,9 @@
   --form-required-weight: 600;
 
   --form-control-min-height: 46px;
+  --form-checkbox-size: 14px;
+  --form-checkbox-border-width: 1px;
+  --form-checkbox-check-color: #2563eb;
   --form-control-padding-y: 12px;
   --form-control-padding-x: 16px;
   --form-control-padding-right-icon: 40px;
@@ -353,6 +356,35 @@
   --tree-file-icon-code: #0550ae;
   --tree-file-icon-media: #8250df;
   --tree-file-icon-archive: #6e7781;
+  --access-mode-grid-gap: 12px;
+  --access-mode-card-radius: 12px;
+  --access-mode-card-padding-y: 16px;
+  --access-mode-card-padding-x: 12px;
+  --access-mode-card-border: #e2e8f0;
+  --access-mode-card-bg: #ffffff;
+  --access-mode-card-selected-border: #93c5fd;
+  --access-mode-card-selected-bg: #f8fbff;
+  --access-mode-icon-color: #475569;
+  --access-mode-icon-selected-color: #2563eb;
+  --access-mode-title-color: #0f172a;
+  --access-mode-title-selected-color: #2563eb;
+  --access-mode-title-size: 13px;
+  --access-mode-title-weight: 700;
+  --access-mode-title-line-height: 1.25;
+  --access-mode-desc-color: #64748b;
+  --access-mode-desc-size: 11px;
+  --access-mode-desc-weight: 400;
+  --access-mode-desc-line-height: 1.45;
+  --access-mode-radio-size: 14px;
+  --access-mode-radio-border: #cbd5e1;
+  --access-mode-radio-selected-border: #2563eb;
+  --access-mode-radio-selected-dot: #2563eb;
+  --access-mode-section-gap: 10px;
+  --access-agent-connected-color: #15803d;
+  --access-agent-connected-bg: #f0fdf4;
+  --access-agent-disconnected-color: #64748b;
+  --access-agent-disconnected-bg: #f1f5f9;
+  --dept-transfer-panel-height: 320px;
   --kb-status-ocr-color: #c2410c;
   --kb-status-ocr-bg: #ffedd5;
   --kb-status-draft-color: #475569;
@@ -366,6 +398,7 @@
   --kb-pending-dot-ring: rgba(96, 165, 250, 0.28);
   --kb-pending-text: #64748b;
   --kb-page-sources-max-width: 1600px;
+  --kb-page-access-max-width: 1600px;
 
   /* ── Agents catalog page ── */
   --agents-card-bg: #f0f7ff;
@@ -572,6 +605,9 @@
   --form-required-weight: 600;
 
   --form-control-min-height: 46px;
+  --form-checkbox-size: 14px;
+  --form-checkbox-border-width: 1px;
+  --form-checkbox-check-color: #58a6ff;
   --form-control-padding-y: 12px;
   --form-control-padding-x: 16px;
   --form-control-padding-right-icon: 40px;
@@ -736,6 +772,35 @@
   --tree-file-icon-code: #79c0ff;
   --tree-file-icon-media: #bc8cff;
   --tree-file-icon-archive: #8b949e;
+  --access-mode-grid-gap: 12px;
+  --access-mode-card-radius: 12px;
+  --access-mode-card-padding-y: 16px;
+  --access-mode-card-padding-x: 12px;
+  --access-mode-card-border: #30363d;
+  --access-mode-card-bg: #161b22;
+  --access-mode-card-selected-border: rgba(88, 166, 255, 0.55);
+  --access-mode-card-selected-bg: rgba(56, 139, 253, 0.08);
+  --access-mode-icon-color: #8b949e;
+  --access-mode-icon-selected-color: #58a6ff;
+  --access-mode-title-color: #e6edf3;
+  --access-mode-title-selected-color: #58a6ff;
+  --access-mode-title-size: 13px;
+  --access-mode-title-weight: 700;
+  --access-mode-title-line-height: 1.25;
+  --access-mode-desc-color: #8b949e;
+  --access-mode-desc-size: 11px;
+  --access-mode-desc-weight: 400;
+  --access-mode-desc-line-height: 1.45;
+  --access-mode-radio-size: 14px;
+  --access-mode-radio-border: #484f58;
+  --access-mode-radio-selected-border: #58a6ff;
+  --access-mode-radio-selected-dot: #58a6ff;
+  --access-mode-section-gap: 10px;
+  --access-agent-connected-color: #3fb950;
+  --access-agent-connected-bg: rgba(46, 160, 67, 0.15);
+  --access-agent-disconnected-color: #8b949e;
+  --access-agent-disconnected-bg: #30363d;
+  --dept-transfer-panel-height: 320px;
   --kb-status-ocr-color: #e3b341;
   --kb-status-ocr-bg: rgba(210, 153, 34, 0.15);
   --kb-status-draft-color: #8b949e;
@@ -749,6 +814,7 @@
   --kb-pending-dot-ring: rgba(88, 166, 255, 0.28);
   --kb-pending-text: #8b949e;
   --kb-page-sources-max-width: 1600px;
+  --kb-page-access-max-width: 1600px;
 
   /* ── Agents catalog page ── */
   --agents-card-bg: rgba(56, 139, 253, 0.1);

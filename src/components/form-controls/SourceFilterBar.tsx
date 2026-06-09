@@ -5,6 +5,8 @@ import FormSelect from "./FormSelect";
 import Switch from "./Switch";
 import styles from "./form-controls.module.css";
 
+const showOnlyCurrentLabel = "Показывать только актуальные";
+
 export default function SourceFilterBar({
   search,
   onSearch,
@@ -37,44 +39,53 @@ export default function SourceFilterBar({
   selectedCount: number;
 }) {
   return (
-    <div className={styles.filterBar}>
-      <FormSearchInput
-        className={styles.filterBarSearch}
-        compact
-        value={search}
-        onChange={onSearch}
-        placeholder="Найти документ по названию"
-      />
-      <FormSelect
-        compact
-        value={typeFilter}
-        onChange={onTypeFilter}
-        placeholder="Тип документа"
-        options={typeOptions}
-        ariaLabel="Тип документа"
-      />
-      <DepartmentSelect
-        compact
-        value={departmentFilter}
-        onChange={onDepartmentFilter}
-        departments={departments}
-        allowEmpty={false}
-        allValue="all"
-        allLabel="Подразделение"
-        ariaLabel="Подразделение"
-      />
-      <FormSelect
-        compact
-        value={statusFilter}
-        onChange={onStatusFilter}
-        placeholder="Статус"
-        options={statusOptions}
-        ariaLabel="Статус"
-      />
-      <div className={styles.filterBarSwitch}>
-        <Switch label="Показывать только актуальные" checked={showOnlyCurrent} onChange={onShowOnlyCurrent} />
+    <div className={styles.filterBarStack}>
+      <div className={styles.filterBarPrimary}>
+        <FormSearchInput
+          compact
+          className={styles.filterBarSearchWide}
+          value={search}
+          onChange={onSearch}
+          placeholder="Найти документ по названию"
+        />
+        <span className={styles.filterBarSwitchLabel}>{showOnlyCurrentLabel}</span>
+        <Switch
+          aria-label={showOnlyCurrentLabel}
+          checked={showOnlyCurrent}
+          onChange={onShowOnlyCurrent}
+        />
       </div>
-      <span className={`${styles.selectedBadge} ${styles.filterBarBadge}`}>Выбрано: {selectedCount}</span>
+
+      <div className={styles.filterBarSecondary}>
+        <FormSelect
+          compact
+          value={typeFilter}
+          onChange={onTypeFilter}
+          placeholder="Тип документа"
+          options={typeOptions}
+          ariaLabel="Тип документа"
+        />
+        <DepartmentSelect
+          compact
+          className={styles.filterBarDepartmentWide}
+          value={departmentFilter}
+          onChange={onDepartmentFilter}
+          departments={departments}
+          allowEmpty={false}
+          allValue="all"
+          allLabel="Подразделение"
+          ariaLabel="Подразделение"
+        />
+        <FormSelect
+          compact
+          value={statusFilter}
+          onChange={onStatusFilter}
+          placeholder="Статус"
+          options={statusOptions}
+          ariaLabel="Статус"
+        />
+        <span className={`${styles.selectedBadge} ${styles.filterBarBadge}`}>Выбрано: {selectedCount}</span>
+      </div>
     </div>
   );
 }

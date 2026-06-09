@@ -1,4 +1,5 @@
 import { FormEvent, useId, useState } from "react";
+import { FormCheckbox } from "@/components/form-controls";
 import {
   BarChart3,
   BrainCircuit,
@@ -395,14 +396,12 @@ export default function Login() {
             )}
 
             <div className={styles.formMeta}>
-              <label className={styles.checkbox}>
-                <input
-                  checked={rememberMe}
-                  type="checkbox"
-                  onChange={(event) => setRememberMe(event.target.checked)}
-                />
-                <span>Запомнить меня</span>
-              </label>
+              <FormCheckbox
+                checked={rememberMe}
+                label="Запомнить меня"
+                className={styles.rememberCheckbox}
+                onChange={setRememberMe}
+              />
             </div>
 
             {error && <div className={styles.errorMessage}>{error}</div>}

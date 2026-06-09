@@ -1,0 +1,506 @@
+.page {
+  display: grid;
+  gap: 16px;
+  width: min(1180px, calc(100vw - 72px));
+  min-width: 0;
+  margin: 0 auto;
+  color: var(--color-text);
+}
+
+.header h1 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.035em;
+}
+
+.header p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 14px;
+  align-items: start;
+  min-width: 0;
+}
+
+.uploadCard,
+.summaryCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+}
+
+.uploadCard {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+  min-width: 0;
+}
+
+.uploadCard h2,
+.summaryCard h2 {
+  margin: 0;
+  color: var(--summary-section-title-color);
+  font-size: var(--summary-section-title-size);
+  font-weight: var(--summary-section-title-weight);
+  line-height: var(--summary-section-title-line-height);
+}
+
+.uploadIntro {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dropZone {
+  position: relative;
+  min-height: 168px;
+  overflow: hidden;
+  border: 1px solid var(--kb-table-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.dropZoneDragOver {
+  border-color: transparent;
+}
+
+.dropZoneDragOver .dropZoneInner {
+  opacity: 0.32;
+  pointer-events: none;
+}
+
+.dropZoneInner {
+  display: grid;
+  gap: 8px;
+  place-content: center;
+  justify-items: center;
+  min-height: 168px;
+  padding: 24px;
+  text-align: center;
+}
+
+.dropZoneIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  color: var(--color-primary-text);
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dropZoneInner strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dropZoneInner span {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  gap: 6px;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: var(--color-primary-text);
+  text-align: center;
+  background: var(--kb-drop-overlay-bg);
+  border: 2px dashed var(--kb-drop-overlay-border);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.dropOverlayIcon {
+  display: grid;
+  width: 52px;
+  height: 52px;
+  place-items: center;
+  color: var(--color-primary-text);
+  background: var(--color-surface);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dropOverlay strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dropOverlay span:last-child {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.uploadForm {
+  display: grid;
+  gap: var(--form-grid-gap-y);
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--form-grid-gap-y) var(--form-grid-gap-x);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--form-field-gap);
+  margin: 0;
+  min-width: 0;
+}
+
+.fieldLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--form-label-color);
+  font-size: var(--form-label-size);
+  font-weight: var(--form-label-weight);
+  line-height: var(--form-label-line-height);
+}
+
+.wideField {
+  grid-column: 1 / -1;
+}
+
+.control {
+  width: 100%;
+  min-height: var(--form-control-min-height);
+  padding: var(--form-control-padding-y) var(--form-control-padding-x);
+  color: var(--form-control-text-color);
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
+  line-height: var(--form-control-line-height);
+  background: var(--form-control-bg);
+  border: var(--form-control-border-width) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius);
+  outline: none;
+  transition: var(--form-control-transition);
+}
+
+.control::placeholder {
+  color: var(--form-control-placeholder-color);
+  font-size: var(--form-control-placeholder-size);
+  font-weight: var(--form-control-placeholder-weight);
+  opacity: var(--form-control-placeholder-opacity);
+}
+
+.control:focus {
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.uploadActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.fileButton {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--form-control-min-height);
+  padding: 0 var(--form-control-padding-x);
+  color: var(--color-primary-text);
+  background: var(--color-surface);
+  border: 1px dashed var(--kb-file-button-border);
+  border-radius: var(--form-control-border-radius);
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.fileButton input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.submitButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--nav-button-gap);
+  min-height: var(--nav-button-min-height);
+  padding: 0 var(--nav-button-padding-x);
+  color: var(--nav-button-primary-color);
+  background: var(--nav-button-primary-bg);
+  border: 1px solid transparent;
+  border-radius: var(--nav-button-radius);
+  box-shadow: var(--nav-button-primary-shadow);
+  font-size: var(--nav-button-font-size);
+  font-weight: var(--nav-button-font-weight);
+  line-height: var(--nav-button-line-height);
+  cursor: pointer;
+  transition: var(--nav-button-transition);
+  white-space: nowrap;
+}
+
+.submitButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.submitButton:focus-visible {
+  outline: none;
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.selectedFileName {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.error {
+  margin: 0;
+  padding: var(--form-callout-padding-y) var(--form-callout-padding-x);
+  color: #b91c1c;
+  background: #fef2f2;
+  border-radius: var(--form-callout-radius);
+  font-size: var(--form-callout-font-size);
+  line-height: var(--form-callout-line-height);
+}
+
+.callout {
+  display: flex;
+  gap: var(--form-callout-gap);
+  align-items: flex-start;
+  padding: var(--form-callout-padding-y) var(--form-callout-padding-x);
+  color: var(--form-callout-text-color);
+  background: var(--form-callout-bg);
+  border-radius: var(--form-callout-radius);
+  font-size: var(--form-callout-font-size);
+  font-weight: var(--form-callout-font-weight);
+  line-height: var(--form-callout-line-height);
+}
+
+.stagedSection {
+  display: grid;
+  gap: 10px;
+}
+
+.stagedHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stagedHeader h3 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.linkButton {
+  padding: 0;
+  color: var(--color-primary-text);
+  background: transparent;
+  border: 0;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.linkButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.stagedList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.stagedCard {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  width: min(100%, 260px);
+  padding: 8px 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+}
+
+.stagedIcon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-primary-text);
+  background: var(--kb-upload-icon-bg);
+  border-radius: 8px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.stagedCopy {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.stagedCopy strong {
+  overflow: hidden;
+  color: var(--kb-doc-title);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stagedCopy small {
+  color: var(--kb-doc-meta);
+  font-size: 11px;
+  line-height: 1.3;
+}
+
+.stagedUpload {
+  padding: 0 8px;
+  color: var(--color-primary-text);
+  background: transparent;
+  border: 0;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.stagedUpload:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.stagedRemove {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--color-placeholder);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.stagedRemove:hover:not(:disabled) {
+  color: var(--color-muted);
+  background: var(--color-hover-strong);
+}
+
+.stagedRemove:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.summaryCard {
+  position: sticky;
+  top: calc(var(--layout-topbar-height) + var(--layout-sticky-gap));
+  align-self: start;
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.summaryBlock {
+  display: grid;
+  gap: var(--summary-rows-gap);
+  padding: var(--summary-block-padding);
+  background: var(--summary-block-bg);
+  border-radius: var(--summary-block-radius);
+}
+
+.summaryRows {
+  display: grid;
+  gap: var(--summary-rows-gap);
+}
+
+.summaryRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.summaryLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--summary-label-color);
+  font-size: var(--summary-label-size);
+  font-weight: var(--summary-label-weight);
+  line-height: var(--summary-label-line-height);
+}
+
+.summaryValue {
+  flex: 0 1 58%;
+  color: var(--summary-value-color);
+  font-size: var(--summary-value-size);
+  font-weight: var(--summary-value-weight);
+  line-height: var(--summary-value-line-height);
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.summaryEmpty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+@media (max-width: 960px) {
+  .layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .summaryCard {
+    position: static;
+  }
+
+  .formGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

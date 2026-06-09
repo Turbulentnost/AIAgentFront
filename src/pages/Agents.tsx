@@ -140,21 +140,25 @@ function AgentCard({
 
   return (
     <article className={styles.agentCard}>
-      <AgentStatusBadge status={agent.status} />
       <div className={styles.agentArt}>
         <img src={AGENT_ILLUSTRATION} alt="" loading="lazy" />
       </div>
       <div className={styles.agentBody}>
-        <h2 className={styles.agentTitle}>{agent.name}</h2>
+        <div className={styles.agentBodyHead}>
+          <h2 className={styles.agentTitle}>{agent.name}</h2>
+          <AgentStatusBadge status={agent.status} />
+        </div>
         <p className={styles.agentDescription}>{description}</p>
-        <span className={styles.agentUsage}>
-          <Users size={15} strokeWidth={2} aria-hidden="true" />
-          {formatUsageCount(usageCount)}
-        </span>
-      </div>
-      <div className={styles.agentCapability}>
-        <FolderOpen size={15} strokeWidth={2} aria-hidden="true" />
-        {capability}
+        <div className={styles.agentMeta}>
+          <span className={styles.agentUsage}>
+            <Users size={15} strokeWidth={2} aria-hidden="true" />
+            {formatUsageCount(usageCount)}
+          </span>
+          <span className={styles.agentCapability}>
+            <FolderOpen size={15} strokeWidth={2} aria-hidden="true" />
+            {capability}
+          </span>
+        </div>
       </div>
     </article>
   );
@@ -263,7 +267,7 @@ export default function Agents() {
                 compact
                 value={departmentFilter}
                 onChange={setDepartmentFilter}
-                options={departmentOptions}
+                options={[{ value: "all", label: "Все подразделения" }, ...departmentOptions]}
                 placeholder="Все подразделения"
                 ariaLabel="Подразделение"
               />

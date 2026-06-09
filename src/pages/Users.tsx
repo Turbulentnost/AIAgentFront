@@ -121,7 +121,7 @@ export default function Users() {
                 Email <span className={styles.required}>*</span>
               </span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="name@company.com"
                 type="email"
                 autoComplete="off"
@@ -136,7 +136,7 @@ export default function Users() {
                 Пароль <span className={styles.required}>*</span>
               </span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="Минимум 8 символов"
                 type="password"
                 autoComplete="new-password"
@@ -150,7 +150,7 @@ export default function Users() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Фамилия</span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="Иванов"
                 value={form.last_name}
                 onChange={(event) => setForm({ ...form, last_name: event.target.value })}
@@ -160,7 +160,7 @@ export default function Users() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Имя</span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="Иван"
                 value={form.first_name}
                 onChange={(event) => setForm({ ...form, first_name: event.target.value })}
@@ -170,7 +170,7 @@ export default function Users() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Отчество</span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="Иванович"
                 value={form.middle_name}
                 onChange={(event) => setForm({ ...form, middle_name: event.target.value })}
@@ -180,7 +180,7 @@ export default function Users() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Должность</span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="Инженер-конструктор"
                 value={form.position}
                 onChange={(event) => setForm({ ...form, position: event.target.value })}
@@ -190,7 +190,7 @@ export default function Users() {
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Телефон</span>
               <input
-                className={formStyles.control}
+                className={`${formStyles.control} ${styles.compactControl}`}
                 placeholder="+7 (999) 000-00-00"
                 type="tel"
                 value={form.phone}
@@ -236,6 +236,7 @@ export default function Users() {
             </div>
           </div>
 
+          <div className={styles.mainCardBody}>
           {usersQuery.isError ? <p className={styles.error}>Не удалось загрузить пользователей.</p> : null}
 
           {!usersQuery.data?.length ? (
@@ -245,7 +246,13 @@ export default function Users() {
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
-                <thead>
+                <colgroup>
+                  <col className={styles.colUser} />
+                  <col className={styles.colDepartment} />
+                  <col className={styles.colStatus} />
+                  <col className={styles.colActions} />
+                </colgroup>
+                <thead className={styles.tableHead}>
                   <tr>
                     <th>Пользователь</th>
                     <th>Подразделение</th>
@@ -253,35 +260,46 @@ export default function Users() {
                     <th>Действия</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {filteredUsers.map((item) => (
-                    <tr key={item.id}>
-                      <td>
-                        <span className={styles.userName}>{getUserDisplayName(item)}</span>
-                        <small className={styles.userMeta}>{item.position || item.email}</small>
-                      </td>
-                      <td>{getDepartmentName(departments, item.department_id)}</td>
-                      <td>
-                        <span className={item.is_active ? styles.statusActive : styles.statusInactive}>
-                          {item.is_active ? "Активен" : "Заблокирован"}
-                        </span>
-                      </td>
-                      <td>
-                        <button
-                          className={styles.deactivateButton}
-                          type="button"
-                          onClick={() => deactivateMutation.mutate(item.id)}
-                          disabled={!item.is_active || deactivateMutation.isPending}
-                        >
-                          Заблокировать
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
               </table>
+              <div className={styles.tableBodyScroll}>
+                <table className={styles.table}>
+                  <colgroup>
+                    <col className={styles.colUser} />
+                    <col className={styles.colDepartment} />
+                    <col className={styles.colStatus} />
+                    <col className={styles.colActions} />
+                  </colgroup>
+                  <tbody>
+                    {filteredUsers.map((item) => (
+                      <tr key={item.id}>
+                        <td>
+                          <span className={styles.userName}>{getUserDisplayName(item)}</span>
+                          <small className={styles.userMeta}>{item.position || item.email}</small>
+                        </td>
+                        <td>{getDepartmentName(departments, item.department_id)}</td>
+                        <td>
+                          <span className={item.is_active ? styles.statusActive : styles.statusInactive}>
+                            {item.is_active ? "Активен" : "Заблокирован"}
+                          </span>
+                        </td>
+                        <td>
+                          <button
+                            className={styles.deactivateButton}
+                            type="button"
+                            onClick={() => deactivateMutation.mutate(item.id)}
+                            disabled={!item.is_active || deactivateMutation.isPending}
+                          >
+                            Заблокировать
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
+          </div>
         </div>
       </div>
     </section>

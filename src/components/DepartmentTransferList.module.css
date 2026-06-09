@@ -1,0 +1,244 @@
+.root {
+  display: grid;
+  gap: 10px;
+}
+
+.sectionHead {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.infoButton {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--form-icon-color);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.infoButton:hover {
+  color: var(--form-icon-hover-color);
+}
+
+.searchField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.searchIcon {
+  position: absolute;
+  left: var(--form-icon-offset-x);
+  z-index: 1;
+  color: var(--form-icon-color);
+  pointer-events: none;
+}
+
+.searchInput {
+  width: 100%;
+  min-height: var(--form-control-min-height);
+  padding: var(--form-control-padding-y) var(--form-control-padding-x);
+  padding-left: var(--form-control-padding-left-search);
+  color: var(--form-control-text-color);
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
+  line-height: var(--form-control-line-height);
+  background: var(--form-control-bg);
+  border: var(--form-control-border-width) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius);
+  outline: none;
+  transition: var(--form-control-transition);
+}
+
+.searchInput::placeholder {
+  color: var(--form-control-placeholder-color);
+  font-size: var(--form-control-placeholder-size);
+  font-weight: var(--form-control-placeholder-weight);
+  opacity: var(--form-control-placeholder-opacity);
+}
+
+.searchInput:focus {
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.transferShell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 12px;
+  align-items: stretch;
+}
+
+.panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-width: 0;
+  height: var(--dept-transfer-panel-height);
+  overflow: hidden;
+  background: var(--form-control-bg);
+  border: var(--form-control-border-width) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius);
+}
+
+.panelHead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.panelTitle {
+  color: var(--form-label-color);
+  font-size: var(--form-label-size);
+  font-weight: var(--form-label-weight);
+  line-height: var(--form-label-line-height);
+}
+
+.panelCount {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 2px 8px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.clearButton {
+  padding: 0;
+  color: var(--color-primary-text);
+  background: transparent;
+  border: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.clearButton:hover {
+  text-decoration: underline;
+}
+
+.clearButton:disabled {
+  color: var(--color-muted);
+  cursor: not-allowed;
+  text-decoration: none;
+}
+
+.panelBody {
+  min-height: 0;
+  padding: 4px 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.selectedList {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 2px 0;
+  list-style: none;
+}
+
+.selectedRow {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 34px;
+  padding: 2px 10px 2px 8px;
+}
+
+.selectedRow:hover {
+  background: var(--color-hover-strong);
+  border-radius: 6px;
+}
+
+.nodeName {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.transferActions {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
+
+.transferButton {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: var(--form-control-bg);
+  border: var(--form-control-border-width) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius);
+  cursor: pointer;
+  transition: var(--form-control-transition);
+}
+
+.transferButton:hover:not(:disabled) {
+  color: var(--color-primary-text);
+  border-color: var(--form-control-focus-border-color);
+  background: var(--color-hover-strong);
+}
+
+.transferButton:focus-visible {
+  outline: none;
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.transferButton:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.selectedIcon {
+  color: var(--color-muted);
+}
+
+.removeButton {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  color: var(--form-icon-color);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.removeButton:hover {
+  color: var(--form-icon-hover-color);
+  background: var(--color-hover-strong);
+}
+
+.emptyState {
+  margin: 0;
+  padding: 16px 12px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}

@@ -5,15 +5,18 @@ export default function Switch({
   onChange,
   label,
   disabled = false,
-  id
+  id,
+  "aria-label": ariaLabel
 }: {
   checked: boolean;
   onChange: (checked: boolean) => void;
   label?: string;
   disabled?: boolean;
   id?: string;
+  "aria-label"?: string;
 }) {
   const switchId = id ?? `switch-${label?.replace(/\s+/g, "-").toLowerCase() ?? "control"}`;
+  const accessibleName = label ?? ariaLabel;
 
   return (
     <label
@@ -26,7 +29,7 @@ export default function Switch({
         type="button"
         role="switch"
         aria-checked={checked}
-        aria-label={label}
+        aria-label={accessibleName}
         disabled={disabled}
         className={`${styles.switch} ${checked ? styles.switchChecked : ""}`}
         onClick={() => !disabled && onChange(!checked)}

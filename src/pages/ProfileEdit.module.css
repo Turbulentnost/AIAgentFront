@@ -19,7 +19,7 @@
   width: fit-content;
   color: var(--color-primary-text);
   font-size: 12px;
-  font-weight: 800;
+  font-weight: var(--nav-button-font-weight);
   text-decoration: none;
 }
 
@@ -27,7 +27,7 @@
   margin: 0;
   color: var(--color-text-strong);
   font-size: 26px;
-  font-weight: 800;
+  font-weight: var(--summary-title-weight);
   line-height: 1.1;
   letter-spacing: -0.035em;
 }
@@ -36,8 +36,8 @@
   margin: 4px 0 0;
   max-width: 720px;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 600;
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
   line-height: 1.35;
 }
 
@@ -52,8 +52,8 @@
 .loadingCard {
   padding: 24px 26px;
   color: var(--color-text-secondary);
-  font-size: 14px;
-  font-weight: 700;
+  font-size: var(--form-control-font-size);
+  font-weight: var(--form-control-font-weight);
 }
 
 .card {
@@ -72,7 +72,7 @@
   margin: 4px 0 0;
   color: var(--color-muted);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: var(--form-control-font-weight);
   line-height: 1.35;
 }
 
@@ -187,7 +187,7 @@
   border: 1px solid var(--color-danger-border);
   border-radius: 10px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: var(--form-control-font-weight);
 }
 
 .actions {

@@ -1,0 +1,95 @@
+.tree {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.rootList,
+.children {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folderBlock {
+  display: grid;
+  gap: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 12px var(--form-checkbox-size) minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 8px 2px 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border-radius: 6px;
+}
+
+.row:hover {
+  background: var(--color-hover-strong);
+}
+
+.chevronSpacer,
+.chevronWrap {
+  display: grid;
+  width: 12px;
+  height: 16px;
+  place-items: center;
+}
+
+.chevronWrap {
+  padding: 0;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.chevronWrap:focus-visible {
+  outline: none;
+  box-shadow: var(--form-control-focus-ring);
+  border-radius: 4px;
+}
+
+.chevron {
+  color: var(--color-muted);
+  transition: transform 0.16s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.nodeName {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

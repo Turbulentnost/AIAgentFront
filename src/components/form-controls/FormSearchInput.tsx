@@ -16,7 +16,7 @@ export default function FormSearchInput({
 }) {
   return (
     <div className={`${styles.selectField} ${compact ? styles.compact : ""} ${className ?? ""}`}>
-      <Search className={styles.selectSearch} size={16} strokeWidth={2} aria-hidden="true" />
+      <Search className={styles.selectSearch} size={compact ? 14 : 16} strokeWidth={2} aria-hidden="true" />
       <input
         className={styles.control}
         type="search"

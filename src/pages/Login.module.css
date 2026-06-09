@@ -721,30 +721,15 @@
   justify-content: space-between;
 }
 
-.formMeta .checkbox {
-  display: inline-flex;
+.rememberCheckbox {
   flex: 0 0 auto;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  gap: 0.5rem;
-  align-items: center;
   color: var(--color-login-label);
   font-size: 0.8125rem;
   font-weight: 700;
   white-space: nowrap;
-  cursor: pointer;
 }
 
-.formMeta .checkbox input {
-  flex: 0 0 auto;
-  margin: 0;
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--login-blue);
-  cursor: pointer;
-}
-
-.formMeta .checkbox span {
+.rememberCheckbox span:last-child {
   line-height: 1;
 }
 

@@ -3,7 +3,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
-  Bot,
   Check,
   CheckCircle2,
   ChevronDown,
@@ -30,16 +29,25 @@ import {
   Table2,
   PanelLeft,
   Upload,
+  Users,
   X
 } from "lucide-react";
 import { isAxiosError } from "axios";
 import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, usersApi } from "@/api/endpoints";
+import {
+  AccessAdminsIcon,
+  AccessAgentsIcon,
+  AccessDepartmentsIcon,
+  AccessMixedIcon,
+  AccessUsersIcon
+} from "@/components/AccessModeIcons";
 import { collectDroppedSourceFiles } from "@/utils/collectDroppedEntries";
 import { buildSourceFileTree, type SourceTreeRoot } from "@/utils/sourceFileTree";
 import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
+import DepartmentTransferList from "@/components/DepartmentTransferList";
 import SourceFileTree from "@/components/SourceFileTree";
-import { FormAutocomplete, FormSelect, SourceFilterBar, Switch } from "@/components/form-controls";
+import { FormAutocomplete, FormCheckbox, FormSelect, SourceFilterBar, Switch } from "@/components/form-controls";
 import type {
   AgentAccess,
   Department,
@@ -174,8 +182,8 @@ const sidebarSteps = [
   { label: "Основные сведения", hint: "Информация о базе знаний", stepIndexes: [0] },
   { label: "Источники", hint: "Выбор документов и файлов", stepIndexes: [1, 2] },
   { label: "Обработка", hint: "Извлечение и индексация", stepIndexes: [3] },
-  { label: "Доступ и агенты", hint: "Права и подключение", stepIndexes: [4, 5] },
-  { label: "Проверка и создание", hint: "Итоговая проверка", stepIndexes: [6] }
+  { label: "Доступ и агенты", hint: "Права и подключение", stepIndexes: [4] },
+  { label: "Проверка и создание", hint: "Итоговая проверка", stepIndexes: [5] }
 ] as const;
 
 const steps: { id: StepId; label: string; hint: string; navLabel: string }[] = [
@@ -183,8 +191,7 @@ const steps: { id: StepId; label: string; hint: string; navLabel: string }[] = [
   { id: "sources", label: "Источники", hint: "Выбор документов и файлов", navLabel: "Выбор источников" },
   { id: "readiness", label: "Источники", hint: "Проверка готовности документов", navLabel: "Проверка готовности" },
   { id: "processing", label: "Обработка", hint: "Извлечение и индексация", navLabel: "Обработка" },
-  { id: "access", label: "Доступ и агенты", hint: "Права и подключение", navLabel: "Настройка доступа" },
-  { id: "agents", label: "Доступ и агенты", hint: "Подключение ИИ-агентов", navLabel: "Подключение агентов" },
+  { id: "access", label: "Доступ и агенты", hint: "Права и подключение", navLabel: "Доступ и агенты" },
   { id: "preview", label: "Проверка и создание", hint: "Итоговая проверка", navLabel: "Проверка и создание" }
 ];
 
@@ -240,6 +247,44 @@ const baseKindLabels: Record<BaseKind, string> = {
   process: "Процессная"
 };
 
+const accessModeOptions: {
+  value: AccessMode;
+  title: string;
+  description: string;
+  Icon: typeof AccessDepartmentsIcon;
+}[] = [
+  {
+    value: "departments",
+    title: "По подразделениям",
+    description: "Доступ предоставляется подразделениям",
+    Icon: AccessDepartmentsIcon
+  },
+  {
+    value: "users",
+    title: "По пользователям",
+    description: "Доступ предоставляется конкретным пользователям",
+    Icon: AccessUsersIcon
+  },
+  {
+    value: "mixed",
+    title: "Смешанный доступ",
+    description: "Комбинация подразделений и пользователей",
+    Icon: AccessMixedIcon
+  },
+  {
+    value: "admins",
+    title: "Только администраторы",
+    description: "Доступ только у администраторов и владельцев",
+    Icon: AccessAdminsIcon
+  },
+  {
+    value: "agents",
+    title: "Только выбранные агенты",
+    description: "Доступ предоставляется только выбранным ИИ-агентам",
+    Icon: AccessAgentsIcon
+  }
+];
+
 const accessLabels: Record<KnowledgeBaseAccessType, string> = {
   read: "Чтение",
   search: "Поиск",
@@ -256,6 +301,8 @@ const agentModeLabels: Record<KnowledgeBaseAgentAccessMode, string> = {
   decision: "Поиск + принятие решений",
   auto_action: "Автоматические действия"
 };
+
+const ACCESS_REASON_MAX = 500;
 
 const defaultProcessing: ProcessingSettings = {
   mode: "standard",
@@ -370,6 +417,8 @@ export default function KnowledgeBaseCreate() {
     stagedDropFiles.length > 0 && (activeStep.id === "sources" || activeStep.id === "readiness");
 
   const showRightSidebarExpand = activeStep.id === "sources" || activeStep.id === "readiness";
+  const showRightSidebarWidthToggle =
+    activeStep.id === "sources" && canFlipRightSidebar && rightSidebarView === "tree";
 
   useEffect(() => {
     if (!canFlipRightSidebar) {
@@ -393,6 +442,10 @@ export default function KnowledgeBaseCreate() {
   useEffect(() => {
     if (!showRightSidebarExpand) setIsRightSidebarExpanded(false);
   }, [showRightSidebarExpand]);
+
+  useEffect(() => {
+    if (!showRightSidebarWidthToggle) setIsRightSidebarExpanded(false);
+  }, [showRightSidebarWidthToggle]);
 
   const activeSidebarIndex = getSidebarActiveIndex(stepIndex);
   const selectedDocuments = useMemo(
@@ -603,8 +656,10 @@ export default function KnowledgeBaseCreate() {
   const backStepLabel = stepIndex > 0 ? steps[stepIndex - 1].navLabel : null;
   const nextStepLabel = stepIndex < steps.length - 1 ? steps[stepIndex + 1].navLabel : null;
 
+  const isAccessStep = activeStep.id === "access";
+
   return (
-    <div className={`${styles.page} ${activeStep.id === "sources" ? styles.pageSourcesWide : ""}`}>
+    <div className={`${styles.page} ${activeStep.id === "sources" ? styles.pageSourcesWide : ""} ${isAccessStep ? styles.pageAccessWide : ""}`.trim()}>
       <header className={styles.header}>
         <Link to="/knowledge-base" className={styles.backLink}>
           <ChevronLeft size={16} />
@@ -624,7 +679,7 @@ export default function KnowledgeBaseCreate() {
       </header>
 
       <main
-        className={`${styles.layout} ${
+        className={`${styles.layout} ${isAccessStep ? styles.layoutAccessWide : ""} ${
           showRightSidebarExpand && isRightSidebarExpanded ? styles.layoutRightSidebarExpanded : ""
         }`.trim()}
       >
@@ -647,7 +702,11 @@ export default function KnowledgeBaseCreate() {
           </div>
         </aside>
 
-        <section className={`${styles.contentCard} ${activeStep.id === "sources" ? styles.contentCardSources : ""}`}>
+        <section
+          className={`${styles.contentCard} ${activeStep.id === "sources" ? styles.contentCardSources : ""} ${
+            isAccessStep ? styles.contentCardAccess : ""
+          }`.trim()}
+        >
           {activeStep.id === "main" && (
             <StepMain
               name={name}
@@ -708,26 +767,19 @@ export default function KnowledgeBaseCreate() {
           {activeStep.id === "access" && (
             <StepAccess
               accessMode={accessMode}
-              accessType={accessType}
-              includeChildren={includeChildren}
               accessReason={accessReason}
               users={usersQuery.data ?? []}
               departments={activeDepartments}
+              agents={agents.data ?? []}
               selectedUserIds={selectedUserIds}
               selectedDepartmentIds={selectedDepartmentIds}
-              selectedDocuments={selectedDocuments}
+              selectedAgents={selectedAgents}
               onMode={setAccessMode}
-              onAccessType={setAccessType}
-              onIncludeChildren={setIncludeChildren}
               onReason={setAccessReason}
+              onSelectedDepartments={setSelectedDepartmentIds}
               onToggleUser={(id) => setSelectedUserIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))}
-              onToggleDepartment={(id) => setSelectedDepartmentIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))}
-              onSelectDepartments={(ids) => setSelectedDepartmentIds((current) => [...new Set([...current, ...ids])])}
-              onDeselectDepartments={(ids) => setSelectedDepartmentIds((current) => current.filter((id) => !ids.includes(id)))}
+              onChangeAgents={setSelectedAgents}
             />
-          )}
-          {activeStep.id === "agents" && (
-            <StepAgents agents={agents.data ?? []} selectedAgents={selectedAgents} onChange={setSelectedAgents} />
           )}
           {activeStep.id === "preview" && (
             <StepPreview
@@ -749,6 +801,7 @@ export default function KnowledgeBaseCreate() {
           )}
         </section>
 
+        {!isAccessStep ? (
         <div className={styles.summaryCardShell}>
           <aside
             className={`${styles.summaryCard} ${canFlipRightSidebar ? styles.summaryCardFlipHost : ""} ${
@@ -757,7 +810,7 @@ export default function KnowledgeBaseCreate() {
               isRightSidebarExpanded ? styles.summaryCardExpanded : ""
             } ${showRightSidebarExpand || canFlipRightSidebar ? styles.summaryCardWithControls : ""}`.trim()}
           >
-            {showRightSidebarExpand ? (
+            {showRightSidebarWidthToggle ? (
               <button
                 type="button"
                 className={styles.summaryWidthToggle}
@@ -847,6 +900,7 @@ export default function KnowledgeBaseCreate() {
             )}
           </aside>
         </div>
+        ) : null}
       </main>
 
       {createKnowledgeBase.isError && (
@@ -1167,7 +1221,11 @@ function StepSources(props: {
               return (
                 <tr key={document.id} className={selected ? styles.sourcesTableRowSelected : undefined}>
                   <td className={styles.sourcesCheckCell}>
-                    <input type="checkbox" checked={selected} onChange={() => props.onToggleSource(document.id)} aria-label={`Выбрать ${document.title}`} />
+                    <FormCheckbox
+                      checked={selected}
+                      aria-label={`Выбрать ${document.title}`}
+                      onChange={() => props.onToggleSource(document.id)}
+                    />
                   </td>
                   <td className={styles.sourcesDocColumn}>
                     <div className={styles.sourcesDocCell}>
@@ -1492,64 +1550,186 @@ function StepProcessing({ settings, onChange }: { settings: ProcessingSettings; 
   );
 }
 
+function AccessAgentsTable({
+  agents,
+  selectedAgents,
+  onChange
+}: {
+  agents: AgentAccess[];
+  selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
+  onChange: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const filteredAgents = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return agents;
+    return agents.filter((agent) => `${agent.name} ${agent.purpose ?? ""} ${agent.slug}`.toLowerCase().includes(query));
+  }, [agents, search]);
+  const allVisibleSelected = filteredAgents.length > 0 && filteredAgents.every((agent) => Boolean(selectedAgents[agent.id]));
+
+  function toggleAgent(agentId: string, checked: boolean) {
+    const next = { ...selectedAgents };
+    if (checked) next[agentId] = "search_only";
+    else delete next[agentId];
+    onChange(next);
+  }
+
+  function toggleAllVisible(checked: boolean) {
+    const next = { ...selectedAgents };
+    for (const agent of filteredAgents) {
+      if (checked) next[agent.id] = "search_only";
+      else delete next[agent.id];
+    }
+    onChange(next);
+  }
+
+  return (
+    <section className={styles.accessAgentsSection} aria-label="Подключение ИИ-агентов">
+      <div className={styles.accessModeSectionHead}>
+        <span className={styles.fieldLabel}>Подключение ИИ-агентов</span>
+        <button type="button" className={styles.accessModeInfoButton} aria-label="Подсказка о подключении ИИ-агентов">
+          <Info size={14} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      </div>
+      <p className={styles.accessAgentsIntro}>
+        Выберите агентов, которые смогут использовать эту базу знаний в своих задачах и ответах.
+      </p>
+      <div className={styles.accessAgentsSearchField}>
+        <Search className={styles.accessAgentsSearchIcon} size={16} strokeWidth={2} aria-hidden="true" />
+        <input
+          className={styles.accessAgentsSearchInput}
+          value={search}
+          onChange={(event) => setSearch(event.target.value)}
+          placeholder="Поиск агента"
+        />
+      </div>
+      <div className={styles.accessAgentsTableWrap}>
+        {filteredAgents.length ? (
+          <table className={styles.accessAgentsTable}>
+            <thead>
+              <tr>
+                <th>
+                  <FormCheckbox
+                    checked={allVisibleSelected}
+                    aria-label="Выбрать всех агентов"
+                    onChange={toggleAllVisible}
+                  />
+                </th>
+                <th>ИИ-агент</th>
+                <th>Описание</th>
+                <th>
+                  <span className={styles.accessAgentsHeadLabel}>
+                    Доступ
+                    <Info size={12} strokeWidth={2.2} aria-hidden="true" />
+                  </span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredAgents.map((agent) => {
+                const connected = Boolean(selectedAgents[agent.id]);
+                return (
+                  <tr key={agent.id}>
+                    <td>
+                      <FormCheckbox
+                        checked={connected}
+                        aria-label={`Подключить ${agent.name}`}
+                        onChange={(checked) => toggleAgent(agent.id, checked)}
+                      />
+                    </td>
+                    <td>
+                      <span className={styles.accessAgentName}>{agent.name}</span>
+                    </td>
+                    <td>
+                      <span className={styles.accessAgentDescription}>{agent.purpose || agent.slug}</span>
+                    </td>
+                    <td>
+                      <span className={connected ? styles.agentStatusBadgeConnected : styles.agentStatusBadgeDisconnected}>
+                        {connected ? "Подключен" : "Не подключен"}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        ) : (
+          <p className={styles.accessAgentsEmpty}>{agents.length ? "Агенты не найдены" : "Агенты пока не настроены."}</p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function StepAccess(props: {
   accessMode: AccessMode;
-  accessType: KnowledgeBaseAccessType;
-  includeChildren: boolean;
   accessReason: string;
   users: User[];
   departments: Department[];
+  agents: AgentAccess[];
   selectedUserIds: string[];
   selectedDepartmentIds: string[];
-  selectedDocuments: Document[];
+  selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
   onMode: (value: AccessMode) => void;
-  onAccessType: (value: KnowledgeBaseAccessType) => void;
-  onIncludeChildren: (value: boolean) => void;
   onReason: (value: string) => void;
+  onSelectedDepartments: (ids: string[]) => void;
   onToggleUser: (id: string) => void;
-  onToggleDepartment: (id: string) => void;
-  onSelectDepartments: (ids: string[]) => void;
-  onDeselectDepartments: (ids: string[]) => void;
+  onChangeAgents: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void;
 }) {
+  const showDepartments = props.accessMode === "departments" || props.accessMode === "mixed";
+  const showUsers = props.accessMode === "users" || props.accessMode === "mixed";
+
   return (
-    <div className={styles.stepBody}>
-      <StepTitle icon={LockKeyhole} title="Настройка доступа" text="Обязательный шаг. По умолчанию база создаётся с ограниченным доступом, а не общедоступной." />
-      <div className={styles.accessModes}>
-        {[
-          ["users", "Доступ по пользователям"],
-          ["departments", "Доступ по подразделениям"],
-          ["mixed", "Смешанный доступ"],
-          ["admins", "Только администраторы"],
-          ["agents", "Только выбранные агенты"]
-        ].map(([value, label]) => (
-          <button key={value} type="button" className={props.accessMode === value ? styles.selectedMode : undefined} onClick={() => props.onMode(value as AccessMode)}>
-            {label}
+    <div className={`${styles.stepBody} ${styles.stepBodyAccess}`}>
+      <StepTitle
+        icon={Users}
+        title="Доступ и агенты"
+        text="Определите модель доступа к базе знаний и подключите ИИ-агентов, которые смогут её использовать."
+      />
+      <section className={styles.accessModeSection} aria-labelledby="access-mode-label">
+        <div className={styles.accessModeSectionHead} id="access-mode-label">
+          <span className={styles.fieldLabel}>Модель доступа</span>
+          <button type="button" className={styles.accessModeInfoButton} aria-label="Подсказка о модели доступа">
+            <Info size={14} strokeWidth={2.2} aria-hidden="true" />
           </button>
-        ))}
-      </div>
-      <div className={styles.formGrid}>
-        <label>
-          Тип доступа
-          <select value={props.accessType} onChange={(event) => props.onAccessType(event.target.value as KnowledgeBaseAccessType)} disabled={props.accessMode === "admins"}>
-            {Object.entries(accessLabels).map(([value, label]) => (
-              <option key={value} value={value}>{label}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Основание доступа
-          <input value={props.accessReason} onChange={(event) => props.onReason(event.target.value)} placeholder="Проект, приказ, задача, распоряжение" />
-        </label>
-        {(props.accessMode === "departments" || props.accessMode === "mixed") && (
-          <label className={styles.checkboxLine}>
-            <input type="checkbox" checked={props.includeChildren} onChange={(event) => props.onIncludeChildren(event.target.checked)} />
-            Распространять доступ на дочерние подразделения
-          </label>
-        )}
-      </div>
-      {(props.accessMode === "users" || props.accessMode === "mixed") && (
+        </div>
+        <div className={styles.accessModeGrid} role="radiogroup" aria-label="Модель доступа">
+          {accessModeOptions.map(({ value, title, description, Icon }) => {
+            const selected = props.accessMode === value;
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                className={`${styles.accessModeCard} ${selected ? styles.accessModeCardSelected : ""}`.trim()}
+                onClick={() => props.onMode(value)}
+              >
+                <Icon className={styles.accessModeIcon} />
+                <div className={styles.accessModeContent}>
+                  <span className={styles.accessModeHeading}>
+                    <span className={styles.accessModeRadio} aria-hidden="true" />
+                    <span className={styles.accessModeTitle}>{title}</span>
+                  </span>
+                  <span className={styles.accessModeDescription}>{description}</span>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+
+      {showDepartments ? (
+        <DepartmentTransferList
+          departments={props.departments}
+          selectedIds={props.selectedDepartmentIds}
+          onChange={props.onSelectedDepartments}
+        />
+      ) : null}
+
+      {showUsers ? (
         <SelectableList
-          title="Пользователи"
+          title="Доступ для пользователей"
           items={props.users.map((user) => ({
             id: user.id,
             title: user.full_name || user.email,
@@ -1557,68 +1737,33 @@ function StepAccess(props: {
           }))}
           selectedIds={props.selectedUserIds}
           onToggle={props.onToggleUser}
-        />
-      )}
-      {(props.accessMode === "departments" || props.accessMode === "mixed") && (
-        <SelectableList
-          title="Подразделения"
-          items={props.departments.map((department) => ({ id: department.id, title: department.name, subtitle: department.description || "Без описания" }))}
-          selectedIds={props.selectedDepartmentIds}
-          onToggle={props.onToggleDepartment}
           enableSearch
-          searchPlaceholder="Найти подразделение"
-          enableSelectAll
-          onSelectAll={props.onSelectDepartments}
-          onDeselectAll={props.onDeselectDepartments}
+          searchPlaceholder="Поиск пользователя"
         />
-      )}
-      {props.selectedDocuments.length > 0 && (
-        <WarningCallout text="Если пользователь имеет доступ к базе, но не имеет доступа к части документов-источников, агент и поиск будут использовать только разрешённые для него фрагменты." />
-      )}
-    </div>
-  );
-}
+      ) : null}
 
-function StepAgents({ agents, selectedAgents, onChange }: { agents: AgentAccess[]; selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>; onChange: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void }) {
-  return (
-    <div className={styles.stepBody}>
-      <StepTitle icon={Bot} title="Подключение ИИ-агентов" text="Выберите агентов из доступных вам и режим использования базы. Загрузивший источники может ограничить список агентов." />
-      <div className={styles.agentGrid}>
-        {agents.map((agent) => {
-          const selected = selectedAgents[agent.id];
-          return (
-            <article key={agent.id} className={selected ? styles.selectedAgent : undefined}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={Boolean(selected)}
-                  onChange={(event) => {
-                    const next = { ...selectedAgents };
-                    if (event.target.checked) next[agent.id] = "search_only";
-                    else delete next[agent.id];
-                    onChange(next);
-                  }}
-                />
-                <span>
-                  <strong>{agent.name}</strong>
-                  <small>{agent.purpose || agent.slug}</small>
-                </span>
-              </label>
-              <select
-                value={selected || "search_only"}
-                disabled={!selected}
-                onChange={(event) => onChange({ ...selectedAgents, [agent.id]: event.target.value as KnowledgeBaseAgentAccessMode })}
-              >
-                {Object.entries(agentModeLabels).map(([value, label]) => (
-                  <option key={value} value={value}>{label}</option>
-                ))}
-              </select>
-            </article>
-          );
-        })}
-        {!agents.length && <div className={styles.emptyCell}>Агенты пока не настроены.</div>}
-      </div>
-      <InfoCallout text="Ключевое правило: агент может использовать только те фрагменты базы знаний, к которым имеет доступ пользователь, запустивший агента." />
+      <section className={styles.accessReasonSection}>
+        <div className={styles.accessModeSectionHead}>
+          <span className={styles.fieldLabel}>Основание предоставления доступа</span>
+          <button type="button" className={styles.accessModeInfoButton} aria-label="Подсказка об основании доступа">
+            <Info size={14} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        </div>
+        <label className={`${styles.field} ${styles.accessReasonField}`}>
+          <input
+            className={`${styles.control} ${styles.accessReasonInput}`}
+            value={props.accessReason}
+            maxLength={ACCESS_REASON_MAX}
+            onChange={(event) => props.onReason(event.target.value)}
+            placeholder="Приказ, распоряжение или иное основание"
+          />
+          <span className={styles.accessReasonCounter} aria-hidden="true">
+            {props.accessReason.length}/{ACCESS_REASON_MAX}
+          </span>
+        </label>
+      </section>
+
+      <AccessAgentsTable agents={props.agents} selectedAgents={props.selectedAgents} onChange={props.onChangeAgents} />
     </div>
   );
 }
@@ -1679,8 +1824,7 @@ function Summary(props: {
   const sourcesConfigured = props.stepIndex >= 2 || (props.stepIndex === 1 && props.selectedDocuments.length > 0);
   const processingConfigured = props.stepIndex >= 3;
   const accessConfigured = props.stepIndex >= 4;
-  const agentsConfigured = props.stepIndex >= 5;
-  const previewConfigured = props.stepIndex >= 6;
+  const previewConfigured = props.stepIndex >= 5;
 
   const selectedSize = useMemo(
     () => props.selectedDocuments.reduce((sum, document) => sum + (document.file_size ?? 0), 0),
@@ -1737,26 +1881,19 @@ function Summary(props: {
         title: "Доступ и агенты",
         stepIndex: 4,
         configured: accessConfigured,
-        collapsedStatus: accessConfigured ? accessModeLabel(props.accessMode) : "Не настроено",
+        collapsedStatus: accessConfigured
+          ? `${accessModeLabel(props.accessMode)} · ${Object.keys(props.selectedAgents).length} агентов`
+          : "Не настроено",
         rows: [
           ["Тип доступа", accessModeLabel(props.accessMode)],
+          ["Подключено агентов", String(Object.keys(props.selectedAgents).length)],
           ["Предупреждения", String(props.warningsCount)]
         ] as [string, string][]
       },
       {
-        id: "agents",
-        title: "Подключение агентов",
-        stepIndex: 5,
-        configured: agentsConfigured,
-        collapsedStatus: agentsConfigured
-          ? `${Object.keys(props.selectedAgents).length} агентов`
-          : "Не настроено",
-        rows: [["Подключено агентов", String(Object.keys(props.selectedAgents).length)]] as [string, string][]
-      },
-      {
         id: "preview",
         title: "Проверка и создание",
-        stepIndex: 6,
+        stepIndex: 5,
         configured: previewConfigured,
         collapsedStatus: previewConfigured ? "Готово к проверке" : "Не выполнено",
         rows: previewConfigured ? ([["Статус", "Ожидает подтверждения"]] as [string, string][]) : undefined
@@ -1764,7 +1901,6 @@ function Summary(props: {
     ],
     [
       accessConfigured,
-      agentsConfigured,
       previewConfigured,
       processingConfigured,
       props.accessMode,
@@ -1792,8 +1928,7 @@ function Summary(props: {
       2: "sources",
       3: "processing",
       4: "access",
-      5: "agents",
-      6: "preview"
+      5: "preview"
     };
     const id = stepSectionIds[props.stepIndex];
     if (id) setExpanded((state) => ({ ...state, [id]: true }));
@@ -2047,15 +2182,15 @@ function SelectableList({
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={searchPlaceholder} />
         </label>
       )}
-      <div>
+      <div className={styles.selectableListBody}>
         {filteredItems.map((item) => (
-          <label key={item.id}>
-            <input type="checkbox" checked={selectedIds.includes(item.id)} onChange={() => onToggle(item.id)} />
-            <span>
+          <div key={item.id} className={styles.selectableRow}>
+            <FormCheckbox checked={selectedIds.includes(item.id)} onChange={() => onToggle(item.id)} aria-label={item.title} />
+            <span className={styles.selectableRowCopy}>
               <strong>{item.title}</strong>
               <small>{item.subtitle}</small>
             </span>
-          </label>
+          </div>
         ))}
         {!filteredItems.length && <div className={styles.emptyCell}>Ничего не найдено.</div>}
       </div>
