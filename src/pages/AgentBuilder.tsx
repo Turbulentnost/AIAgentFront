@@ -144,17 +144,6 @@ export default function AgentBuilder() {
     onError: (err) => setError(extractError(err))
   });
 
-  const previewMutation = useMutation({
-    mutationFn: (sessionId: string) => agentBuilderApi.runPreview(sessionId),
-    onSuccess: (data) => {
-      setError(null);
-      setChat(buildChatFromDetail(data));
-      queryClient.setQueryData(["agent-builder", "session", data.id], data);
-      queryClient.invalidateQueries({ queryKey: ["agent-builder"] });
-    },
-    onError: (err) => setError(extractError(err))
-  });
-
   const sandboxQuery = useQuery({
     queryKey: ["agent-builder", "sandbox", selectedSessionId],
     queryFn: () => agentBuilderApi.getLatestSandboxRun(selectedSessionId!),
@@ -182,15 +171,14 @@ export default function AgentBuilder() {
   const isThinking =
     startMutation.isPending ||
     messageMutation.isPending ||
-    regenerateMutation.isPending ||
-    previewMutation.isPending;
+    regenerateMutation.isPending;
 
   const canApprove = useMemo(() => {
     const status = detail?.blueprint?.status;
-    const previewOk = detail?.preview_result?.success === true && Boolean(detail.preview_result.output_text);
-    const sandboxOk = sandboxRun?.status === "succeeded";
-    return (previewOk || sandboxOk) && (status === "generated" || status === "needs_user_review");
-  }, [detail?.blueprint?.status, detail?.preview_result, sandboxRun?.status]);
+    const validationOk = detail?.validation_result?.valid === true;
+    const summaryOk = detail?.design_summary ? detail.design_summary.valid !== false : true;
+    return validationOk && summaryOk && (status === "generated" || status === "needs_user_review");
+  }, [detail?.blueprint?.status, detail?.validation_result, detail?.design_summary]);
 
   const needsClarification = detail?.status === "needs_clarification";
   const typeConfirmed = Boolean(detail?.agent_type) || Boolean(detail?.agent_type_proposal?.confirmed);
@@ -414,12 +402,36 @@ export default function AgentBuilder() {
             </div>
           ) : null}
 
+          {hasBlueprint && detail?.design_summary ? (
+            <div className={styles.previewResult}>
+              <strong>Структура агента (статическая проверка)</strong>
+              <p className={styles.previewMeta}>
+                Конструктор не выполняет инструменты и сетевые вызовы — он только описывает blueprint
+                и его runtime-зависимости. Реальный прогон доступен в Runtime Sandbox ниже.
+              </p>
+              {detail.design_summary.capabilities.length ? (
+                <p className={styles.previewMeta}>
+                  Возможности: {detail.design_summary.capabilities.join(", ")}
+                </p>
+              ) : null}
+              {detail.design_summary.runtime_dependencies.length ? (
+                <p className={styles.previewMeta}>
+                  Runtime-зависимости: {detail.design_summary.runtime_dependencies.join(", ")}
+                </p>
+              ) : null}
+              {detail.design_summary.output_text ? (
+                <pre className={styles.previewText}>{detail.design_summary.output_text}</pre>
+              ) : null}
+            </div>
+          ) : null}
+
           {hasBlueprint ? (
             <div className={styles.previewResult}>
-              <strong>Пробный запуск (Sandbox)</strong>
+              <strong>Runtime Sandbox</strong>
               <p className={styles.previewMeta}>
-                Агент реально выполнит шаги blueprint. Для получения данных с внешних сайтов держите вкладку открытой —
-                страницы откроются в вашем браузере.
+                Единственная среда выполнения: агент реально выполнит шаги blueprint с живыми данными
+                (браузер, поиск, базы знаний). Для получения данных с внешних сайтов держите вкладку
+                открытой — страницы откроются в вашем браузере. Это отдельный шаг, не часть проектирования.
               </p>
               <textarea
                 className={styles.messageInput}
@@ -435,10 +447,10 @@ export default function AgentBuilder() {
                 onClick={handleStartSandbox}
               >
                 {sandboxRunning || startSandboxMutation.isPending
-                  ? "Выполняется пробный запуск…"
+                  ? "Выполняется Runtime Sandbox…"
                   : sandboxRun
                     ? "Запустить заново"
-                    : "Запустить пробный запуск"}
+                    : "Запустить Runtime Sandbox"}
               </button>
               {sandboxRun ? <SandboxTrace run={sandboxRun} /> : null}
             </div>
@@ -558,16 +570,6 @@ export default function AgentBuilder() {
           ) : null}
 
           <div className={styles.actions}>
-            {hasBlueprint && !detail?.preview_result?.success ? (
-              <button
-                className={styles.secondaryBtn}
-                type="button"
-                disabled={!selectedSessionId || previewMutation.isPending}
-                onClick={() => selectedSessionId && previewMutation.mutate(selectedSessionId)}
-              >
-                {previewMutation.isPending ? "Пробный запуск..." : "Запустить пробный запуск"}
-              </button>
-            ) : null}
             <button
               className={styles.secondaryBtn}
               type="button"
@@ -583,7 +585,7 @@ export default function AgentBuilder() {
               onClick={() => selectedSessionId && approveMutation.mutate(selectedSessionId)}
               title={
                 !canApprove
-                  ? "Сначала дождитесь успешного пробного запуска (Sandbox)"
+                  ? "Сначала дождитесь корректной структуры blueprint (статическая валидация)"
                   : undefined
               }
             >

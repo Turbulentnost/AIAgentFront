@@ -763,14 +763,16 @@ export interface AgentBuilderRequirementsValidation {
   elements?: AgentBuilderRequiredElement[];
 }
 
-export interface AgentBuilderPreview {
+export interface AgentBuilderDesignSummary {
   success: boolean;
-  preview_type?: string | null;
+  summary_type?: string | null;
   output_text?: string | null;
-  city?: string | null;
-  source?: string | null;
-  source_url?: string | null;
-  error?: string | null;
+  capabilities: string[];
+  runtime_dependencies: string[];
+  input_params: string[];
+  output_format: string[];
+  valid: boolean;
+  errors: string[];
 }
 
 export interface AgentBuilderSessionDetail extends AgentBuilderSession {
@@ -782,7 +784,7 @@ export interface AgentBuilderSessionDetail extends AgentBuilderSession {
   design_stages: AgentBuilderDesignStage[];
   required_elements: AgentBuilderRequiredElement[];
   requirements_validation?: AgentBuilderRequirementsValidation | null;
-  preview_result?: AgentBuilderPreview | null;
+  design_summary?: AgentBuilderDesignSummary | null;
   agent_type?: string | null;
   agent_type_proposal?: AgentTypeProposal | null;
 }
