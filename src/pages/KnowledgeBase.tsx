@@ -1005,7 +1005,7 @@ function DetailTabContent(props: {
               <article key={hit.knowledge_base_chunk_id || hit.chunk_id || hit.content.slice(0, 20)} className={styles.testHitCard}>
                 <header>
                   <strong>{hit.document_title || "Источник"}</strong>
-                  <span>Релевантность {hit.score.toFixed(3)}</span>
+                  <span>Релевантность {formatRelevance(hit.score)}</span>
                 </header>
                 <div className={styles.testHitMeta}>
                   <span>Стр. {hit.page_number ?? "—"}</span>
@@ -1141,7 +1141,7 @@ function KnowledgeBaseQuickSearch({
           {hits.slice(0, 3).map((hit) => (
             <article key={hit.knowledge_base_chunk_id || hit.chunk_id || hit.content.slice(0, 24)}>
               <strong>{hit.document_title || "Источник"}</strong>
-              <span>Релевантность {hit.score.toFixed(3)}</span>
+              <span>Релевантность {formatRelevance(hit.score)}</span>
               <p>{hit.content}</p>
             </article>
           ))}
@@ -1297,6 +1297,11 @@ function highlightSearchTerms(content: string, query: string): React.ReactNode {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function formatRelevance(score: number) {
+  const percent = Math.round(Math.max(0, Math.min(1, score)) * 100);
+  return `${percent}%`;
 }
 
 function formatDate(value?: string | null) {
