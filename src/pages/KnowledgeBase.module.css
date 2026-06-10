@@ -340,9 +340,25 @@
   border: 1px solid #dbe3ef;
   border-radius: 8px;
   background: #fff;
+  color: #334155;
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.sourceActions button:hover,
+.chunkActions button:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.compactTable .actionsCell {
+  min-width: 132px;
 }
 
 .chunkFilters {
@@ -780,4 +796,253 @@
   color: #2563eb;
   font-weight: 700;
   cursor: pointer;
+}
+
+.indexingLayout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.indexingMainColumn,
+.indexingSideColumn {
+  display: grid;
+  gap: 12px;
+}
+
+.indexingSideCard {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.indexingProgressHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.indexingProgressMeta {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.indexingDuration {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.progressBars {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.progressBars > div {
+  display: grid;
+  gap: 4px;
+}
+
+.progressBars span {
+  color: #475569;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.progressTrack {
+  height: 8px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+}
+
+.indexingPipeline {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.indexingPipeline li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #edf1f6;
+}
+
+.indexingPipeline li strong {
+  display: block;
+  font-size: 12px;
+}
+
+.indexingPipeline li span {
+  color: #64748b;
+  font-size: 11px;
+}
+
+.pipeline_done {
+  color: #15803d;
+}
+
+.pipeline_running {
+  color: #1d4ed8;
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.pipeline_pending {
+  color: #94a3b8;
+}
+
+.indexingSpinner {
+  animation: kbSpin 1s linear infinite;
+}
+
+.errorBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  margin-left: 8px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.paramsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.paramsGrid > div {
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  border-radius: 8px;
+  background: #f8fafc;
+  border: 1px solid #edf1f6;
+}
+
+.paramsGrid span {
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.paramsGrid strong {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.testSearchForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.testSearchForm label {
+  display: grid;
+  gap: 4px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.testSearchForm select {
+  height: 34px;
+  padding: 0 8px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.testHitsSection {
+  display: grid;
+  gap: 10px;
+}
+
+.testHitCard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.testHitCard header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.testHitCard header span {
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.testHitMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.testHitContent {
+  margin: 0;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.testHitContent mark {
+  padding: 0 2px;
+  border-radius: 3px;
+  background: #fef08a;
+  color: inherit;
+}
+
+.answerPreviewCard {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.answerPreviewCard small {
+  color: #64748b;
+  font-size: 11px;
 }

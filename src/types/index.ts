@@ -532,7 +532,7 @@ export type KnowledgeBaseAccessType =
 export type KnowledgeBaseGrantType = "user" | "department" | "role" | "organization" | "agent" | "admin_only";
 export type KnowledgeBaseAgentAccessMode = "search_only" | "search_and_cite" | "decision" | "auto_action";
 export type KnowledgeBaseIndexJobType = "full" | "source" | "chunk" | "embeddings" | "access_reindex";
-export type KnowledgeBaseIndexJobStatus = "queued" | "running" | "completed" | "failed" | "partial";
+export type KnowledgeBaseIndexJobStatus = "queued" | "running" | "completed" | "failed" | "partial" | "cancelled" | "CANCELLED";
 
 export interface KnowledgeBase {
   id: string;
@@ -700,6 +700,10 @@ export interface KnowledgeBaseIndexingJob {
   qdrant_points_count?: number;
   fulltext_chunks_count?: number;
   processing_params?: Record<string, unknown> | null;
+  cancel_requested?: boolean;
+  cancel_requested_by_user_id?: string | null;
+  cancel_requested_at?: string | null;
+  cancel_reason?: string | null;
   duration_ms: number | null;
   started_by_user_id: string | null;
   started_at: string | null;
