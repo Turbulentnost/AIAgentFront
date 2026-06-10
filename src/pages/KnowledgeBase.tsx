@@ -8,15 +8,18 @@ import {
   Filter,
   Layers3,
   LockKeyhole,
+  Circle,
   Play,
   Plus,
   RefreshCw,
   Search,
   ShieldCheck,
+  Square,
   Trash2,
   TriangleAlert
 } from "lucide-react";
 import { agentsApi, knowledgeBasesApi } from "@/api/endpoints";
+import { useKnowledgeBaseIndexingWs } from "@/hooks/useKnowledgeBaseIndexingWs";
 import type {
   KnowledgeBase,
   KnowledgeBaseAccessGrantInput,
@@ -63,7 +66,21 @@ const jobStatusLabels: Record<KnowledgeBaseIndexingJob["status"], string> = {
   running: "Выполняется",
   completed: "Завершено",
   failed: "Ошибка",
-  partial: "Частично"
+  partial: "Частично",
+  cancelled: "Остановлена",
+  CANCELLED: "Остановлена"
+};
+
+const indexingStageLabels: Record<string, string> = {
+  precheck: "Проверка источников",
+  text_extraction: "Извлечение текста и структуры",
+  chunking: "Разбиение на фрагменты",
+  embeddings: "Создание embeddings",
+  qdrant: "Индексация в Qdrant",
+  fulltext: "Полнотекстовый индекс",
+  quality_control: "Контроль качества",
+  stopping: "Остановка запрошена",
+  stopped: "Остановлена"
 };
 
 const jobTypeLabels: Record<KnowledgeBaseIndexingJob["job_type"], string> = {
@@ -98,6 +115,8 @@ const qualityLabels: Record<string, string> = {
 const granteeTypeLabels: Record<string, string> = {
   user: "Пользователь",
   department: "Подразделение",
+  organization: "Организация",
+  role: "Роль",
   agent: "Агент",
   admin_only: "Только администраторы"
 };
@@ -174,7 +193,7 @@ export default function KnowledgeBasePage() {
     if (!hasActiveIndexingInList) return;
     const timer = window.setInterval(() => {
       void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-    }, 3000);
+    }, 15000);
     return () => window.clearInterval(timer);
   }, [hasActiveIndexingInList, queryClient]);
 
@@ -211,8 +230,12 @@ export default function KnowledgeBasePage() {
     selected &&
       (selected.indexing_active ||
         selected.status === "processing" ||
-        selected.status === "updating")
+        selected.status === "updating" ||
+        latestJob?.status === "queued" ||
+        latestJob?.status === "running")
   );
+
+  useKnowledgeBaseIndexingWs(selected?.id, Boolean(canViewSelected && isIndexingActive));
 
   useEffect(() => {
     const requestedTab = searchParams.get("tab");
@@ -221,17 +244,6 @@ export default function KnowledgeBasePage() {
     }
   }, [searchParams]);
 
-  useEffect(() => {
-    if (!isIndexingActive || !selected?.id) return;
-    const timer = window.setInterval(() => {
-      void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      void queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", selected.id] });
-      void queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", selected.id] });
-      void queryClient.invalidateQueries({ queryKey: ["knowledge-base-chunks", selected.id] });
-      void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", "stats"] });
-    }, 3000);
-    return () => window.clearInterval(timer);
-  }, [isIndexingActive, queryClient, selected?.id]);
   const access = useQuery({
     queryKey: ["knowledge-base-access", selected?.id],
     queryFn: () => knowledgeBasesApi.access(selected!.id),
@@ -241,6 +253,20 @@ export default function KnowledgeBasePage() {
     queryKey: ["knowledge-base-audit", selected?.id],
     queryFn: () => knowledgeBasesApi.audit(selected!.id),
     enabled: canViewSelected
+  });
+
+  const cancelIndexing = useMutation({
+    mutationFn: (knowledgeBaseId: string) =>
+      knowledgeBasesApi.cancelIndexing(knowledgeBaseId, {
+        reason: "Остановка по запросу пользователя",
+        force: true
+      }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      if (selected?.id) {
+        await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", selected.id] });
+      }
+    }
   });
 
   const startIndexing = useMutation({
@@ -375,13 +401,24 @@ export default function KnowledgeBasePage() {
                 <div className={styles.indexingBanner}>
                   <RefreshCw size={16} className={styles.indexingSpinner} />
                   <div>
-                    <strong>Идёт индексация базы знаний</strong>
+                    <strong>
+                      {latestJob?.cancel_requested ? "Остановка индексации запрошена" : "Идёт индексация базы знаний"}
+                    </strong>
                     <span>
                       {latestJob
-                        ? `${jobTypeLabels[latestJob.job_type] ?? latestJob.job_type}: ${jobStatusLabels[latestJob.status] ?? latestJob.status}`
+                        ? `${indexingStageLabels[String(latestJob.processing_params?.current_stage ?? "")] || "Подготовка"} · ${jobStatusLabels[latestJob.status] ?? latestJob.status}`
                         : "Подготовка документов, создание embeddings и запись в Qdrant"}
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    className={styles.dangerButton}
+                    onClick={() => selected && cancelIndexing.mutate(selected.id)}
+                    disabled={cancelIndexing.isPending}
+                  >
+                    <Square size={14} />
+                    Остановить
+                  </button>
                 </div>
               ) : null}
               <div className={styles.detailHeader}>
@@ -515,6 +552,7 @@ function DetailTabContent(props: {
   } = props;
 
   const [testQuery, setTestQuery] = useState("");
+  const [testTopK, setTestTopK] = useState(5);
   const [testHits, setTestHits] = useState<KnowledgeBaseSearchHit[]>([]);
   const [testPreview, setTestPreview] = useState<string | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
@@ -536,14 +574,15 @@ function DetailTabContent(props: {
     queryFn: agentsApi.list,
     enabled: tab === "agents"
   });
+  const activeJob = jobs.find((job) => job.status === "running" || job.status === "queued") ?? latestJob;
   const jobErrors = useQuery({
-    queryKey: ["knowledge-base-job-errors", latestJob?.id],
-    queryFn: () => knowledgeBasesApi.jobErrors(latestJob!.id),
-    enabled: tab === "indexing" && Boolean(latestJob?.id)
+    queryKey: ["knowledge-base-job-errors", activeJob?.id],
+    queryFn: () => knowledgeBasesApi.jobErrors(activeJob!.id),
+    enabled: tab === "indexing" && Boolean(activeJob?.id)
   });
 
   const testSearch = useMutation({
-    mutationFn: (query: string) => knowledgeBasesApi.testSearch(knowledgeBase.id, { query, top_k: 5 }),
+    mutationFn: (query: string) => knowledgeBasesApi.testSearch(knowledgeBase.id, { query, top_k: testTopK }),
     onSuccess: (result) => {
       setTestHits(result.hits);
       setTestPreview(result.answer_preview);
@@ -587,7 +626,10 @@ function DetailTabContent(props: {
     }
   });
 
-  const canTestSearch = knowledgeBase.can_search && !isIndexingActive;
+  const canTestSearch =
+    ["needs_review", "ready", "error", "updating", "processing"].includes(knowledgeBase.status) &&
+    !(isIndexingActive && (knowledgeBase.fragments_count ?? 0) === 0);
+  const testSearchPlaceholder = testSearchPlaceholderText(knowledgeBase, isIndexingActive);
   const selectedSource = sources.find((s) => s.id === selectedSourceId) ?? null;
   const filteredChunks = chunks.filter((chunk) => {
     if (chunkFilter === "excluded") return chunk.is_excluded_from_search;
@@ -786,78 +828,133 @@ function DetailTabContent(props: {
           job.errors_count === 0
         )
     );
-    const progressJob = latestJob?.status === "running" ? latestJob : null;
+    const progressJob = activeJob && (activeJob.status === "running" || activeJob.status === "queued") ? activeJob : null;
+    const totalSources = progressJob?.total_sources_count || sources.length || 1;
+    const totalChunks = progressJob?.total_chunks_count || knowledgeBase.fragments_count || 1;
+    const stages = buildIndexingStages(progressJob, totalSources, totalChunks);
+    const params = progressJob?.processing_params ?? latestJob?.processing_params ?? {};
 
     return (
-      <div className={styles.detailBody}>
-        {progressJob ? (
-          <article className={styles.indexingProgressCard}>
-            <h3 className={styles.sectionTitle}>Текущая индексация</h3>
-            <p>Источники: {progressJob.processed_sources_count} / {progressJob.total_sources_count || sources.length}</p>
-            <p>Извлечение текста: {progressJob.extracted_sources_count ?? 0} / {progressJob.total_sources_count || sources.length}</p>
-            <p>Фрагментация: {progressJob.chunked_sources_count ?? 0} / {progressJob.total_sources_count || sources.length}</p>
-            <p>Embeddings: {progressJob.embedded_chunks_count ?? 0} / {progressJob.total_chunks_count || knowledgeBase.fragments_count}</p>
-            <p>Qdrant: {progressJob.qdrant_points_count ?? 0} / {progressJob.total_chunks_count || knowledgeBase.fragments_count}</p>
-            <p>Полнотекстовый индекс: {progressJob.fulltext_chunks_count ?? 0} / {progressJob.total_chunks_count || knowledgeBase.fragments_count}</p>
-            <p>Ошибки: {progressJob.errors_count}</p>
-          </article>
-        ) : null}
-        <h3 className={styles.sectionTitle}>По файлам</h3>
-        <CompactTable
-          headers={["Файл", "Статус", "Чанков", "Embeddings", "Последняя индексация"]}
-          rows={sources.map((source) => {
-            const sourceChunks = chunks.filter((chunk) => chunk.source_id === source.id);
-            const chunkTotal = sourceChunks.length || source.fragments_count;
-            const indexedCount = sourceChunks.filter((chunk) => chunk.embedding_status === "indexed").length;
-            let embeddingLabel = "—";
-            if (chunkTotal > 0 && indexedCount === chunkTotal) embeddingLabel = `Готово (${indexedCount})`;
-            else if (indexedCount > 0) embeddingLabel = `${indexedCount} из ${chunkTotal}`;
-            else if (source.processing_status === "processing") embeddingLabel = "В процессе";
-            else if (source.processing_status === "error") embeddingLabel = "Ошибка";
-            return [
-              source.document_title || source.original_filename || source.document_id,
-              sourceStatusLabels[source.processing_status] ?? source.processing_status,
-              formatNumber(chunkTotal),
-              embeddingLabel,
-              formatDate(source.last_indexed_at)
-            ];
-          })}
-          empty="Источники ещё не добавлены."
-        />
-        {(jobErrors.data ?? []).length > 0 ? (
-          <>
-            <h3 className={styles.sectionTitle}>Ошибки</h3>
+      <div className={styles.indexingLayout}>
+        <section className={styles.indexingMainColumn}>
+          {progressJob ? (
+            <article className={styles.indexingProgressCard}>
+              <header className={styles.indexingProgressHeader}>
+                <div>
+                  <h3 className={styles.sectionTitle}>Текущая индексация</h3>
+                  <p className={styles.indexingProgressMeta}>
+                    {progressJob.cancel_requested
+                      ? "Остановка запрошена — завершение текущего этапа"
+                      : `${jobTypeLabels[progressJob.job_type] ?? progressJob.job_type} · ${jobStatusLabels[progressJob.status]}`}
+                  </p>
+                </div>
+                <span className={styles.indexingDuration}>
+                  {formatJobDuration(progressJob)}
+                </span>
+              </header>
+              <div className={styles.progressBars}>
+                <div>
+                  <span>Источники: {progressJob.processed_sources_count} / {totalSources}</span>
+                  <div className={styles.progressTrack}>
+                    <div className={styles.progressFill} style={{ width: `${percent(progressJob.processed_sources_count, totalSources)}%` }} />
+                  </div>
+                </div>
+                <div>
+                  <span>Фрагменты: {progressJob.embedded_chunks_count ?? 0} / {totalChunks}</span>
+                  <div className={styles.progressTrack}>
+                    <div className={styles.progressFill} style={{ width: `${percent(progressJob.embedded_chunks_count ?? 0, totalChunks)}%` }} />
+                  </div>
+                </div>
+              </div>
+              <ul className={styles.indexingPipeline}>
+                {stages.map((stage) => (
+                  <li key={stage.id} className={styles[`pipeline_${stage.status}`]}>
+                    {stage.status === "done" ? <CheckCircle2 size={16} /> : stage.status === "running" ? <RefreshCw size={16} className={styles.indexingSpinner} /> : <Circle size={16} />}
+                    <div>
+                      <strong>{stage.label}</strong>
+                      {stage.detail ? <span>{stage.detail}</span> : null}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          ) : (
+            <div className={styles.emptyState}>Активная индексация не выполняется. Запустите обработку источников.</div>
+          )}
+          <h3 className={styles.sectionTitle}>По файлам</h3>
+          <CompactTable
+            headers={["Файл", "Статус", "Чанков", "Embeddings", "Последняя индексация"]}
+            rows={sources.map((source) => {
+              const sourceChunks = chunks.filter((chunk) => chunk.source_id === source.id);
+              const chunkTotal = sourceChunks.length || source.fragments_count;
+              const indexedCount = sourceChunks.filter((chunk) => chunk.embedding_status === "indexed").length;
+              let embeddingLabel = "—";
+              if (chunkTotal > 0 && indexedCount === chunkTotal) embeddingLabel = `Готово (${indexedCount})`;
+              else if (indexedCount > 0) embeddingLabel = `${indexedCount} из ${chunkTotal}`;
+              else if (source.processing_status === "processing") embeddingLabel = "В процессе";
+              else if (source.processing_status === "error") embeddingLabel = "Ошибка";
+              return [
+                source.document_title || source.original_filename || source.document_id,
+                sourceStatusLabels[source.processing_status] ?? source.processing_status,
+                formatNumber(chunkTotal),
+                embeddingLabel,
+                formatDate(source.last_indexed_at)
+              ];
+            })}
+            empty="Источники ещё не добавлены."
+          />
+        </section>
+        <aside className={styles.indexingSideColumn}>
+          {jobHistory.length > 0 ? (
+            <section className={styles.indexingSideCard}>
+              <h3 className={styles.sectionTitle}>История индексации</h3>
+              <CompactTable
+                headers={["Запуск", "Режим", "Статус", "Источники", "Фрагменты", "Ошибки"]}
+                rows={jobHistory.slice(0, 8).map((job) => [
+                  formatDate(job.started_at || job.created_at),
+                  jobTypeLabels[job.job_type] ?? job.job_type,
+                  jobStatusLabels[job.status] ?? job.status,
+                  `${job.processed_sources_count} / ${job.total_sources_count || job.processed_sources_count}`,
+                  formatNumber(job.created_fragments_count + job.updated_fragments_count),
+                  formatNumber(job.errors_count)
+                ])}
+                empty="Заданий индексации ещё не было."
+              />
+            </section>
+          ) : null}
+          <section className={styles.indexingSideCard}>
+            <h3 className={styles.sectionTitle}>
+              Ошибки индексации
+              {(jobErrors.data ?? []).length ? <span className={styles.errorBadge}>{(jobErrors.data ?? []).length}</span> : null}
+            </h3>
             <CompactTable
-              headers={["Источник", "Тип", "Ошибка", "Действие"]}
-              rows={(jobErrors.data ?? []).map((error: KnowledgeBaseIndexingError) => [
-                error.source_id || "—",
-                error.error_type,
-                error.user_message || error.technical_message || "-",
-                <button key={error.id} type="button" onClick={() => retryError.mutate(error.id)} disabled={retryError.isPending}>
-                  Повторить
-                </button>
-              ])}
-              empty=""
+              headers={["Источник", "Этап", "Ошибка", "Рекомендация", "Действие"]}
+              rows={(jobErrors.data ?? []).map((error: KnowledgeBaseIndexingError) => {
+                const source = sources.find((item) => item.id === error.source_id);
+                return [
+                  source?.document_title || source?.original_filename || "—",
+                  error.error_type,
+                  error.user_message || error.technical_message || "-",
+                  error.recommended_action || "Повторите обработку",
+                  <button key={error.id} type="button" onClick={() => retryError.mutate(error.id)} disabled={retryError.isPending}>
+                    Повторить
+                  </button>
+                ];
+              })}
+              empty="Ошибок индексации нет."
             />
-          </>
-        ) : null}
-        {jobHistory.length > 0 ? (
-          <>
-            <h3 className={styles.sectionTitle}>История заданий</h3>
-            <CompactTable
-              headers={["Тип", "Статус", "Источники", "Создано", "Ошибки", "Длительность"]}
-              rows={jobHistory.map((job) => [
-                jobTypeLabels[job.job_type] ?? job.job_type,
-                jobStatusLabels[job.status] ?? job.status,
-                `${job.processed_sources_count} / ${job.total_sources_count || job.processed_sources_count}`,
-                formatNumber(job.created_fragments_count + job.updated_fragments_count),
-                formatNumber(job.errors_count),
-                job.duration_ms ? `${Math.round(job.duration_ms / 1000)} сек` : "-"
-              ])}
-              empty="Заданий индексации ещё не было."
-            />
-          </>
-        ) : null}
+          </section>
+          <section className={styles.indexingSideCard}>
+            <h3 className={styles.sectionTitle}>Параметры индексации</h3>
+            <div className={styles.paramsGrid}>
+              <div><span>Режим</span><strong>{progressJob ? jobTypeLabels[progressJob.job_type] : "—"}</strong></div>
+              <div><span>Chunk size</span><strong>{String(params.chunk_size ?? "—")}</strong></div>
+              <div><span>Overlap</span><strong>{String(params.chunk_overlap ?? "—")}</strong></div>
+              <div><span>Embedding</span><strong>{progressJob?.embedding_model || String(params.embedding_model ?? "—")}</strong></div>
+              <div><span>Qdrant</span><strong>{progressJob?.qdrant_collection || "—"}</strong></div>
+            </div>
+          </section>
+        </aside>
       </div>
     );
   }
@@ -868,10 +965,15 @@ function DetailTabContent(props: {
         {readiness.data ? (
           <div className={styles.readinessCard}>
             <strong>Оценка готовности: {readiness.data.recommendation}</strong>
-            <span>Качество: {readiness.data.quality_percent}% · FTS: {readiness.data.fts_chunks} · Ошибки: {readiness.data.unresolved_errors}</span>
+            <span>
+              Качество: {readiness.data.quality_percent}% · FTS: {readiness.data.fts_chunks} · Ошибки: {readiness.data.unresolved_errors}
+              {readiness.data.can_promote_to_ready ? " · Можно опубликовать" : ""}
+            </span>
           </div>
         ) : null}
+        {!canTestSearch ? <div className={styles.statusCallout}>{testSearchPlaceholder}</div> : null}
         <form
+          className={styles.testSearchForm}
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             if (testQuery.trim() && canTestSearch) testSearch.mutate(testQuery.trim());
@@ -880,25 +982,53 @@ function DetailTabContent(props: {
           <input
             value={testQuery}
             onChange={(event) => setTestQuery(event.target.value)}
-            placeholder={canTestSearch ? "Введите тестовый вопрос" : "Поиск недоступен для текущего статуса базы"}
+            placeholder={canTestSearch ? "Введите тестовый вопрос для проверки фрагментов" : testSearchPlaceholder}
             disabled={!canTestSearch}
           />
+          <label>
+            Результатов
+            <select value={testTopK} onChange={(event) => setTestTopK(Number(event.target.value))} disabled={!canTestSearch}>
+              {[3, 5, 10, 15].map((value) => (
+                <option key={value} value={value}>{value}</option>
+              ))}
+            </select>
+          </label>
           <button type="submit" disabled={!canTestSearch || testSearch.isPending}>
             <Play size={15} />
             Проверить
           </button>
         </form>
-        {testPreview ? <p className={styles.answerPreview}>{testPreview}</p> : null}
-        {testHits.map((hit) => (
-          <article key={hit.knowledge_base_chunk_id || hit.chunk_id || hit.content.slice(0, 20)}>
-            <strong>{hit.document_title || "Источник"}</strong>
-            <span>
-              Релевантность {hit.score.toFixed(3)} · {hit.accessible ? "доступен" : "нет доступа"} · {hit.access_reason}
-            </span>
-            <span>Стр. {hit.page_number ?? "-"} · {hit.section_title || "-"} · {hit.clause_number || "-"}</span>
-            <p>{hit.content}</p>
-          </article>
-        ))}
+        {testHits.length > 0 ? (
+          <section className={styles.testHitsSection}>
+            <h3 className={styles.sectionTitle}>Найденные фрагменты</h3>
+            {testHits.map((hit) => (
+              <article key={hit.knowledge_base_chunk_id || hit.chunk_id || hit.content.slice(0, 20)} className={styles.testHitCard}>
+                <header>
+                  <strong>{hit.document_title || "Источник"}</strong>
+                  <span>Релевантность {formatRelevance(hit.score)}</span>
+                </header>
+                <div className={styles.testHitMeta}>
+                  <span>Стр. {hit.page_number ?? "—"}</span>
+                  <span>{hit.section_title || "Раздел не указан"}</span>
+                  <span>{hit.clause_number ? `П. ${hit.clause_number}` : "Пункт не указан"}</span>
+                  <span>
+                    {hit.accessible
+                      ? "Доступен"
+                      : `В рабочем поиске недоступен (${hit.access_reason}); текст показан для проверки`}
+                  </span>
+                </div>
+                <p className={styles.testHitContent}>{highlightSearchTerms(hit.content, testQuery)}</p>
+              </article>
+            ))}
+          </section>
+        ) : null}
+        {testPreview ? (
+          <section className={styles.answerPreviewCard}>
+            <h3 className={styles.sectionTitle}>Предварительный ответ</h3>
+            <p className={styles.answerPreview}>{testPreview}</p>
+            <small>Ответ сформирован только на основании найденных фрагментов.</small>
+          </section>
+        ) : null}
         {testSearch.isSuccess && !testHits.length ? <div className={styles.emptyState}>Фрагменты не найдены.</div> : null}
       </div>
     );
@@ -920,7 +1050,7 @@ function DetailTabContent(props: {
 function statusCalloutText(kb: KnowledgeBaseListItem): string {
   if (kb.indexing_active || kb.status === "processing") return "Идёт индексация: поиск будет доступен после завершения.";
   if (kb.status === "draft") return "База не готова: добавьте источники и запустите индексацию.";
-  if (kb.status === "needs_review") return "Есть замечания: проверьте ошибки индексации.";
+  if (kb.status === "needs_review") return "Индексация завершена частично: проверьте ошибки и проблемные источники.";
   if (kb.status === "ready") return "База готова к поиску и подключению агентов.";
   if (kb.status === "error") return "Индексация завершилась с ошибкой.";
   return statusLabels[kb.status];
@@ -939,12 +1069,13 @@ function SourceActions({
   onReindex: () => void;
   onDelete: () => void;
 }) {
+  const indexing = source.processing_status === "processing";
   return (
     <div className={styles.sourceActions}>
       <button type="button" onClick={onView}>Просмотр</button>
-      <button type="button" onClick={onReindex}>Переобработать</button>
-      <button type="button" onClick={onExclude}>Исключить</button>
-      <button type="button" onClick={onDelete}>Удалить</button>
+      <button type="button" onClick={onReindex} disabled={indexing}>Переобработать</button>
+      <button type="button" onClick={onExclude} disabled={indexing}>Исключить</button>
+      <button type="button" onClick={onDelete} disabled={indexing}>Удалить</button>
     </div>
   );
 }
@@ -1010,7 +1141,7 @@ function KnowledgeBaseQuickSearch({
           {hits.slice(0, 3).map((hit) => (
             <article key={hit.knowledge_base_chunk_id || hit.chunk_id || hit.content.slice(0, 24)}>
               <strong>{hit.document_title || "Источник"}</strong>
-              <span>Релевантность {hit.score.toFixed(3)}</span>
+              <span>Релевантность {formatRelevance(hit.score)}</span>
               <p>{hit.content}</p>
             </article>
           ))}
@@ -1037,24 +1168,34 @@ function InfoGrid({ items }: { items: [string, string | number | null | undefine
 }
 
 function CompactTable({ headers, rows, empty }: { headers: string[]; rows: React.ReactNode[][]; empty: string }) {
+  const actionsColumnIndex = headers.length - 1;
   return (
-    <table className={styles.compactTable}>
-      <thead>
-        <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
-      </thead>
-      <tbody>
-        {rows.map((row, index) => (
-          <tr key={index}>
-            {row.map((cell, cellIndex) => <td key={`${index}-${cellIndex}`}>{cell}</td>)}
-          </tr>
-        ))}
-        {!rows.length && (
-          <tr>
-            <td colSpan={headers.length} className={styles.emptyCell}>{empty}</td>
-          </tr>
-        )}
-      </tbody>
-    </table>
+    <div className={styles.tableWrap}>
+      <table className={styles.compactTable}>
+        <thead>
+          <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={index}>
+              {row.map((cell, cellIndex) => (
+                <td
+                  key={`${index}-${cellIndex}`}
+                  className={cellIndex === actionsColumnIndex && headers[actionsColumnIndex] === "Действия" ? styles.actionsCell : undefined}
+                >
+                  {cell}
+                </td>
+              ))}
+            </tr>
+          ))}
+          {!rows.length && (
+            <tr>
+              <td colSpan={headers.length} className={styles.emptyCell}>{empty}</td>
+            </tr>
+          )}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -1075,8 +1216,92 @@ function Pipeline() {
   );
 }
 
+type IndexingStageStatus = "pending" | "running" | "done";
+
+function buildIndexingStages(
+  job: KnowledgeBaseIndexingJob | null,
+  totalSources: number,
+  totalChunks: number
+): { id: string; label: string; status: IndexingStageStatus; detail?: string }[] {
+  if (!job) return [];
+  if (job.status === "queued") {
+    return [
+      { id: "queue", label: "Ожидание worker", status: "running", detail: "Задание в очереди" },
+      { id: "precheck", label: "Проверка источников", status: "pending" },
+      { id: "text_extraction", label: "Извлечение текста и структуры", status: "pending" },
+      { id: "chunking", label: "Разбиение на фрагменты", status: "pending" },
+      { id: "embeddings", label: "Создание embeddings", status: "pending" },
+      { id: "qdrant", label: "Индексация в Qdrant", status: "pending" },
+      { id: "fulltext", label: "Полнотекстовый индекс", status: "pending" },
+      { id: "quality_control", label: "Контроль качества", status: "pending" }
+    ];
+  }
+  const current = String(job.processing_params?.current_stage ?? "");
+  const stageOrder = ["precheck", "text_extraction", "chunking", "embeddings", "qdrant", "fulltext", "quality_control", "stopping", "stopped"];
+  const currentIndex = stageOrder.indexOf(current);
+
+  const defs = [
+    { id: "precheck", label: "Проверка источников", done: (job.total_sources_count ?? 0) > 0 },
+    { id: "text_extraction", label: "Извлечение текста и структуры", done: (job.extracted_sources_count ?? 0) > 0, detail: `${job.extracted_sources_count ?? 0}/${totalSources}` },
+    { id: "chunking", label: "Разбиение на фрагменты", done: (job.chunked_sources_count ?? 0) > 0, detail: `${job.chunked_sources_count ?? 0}/${totalSources}` },
+    { id: "embeddings", label: "Создание embeddings", done: (job.embedded_chunks_count ?? 0) > 0, detail: `${job.embedded_chunks_count ?? 0}/${totalChunks}` },
+    { id: "qdrant", label: "Индексация в Qdrant", done: (job.qdrant_points_count ?? 0) > 0, detail: `${job.qdrant_points_count ?? 0}/${totalChunks}` },
+    { id: "fulltext", label: "Полнотекстовый индекс", done: (job.fulltext_chunks_count ?? 0) > 0, detail: `${job.fulltext_chunks_count ?? 0}/${totalChunks}` },
+    { id: "quality_control", label: "Контроль качества", done: job.status === "completed" || job.status === "partial" }
+  ];
+
+  return defs.map((stage) => {
+    const stageIndex = stageOrder.indexOf(stage.id);
+    let status: IndexingStageStatus = "pending";
+    if (current === stage.id || (currentIndex === -1 && !stage.done && defs.findIndex((item) => item.id === stage.id) === defs.findIndex((item) => !item.done))) {
+      status = "running";
+    } else if (stage.done || (currentIndex >= 0 && stageIndex < currentIndex)) {
+      status = "done";
+    }
+    if (current === stage.id) status = "running";
+    return { ...stage, status };
+  });
+}
+
+function formatJobDuration(job: KnowledgeBaseIndexingJob) {
+  if (job.duration_ms) return `${Math.round(job.duration_ms / 1000)} сек`;
+  if (!job.started_at) return "—";
+  const started = new Date(job.started_at).getTime();
+  const seconds = Math.max(0, Math.round((Date.now() - started) / 1000));
+  const minutes = Math.floor(seconds / 60);
+  const rest = seconds % 60;
+  return minutes ? `${minutes} мин ${rest} сек` : `${rest} сек`;
+}
+
+function percent(value: number, total: number) {
+  if (!total) return 0;
+  return Math.min(100, Math.round((value / total) * 100));
+}
+
+function testSearchPlaceholderText(kb: KnowledgeBaseListItem, indexingActive: boolean) {
+  if (kb.status === "draft") return "Тест поиска недоступен: база ещё не проиндексирована. Добавьте источники и запустите индексацию.";
+  if (indexingActive && (kb.fragments_count ?? 0) === 0) return "Тест поиска временно недоступен: выполняется первая индексация.";
+  if (kb.status === "archived") return "Тест поиска недоступен для архивной базы знаний.";
+  return "Тест поиска недоступен для текущего статуса.";
+}
+
+function highlightSearchTerms(content: string, query: string): React.ReactNode {
+  const terms = query.trim().split(/\s+/).filter((term) => term.length > 1);
+  if (!terms.length) return content;
+  const pattern = new RegExp(`(${terms.map((term) => term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|")})`, "gi");
+  return content.split(pattern).map((part, index) => {
+    const isMatch = terms.some((term) => part.toLowerCase() === term.toLowerCase());
+    return isMatch ? <mark key={index}>{part}</mark> : part;
+  });
+}
+
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function formatRelevance(score: number) {
+  const percent = Math.round(Math.max(0, Math.min(1, score)) * 100);
+  return `${percent}%`;
 }
 
 function formatDate(value?: string | null) {

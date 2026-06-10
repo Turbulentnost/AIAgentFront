@@ -349,7 +349,7 @@ const defaultProcessing: ProcessingSettings = {
   chunking: true,
   embeddings: true,
   qdrantIndexing: true,
-  manualReview: true,
+  manualReview: false,
   chunkSize: 800,
   chunkOverlap: 100,
   embeddingModel: embeddingModelOptions[0].value,
@@ -405,15 +405,9 @@ export default function KnowledgeBaseCreate() {
     enabled: canLoadReferenceData,
     staleTime: 5 * 60 * 1000
   });
-  const users = useQuery({
-    queryKey: ["users", "responsible-candidates"],
+  const platformUsers = useQuery({
+    queryKey: ["users", "platform-access"],
     queryFn: usersApi.listResponsibleCandidates,
-    enabled: canLoadReferenceData,
-    staleTime: 5 * 60 * 1000
-  });
-  const responsibleCandidates = useQuery({
-    queryKey: ["knowledge-bases", "responsible-users"],
-    queryFn: knowledgeBasesApi.listResponsibleUsers,
     enabled: canLoadReferenceData,
     staleTime: 5 * 60 * 1000
   });
@@ -701,9 +695,9 @@ export default function KnowledgeBaseCreate() {
               departments={activeDepartments}
               departmentsLoading={departments.isPending}
               departmentsError={departments.isError}
-              responsibleUsers={responsibleCandidates.data ?? []}
-              responsibleUsersLoading={responsibleCandidates.isPending}
-              responsibleUsersError={responsibleCandidates.isError}
+              responsibleUsers={platformUsers.data ?? []}
+              responsibleUsersLoading={platformUsers.isPending}
+              responsibleUsersError={platformUsers.isError}
               onName={setName}
               onDescription={setDescription}
               onBaseKind={setBaseKind}
@@ -758,7 +752,7 @@ export default function KnowledgeBaseCreate() {
               accessTermMode={accessTermMode}
               accessExpiresAt={accessExpiresAt}
               includeChildren={includeChildren}
-              users={users.data ?? []}
+              users={platformUsers.data ?? []}
               departments={activeDepartments}
               roles={roles.data ?? []}
               accessRules={accessRules}
@@ -784,8 +778,8 @@ export default function KnowledgeBaseCreate() {
               description={description}
               baseKind={baseKind}
               department={activeDepartments.find((item) => item.id === departmentId)}
-              responsible={responsibleCandidates.data?.find((item) => item.id === responsibleUserId)}
-              users={users.data ?? []}
+              responsible={platformUsers.data?.find((item) => item.id === responsibleUserId)}
+              users={platformUsers.data ?? []}
               topic={topic}
               selectedDocuments={selectedDocuments}
               processing={processing}
@@ -804,12 +798,12 @@ export default function KnowledgeBaseCreate() {
             name={name}
             baseKind={baseKind}
             department={activeDepartments.find((item) => item.id === departmentId)}
-            responsible={responsibleCandidates.data?.find((item) => item.id === responsibleUserId)}
+            responsible={platformUsers.data?.find((item) => item.id === responsibleUserId)}
             topic={topic}
             selectedDocuments={selectedDocuments}
             stagedDropCount={stagedDropFiles.length}
             readiness={readiness}
-            users={users.data ?? []}
+            users={platformUsers.data ?? []}
             processing={processing}
             accessMode={accessMode}
             accessRules={accessRules}
@@ -992,12 +986,12 @@ function StepMain(props: {
             }))}
             placeholder={
               props.responsibleUsersLoading
-                ? "Загружаем сотрудников из оргструктуры..."
+                ? "Загружаем зарегистрированных сотрудников..."
                 : props.responsibleUsersError
                   ? "Не удалось загрузить список сотрудников"
                   : props.responsibleUsers.length
                     ? "Начните вводить ФИО, должность или отдел"
-                    : "Список сотрудников пуст — выполните синхронизацию из 1С"
+                    : "Нет зарегистрированных сотрудников с доступом к платформе"
             }
             noResultsText="Сотрудник не найден"
             ariaLabel="Ответственный"
@@ -1613,7 +1607,16 @@ function StepAccess(props: {
       props.onRulesChange([]);
       props.onExceptionsChange([]);
     } else if (mode === "everyone") {
-      props.onRulesChange([organizationRule(props.defaultAccessLevel, props.defaultAccessBasis, props.accessComment, props.accessTermMode, props.accessExpiresAt)]);
+      props.onRulesChange([
+        organizationRule(
+          props.defaultAccessLevel,
+          props.defaultAccessBasis,
+          props.accessComment,
+          props.accessTermMode,
+          props.accessExpiresAt,
+          props.users.length
+        )
+      ]);
     } else {
       props.onRulesChange(props.accessRules.filter((rule) => allowed.includes(rule.granteeType)));
     }
@@ -1636,7 +1639,16 @@ function StepAccess(props: {
       </section>
 
       {props.accessMode === "everyone" ? (
-        <WarningCallout text="Общий доступ не отменяет ограничения на исходные документы. Если сотрудник не имеет права на конкретный документ, его фрагменты не будут выданы в поиске." />
+        <>
+          <WarningCallout text="Общий доступ не отменяет ограничения на исходные документы. Если сотрудник не имеет права на конкретный документ, его фрагменты не будут выданы в поиске." />
+          <section className={styles.accessConstructorSection}>
+            <h3>Сотрудники с доступом к платформе ({props.users.length})</h3>
+            <p className={styles.fieldHint}>
+              К базе будут допущены только зарегистрированные пользователи, которые могут войти в систему (через 1С или обычную регистрацию). Сотрудники из оргструктуры без учётной записи в список не попадают.
+            </p>
+            <RegisteredUsersList users={props.users} />
+          </section>
+        </>
       ) : null}
 
       <section className={styles.accessConstructorSection}>
@@ -1763,7 +1775,7 @@ function StepAccess(props: {
               {subjectType !== "organization" ? (
                 <label>
                   Найти
-                  <input value={subjectQuery} onChange={(event) => setSubjectQuery(event.target.value)} placeholder="Введите название или ФИО" />
+                  <input value={subjectQuery} onChange={(event) => setSubjectQuery(event.target.value)} placeholder={subjectType === "user" ? "ФИО, должность или подразделение" : "Введите название"} />
                 </label>
               ) : null}
             </div>
@@ -1785,7 +1797,7 @@ function StepAccess(props: {
                 ))}
               </div>
             ) : (
-              <InfoCallout text="База знаний будет доступна всем активным пользователям платформы. Ограничения исходных документов сохраняются." />
+              <InfoCallout text="База знаний будет доступна всем зарегистрированным сотрудникам с учётной записью в платформе. Сотрудники без входа в систему не получат доступ." />
             )}
             <footer>
               <button type="button" className={styles.navBackButton} onClick={resetModal}>Отмена</button>
@@ -1855,18 +1867,57 @@ function formatAccessTerm(termMode: AccessTermMode, expiresAt: string) {
   return termMode === "until" && expiresAt ? `До ${expiresAt}` : "Бессрочно";
 }
 
+function RegisteredUsersList({ users }: { users: ResponsibleUser[] }) {
+  const [query, setQuery] = useState("");
+  const normalized = query.trim().toLowerCase();
+  const filtered = users.filter((user) => {
+    if (!normalized) return true;
+    const haystack = `${user.full_name ?? ""} ${user.position ?? ""} ${user.department_name ?? ""}`.toLowerCase();
+    return haystack.includes(normalized);
+  });
+
+  if (!users.length) {
+    return <InfoCallout text="Зарегистрированных сотрудников пока нет. Добавьте пользователей или выполните вход через 1С." />;
+  }
+
+  return (
+    <>
+      <label className={styles.field}>
+        <span className={styles.fieldLabel}>Поиск в списке</span>
+        <input
+          className={styles.control}
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="ФИО, должность или подразделение"
+        />
+      </label>
+      <div className={styles.registeredUsersList}>
+        {filtered.slice(0, 100).map((user) => (
+          <article key={user.id}>
+            <strong>{user.full_name || "Пользователь"}</strong>
+            <span>{[user.position, user.department_name].filter(Boolean).join(" · ") || "Подразделение не указано"}</span>
+          </article>
+        ))}
+        {!filtered.length ? <p className={styles.fieldHint}>Сотрудники не найдены.</p> : null}
+        {filtered.length > 100 ? <p className={styles.fieldHint}>Показаны первые 100 из {filtered.length}.</p> : null}
+      </div>
+    </>
+  );
+}
+
 function organizationRule(
   level: KnowledgeBaseAccessType,
   basis: AccessBasis,
   comment: string,
   termMode: AccessTermMode,
-  expiresAt: string
+  expiresAt: string,
+  usersCount = 0
 ): AccessRule {
   return {
     id: crypto.randomUUID(),
     granteeType: "organization",
     granteeId: null,
-    granteeLabel: "Все активные сотрудники",
+    granteeLabel: usersCount ? `Все зарегистрированные сотрудники (${usersCount})` : "Все зарегистрированные сотрудники",
     level,
     basis,
     comment,
