@@ -400,6 +400,44 @@
   --kb-page-sources-max-width: 1600px;
   --kb-page-access-max-width: 1600px;
 
+  /* KB list page */
+  --kb-list-mark-bg: #fef08a;
+  --kb-list-indexing-border: #fde68a;
+  --kb-list-indexing-text: #92400e;
+  --kb-list-indexing-strong: #78350f;
+  --kb-list-pipeline-running-bg: #eff6ff;
+  --kb-list-pipeline-running-border: #bfdbfe;
+  --kb-list-status-pulse: rgba(245, 158, 11, 0.45);
+  --kb-list-progress-track: #e2e8f0;
+  --kb-list-progress-fill: linear-gradient(90deg, #2563eb, #3b82f6);
+  --kb-list-callout-text: #1e3a8a;
+  --kb-list-security-bg: #f0fdf4;
+  --kb-list-status-review-color: #b45309;
+  --kb-list-status-review-bg: #fef3c7;
+
+  /* Agent builder page */
+  --builder-user-bubble-bg: #dbeafe;
+  --builder-user-bubble-text: #1e3a8a;
+  --builder-assistant-bubble-bg: #f1f5f9;
+  --builder-assistant-bubble-text: #0f172a;
+  --builder-result-banner-border: #86efac;
+  --builder-result-banner-bg: #f0fdf4;
+  --builder-result-banner-text: #14532d;
+  --builder-preview-border: #93c5fd;
+  --builder-preview-bg: #eff6ff;
+  --builder-preview-text: #1e3a8a;
+  --builder-preview-text-box-border: #bfdbfe;
+  --builder-preview-error-border: #fecaca;
+  --builder-preview-error-bg: #fef2f2;
+  --builder-preview-error-text: #991b1b;
+  --builder-type-border: #c4b5fd;
+  --builder-type-bg: #f5f3ff;
+  --builder-type-text: #4c1d95;
+  --builder-type-label: #6d28d9;
+  --builder-type-explanation-bg: #ede9fe;
+  --builder-type-select-disabled-bg: #ede9fe;
+  --builder-session-active-bg: #eff6ff;
+
   /* ── Agents catalog page ── */
   --agents-card-bg: #f0f7ff;
   --agents-card-border: transparent;
@@ -815,6 +853,44 @@
   --kb-pending-text: #8b949e;
   --kb-page-sources-max-width: 1600px;
   --kb-page-access-max-width: 1600px;
+
+  /* KB list page */
+  --kb-list-mark-bg: rgba(210, 153, 34, 0.35);
+  --kb-list-indexing-border: rgba(210, 153, 34, 0.35);
+  --kb-list-indexing-text: #d29922;
+  --kb-list-indexing-strong: #e3b341;
+  --kb-list-pipeline-running-bg: rgba(56, 139, 253, 0.12);
+  --kb-list-pipeline-running-border: rgba(88, 166, 255, 0.35);
+  --kb-list-status-pulse: rgba(210, 153, 34, 0.45);
+  --kb-list-progress-track: #30363d;
+  --kb-list-progress-fill: linear-gradient(90deg, #1f6feb, #58a6ff);
+  --kb-list-callout-text: #a5b4fc;
+  --kb-list-security-bg: rgba(46, 160, 67, 0.15);
+  --kb-list-status-review-color: #e3b341;
+  --kb-list-status-review-bg: rgba(210, 153, 34, 0.15);
+
+  /* Agent builder page */
+  --builder-user-bubble-bg: rgba(56, 139, 253, 0.18);
+  --builder-user-bubble-text: #a5b4fc;
+  --builder-assistant-bubble-bg: #21262d;
+  --builder-assistant-bubble-text: #e6edf3;
+  --builder-result-banner-border: rgba(46, 160, 67, 0.45);
+  --builder-result-banner-bg: rgba(46, 160, 67, 0.15);
+  --builder-result-banner-text: #56d364;
+  --builder-preview-border: rgba(88, 166, 255, 0.45);
+  --builder-preview-bg: rgba(56, 139, 253, 0.12);
+  --builder-preview-text: #a5b4fc;
+  --builder-preview-text-box-border: rgba(88, 166, 255, 0.35);
+  --builder-preview-error-border: rgba(248, 81, 73, 0.45);
+  --builder-preview-error-bg: rgba(248, 81, 73, 0.12);
+  --builder-preview-error-text: #ff7b72;
+  --builder-type-border: rgba(163, 113, 247, 0.45);
+  --builder-type-bg: rgba(163, 113, 247, 0.12);
+  --builder-type-text: #d2a8ff;
+  --builder-type-label: #a371f7;
+  --builder-type-explanation-bg: rgba(163, 113, 247, 0.18);
+  --builder-type-select-disabled-bg: rgba(163, 113, 247, 0.1);
+  --builder-session-active-bg: rgba(56, 139, 253, 0.12);
 
   /* ── Agents catalog page ── */
   --agents-card-bg: rgba(56, 139, 253, 0.1);

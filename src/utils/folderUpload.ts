@@ -3,6 +3,10 @@ export interface FolderUploadFile {
   relativePath: string;
 }
 
+type SyncTransferItem =
+  | { kind: "entry"; entry: FileSystemEntry }
+  | { kind: "file"; file: File };
+
 function fileRelativePath(file: File): string {
   const withPath = file as File & { webkitRelativePath?: string };
   return withPath.webkitRelativePath?.trim() || file.name;
@@ -46,30 +50,48 @@ async function walkFileTree(entry: FileSystemEntry, parentPath: string, out: Fol
   }
 }
 
+function collectSyncItems(dataTransfer: DataTransfer): SyncTransferItem[] {
+  const syncItems: SyncTransferItem[] = [];
+
+  if (dataTransfer.items?.length) {
+    for (const item of dataTransfer.items) {
+      if (item.kind !== "file") continue;
+      const entry = item.webkitGetAsEntry?.();
+      if (entry) {
+        syncItems.push({ kind: "entry", entry });
+        continue;
+      }
+      const file = item.getAsFile();
+      if (file) syncItems.push({ kind: "file", file });
+    }
+  }
+
+  if (!syncItems.length && dataTransfer.files?.length) {
+    for (const file of dataTransfer.files) {
+      syncItems.push({ kind: "file", file });
+    }
+  }
+
+  return syncItems;
+}
+
 export function collectFilesFromFileList(files: FileList | File[]): FolderUploadFile[] {
   return [...files].map((file) => ({ file, relativePath: fileRelativePath(file) }));
 }
 
 export async function collectFilesFromDataTransfer(dataTransfer: DataTransfer): Promise<FolderUploadFile[]> {
-  const items = dataTransfer.items;
-  if (!items?.length) {
-    return collectFilesFromFileList(dataTransfer.files);
-  }
-
+  const syncItems = collectSyncItems(dataTransfer);
   const collected: FolderUploadFile[] = [];
-  const walkers: Promise<void>[] = [];
-  for (const item of items) {
-    if (item.kind !== "file") continue;
-    const entry = item.webkitGetAsEntry?.();
-    if (!entry) continue;
-    walkers.push(walkFileTree(entry, "", collected));
+
+  for (const item of syncItems) {
+    if (item.kind === "entry") {
+      await walkFileTree(item.entry, "", collected);
+      continue;
+    }
+    collected.push({ file: item.file, relativePath: fileRelativePath(item.file) });
   }
 
-  if (walkers.length) {
-    await Promise.all(walkers);
-    return collected;
-  }
-  return collectFilesFromFileList(dataTransfer.files);
+  return collected;
 }
 
 export function titleFromRelativePath(relativePath: string): string {

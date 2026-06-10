@@ -10,6 +10,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  ClipboardList,
   Cog,
   Database,
   FilePlus2,
@@ -20,6 +21,7 @@ import {
   LockKeyhole,
   CloudUpload,
   MoreVertical,
+  PanelLeft,
   ScanText,
   Search,
   Settings2,
@@ -34,6 +36,7 @@ import { isAxiosError } from "axios";
 import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, rolesApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
+import SourceFileTree from "@/components/SourceFileTree";
 import { FormAutocomplete, FormSelect, SourceFilterBar, Switch } from "@/components/form-controls";
 import type {
   AgentAccess,
@@ -47,12 +50,14 @@ import type {
   Role
 } from "@/types";
 import { filterActiveDepartments } from "@/utils/departments";
+import { createId } from "@/utils/createId";
 import {
   collectFilesFromDataTransfer,
   collectFilesFromFileList,
   titleFromRelativePath,
   type FolderUploadFile
 } from "@/utils/folderUpload";
+import { buildSourceFileTree, type SourceTreeRoot } from "@/utils/sourceFileTree";
 import styles from "./KnowledgeBaseCreate.module.css";
 
 type StepId = "main" | "sources" | "readiness" | "processing" | "access" | "agents" | "preview";
@@ -205,6 +210,8 @@ const processingAdvancedParamHints = {
   vectorStore: "Основное векторное хранилище платформы. Для типовых баз используется Qdrant без дополнительной настройки.",
   qdrantCollection: "Имя коллекции в Qdrant, куда будут записаны векторы этой базы знаний. Допустимы латиница, цифры и _."
 } as const;
+
+const RIGHT_SIDEBAR_FLIP_MS = 540;
 
 const sidebarSteps = [
   { label: "Основные сведения", hint: "Информация о базе знаний", stepIndexes: [0] },
@@ -393,6 +400,36 @@ export default function KnowledgeBaseCreate() {
   const [sourceOnlyCurrent, setSourceOnlyCurrent] = useState(true);
   const [stagedDropFiles, setStagedDropFiles] = useState<StagedSourceFile[]>([]);
   const [uploadingStagedIds, setUploadingStagedIds] = useState<string[]>([]);
+  const [rightSidebarView, setRightSidebarView] = useState<"summary" | "tree">("summary");
+  const [isRightSidebarAnimating, setIsRightSidebarAnimating] = useState(false);
+  const [isRightSidebarExpanded, setIsRightSidebarExpanded] = useState(false);
+  const stagedDropCountRef = useRef(0);
+  const rightSidebarFlipTimerRef = useRef<number | null>(null);
+
+  const beginRightSidebarFlip = useCallback(() => {
+    setIsRightSidebarAnimating(true);
+    if (rightSidebarFlipTimerRef.current) window.clearTimeout(rightSidebarFlipTimerRef.current);
+    rightSidebarFlipTimerRef.current = window.setTimeout(() => {
+      setIsRightSidebarAnimating(false);
+      rightSidebarFlipTimerRef.current = null;
+    }, RIGHT_SIDEBAR_FLIP_MS);
+  }, []);
+
+  const showRightSidebarPanel = useCallback(
+    (view: "summary" | "tree") => {
+      if (view === rightSidebarView) return;
+      beginRightSidebarFlip();
+      setRightSidebarView(view);
+    },
+    [beginRightSidebarFlip, rightSidebarView]
+  );
+
+  useEffect(
+    () => () => {
+      if (rightSidebarFlipTimerRef.current) window.clearTimeout(rightSidebarFlipTimerRef.current);
+    },
+    []
+  );
 
   const documents = useQuery({
     queryKey: ["documents"],
@@ -425,6 +462,47 @@ export default function KnowledgeBaseCreate() {
 
   const activeDepartments = useMemo(() => filterActiveDepartments(departments.data ?? []), [departments.data]);
   const activeStep = steps[stepIndex];
+
+  const stagedFileTree = useMemo(
+    () =>
+      buildSourceFileTree(
+        stagedDropFiles.map((item) => ({
+          id: item.id,
+          relativePath: item.relativePath,
+          fileSize: item.file.size
+        }))
+      ),
+    [stagedDropFiles]
+  );
+
+  const canFlipRightSidebar =
+    stagedDropFiles.length > 0 && (activeStep.id === "sources" || activeStep.id === "readiness");
+
+  const showRightSidebarExpand = activeStep.id === "sources" || activeStep.id === "readiness";
+
+  useEffect(() => {
+    if (!canFlipRightSidebar) {
+      setRightSidebarView("summary");
+      stagedDropCountRef.current = stagedDropFiles.length;
+      return;
+    }
+
+    if (activeStep.id === "sources" && stagedDropFiles.length > stagedDropCountRef.current) {
+      beginRightSidebarFlip();
+      setRightSidebarView("tree");
+    }
+
+    if (stagedDropFiles.length === 0) {
+      setRightSidebarView("summary");
+    }
+
+    stagedDropCountRef.current = stagedDropFiles.length;
+  }, [activeStep.id, beginRightSidebarFlip, canFlipRightSidebar, stagedDropFiles.length]);
+
+  useEffect(() => {
+    if (!showRightSidebarExpand) setIsRightSidebarExpanded(false);
+  }, [showRightSidebarExpand]);
+
   const activeSidebarIndex = getSidebarActiveIndex(stepIndex);
   const selectedDocuments = useMemo(
     () => (documents.data ?? []).filter((document) => selectedSourceIds.includes(document.id)),
@@ -467,7 +545,7 @@ export default function KnowledgeBaseCreate() {
         const duplicate = next.some(
           (existing) => existing.relativePath === item.relativePath && existing.file.size === item.file.size
         );
-        if (!duplicate) next.push({ id: crypto.randomUUID(), file: item.file, relativePath: item.relativePath });
+        if (!duplicate) next.push({ id: createId(), file: item.file, relativePath: item.relativePath });
       }
       return next;
     });
@@ -642,6 +720,33 @@ export default function KnowledgeBaseCreate() {
   const backStepLabel = stepIndex > 0 ? steps[stepIndex - 1].navLabel : null;
   const nextStepLabel = stepIndex < steps.length - 1 ? steps[stepIndex + 1].navLabel : null;
 
+  const summaryPanelProps = {
+    stepIndex,
+    name,
+    baseKind,
+    department: activeDepartments.find((item) => item.id === departmentId),
+    responsible: platformUsers.data?.find((item) => item.id === responsibleUserId),
+    topic,
+    selectedDocuments,
+    stagedDropCount: stagedDropFiles.length,
+    stagedFileTree,
+    readiness,
+    users: platformUsers.data ?? [],
+    processing,
+    accessMode,
+    accessRules,
+    accessExceptions,
+    defaultAccessLevel,
+    defaultAccessBasis,
+    includeChildren,
+    selectedAgents,
+    warningsCount: warnings.length,
+    onNavigateToStep: (index: number) => {
+      setNavError(null);
+      setStepIndex(index);
+    }
+  };
+
   return (
     <div className={`${styles.page} ${activeStep.id === "sources" ? styles.pageSourcesWide : ""}`}>
       <header className={styles.header}>
@@ -792,33 +897,64 @@ export default function KnowledgeBaseCreate() {
           )}
         </section>
 
-        <aside className={styles.summaryCard}>
-          <Summary
-            stepIndex={stepIndex}
-            name={name}
-            baseKind={baseKind}
-            department={activeDepartments.find((item) => item.id === departmentId)}
-            responsible={platformUsers.data?.find((item) => item.id === responsibleUserId)}
-            topic={topic}
-            selectedDocuments={selectedDocuments}
-            stagedDropCount={stagedDropFiles.length}
-            readiness={readiness}
-            users={platformUsers.data ?? []}
-            processing={processing}
-            accessMode={accessMode}
-            accessRules={accessRules}
-            accessExceptions={accessExceptions}
-            defaultAccessLevel={defaultAccessLevel}
-            defaultAccessBasis={defaultAccessBasis}
-            includeChildren={includeChildren}
-            selectedAgents={selectedAgents}
-            warningsCount={warnings.length}
-            onNavigateToStep={(index) => {
-              setNavError(null);
-              setStepIndex(index);
-            }}
-          />
-        </aside>
+        <div className={styles.summaryCardShell}>
+          <aside
+            className={`${styles.summaryCard} ${canFlipRightSidebar ? styles.summaryCardFlipHost : ""} ${
+              canFlipRightSidebar && rightSidebarView === "tree" ? styles.summaryCardShowingTree : ""
+            } ${isRightSidebarAnimating ? styles.summaryCardAnimating : ""} ${
+              isRightSidebarExpanded ? styles.summaryCardExpanded : ""
+            } ${showRightSidebarExpand || canFlipRightSidebar ? styles.summaryCardWithControls : ""}`.trim()}
+          >
+            {showRightSidebarExpand ? (
+              <button
+                type="button"
+                className={styles.summaryWidthToggle}
+                aria-label={isRightSidebarExpanded ? "Сузить правую панель" : "Развернуть правую панель"}
+                aria-expanded={isRightSidebarExpanded}
+                onClick={() => setIsRightSidebarExpanded((current) => !current)}
+              >
+                <PanelLeft size={18} strokeWidth={2} aria-hidden="true" />
+              </button>
+            ) : null}
+            {canFlipRightSidebar ? (
+              <>
+                <div
+                  className={`${styles.summaryFlipInner} ${rightSidebarView === "tree" ? styles.summaryFlipInnerFlipped : ""}`}
+                >
+                  <div className={styles.summaryFlipFront}>
+                    <Summary {...summaryPanelProps} />
+                  </div>
+                  <div className={styles.summaryFlipBack}>
+                    <SourceTreeSidebarPanel tree={stagedFileTree} />
+                  </div>
+                </div>
+                <div className={styles.summarySidebarFooter}>
+                  {rightSidebarView === "summary" ? (
+                    <button
+                      type="button"
+                      className={styles.summarySidebarNavButton}
+                      onClick={() => showRightSidebarPanel("tree")}
+                    >
+                      <ListTree size={16} strokeWidth={2} aria-hidden="true" />
+                      Структура загрузки ({stagedFileTree.fileCount})
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className={styles.summarySidebarNavButton}
+                      onClick={() => showRightSidebarPanel("summary")}
+                    >
+                      <ClipboardList size={16} strokeWidth={2} aria-hidden="true" />
+                      Сводка
+                    </button>
+                  )}
+                </div>
+              </>
+            ) : (
+              <Summary {...summaryPanelProps} />
+            )}
+          </aside>
+        </div>
       </main>
 
       {createKnowledgeBase.isError && (
@@ -1053,6 +1189,7 @@ function StepSources(props: {
   const ocrCount = props.readiness.filter((item) => item.level === "warning").length;
   const dragDepthRef = useRef(0);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [dropError, setDropError] = useState<string | null>(null);
 
   const handleDragEnter = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -1075,17 +1212,40 @@ function StepSources(props: {
   }, []);
 
   const handleDrop = useCallback(
-    async (event: DragEvent) => {
+    (event: DragEvent) => {
       event.preventDefault();
       event.stopPropagation();
       dragDepthRef.current = 0;
       setIsDragOver(false);
-      if (!event.dataTransfer.files.length && !event.dataTransfer.items?.length) return;
-      const incoming = await collectFilesFromDataTransfer(event.dataTransfer);
-      if (incoming.length) props.onStageIncoming(incoming);
+
+      void (async () => {
+        try {
+          setDropError(null);
+          const incoming = await collectFilesFromDataTransfer(event.dataTransfer);
+          const accepted = incoming.filter((item) => isAcceptedSourceFile(item.file));
+          if (accepted.length) {
+            props.onStageIncoming(accepted);
+          } else if (incoming.length) {
+            setDropError("Нет файлов подходящего формата. Поддерживаются PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT.");
+          } else {
+            setDropError("Не удалось прочитать перетащенные файлы или папку.");
+          }
+        } catch {
+          setDropError("Не удалось обработать перетаскивание");
+        }
+      })();
     },
     [props.onStageIncoming]
   );
+
+  useEffect(() => {
+    const resetDragState = () => {
+      dragDepthRef.current = 0;
+      setIsDragOver(false);
+    };
+    window.addEventListener("dragend", resetDragState);
+    return () => window.removeEventListener("dragend", resetDragState);
+  }, []);
 
   return (
     <div className={styles.stepBody}>
@@ -1202,6 +1362,8 @@ function StepSources(props: {
           </tbody>
         </table>
       </div>
+
+      {dropError ? <p className={styles.createError} role="alert">{dropError}</p> : null}
 
       <div className={styles.sourcesUploadCard}>
         <div className={styles.sourcesUploadLead}>
@@ -1552,7 +1714,7 @@ function StepAccess(props: {
     props.onRulesChange([
       ...props.accessRules,
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         granteeType: subjectType,
         granteeId: canAddOrganization ? null : selectedSubjectId,
         granteeLabel: label,
@@ -1572,7 +1734,7 @@ function StepAccess(props: {
     props.onExceptionsChange([
       ...props.accessExceptions,
       {
-        id: crypto.randomUUID(),
+        id: createId(),
         granteeType: subjectType,
         granteeId: selectedSubjectId,
         granteeLabel: selectedSubjectLabel,
@@ -1914,7 +2076,7 @@ function organizationRule(
   usersCount = 0
 ): AccessRule {
   return {
-    id: crypto.randomUUID(),
+    id: createId(),
     granteeType: "organization",
     granteeId: null,
     granteeLabel: usersCount ? `Все зарегистрированные сотрудники (${usersCount})` : "Все зарегистрированные сотрудники",
@@ -2030,6 +2192,22 @@ function StepPreview(props: {
   );
 }
 
+function SourceTreeSidebarPanel({ tree }: { tree: SourceTreeRoot }) {
+  return (
+    <section className={styles.sourceTreeSidebar} aria-label="Структура загруженных файлов">
+      <div className={styles.sourceTreeHead}>
+        <h3 className={styles.sourceTreeTitle}>Структура загрузки</h3>
+        <p className={styles.sourceTreeMeta}>
+          {tree.fileCount} файлов · {tree.folderCount} папок
+        </p>
+      </div>
+      <div className={styles.sourceTreeBody}>
+        <SourceFileTree tree={tree} defaultExpandAll />
+      </div>
+    </section>
+  );
+}
+
 function Summary(props: {
   stepIndex: number;
   name: string;
@@ -2039,6 +2217,7 @@ function Summary(props: {
   topic: string;
   selectedDocuments: Document[];
   stagedDropCount: number;
+  stagedFileTree: SourceTreeRoot;
   readiness: ReturnType<typeof checkDocumentReadiness>[];
   users: ResponsibleUser[];
   processing: ProcessingSettings;
@@ -2095,6 +2274,7 @@ function Summary(props: {
         rows: [
           ["Выбрано документов", String(props.selectedDocuments.length)],
           ["Новых загрузок", String(props.stagedDropCount)],
+          ["Папок", String(props.stagedFileTree.folderCount)],
           ["Всего файлов", String(props.selectedDocuments.length + props.stagedDropCount)],
           ["Общий размер", formatBytes(selectedSize)]
         ] as [string, string][],
@@ -2163,6 +2343,7 @@ function Summary(props: {
       props.selectedAgents,
       props.selectedDocuments.length,
       props.stagedDropCount,
+      props.stagedFileTree.folderCount,
       props.topic,
       props.warningsCount,
       selectedSize,

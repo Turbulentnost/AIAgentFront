@@ -23,6 +23,10 @@ type FileSystemDirectoryEntryLike = FileSystemEntryLike & {
   };
 };
 
+type SyncDroppedItem =
+  | { kind: "entry"; entry: FileSystemEntryLike }
+  | { kind: "file"; file: File };
+
 function readAllDirectoryEntries(reader: ReturnType<FileSystemDirectoryEntryLike["createReader"]>) {
   return new Promise<FileSystemEntryLike[]>((resolve, reject) => {
     const entries: FileSystemEntryLike[] = [];
@@ -87,39 +91,53 @@ function relativePathFromFile(file: File) {
   return relativePath;
 }
 
-export async function collectDroppedSourceFiles(
-  dataTransfer: DataTransfer,
-  acceptFile: (file: File) => boolean
-): Promise<DroppedSourceFile[]> {
-  const items = [...dataTransfer.items];
-  const results: DroppedSourceFile[] = [];
+function collectSyncItems(dataTransfer: DataTransfer): SyncDroppedItem[] {
+  const syncItems: SyncDroppedItem[] = [];
 
-  if (items.length) {
-    for (const item of items) {
+  if (dataTransfer.items?.length) {
+    for (const item of dataTransfer.items) {
       if (item.kind !== "file") continue;
 
       const entry = (item as DataTransferItem & { webkitGetAsEntry?: () => FileSystemEntryLike | null }).webkitGetAsEntry?.();
       if (entry) {
-        await traverseEntry(entry, "", acceptFile, results);
+        syncItems.push({ kind: "entry", entry });
         continue;
       }
 
       const file = item.getAsFile();
-      if (file && acceptFile(file)) {
-        results.push({ file, relativePath: relativePathFromFile(file) });
-      }
+      if (file) syncItems.push({ kind: "file", file });
     }
-  } else {
-    for (const file of [...dataTransfer.files]) {
-      if (acceptFile(file)) {
-        results.push({ file, relativePath: relativePathFromFile(file) });
-      }
+  }
+
+  if (!syncItems.length && dataTransfer.files?.length) {
+    for (const file of dataTransfer.files) {
+      syncItems.push({ kind: "file", file });
+    }
+  }
+
+  return syncItems;
+}
+
+export async function collectDroppedSourceFiles(
+  dataTransfer: DataTransfer,
+  acceptFile: (file: File) => boolean
+): Promise<DroppedSourceFile[]> {
+  const syncItems = collectSyncItems(dataTransfer);
+  const results: DroppedSourceFile[] = [];
+
+  for (const item of syncItems) {
+    if (item.kind === "entry") {
+      await traverseEntry(item.entry, "", acceptFile, results);
+      continue;
+    }
+    if (acceptFile(item.file)) {
+      results.push({ file: item.file, relativePath: relativePathFromFile(item.file) });
     }
   }
 
   const unique = new Map<string, DroppedSourceFile>();
-  for (const item of results) {
-    unique.set(`${item.relativePath}:${item.file.size}:${item.file.lastModified}`, item);
+  for (const result of results) {
+    unique.set(`${result.relativePath}:${result.file.size}:${result.file.lastModified}`, result);
   }
 
   return [...unique.values()];

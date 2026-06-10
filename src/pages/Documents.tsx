@@ -1,6 +1,7 @@
 import {
   FormEvent,
   useCallback,
+  useEffect,
   useId,
   useRef,
   useState,
@@ -11,6 +12,7 @@ import { CloudUpload, Info, Upload, X } from "lucide-react";
 import { documentsApi } from "@/api/endpoints";
 import { FormSelect } from "@/components/form-controls";
 import { collectDroppedSourceFiles } from "@/utils/collectDroppedEntries";
+import { createId } from "@/utils/createId";
 import type { Document, DocumentProcessingStatus, DocumentType } from "@/types";
 import styles from "./Documents.module.css";
 
@@ -104,7 +106,7 @@ export default function Documents() {
         if (existing.has(key)) continue;
         existing.add(key);
         next.push({
-          id: `${key}-${crypto.randomUUID()}`,
+          id: `${key}-${createId()}`,
           file: entry.file,
           relativePath: entry.relativePath
         });
@@ -135,16 +137,36 @@ export default function Documents() {
   }, []);
 
   const handleDrop = useCallback(
-    async (event: DragEvent) => {
+    (event: DragEvent) => {
       event.preventDefault();
       event.stopPropagation();
       dragDepthRef.current = 0;
       setIsDragOver(false);
-      const dropped = await collectDroppedSourceFiles(event.dataTransfer, isAcceptedFile);
-      if (dropped.length) stageDroppedEntries(dropped);
+
+      void (async () => {
+        try {
+          const dropped = await collectDroppedSourceFiles(event.dataTransfer, isAcceptedFile);
+          if (dropped.length) {
+            stageDroppedEntries(dropped);
+          } else {
+            setError("Нет подходящих файлов. Поддерживаются PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT.");
+          }
+        } catch {
+          setError("Не удалось обработать перетаскивание");
+        }
+      })();
     },
     [stageDroppedEntries]
   );
+
+  useEffect(() => {
+    const resetDragState = () => {
+      dragDepthRef.current = 0;
+      setIsDragOver(false);
+    };
+    window.addEventListener("dragend", resetDragState);
+    return () => window.removeEventListener("dragend", resetDragState);
+  }, []);
 
   const removeStaged = useCallback((id: string) => {
     setStagedFiles((current) => current.filter((item) => item.id !== id));
