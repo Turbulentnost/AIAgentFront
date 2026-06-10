@@ -1,18 +1,21 @@
-import React, { FormEvent, useEffect, useMemo, useState } from "react";
+import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  Bot,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Database,
   FileText,
   Filter,
   Layers3,
   LockKeyhole,
   Circle,
-  Play,
   Plus,
   RefreshCw,
   Search,
+  Send,
   ShieldCheck,
   Square,
   Trash2,
@@ -551,10 +554,6 @@ function DetailTabContent(props: {
     onTabChange
   } = props;
 
-  const [testQuery, setTestQuery] = useState("");
-  const [testTopK, setTestTopK] = useState(5);
-  const [testHits, setTestHits] = useState<KnowledgeBaseSearchHit[]>([]);
-  const [testPreview, setTestPreview] = useState<string | null>(null);
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [chunkFilter, setChunkFilter] = useState<"all" | "excluded" | "errors" | "ocr">("all");
   const [newRuleText, setNewRuleText] = useState("");
@@ -581,13 +580,6 @@ function DetailTabContent(props: {
     enabled: tab === "indexing" && Boolean(activeJob?.id)
   });
 
-  const testSearch = useMutation({
-    mutationFn: (query: string) => knowledgeBasesApi.testSearch(knowledgeBase.id, { query, top_k: testTopK }),
-    onSuccess: (result) => {
-      setTestHits(result.hits);
-      setTestPreview(result.answer_preview);
-    }
-  });
   const retryError = useMutation({
     mutationFn: (errorId: string) => knowledgeBasesApi.retryIndexingError(errorId),
     onSuccess: () => {
@@ -972,64 +964,7 @@ function DetailTabContent(props: {
           </div>
         ) : null}
         {!canTestSearch ? <div className={styles.statusCallout}>{testSearchPlaceholder}</div> : null}
-        <form
-          className={styles.testSearchForm}
-          onSubmit={(event: FormEvent<HTMLFormElement>) => {
-            event.preventDefault();
-            if (testQuery.trim() && canTestSearch) testSearch.mutate(testQuery.trim());
-          }}
-        >
-          <input
-            value={testQuery}
-            onChange={(event) => setTestQuery(event.target.value)}
-            placeholder={canTestSearch ? "Введите тестовый вопрос для проверки фрагментов" : testSearchPlaceholder}
-            disabled={!canTestSearch}
-          />
-          <label>
-            Результатов
-            <select value={testTopK} onChange={(event) => setTestTopK(Number(event.target.value))} disabled={!canTestSearch}>
-              {[3, 5, 10, 15].map((value) => (
-                <option key={value} value={value}>{value}</option>
-              ))}
-            </select>
-          </label>
-          <button type="submit" disabled={!canTestSearch || testSearch.isPending}>
-            <Play size={15} />
-            Проверить
-          </button>
-        </form>
-        {testHits.length > 0 ? (
-          <section className={styles.testHitsSection}>
-            <h3 className={styles.sectionTitle}>Найденные фрагменты</h3>
-            {testHits.map((hit) => (
-              <article key={hit.knowledge_base_chunk_id || hit.chunk_id || hit.content.slice(0, 20)} className={styles.testHitCard}>
-                <header>
-                  <strong>{hit.document_title || "Источник"}</strong>
-                  <span>Релевантность {formatRelevance(hit.score)}</span>
-                </header>
-                <div className={styles.testHitMeta}>
-                  <span>Стр. {hit.page_number ?? "—"}</span>
-                  <span>{hit.section_title || "Раздел не указан"}</span>
-                  <span>{hit.clause_number ? `П. ${hit.clause_number}` : "Пункт не указан"}</span>
-                  <span>
-                    {hit.accessible
-                      ? "Доступен"
-                      : `В рабочем поиске недоступен (${hit.access_reason}); текст показан для проверки`}
-                  </span>
-                </div>
-                <p className={styles.testHitContent}>{highlightSearchTerms(hit.content, testQuery)}</p>
-              </article>
-            ))}
-          </section>
-        ) : null}
-        {testPreview ? (
-          <section className={styles.answerPreviewCard}>
-            <h3 className={styles.sectionTitle}>Предварительный ответ</h3>
-            <p className={styles.answerPreview}>{testPreview}</p>
-            <small>Ответ сформирован только на основании найденных фрагментов.</small>
-          </section>
-        ) : null}
-        {testSearch.isSuccess && !testHits.length ? <div className={styles.emptyState}>Фрагменты не найдены.</div> : null}
+        <SearchChat key={knowledgeBase.id} knowledgeBaseId={knowledgeBase.id} canSearch={canTestSearch} />
       </div>
     );
   }
@@ -1283,6 +1218,178 @@ function testSearchPlaceholderText(kb: KnowledgeBaseListItem, indexingActive: bo
   if (indexingActive && (kb.fragments_count ?? 0) === 0) return "Тест поиска временно недоступен: выполняется первая индексация.";
   if (kb.status === "archived") return "Тест поиска недоступен для архивной базы знаний.";
   return "Тест поиска недоступен для текущего статуса.";
+}
+
+type SearchChatTurn = {
+  id: string;
+  question: string;
+  status: "pending" | "done" | "error";
+  answer?: string | null;
+  hits?: KnowledgeBaseSearchHit[];
+};
+
+function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; canSearch: boolean }) {
+  const [turns, setTurns] = useState<SearchChatTurn[]>([]);
+  const [draft, setDraft] = useState("");
+  const [topK, setTopK] = useState(5);
+  const threadRef = useRef<HTMLDivElement | null>(null);
+  const pending = turns.some((turn) => turn.status === "pending");
+
+  useEffect(() => {
+    const node = threadRef.current;
+    if (node) node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
+  }, [turns]);
+
+  const ask = async (question: string) => {
+    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    setTurns((prev) => [...prev, { id, question, status: "pending" }]);
+    try {
+      const result = await knowledgeBasesApi.testSearch(knowledgeBaseId, { query: question, top_k: topK });
+      setTurns((prev) =>
+        prev.map((turn) =>
+          turn.id === id ? { ...turn, status: "done" as const, answer: result.answer_preview, hits: result.hits } : turn
+        )
+      );
+    } catch {
+      setTurns((prev) => prev.map((turn) => (turn.id === id ? { ...turn, status: "error" as const } : turn)));
+    }
+  };
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const question = draft.trim();
+    if (!question || !canSearch || pending) return;
+    setDraft("");
+    void ask(question);
+  };
+
+  return (
+    <section className={styles.chatPanel}>
+      <div className={styles.chatThread} ref={threadRef}>
+        {turns.length === 0 ? (
+          <div className={styles.chatEmpty}>
+            <Bot size={28} />
+            <p>Задайте вопрос по содержимому базы знаний — найду подходящие фрагменты и сформирую краткий ответ с источниками.</p>
+          </div>
+        ) : null}
+        {turns.map((turn) => (
+          <div key={turn.id} className={styles.chatTurn}>
+            <div className={styles.chatUserMsg}>{turn.question}</div>
+            <div className={styles.chatBotRow}>
+              <span className={styles.chatBotAvatar}>
+                <Bot size={15} />
+              </span>
+              <div className={styles.chatBotMsg}>
+                {turn.status === "pending" ? (
+                  <span className={styles.chatTyping}>
+                    Ищу фрагменты и формирую ответ
+                    <span className={styles.chatTypingDots}>
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  </span>
+                ) : null}
+                {turn.status === "error" ? <span>Не удалось выполнить поиск. Попробуйте ещё раз.</span> : null}
+                {turn.status === "done" ? (
+                  <>
+                    <p className={styles.chatAnswer}>
+                      {turn.answer || (turn.hits?.length ? "Готового ответа нет — посмотрите найденные фрагменты." : "По этому вопросу ничего не нашлось в базе знаний.")}
+                    </p>
+                    {turn.hits && turn.hits.length > 0 ? <FragmentsDisclosure hits={turn.hits} query={turn.question} /> : null}
+                    <small className={styles.chatDisclaimer}>Ответ сформирован только на основании найденных фрагментов.</small>
+                  </>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <form className={styles.chatComposer} onSubmit={submit}>
+        <input
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder={canSearch ? "Спросите что-нибудь по базе знаний…" : "Поиск недоступен"}
+          disabled={!canSearch || pending}
+        />
+        <select
+          value={topK}
+          onChange={(event) => setTopK(Number(event.target.value))}
+          disabled={!canSearch}
+          title="Сколько фрагментов искать"
+        >
+          {[3, 5, 10, 15].map((value) => (
+            <option key={value} value={value}>{value} фр.</option>
+          ))}
+        </select>
+        <button type="submit" disabled={!canSearch || pending || !draft.trim()} title="Отправить">
+          <Send size={15} />
+        </button>
+      </form>
+    </section>
+  );
+}
+
+function FragmentsDisclosure({ hits, query }: { hits: KnowledgeBaseSearchHit[]; query: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className={styles.fragmentsBlock}>
+      <button type="button" className={styles.fragmentsPill} onClick={() => setOpen((value) => !value)}>
+        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        <Layers3 size={13} />
+        {hits.length} {fragmentsLabel(hits.length)}
+      </button>
+      {open ? (
+        <div className={styles.fragmentsList}>
+          {hits.map((hit, index) => (
+            <FragmentCard
+              key={hit.knowledge_base_chunk_id || hit.chunk_id || `${index}-${hit.content.slice(0, 16)}`}
+              hit={hit}
+              index={index + 1}
+              query={query}
+            />
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function FragmentCard({ hit, index, query }: { hit: KnowledgeBaseSearchHit; index: number; query: string }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <article className={styles.fragmentCard}>
+      <button type="button" className={styles.fragmentHead} onClick={() => setExpanded((value) => !value)}>
+        <span className={styles.fragmentIndex}>{index}</span>
+        <strong>{hit.document_title || "Источник"}</strong>
+        <span className={styles.fragmentScore}>{formatRelevance(hit.score)}</span>
+        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+      </button>
+      <p className={expanded ? styles.fragmentTextFull : styles.fragmentTextClamp}>
+        {highlightSearchTerms(hit.content, query)}
+      </p>
+      {expanded ? (
+        <div className={styles.fragmentMeta}>
+          <span>Стр. {hit.page_number ?? "—"}</span>
+          <span>{hit.section_title || "Раздел не указан"}</span>
+          <span>{hit.clause_number ? `П. ${hit.clause_number}` : "Пункт не указан"}</span>
+          <span>
+            {hit.accessible
+              ? "Доступен в рабочем поиске"
+              : `В рабочем поиске недоступен (${hit.access_reason}); текст показан для проверки`}
+          </span>
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function fragmentsLabel(count: number): string {
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return "фрагмент";
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return "фрагмента";
+  return "фрагментов";
 }
 
 function highlightSearchTerms(content: string, query: string): React.ReactNode {
