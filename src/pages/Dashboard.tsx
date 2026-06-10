@@ -12,11 +12,11 @@ import {
   TriangleAlert,
   UserRound
 } from "lucide-react";
-import { useState, useMemo, type MouseEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
-import { useAuth } from "@/auth/AuthContext";
+import { useMemo, useState, type MouseEvent } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { agentsApi } from "@/api/endpoints";
+import { useAuth } from "@/auth/AuthContext";
 import {
   dashboardActivities,
   dashboardStats,
@@ -94,7 +94,16 @@ const agentStatusLabels: Record<AgentStatus, string> = {
 function getAgentLaunchIcon(agent: AgentAccess): QuickLaunchAgent["icon"] {
   const key = `${agent.slug} ${agent.name} ${agent.purpose ?? ""}`.toLowerCase();
   if (key.includes("tender") || key.includes("тендер") || key.includes("закуп")) return "chart";
-  if (key.includes("kd") || key.includes("td") || key.includes("кд") || key.includes("документ")) return "documents";
+  if (
+    key.includes("kd") ||
+    key.includes("td") ||
+    key.includes("кд") ||
+    key.includes("нд") ||
+    key.includes("document") ||
+    key.includes("документ")
+  ) {
+    return "documents";
+  }
   return "clipboard";
 }
 
@@ -111,7 +120,7 @@ export default function Dashboard() {
   const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
 
   const agentsQuery = useQuery({
-    queryKey: ["agents", "available", "dashboard"],
+    queryKey: ["agents", "available"],
     queryFn: agentsApi.available
   });
 
@@ -176,11 +185,11 @@ export default function Dashboard() {
       <section className={styles.quickLaunch} aria-labelledby="quick-launch-title">
         <h2 id="quick-launch-title">Быстрый запуск</h2>
         {agentsQuery.isPending ? (
-          <p className={styles.launchEmpty}>Загружаем агентов...</p>
+          <div className={styles.launchState}>Загружаем доступных агентов...</div>
         ) : agentsQuery.isError ? (
-          <p className={styles.launchEmpty}>Не удалось загрузить агентов</p>
+          <div className={styles.launchState}>Не удалось загрузить список агентов.</div>
         ) : !launchAgents.length ? (
-          <p className={styles.launchEmpty}>Нет доступных агентов для запуска.</p>
+          <div className={styles.launchState}>У вас пока нет доступных агентов.</div>
         ) : (
           <div className={styles.launchGrid}>
             {launchAgents.map((agent) => {

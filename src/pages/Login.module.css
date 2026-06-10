@@ -836,6 +836,17 @@
   text-align: center;
 }
 
+.corporateHint {
+  margin: 0;
+  padding: 0.75rem 0.875rem;
+  color: var(--login-blue);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+  background: var(--color-login-hover);
+  border: 1px solid var(--color-login-card-border);
+  border-radius: 0.625rem;
+}
+
 @keyframes neonCurrent {
   0%,
   13% {

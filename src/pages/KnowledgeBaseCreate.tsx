@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -33,16 +33,7 @@ import {
   X
 } from "lucide-react";
 import { isAxiosError } from "axios";
-import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, usersApi } from "@/api/endpoints";
-import {
-  AccessAdminsIcon,
-  AccessAgentsIcon,
-  AccessDepartmentsIcon,
-  AccessMixedIcon,
-  AccessUsersIcon
-} from "@/components/AccessModeIcons";
-import { collectDroppedSourceFiles } from "@/utils/collectDroppedEntries";
-import { buildSourceFileTree, type SourceTreeRoot } from "@/utils/sourceFileTree";
+import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, rolesApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
 import DepartmentTransferList from "@/components/DepartmentTransferList";
@@ -56,14 +47,55 @@ import type {
   KnowledgeBaseAccessType,
   KnowledgeBaseAgentAccessMode,
   KnowledgeBaseCreate,
-  User
+  ResponsibleUser,
+  Role
 } from "@/types";
 import { filterActiveDepartments } from "@/utils/departments";
+import {
+  collectFilesFromDataTransfer,
+  collectFilesFromFileList,
+  titleFromRelativePath,
+  type FolderUploadFile
+} from "@/utils/folderUpload";
 import styles from "./KnowledgeBaseCreate.module.css";
 
 type StepId = "main" | "sources" | "readiness" | "processing" | "access" | "agents" | "preview";
 type BaseKind = "normative" | "technical" | "project" | "contract" | "process";
-type AccessMode = "users" | "departments" | "mixed" | "admins" | "agents";
+type AccessMode = "admins" | "everyone" | "departments" | "users" | "roles" | "mixed";
+type AccessSubjectType = "organization" | "department" | "user" | "role";
+type AccessTermMode = "forever" | "until";
+type AccessBasis =
+  | "process_owner"
+  | "order"
+  | "project"
+  | "task"
+  | "job_duties"
+  | "admin_assignment"
+  | "ope_testing"
+  | "other";
+
+interface AccessRule {
+  id: string;
+  granteeType: AccessSubjectType;
+  granteeId: string | null;
+  granteeLabel: string;
+  level: KnowledgeBaseAccessType;
+  basis: AccessBasis;
+  comment: string;
+  termMode: AccessTermMode;
+  expiresAt: string;
+  includeChildren: boolean;
+}
+
+interface AccessExceptionRule {
+  id: string;
+  granteeType: Exclude<AccessSubjectType, "organization">;
+  granteeId: string;
+  granteeLabel: string;
+  reason: string;
+  termMode: AccessTermMode;
+  expiresAt: string;
+}
 
 type ProcessingMode = "standard" | "advanced";
 
@@ -182,8 +214,9 @@ const sidebarSteps = [
   { label: "Основные сведения", hint: "Информация о базе знаний", stepIndexes: [0] },
   { label: "Источники", hint: "Выбор документов и файлов", stepIndexes: [1, 2] },
   { label: "Обработка", hint: "Извлечение и индексация", stepIndexes: [3] },
-  { label: "Доступ и агенты", hint: "Права и подключение", stepIndexes: [4] },
-  { label: "Проверка и создание", hint: "Итоговая проверка", stepIndexes: [5] }
+  { label: "Доступ пользователей", hint: "Права пользователей", stepIndexes: [4] },
+  { label: "Подключение агентов", hint: "Доступ агентов к базе", stepIndexes: [5] },
+  { label: "Проверка и создание", hint: "Итоговая проверка", stepIndexes: [6] }
 ] as const;
 
 const steps: { id: StepId; label: string; hint: string; navLabel: string }[] = [
@@ -191,7 +224,8 @@ const steps: { id: StepId; label: string; hint: string; navLabel: string }[] = [
   { id: "sources", label: "Источники", hint: "Выбор документов и файлов", navLabel: "Выбор источников" },
   { id: "readiness", label: "Источники", hint: "Проверка готовности документов", navLabel: "Проверка готовности" },
   { id: "processing", label: "Обработка", hint: "Извлечение и индексация", navLabel: "Обработка" },
-  { id: "access", label: "Доступ и агенты", hint: "Права и подключение", navLabel: "Доступ и агенты" },
+  { id: "access", label: "Доступ пользователей", hint: "Права пользователей", navLabel: "Настройка доступа" },
+  { id: "agents", label: "Подключение агентов", hint: "Подключение ИИ-агентов", navLabel: "Подключение агентов" },
   { id: "preview", label: "Проверка и создание", hint: "Итоговая проверка", navLabel: "Проверка и создание" }
 ];
 
@@ -286,13 +320,61 @@ const accessModeOptions: {
 ];
 
 const accessLabels: Record<KnowledgeBaseAccessType, string> = {
-  read: "Чтение",
+  read: "Просмотр карточки",
   search: "Поиск",
-  use_via_agent: "Использование через агента",
+  use_via_agent: "Поиск и цитирование",
   manage_sources: "Управление источниками",
   reindex: "Переиндексация",
   manage_access: "Управление доступом",
-  admin: "Администрирование"
+  admin: "Администратор базы"
+};
+
+const mainAccessLevels: KnowledgeBaseAccessType[] = ["read", "search", "use_via_agent"];
+const advancedAccessLevels: KnowledgeBaseAccessType[] = ["manage_sources", "reindex", "manage_access", "admin"];
+
+const accessModeDescriptions: Record<AccessMode, { title: string; text: string }> = {
+  admins: {
+    title: "Только владелец и администраторы",
+    text: "База еще не готова или содержит чувствительные данные."
+  },
+  everyone: {
+    title: "Все сотрудники организации",
+    text: "Корпоративная база для общих регламентов, инструкций и шаблонов."
+  },
+  departments: {
+    title: "Выбранные подразделения",
+    text: "База относится к конкретному процессу или службе."
+  },
+  users: {
+    title: "Выбранные пользователи",
+    text: "Точечный доступ отдельным сотрудникам."
+  },
+  roles: {
+    title: "Роли",
+    text: "Типовые права для руководителей, согласующих, аудиторов."
+  },
+  mixed: {
+    title: "Смешанный доступ",
+    text: "Комбинация подразделений, пользователей, ролей и исключений."
+  }
+};
+
+const accessBasisLabels: Record<AccessBasis, string> = {
+  process_owner: "Владелец процесса",
+  order: "Приказ / распоряжение",
+  project: "Проект",
+  task: "Задача / поручение",
+  job_duties: "Должностные обязанности",
+  admin_assignment: "Административное назначение",
+  ope_testing: "ОПЭ / тестирование",
+  other: "Другое"
+};
+
+const subjectTypeLabels: Record<AccessSubjectType, string> = {
+  organization: "Общий доступ",
+  department: "Подразделение",
+  user: "Пользователь",
+  role: "Роль"
 };
 
 const agentModeLabels: Record<KnowledgeBaseAgentAccessMode, string> = {
@@ -324,7 +406,8 @@ const defaultProcessing: ProcessingSettings = {
 export default function KnowledgeBaseCreate() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isAuthenticated, isLoading: authLoading } = useAuth();
+  const canLoadReferenceData = isAuthenticated && !authLoading;
   const [stepIndex, setStepIndex] = useState(0);
   const [navError, setNavError] = useState<string | null>(null);
   const [name, setName] = useState("");
@@ -342,11 +425,14 @@ export default function KnowledgeBaseCreate() {
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [processing, setProcessing] = useState<ProcessingSettings>(defaultProcessing);
   const [accessMode, setAccessMode] = useState<AccessMode>("departments");
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
-  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<string[]>([]);
-  const [accessType, setAccessType] = useState<KnowledgeBaseAccessType>("search");
+  const [defaultAccessLevel, setDefaultAccessLevel] = useState<KnowledgeBaseAccessType>("search");
+  const [defaultAccessBasis, setDefaultAccessBasis] = useState<AccessBasis>("process_owner");
+  const [accessComment, setAccessComment] = useState("");
+  const [accessTermMode, setAccessTermMode] = useState<AccessTermMode>("forever");
+  const [accessExpiresAt, setAccessExpiresAt] = useState("");
   const [includeChildren, setIncludeChildren] = useState(true);
-  const [accessReason, setAccessReason] = useState("");
+  const [accessRules, setAccessRules] = useState<AccessRule[]>([]);
+  const [accessExceptions, setAccessExceptions] = useState<AccessExceptionRule[]>([]);
   const [selectedAgents, setSelectedAgents] = useState<Record<string, KnowledgeBaseAgentAccessMode>>({});
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState("");
@@ -384,14 +470,40 @@ export default function KnowledgeBaseCreate() {
     []
   );
 
-  const documents = useQuery({ queryKey: ["documents"], queryFn: documentsApi.list });
-  const departments = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
-  const usersQuery = useQuery({
-    queryKey: ["users"],
-    queryFn: () => usersApi.list({ limit: 1000, offset: 0 }),
-    enabled: Boolean(currentUser?.is_superuser)
+  const documents = useQuery({
+    queryKey: ["documents"],
+    queryFn: documentsApi.list,
+    enabled: canLoadReferenceData
   });
-  const agents = useQuery({ queryKey: ["agents", "available"], queryFn: agentsApi.available });
+  const departments = useQuery({
+    queryKey: ["departments"],
+    queryFn: departmentsApi.list,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
+  const users = useQuery({
+    queryKey: ["users", "responsible-candidates"],
+    queryFn: usersApi.listResponsibleCandidates,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
+  const responsibleCandidates = useQuery({
+    queryKey: ["knowledge-bases", "responsible-users"],
+    queryFn: knowledgeBasesApi.listResponsibleUsers,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
+  const agents = useQuery({
+    queryKey: ["agents", "available"],
+    queryFn: agentsApi.available,
+    enabled: canLoadReferenceData
+  });
+  const roles = useQuery({
+    queryKey: ["roles"],
+    queryFn: rolesApi.list,
+    enabled: canLoadReferenceData,
+    staleTime: 5 * 60 * 1000
+  });
 
   useEffect(() => {
     if (!currentUser || responsibleUserId) return;
@@ -480,32 +592,27 @@ export default function KnowledgeBaseCreate() {
     }
   });
 
-  const stageDroppedEntries = useCallback((entries: Array<{ file: File; relativePath: string }>) => {
-    if (!entries.length) return;
+  const stageIncomingFiles = useCallback((incoming: FolderUploadFile[]) => {
+    const accepted = incoming.filter((item) => isAcceptedSourceFile(item.file));
+    if (!accepted.length) return;
     setStagedDropFiles((current) => {
       const next = [...current];
-      for (const entry of entries) {
+      for (const item of accepted) {
         const duplicate = next.some(
-          (item) => item.relativePath === entry.relativePath && item.file.size === entry.file.size
+          (existing) => existing.relativePath === item.relativePath && existing.file.size === item.file.size
         );
-        if (!duplicate) {
-          next.push({ id: crypto.randomUUID(), file: entry.file, relativePath: entry.relativePath });
-        }
+        if (!duplicate) next.push({ id: crypto.randomUUID(), file: item.file, relativePath: item.relativePath });
       }
       return next;
     });
   }, []);
 
-  const stageDropFiles = useCallback((files: FileList | File[]) => {
-    stageDroppedEntries(
-      [...files]
-        .filter(isAcceptedSourceFile)
-        .map((file) => ({
-          file,
-          relativePath: (file as File & { webkitRelativePath?: string }).webkitRelativePath || file.name
-        }))
-    );
-  }, [stageDroppedEntries]);
+  const stageDropFiles = useCallback(
+    (files: FileList | File[]) => {
+      stageIncomingFiles(collectFilesFromFileList(files));
+    },
+    [stageIncomingFiles]
+  );
 
   const removeStagedFile = useCallback((id: string) => {
     setStagedDropFiles((current) => current.filter((item) => item.id !== id));
@@ -517,8 +624,12 @@ export default function KnowledgeBaseCreate() {
       if (!staged || uploadingStagedIds.includes(id)) return;
       setUploadingStagedIds((ids) => [...ids, id]);
       try {
-        const title = staged.file.name.replace(/\.[^.]+$/, "") || staged.file.name;
-        const document = await documentsApi.upload(staged.file, { title, document_type: "other" });
+        const title = titleFromRelativePath(staged.relativePath);
+        const document = await documentsApi.upload(staged.file, {
+          title,
+          document_type: "other",
+          relative_path: staged.relativePath
+        });
         setSelectedSourceIds((ids) => [...new Set([...ids, document.id])]);
         setStagedDropFiles((current) => current.filter((item) => item.id !== id));
         await queryClient.invalidateQueries({ queryKey: ["documents"] });
@@ -538,6 +649,10 @@ export default function KnowledgeBaseCreate() {
   const createKnowledgeBase = useMutation({
     mutationFn: async ({ startIndexing }: { startIndexing: boolean }) => {
       const created = await knowledgeBasesApi.create(buildCreatePayload());
+      await knowledgeBasesApi.updateAccess(created.id, {
+        grants: buildAccessGrants(),
+        exceptions: buildAccessExceptions()
+      });
       const agentPayload = Object.entries(selectedAgents).map(([agentId, accessMode]) => ({
         agent_id: agentId,
         access_mode: accessMode,
@@ -547,9 +662,10 @@ export default function KnowledgeBaseCreate() {
       if (startIndexing) await knowledgeBasesApi.index(created.id, { job_type: "full" });
       return created;
     },
-    onSuccess: async (created) => {
+    onSuccess: async (created, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      navigate(`/knowledge-base?kb=${created.id}`);
+      const suffix = variables.startIndexing ? "&tab=indexing" : "";
+      navigate(`/knowledge-base?kb=${created.id}${suffix}`);
     }
   });
 
@@ -565,7 +681,7 @@ export default function KnowledgeBaseCreate() {
       responsible_user_id: optionalUuid(responsibleUserId),
       topic: trimmedTopic || null,
       process_slug: trimmedTopic ? trimmedTopic.toLowerCase().replace(/\s+/g, "-") : null,
-      access_grants: buildAccessGrants(),
+      access_grants: [ownerAdminGrant()],
       source_document_ids: selectedSourceIds,
       embedding_model: getEmbeddingModelApiValue(processing.embeddingModel),
       metadata: {
@@ -580,34 +696,39 @@ export default function KnowledgeBaseCreate() {
 
   function buildAccessGrants() {
     if (accessMode === "admins") {
-      return [{ grantee_type: "admin_only" as const, grantee_id: null, access_type: "admin" as const, reason: accessReason || "Только администраторы" }];
+      return [ownerAdminGrant()];
     }
-    const grants = [];
-    if (accessMode === "users" || accessMode === "mixed") {
-      grants.push(
-        ...selectedUserIds.map((userId) => ({
-          grantee_type: "user" as const,
-          grantee_id: userId,
-          access_type: accessType,
-          reason: accessReason || "Доступ к базе знаний"
-        }))
-      );
-    }
-    if (accessMode === "departments" || accessMode === "mixed") {
-      grants.push(
-        ...selectedDepartmentIds.map((deptId) => ({
-          grantee_type: "department" as const,
-          grantee_id: deptId,
-          access_type: accessType,
-          include_child_departments: includeChildren,
-          reason: accessReason || "Доступ подразделения к базе знаний"
-        }))
-      );
-    }
-    if (accessMode === "agents") {
-      grants.push({ grantee_type: "admin_only" as const, grantee_id: null, access_type: "admin" as const, reason: "База доступна только выбранным агентам с учетом прав пользователя" });
-    }
-    return grants.length ? grants : [{ grantee_type: "admin_only" as const, grantee_id: null, access_type: "admin" as const, reason: "Черновик без расширенного доступа" }];
+    const grants = accessRules.map((rule) => ({
+      grantee_type: rule.granteeType,
+      grantee_id: rule.granteeId,
+      access_type: rule.level,
+      include_child_departments: rule.granteeType === "department" ? rule.includeChildren : false,
+      expires_at: rule.termMode === "until" && rule.expiresAt ? new Date(rule.expiresAt).toISOString() : null,
+      reason: accessBasisLabels[rule.basis],
+      comment: rule.comment || null
+    }));
+    return grants.length ? grants : [ownerAdminGrant()];
+  }
+
+  function buildAccessExceptions() {
+    return accessExceptions.map((exception) => ({
+      grantee_type: exception.granteeType,
+      grantee_id: exception.granteeId,
+      access_type: defaultAccessLevel,
+      is_deny: true,
+      expires_at: exception.termMode === "until" && exception.expiresAt ? new Date(exception.expiresAt).toISOString() : null,
+      reason: exception.reason || "Исключение доступа",
+      comment: null
+    }));
+  }
+
+  function ownerAdminGrant() {
+    return {
+      grantee_type: "admin_only" as const,
+      grantee_id: null,
+      access_type: "admin" as const,
+      reason: "Только владелец и администраторы"
+    };
   }
 
   function getStepValidationMessage(step: StepId) {
@@ -620,12 +741,11 @@ export default function KnowledgeBaseCreate() {
     }
     if (step === "sources") return selectedSourceIds.length > 0 ? null : "Выберите хотя бы один документ-источник.";
     if (step === "access") {
-      if (accessMode === "users" && selectedUserIds.length === 0) return "Выберите пользователей с доступом к базе.";
-      if (accessMode === "departments" && selectedDepartmentIds.length === 0) return "Выберите подразделения с доступом к базе.";
-      if (accessMode === "mixed" && selectedDepartmentIds.length === 0 && selectedUserIds.length === 0) {
-        return "Выберите пользователей или подразделения с доступом к базе.";
-      }
-      if (accessMode === "agents" && Object.keys(selectedAgents).length === 0) return "Подключите хотя бы одного ИИ-агента.";
+      if (accessMode === "admins" || accessMode === "everyone") return null;
+      if (accessMode === "departments" && !accessRules.some((rule) => rule.granteeType === "department")) return "Добавьте подразделение в правила доступа.";
+      if (accessMode === "users" && !accessRules.some((rule) => rule.granteeType === "user")) return "Добавьте пользователя в правила доступа.";
+      if (accessMode === "roles" && !accessRules.some((rule) => rule.granteeType === "role")) return "Добавьте роль в правила доступа.";
+      if (accessMode === "mixed" && accessRules.length === 0) return "Добавьте хотя бы одно правило доступа.";
     }
     return null;
   }
@@ -717,8 +837,11 @@ export default function KnowledgeBaseCreate() {
               topic={topic}
               comment={comment}
               departments={activeDepartments}
-              users={usersQuery.data ?? []}
-              currentUserId={currentUser?.id}
+              departmentsLoading={departments.isPending}
+              departmentsError={departments.isError}
+              responsibleUsers={responsibleCandidates.data ?? []}
+              responsibleUsersLoading={responsibleCandidates.isPending}
+              responsibleUsersError={responsibleCandidates.isError}
               onName={setName}
               onDescription={setDescription}
               onBaseKind={setBaseKind}
@@ -756,7 +879,7 @@ export default function KnowledgeBaseCreate() {
               stagedFiles={stagedDropFiles}
               uploadingStagedIds={uploadingStagedIds}
               onStageFiles={stageDropFiles}
-              onStageDroppedEntries={stageDroppedEntries}
+              onStageIncoming={stageIncomingFiles}
               onRemoveStaged={removeStagedFile}
               onUploadStaged={uploadStagedFile}
               onUploadAllStaged={uploadAllStagedFiles}
@@ -767,18 +890,27 @@ export default function KnowledgeBaseCreate() {
           {activeStep.id === "access" && (
             <StepAccess
               accessMode={accessMode}
-              accessReason={accessReason}
-              users={usersQuery.data ?? []}
+              defaultAccessLevel={defaultAccessLevel}
+              defaultAccessBasis={defaultAccessBasis}
+              accessComment={accessComment}
+              accessTermMode={accessTermMode}
+              accessExpiresAt={accessExpiresAt}
+              includeChildren={includeChildren}
+              users={users.data ?? []}
               departments={activeDepartments}
-              agents={agents.data ?? []}
-              selectedUserIds={selectedUserIds}
-              selectedDepartmentIds={selectedDepartmentIds}
-              selectedAgents={selectedAgents}
+              roles={roles.data ?? []}
+              accessRules={accessRules}
+              accessExceptions={accessExceptions}
+              selectedDocuments={selectedDocuments}
               onMode={setAccessMode}
-              onReason={setAccessReason}
-              onSelectedDepartments={setSelectedDepartmentIds}
-              onToggleUser={(id) => setSelectedUserIds((ids) => (ids.includes(id) ? ids.filter((item) => item !== id) : [...ids, id]))}
-              onChangeAgents={setSelectedAgents}
+              onDefaultAccessLevel={setDefaultAccessLevel}
+              onDefaultAccessBasis={setDefaultAccessBasis}
+              onAccessComment={setAccessComment}
+              onAccessTermMode={setAccessTermMode}
+              onAccessExpiresAt={setAccessExpiresAt}
+              onIncludeChildren={setIncludeChildren}
+              onRulesChange={setAccessRules}
+              onExceptionsChange={setAccessExceptions}
             />
           )}
           {activeStep.id === "preview" && (
@@ -787,120 +919,47 @@ export default function KnowledgeBaseCreate() {
               description={description}
               baseKind={baseKind}
               department={activeDepartments.find((item) => item.id === departmentId)}
-              responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
-              users={usersQuery.data ?? []}
+              responsible={responsibleCandidates.data?.find((item) => item.id === responsibleUserId)}
+              users={users.data ?? []}
               topic={topic}
               selectedDocuments={selectedDocuments}
               processing={processing}
               accessMode={accessMode}
-              selectedUserIds={selectedUserIds}
-              selectedDepartmentIds={selectedDepartmentIds}
+              accessRules={accessRules}
+              accessExceptions={accessExceptions}
               selectedAgents={selectedAgents}
               warnings={warnings}
             />
           )}
         </section>
 
-        {!isAccessStep ? (
-        <div className={styles.summaryCardShell}>
-          <aside
-            className={`${styles.summaryCard} ${canFlipRightSidebar ? styles.summaryCardFlipHost : ""} ${
-              canFlipRightSidebar && rightSidebarView === "tree" ? styles.summaryCardShowingTree : ""
-            } ${isRightSidebarAnimating ? styles.summaryCardAnimating : ""} ${
-              isRightSidebarExpanded ? styles.summaryCardExpanded : ""
-            } ${showRightSidebarExpand || canFlipRightSidebar ? styles.summaryCardWithControls : ""}`.trim()}
-          >
-            {showRightSidebarWidthToggle ? (
-              <button
-                type="button"
-                className={styles.summaryWidthToggle}
-                aria-label={isRightSidebarExpanded ? "Сузить правую панель" : "Развернуть правую панель"}
-                aria-expanded={isRightSidebarExpanded}
-                onClick={() => setIsRightSidebarExpanded((current) => !current)}
-              >
-                <PanelLeft size={18} strokeWidth={2} aria-hidden="true" />
-              </button>
-            ) : null}
-            {canFlipRightSidebar ? (
-              <>
-                <div
-                  className={`${styles.summaryFlipInner} ${rightSidebarView === "tree" ? styles.summaryFlipInnerFlipped : ""}`}
-                >
-                  <div className={styles.summaryFlipFront}>
-                    <Summary
-                      stepIndex={stepIndex}
-                      name={name}
-                      baseKind={baseKind}
-                      department={activeDepartments.find((item) => item.id === departmentId)}
-                      responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
-                      topic={topic}
-                      selectedDocuments={selectedDocuments}
-                      stagedDropCount={stagedDropFiles.length}
-                      stagedFileTree={stagedFileTree}
-                      readiness={readiness}
-                      users={usersQuery.data ?? []}
-                      processing={processing}
-                      accessMode={accessMode}
-                      selectedAgents={selectedAgents}
-                      warningsCount={warnings.length}
-                      onNavigateToStep={(index) => {
-                        setNavError(null);
-                        setStepIndex(index);
-                      }}
-                    />
-                  </div>
-                  <div className={styles.summaryFlipBack}>
-                    <SourceTreeSidebarPanel tree={stagedFileTree} />
-                  </div>
-                </div>
-                <div className={styles.summarySidebarFooter}>
-                  {rightSidebarView === "summary" ? (
-                    <button
-                      type="button"
-                      className={styles.summarySidebarNavButton}
-                      onClick={() => showRightSidebarPanel("tree")}
-                    >
-                      <ListTree size={16} strokeWidth={2} aria-hidden="true" />
-                      Структура загрузки ({stagedFileTree.fileCount})
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      className={styles.summarySidebarNavButton}
-                      onClick={() => showRightSidebarPanel("summary")}
-                    >
-                      <ClipboardList size={16} strokeWidth={2} aria-hidden="true" />
-                      Сводка
-                    </button>
-                  )}
-                </div>
-              </>
-            ) : (
-              <Summary
-                stepIndex={stepIndex}
-                name={name}
-                baseKind={baseKind}
-                department={activeDepartments.find((item) => item.id === departmentId)}
-                responsible={usersQuery.data?.find((item) => item.id === responsibleUserId)}
-                topic={topic}
-                selectedDocuments={selectedDocuments}
-                stagedDropCount={stagedDropFiles.length}
-                stagedFileTree={stagedFileTree}
-                readiness={readiness}
-                users={usersQuery.data ?? []}
-                processing={processing}
-                accessMode={accessMode}
-                selectedAgents={selectedAgents}
-                warningsCount={warnings.length}
-                onNavigateToStep={(index) => {
-                  setNavError(null);
-                  setStepIndex(index);
-                }}
-              />
-            )}
-          </aside>
-        </div>
-        ) : null}
+        <aside className={styles.summaryCard}>
+          <Summary
+            stepIndex={stepIndex}
+            name={name}
+            baseKind={baseKind}
+            department={activeDepartments.find((item) => item.id === departmentId)}
+            responsible={responsibleCandidates.data?.find((item) => item.id === responsibleUserId)}
+            topic={topic}
+            selectedDocuments={selectedDocuments}
+            stagedDropCount={stagedDropFiles.length}
+            readiness={readiness}
+            users={users.data ?? []}
+            processing={processing}
+            accessMode={accessMode}
+            accessRules={accessRules}
+            accessExceptions={accessExceptions}
+            defaultAccessLevel={defaultAccessLevel}
+            defaultAccessBasis={defaultAccessBasis}
+            includeChildren={includeChildren}
+            selectedAgents={selectedAgents}
+            warningsCount={warnings.length}
+            onNavigateToStep={(index) => {
+              setNavError(null);
+              setStepIndex(index);
+            }}
+          />
+        </aside>
       </main>
 
       {createKnowledgeBase.isError && (
@@ -955,8 +1014,11 @@ function StepMain(props: {
   topic: string;
   comment: string;
   departments: Department[];
-  users: User[];
-  currentUserId?: string;
+  departmentsLoading?: boolean;
+  departmentsError?: boolean;
+  responsibleUsers: ResponsibleUser[];
+  responsibleUsersLoading?: boolean;
+  responsibleUsersError?: boolean;
   onName: (value: string) => void;
   onDescription: (value: string) => void;
   onBaseKind: (value: BaseKind) => void;
@@ -1036,10 +1098,21 @@ function StepMain(props: {
             value={props.departmentId}
             onChange={props.onDepartment}
             departments={props.departments}
-            placeholder="Выберите подразделение"
+            placeholder={
+              props.departmentsLoading
+                ? "Загружаем подразделения..."
+                : props.departmentsError
+                  ? "Не удалось загрузить подразделения"
+                  : props.departments.length
+                    ? "Выберите подразделение"
+                    : "Список подразделений пуст"
+            }
             allowEmpty={false}
             ariaLabel="Подразделение-владелец"
           />
+          {props.departmentsError ? (
+            <p className={styles.fieldHint}>Не удалось загрузить подразделения. Обновите страницу или обратитесь к администратору.</p>
+          ) : null}
         </label>
         <label className={styles.field}>
           <span className={styles.fieldLabel}>
@@ -1048,15 +1121,25 @@ function StepMain(props: {
           <FormAutocomplete
             value={props.responsibleUserId}
             onChange={props.onResponsible}
-            options={props.users.map((user) => ({
+            options={props.responsibleUsers.map((user) => ({
               value: user.id,
-              label: getUserPickerLabel(user, props.currentUserId)
+              label: formatResponsibleUserLabel(user)
             }))}
-            placeholder="Выберите пользователя"
-            emptyValue=""
-            emptyLabel="Выберите пользователя"
+            placeholder={
+              props.responsibleUsersLoading
+                ? "Загружаем сотрудников из оргструктуры..."
+                : props.responsibleUsersError
+                  ? "Не удалось загрузить список сотрудников"
+                  : props.responsibleUsers.length
+                    ? "Начните вводить ФИО, должность или отдел"
+                    : "Список сотрудников пуст — выполните синхронизацию из 1С"
+            }
+            noResultsText="Сотрудник не найден"
             ariaLabel="Ответственный"
           />
+          {props.responsibleUsersError ? (
+            <p className={styles.fieldHint}>Не удалось загрузить сотрудников. Обновите страницу или обратитесь к администратору.</p>
+          ) : null}
         </label>
         <div className={`${styles.field} ${styles.wideField}`}>
           <span className={styles.fieldLabel}>Статус</span>
@@ -1102,7 +1185,7 @@ function StepSources(props: {
   onUploadTitle: (value: string) => void;
   onUpload: () => void;
   onStageFiles: (files: FileList | File[]) => void;
-  onStageDroppedEntries: (entries: Array<{ file: File; relativePath: string }>) => void;
+  onStageIncoming: (files: FolderUploadFile[]) => void;
   onRemoveStaged: (id: string) => void;
   onUploadStaged: (id: string) => void;
   onUploadAllStaged: () => void;
@@ -1138,10 +1221,11 @@ function StepSources(props: {
       event.stopPropagation();
       dragDepthRef.current = 0;
       setIsDragOver(false);
-      const dropped = await collectDroppedSourceFiles(event.dataTransfer, isAcceptedSourceFile);
-      if (dropped.length) props.onStageDroppedEntries(dropped);
+      if (!event.dataTransfer.files.length && !event.dataTransfer.items?.length) return;
+      const incoming = await collectFilesFromDataTransfer(event.dataTransfer);
+      if (incoming.length) props.onStageIncoming(incoming);
     },
-    [props.onStageDroppedEntries]
+    [props.onStageIncoming]
   );
 
   return (
@@ -1182,7 +1266,7 @@ function StepSources(props: {
           <div className={styles.sourcesDropOverlay} aria-hidden="true">
             <span className={styles.sourcesDropOverlayIcon}><Upload size={28} strokeWidth={2} /></span>
             <strong>Отпустите файлы или папку для добавления</strong>
-            <span>PDF, DOCX, XLSX, PPTX, TXT — с сохранением вложенных папок</span>
+            <span>PDF, DOCX, XLSX, PPTX, TXT — структура папок сохранится</span>
           </div>
         ) : null}
         <table className={styles.sourcesTable}>
@@ -1282,6 +1366,20 @@ function StepSources(props: {
           Выбрать файл
           <input type="file" accept={sourceAcceptAttr} onChange={(event) => props.onUploadFile(event.target.files?.[0] ?? null)} />
         </label>
+        <label className={styles.sourcesFileButton}>
+          Выбрать папку
+          <input
+            type="file"
+            multiple
+            // @ts-expect-error non-standard directory picker attributes
+            webkitdirectory=""
+            directory=""
+            onChange={(event) => {
+              if (event.target.files?.length) props.onStageFiles(event.target.files);
+              event.target.value = "";
+            }}
+          />
+        </label>
         <button type="button" className={styles.navNextButton} onClick={props.onUpload} disabled={!props.uploadFile || props.uploadPending}>
           {props.uploadPending ? "Загружаем..." : "Загрузить и добавить"}
         </button>
@@ -1311,8 +1409,11 @@ function StepSources(props: {
                     {(extKey || "file").slice(0, 4)}
                   </span>
                   <div className={styles.sourcesStagedCopy}>
-                    <strong title={staged.relativePath}>{staged.relativePath}</strong>
-                    <small>{formatBytes(staged.file.size)}</small>
+                    <strong title={staged.relativePath}>{shortFileName(staged.relativePath)}</strong>
+                    <small>
+                      {staged.relativePath.includes("/") ? staged.relativePath : formatBytes(staged.file.size)}
+                      {staged.relativePath.includes("/") ? ` · ${formatBytes(staged.file.size)}` : null}
+                    </small>
                   </div>
                   <button
                     type="button"
@@ -1663,107 +1764,430 @@ function AccessAgentsTable({
 
 function StepAccess(props: {
   accessMode: AccessMode;
-  accessReason: string;
-  users: User[];
+  defaultAccessLevel: KnowledgeBaseAccessType;
+  defaultAccessBasis: AccessBasis;
+  accessComment: string;
+  accessTermMode: AccessTermMode;
+  accessExpiresAt: string;
+  includeChildren: boolean;
+  users: ResponsibleUser[];
   departments: Department[];
-  agents: AgentAccess[];
-  selectedUserIds: string[];
-  selectedDepartmentIds: string[];
-  selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
+  roles: Role[];
+  accessRules: AccessRule[];
+  accessExceptions: AccessExceptionRule[];
+  selectedDocuments: Document[];
   onMode: (value: AccessMode) => void;
-  onReason: (value: string) => void;
-  onSelectedDepartments: (ids: string[]) => void;
-  onToggleUser: (id: string) => void;
-  onChangeAgents: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void;
+  onDefaultAccessLevel: (value: KnowledgeBaseAccessType) => void;
+  onDefaultAccessBasis: (value: AccessBasis) => void;
+  onAccessComment: (value: string) => void;
+  onAccessTermMode: (value: AccessTermMode) => void;
+  onAccessExpiresAt: (value: string) => void;
+  onIncludeChildren: (value: boolean) => void;
+  onRulesChange: (value: AccessRule[]) => void;
+  onExceptionsChange: (value: AccessExceptionRule[]) => void;
 }) {
-  const showDepartments = props.accessMode === "departments" || props.accessMode === "mixed";
-  const showUsers = props.accessMode === "users" || props.accessMode === "mixed";
+  const [modal, setModal] = useState<"grant" | "exception" | null>(null);
+  const [subjectType, setSubjectType] = useState<AccessSubjectType>(
+    props.accessMode === "users" ? "user" : props.accessMode === "roles" ? "role" : props.accessMode === "everyone" ? "organization" : "department"
+  );
+  const [subjectQuery, setSubjectQuery] = useState("");
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [selectedSubjectLabel, setSelectedSubjectLabel] = useState("");
+  const [showAdvancedRights, setShowAdvancedRights] = useState(false);
+
+  const allowedSubjectTypes = subjectTypesForMode(props.accessMode);
+  const candidates = subjectCandidates(subjectType, props.departments, props.users, props.roles, subjectQuery);
+  const canAddOrganization = subjectType === "organization";
+  const canConfirm =
+    modal === "grant"
+      ? canAddOrganization || Boolean(selectedSubjectId)
+      : subjectType !== "organization" && Boolean(selectedSubjectId);
+
+  function addRule() {
+    const label = canAddOrganization ? "Все активные сотрудники" : selectedSubjectLabel;
+    props.onRulesChange([
+      ...props.accessRules,
+      {
+        id: crypto.randomUUID(),
+        granteeType: subjectType,
+        granteeId: canAddOrganization ? null : selectedSubjectId,
+        granteeLabel: label,
+        level: props.defaultAccessLevel,
+        basis: props.defaultAccessBasis,
+        comment: props.accessComment,
+        termMode: props.accessTermMode,
+        expiresAt: props.accessExpiresAt,
+        includeChildren: subjectType === "department" ? props.includeChildren : false
+      }
+    ]);
+    resetModal();
+  }
+
+  function addException() {
+    if (subjectType === "organization" || !selectedSubjectId) return;
+    props.onExceptionsChange([
+      ...props.accessExceptions,
+      {
+        id: crypto.randomUUID(),
+        granteeType: subjectType,
+        granteeId: selectedSubjectId,
+        granteeLabel: selectedSubjectLabel,
+        reason: props.accessComment || "Исключение доступа",
+        termMode: props.accessTermMode,
+        expiresAt: props.accessExpiresAt
+      }
+    ]);
+    resetModal();
+  }
+
+  function resetModal() {
+    setModal(null);
+    setSubjectQuery("");
+    setSelectedSubjectId(null);
+    setSelectedSubjectLabel("");
+  }
+
+  function openModal(kind: "grant" | "exception", preferredType?: AccessSubjectType) {
+    const nextType = preferredType ?? allowedSubjectTypes[0] ?? "department";
+    setSubjectType(kind === "exception" && nextType === "organization" ? "user" : nextType);
+    setSelectedSubjectId(null);
+    setSelectedSubjectLabel("");
+    setSubjectQuery("");
+    setModal(kind);
+  }
+
+  function handleModeChange(mode: AccessMode) {
+    props.onMode(mode);
+    const allowed = subjectTypesForMode(mode);
+    if (mode === "admins") {
+      props.onRulesChange([]);
+      props.onExceptionsChange([]);
+    } else if (mode === "everyone") {
+      props.onRulesChange([organizationRule(props.defaultAccessLevel, props.defaultAccessBasis, props.accessComment, props.accessTermMode, props.accessExpiresAt)]);
+    } else {
+      props.onRulesChange(props.accessRules.filter((rule) => allowed.includes(rule.granteeType)));
+    }
+  }
+
 
   return (
-    <div className={`${styles.stepBody} ${styles.stepBodyAccess}`}>
-      <StepTitle
-        icon={Users}
-        title="Доступ и агенты"
-        text="Определите модель доступа к базе знаний и подключите ИИ-агентов, которые смогут её использовать."
-      />
-      <section className={styles.accessModeSection} aria-labelledby="access-mode-label">
-        <div className={styles.accessModeSectionHead} id="access-mode-label">
-          <span className={styles.fieldLabel}>Модель доступа</span>
-          <button type="button" className={styles.accessModeInfoButton} aria-label="Подсказка о модели доступа">
-            <Info size={14} strokeWidth={2.2} aria-hidden="true" />
-          </button>
-        </div>
-        <div className={styles.accessModeGrid} role="radiogroup" aria-label="Модель доступа">
-          {accessModeOptions.map(({ value, title, description, Icon }) => {
-            const selected = props.accessMode === value;
-            return (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={selected}
-                className={`${styles.accessModeCard} ${selected ? styles.accessModeCardSelected : ""}`.trim()}
-                onClick={() => props.onMode(value)}
-              >
-                <Icon className={styles.accessModeIcon} />
-                <div className={styles.accessModeContent}>
-                  <span className={styles.accessModeHeading}>
-                    <span className={styles.accessModeRadio} aria-hidden="true" />
-                    <span className={styles.accessModeTitle}>{title}</span>
-                  </span>
-                  <span className={styles.accessModeDescription}>{description}</span>
-                </div>
-              </button>
-            );
-          })}
+    <div className={styles.stepBody}>
+      <StepTitle icon={LockKeyhole} title="Доступ пользователей" text="Настройте, кто из сотрудников сможет пользоваться этой базой знаний и на каком уровне прав." />
+      <section className={styles.accessConstructorSection}>
+        <h3>1. Режим доступа</h3>
+        <div className={styles.accessModes}>
+          {(Object.keys(accessModeDescriptions) as AccessMode[]).map((value) => (
+            <button key={value} type="button" className={props.accessMode === value ? styles.selectedMode : undefined} onClick={() => handleModeChange(value)}>
+              <strong>{accessModeDescriptions[value].title}</strong>
+              <span>{accessModeDescriptions[value].text}</span>
+            </button>
+          ))}
         </div>
       </section>
 
-      {showDepartments ? (
-        <DepartmentTransferList
-          departments={props.departments}
-          selectedIds={props.selectedDepartmentIds}
-          onChange={props.onSelectedDepartments}
-        />
+      {props.accessMode === "everyone" ? (
+        <WarningCallout text="Общий доступ не отменяет ограничения на исходные документы. Если сотрудник не имеет права на конкретный документ, его фрагменты не будут выданы в поиске." />
       ) : null}
 
-      {showUsers ? (
-        <SelectableList
-          title="Доступ для пользователей"
-          items={props.users.map((user) => ({
-            id: user.id,
-            title: user.full_name || user.email,
-            subtitle: `${user.email} · ${user.position || "Должность не указана"}`
-          }))}
-          selectedIds={props.selectedUserIds}
-          onToggle={props.onToggleUser}
-          enableSearch
-          searchPlaceholder="Поиск пользователя"
-        />
-      ) : null}
-
-      <section className={styles.accessReasonSection}>
-        <div className={styles.accessModeSectionHead}>
-          <span className={styles.fieldLabel}>Основание предоставления доступа</span>
-          <button type="button" className={styles.accessModeInfoButton} aria-label="Подсказка об основании доступа">
-            <Info size={14} strokeWidth={2.2} aria-hidden="true" />
+      <section className={styles.accessConstructorSection}>
+        <h3>2. Уровень прав по умолчанию</h3>
+        <div className={styles.rightsGrid}>
+          {[...mainAccessLevels, ...(showAdvancedRights ? advancedAccessLevels : [])].map((value) => (
+            <button
+              key={value}
+              type="button"
+              className={props.defaultAccessLevel === value ? styles.selectedMode : undefined}
+              onClick={() => props.onDefaultAccessLevel(value)}
+            >
+              {accessLabels[value]}
+            </button>
+          ))}
+          <button type="button" onClick={() => setShowAdvancedRights((value) => !value)}>
+            {showAdvancedRights ? "Скрыть расширенные права" : "Расширенные права"}
           </button>
         </div>
-        <label className={`${styles.field} ${styles.accessReasonField}`}>
-          <input
-            className={`${styles.control} ${styles.accessReasonInput}`}
-            value={props.accessReason}
-            maxLength={ACCESS_REASON_MAX}
-            onChange={(event) => props.onReason(event.target.value)}
-            placeholder="Приказ, распоряжение или иное основание"
-          />
-          <span className={styles.accessReasonCounter} aria-hidden="true">
-            {props.accessReason.length}/{ACCESS_REASON_MAX}
-          </span>
+      </section>
+
+      <div className={styles.formGrid}>
+        <label>
+          Основание выдачи доступа
+          <select value={props.defaultAccessBasis} onChange={(event) => props.onDefaultAccessBasis(event.target.value as AccessBasis)}>
+            {Object.entries(accessBasisLabels).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
         </label>
+        <label>
+          Комментарий
+          <input value={props.accessComment} onChange={(event) => props.onAccessComment(event.target.value)} placeholder="Например: доступ для работы с регламентами совещаний" />
+        </label>
+        <label>
+          Срок действия
+          <select value={props.accessTermMode} onChange={(event) => props.onAccessTermMode(event.target.value as AccessTermMode)}>
+            <option value="forever">Бессрочно</option>
+            <option value="until">До даты</option>
+          </select>
+        </label>
+        {props.accessTermMode === "until" ? (
+          <label>
+            Дата окончания
+            <input type="date" value={props.accessExpiresAt} onChange={(event) => props.onAccessExpiresAt(event.target.value)} />
+          </label>
+        ) : null}
+        <label className={styles.checkboxLine}>
+          <input type="checkbox" checked={props.includeChildren} onChange={(event) => props.onIncludeChildren(event.target.checked)} />
+          Распространять на дочерние подразделения
+        </label>
+      </div>
+
+      <section className={styles.accessConstructorSection}>
+        <div className={styles.sectionHeaderLine}>
+          <h3>5. Правила доступа</h3>
+          <div>
+            <button type="button" className={styles.secondaryButton} onClick={() => openModal("grant")}>+ Добавить доступ</button>
+            {props.accessMode === "departments" || props.accessMode === "mixed" ? (
+              <button type="button" className={styles.secondaryButton} onClick={() => openModal("grant", "department")}>+ Добавить подразделение</button>
+            ) : null}
+            {props.accessMode === "roles" || props.accessMode === "mixed" ? (
+              <button type="button" className={styles.secondaryButton} onClick={() => openModal("grant", "role")}>+ Добавить роль</button>
+            ) : null}
+          </div>
+        </div>
+        <CompactRulesTable
+          headers={["Кому предоставлен доступ", "Тип субъекта", "Уровень прав", "Наследование", "Основание", "Срок", "Действия"]}
+          rows={props.accessRules.map((rule) => [
+            rule.granteeLabel,
+            subjectTypeLabels[rule.granteeType],
+            accessLabels[rule.level],
+            rule.includeChildren ? "Да" : "Нет",
+            accessBasisLabels[rule.basis],
+            formatAccessTerm(rule.termMode, rule.expiresAt),
+            <button key={rule.id} type="button" onClick={() => props.onRulesChange(props.accessRules.filter((item) => item.id !== rule.id))}>Удалить</button>
+          ])}
+          empty="Правила доступа ещё не добавлены."
+        />
       </section>
 
-      <AccessAgentsTable agents={props.agents} selectedAgents={props.selectedAgents} onChange={props.onChangeAgents} />
+      <section className={styles.accessConstructorSection}>
+        <div className={styles.sectionHeaderLine}>
+          <h3>6. Исключения доступа</h3>
+          <button type="button" className={styles.secondaryButton} onClick={() => openModal("exception")}>+ Добавить исключение</button>
+        </div>
+        <CompactRulesTable
+          headers={["Кому закрыт доступ", "Тип субъекта", "Причина", "Срок", "Действия"]}
+          rows={props.accessExceptions.map((exception) => [
+            exception.granteeLabel,
+            subjectTypeLabels[exception.granteeType],
+            exception.reason || "Исключение доступа",
+            formatAccessTerm(exception.termMode, exception.expiresAt),
+            <button key={exception.id} type="button" onClick={() => props.onExceptionsChange(props.accessExceptions.filter((item) => item.id !== exception.id))}>Удалить</button>
+          ])}
+          empty="Исключений нет."
+        />
+      </section>
+
+      {props.selectedDocuments.length > 0 && (
+        <WarningCallout text="Если пользователь имеет доступ к базе, но не имеет доступа к части документов-источников, агент и поиск будут использовать только разрешённые для него фрагменты." />
+      )}
+
+      {modal ? (
+        <div className={styles.modalOverlay} role="dialog" aria-modal="true">
+          <div className={styles.accessModal}>
+            <header>
+              <h3>{modal === "grant" ? "Добавить доступ" : "Добавить исключение"}</h3>
+              <button type="button" onClick={resetModal}>×</button>
+            </header>
+            <div className={styles.formGrid}>
+              <label>
+                Кому
+                <select value={subjectType} onChange={(event) => {
+                  setSubjectType(event.target.value as AccessSubjectType);
+                  setSelectedSubjectId(null);
+                  setSelectedSubjectLabel("");
+                }}>
+                  {allowedSubjectTypes.filter((type) => modal === "grant" || type !== "organization").map((type) => (
+                    <option key={type} value={type}>{subjectTypeLabels[type]}</option>
+                  ))}
+                </select>
+              </label>
+              {subjectType !== "organization" ? (
+                <label>
+                  Найти
+                  <input value={subjectQuery} onChange={(event) => setSubjectQuery(event.target.value)} placeholder="Введите название или ФИО" />
+                </label>
+              ) : null}
+            </div>
+            {subjectType !== "organization" ? (
+              <div className={styles.modalPickList}>
+                {candidates.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={selectedSubjectId === item.id ? styles.selectedMode : undefined}
+                    onClick={() => {
+                      setSelectedSubjectId(item.id);
+                      setSelectedSubjectLabel(item.title);
+                    }}
+                  >
+                    <strong>{item.title}</strong>
+                    <span>{item.subtitle}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <InfoCallout text="База знаний будет доступна всем активным пользователям платформы. Ограничения исходных документов сохраняются." />
+            )}
+            <footer>
+              <button type="button" className={styles.navBackButton} onClick={resetModal}>Отмена</button>
+              <button type="button" className={styles.navNextButton} disabled={!canConfirm} onClick={modal === "grant" ? addRule : addException}>
+                {modal === "grant" ? "Добавить доступ" : "Добавить исключение"}
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function subjectTypesForMode(mode: AccessMode): AccessSubjectType[] {
+  if (mode === "everyone") return ["organization"];
+  if (mode === "departments") return ["department"];
+  if (mode === "users") return ["user"];
+  if (mode === "roles") return ["role"];
+  if (mode === "mixed") return ["department", "user", "role"];
+  return ["user"];
+}
+
+function subjectCandidates(
+  type: AccessSubjectType,
+  departments: Department[],
+  users: ResponsibleUser[],
+  roles: Role[],
+  query: string
+): { id: string; title: string; subtitle: string }[] {
+  const normalized = query.trim().toLowerCase();
+  const match = (text: string) => !normalized || text.toLowerCase().includes(normalized);
+  if (type === "department") {
+    return departments
+      .map((department) => ({
+        id: department.id,
+        title: department.name,
+        subtitle: department.description || "Без описания"
+      }))
+      .filter((item) => match(`${item.title} ${item.subtitle}`))
+      .slice(0, 30);
+  }
+  if (type === "user") {
+    return users
+      .map((user) => ({
+        id: user.id,
+        title: user.full_name || "Пользователь",
+        subtitle: [user.position, user.department_name].filter(Boolean).join(" · ") || "Должность не указана"
+      }))
+      .filter((item) => match(`${item.title} ${item.subtitle}`))
+      .slice(0, 30);
+  }
+  if (type === "role") {
+    return roles
+      .map((role) => ({
+        id: role.id,
+        title: role.name,
+        subtitle: role.description || role.code
+      }))
+      .filter((item) => match(`${item.title} ${item.subtitle}`))
+      .slice(0, 30);
+  }
+  return [];
+}
+
+function formatAccessTerm(termMode: AccessTermMode, expiresAt: string) {
+  return termMode === "until" && expiresAt ? `До ${expiresAt}` : "Бессрочно";
+}
+
+function organizationRule(
+  level: KnowledgeBaseAccessType,
+  basis: AccessBasis,
+  comment: string,
+  termMode: AccessTermMode,
+  expiresAt: string
+): AccessRule {
+  return {
+    id: crypto.randomUUID(),
+    granteeType: "organization",
+    granteeId: null,
+    granteeLabel: "Все активные сотрудники",
+    level,
+    basis,
+    comment,
+    termMode,
+    expiresAt,
+    includeChildren: false
+  };
+}
+
+function CompactRulesTable({ headers, rows, empty }: { headers: string[]; rows: ReactNode[][]; empty: string }) {
+  return (
+    <table className={styles.accessRulesTable}>
+      <thead>
+        <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
+      </thead>
+      <tbody>
+        {rows.map((row, index) => (
+          <tr key={index}>
+            {row.map((cell, cellIndex) => <td key={`${index}-${cellIndex}`}>{cell}</td>)}
+          </tr>
+        ))}
+        {!rows.length && (
+          <tr>
+            <td colSpan={headers.length} className={styles.emptyCell}>{empty}</td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  );
+}
+
+function StepAgents({ agents, selectedAgents, onChange }: { agents: AgentAccess[]; selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>; onChange: (value: Record<string, KnowledgeBaseAgentAccessMode>) => void }) {
+  return (
+    <div className={styles.stepBody}>
+      <StepTitle icon={Bot} title="Подключение агентов" text="Выберите, какие агенты смогут использовать базу знаний через зарегистрированный инструмент search_knowledge_base." />
+      <CompactRulesTable
+        headers={["Агент", "Назначение", "Режим использования базы", "Статус агента", "Доступ пользователя учитывается", "Действие"]}
+        rows={agents.map((agent) => {
+          const selected = selectedAgents[agent.id];
+          return [
+            agent.name,
+            agent.purpose || agent.slug,
+            <select
+              key={`${agent.id}-mode`}
+              value={selected || "search_only"}
+              disabled={!selected}
+              onChange={(event) => onChange({ ...selectedAgents, [agent.id]: event.target.value as KnowledgeBaseAgentAccessMode })}
+            >
+              {Object.entries(agentModeLabels).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>,
+            agent.status,
+            "Да",
+            <button
+              key={`${agent.id}-toggle`}
+              type="button"
+              onClick={() => {
+                const next = { ...selectedAgents };
+                if (selected) delete next[agent.id];
+                else next[agent.id] = "search_only";
+                onChange(next);
+              }}
+            >
+              {selected ? "Отключить" : "Подключить"}
+            </button>
+          ];
+        })}
+        empty="Агенты пока не настроены."
+      />
+      <InfoCallout text="Ключевое правило: агент может использовать только те фрагменты базы знаний, к которым имеет доступ пользователь, запустивший агента." />
     </div>
   );
 }
@@ -1773,14 +2197,14 @@ function StepPreview(props: {
   description: string;
   baseKind: BaseKind;
   department?: Department;
-  responsible?: User;
+  responsible?: ResponsibleUser;
   topic: string;
   selectedDocuments: Document[];
-  users: User[];
+  users: ResponsibleUser[];
   processing: ProcessingSettings;
   accessMode: AccessMode;
-  selectedUserIds: string[];
-  selectedDepartmentIds: string[];
+  accessRules: AccessRule[];
+  accessExceptions: AccessExceptionRule[];
   selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
   warnings: ReturnType<typeof checkDocumentReadiness>[];
 }) {
@@ -1788,12 +2212,16 @@ function StepPreview(props: {
     <div className={styles.stepBody}>
       <StepTitle icon={ShieldCheck} title="Предпросмотр и подтверждение" text="Проверьте итоговую сводку перед созданием базы знаний." />
       <div className={styles.previewGrid}>
-        <SummaryBlock title="Основные сведения" rows={[["Название", props.name], ["Описание", props.description], ["Тип", baseKindLabels[props.baseKind]], ["Подразделение", props.department?.name || "-"], ["Ответственный", formatShortPersonName(props.responsible?.full_name, props.responsible?.email)], ["Тематика", props.topic || "-"]]} />
+        <SummaryBlock title="Основные сведения" rows={[["Название", props.name], ["Описание", props.description], ["Тип", baseKindLabels[props.baseKind]], ["Подразделение", props.department?.name || "-"], ["Ответственный", props.responsible ? formatResponsibleUserLabel(props.responsible) : "-"], ["Тематика", props.topic || "-"]]} />
         <SummaryBlock title="Источники" rows={[["Документов", String(props.selectedDocuments.length)], ...props.selectedDocuments.slice(0, 5).map((document) => [document.title, userName(props.users, document.uploaded_by_user_id)] as [string, string])]} />
         <section className={styles.summaryBlock}>
           <ProcessingChecklistCard title="Обработка" subtitle="Текущие настройки" items={buildProcessingChecklist(props.processing)} />
         </section>
-        <SummaryBlock title="Доступ" rows={[["Режим", accessModeLabel(props.accessMode)], ["Пользователей", String(props.selectedUserIds.length)], ["Подразделений", String(props.selectedDepartmentIds.length)]]} />
+        <SummaryBlock title="Доступ" rows={[
+          ["Режим", accessModeLabel(props.accessMode)],
+          ["Правил", String(props.accessRules.length)],
+          ["Исключений", String(props.accessExceptions.length)]
+        ]} />
         <SummaryBlock title="Агенты" rows={[["Подключено", String(Object.keys(props.selectedAgents).length)], ...Object.values(props.selectedAgents).slice(0, 4).map((mode, index) => [`Агент ${index + 1}`, agentModeLabels[mode]] as [string, string])]} />
         <SummaryBlock title="Предупреждения" rows={props.warnings.length ? props.warnings.map((warning) => [warning.document.title, warning.message] as [string, string]) : [["Ошибки", "Нет критичных предупреждений"]]} />
       </div>
@@ -1806,15 +2234,20 @@ function Summary(props: {
   name: string;
   baseKind: BaseKind;
   department?: Department;
-  responsible?: User;
+  responsible?: ResponsibleUser;
   topic: string;
   selectedDocuments: Document[];
   stagedDropCount: number;
   stagedFileTree: SourceTreeRoot;
   readiness: ReturnType<typeof checkDocumentReadiness>[];
-  users: User[];
+  users: ResponsibleUser[];
   processing: ProcessingSettings;
   accessMode: AccessMode;
+  accessRules: AccessRule[];
+  accessExceptions: AccessExceptionRule[];
+  defaultAccessLevel: KnowledgeBaseAccessType;
+  defaultAccessBasis: AccessBasis;
+  includeChildren: boolean;
   selectedAgents: Record<string, KnowledgeBaseAgentAccessMode>;
   warningsCount: number;
   onNavigateToStep: (stepIndex: number) => void;
@@ -1846,7 +2279,7 @@ function Summary(props: {
           ["Тип", baseKindLabels[props.baseKind]],
           ["Тематика", props.topic || "-"],
           ["Подразделение", props.department?.name || "Не выбрано"],
-          ["Ответственный", formatShortPersonName(props.responsible?.full_name, props.responsible?.email)]
+          ["Ответственный", props.responsible ? formatResponsibleUserLabel(props.responsible) : "Не выбран"]
         ] as [string, string][],
         statusBadge: "Черновик"
       },
@@ -1878,16 +2311,20 @@ function Summary(props: {
       },
       {
         id: "access",
-        title: "Доступ и агенты",
+        title: "Доступ пользователей",
         stepIndex: 4,
         configured: accessConfigured,
         collapsedStatus: accessConfigured
           ? `${accessModeLabel(props.accessMode)} · ${Object.keys(props.selectedAgents).length} агентов`
           : "Не настроено",
         rows: [
-          ["Тип доступа", accessModeLabel(props.accessMode)],
-          ["Подключено агентов", String(Object.keys(props.selectedAgents).length)],
-          ["Предупреждения", String(props.warningsCount)]
+          ["Режим", accessModeLabel(props.accessMode)],
+          ["Правил доступа", String(props.accessRules.length)],
+          ["Исключений", String(props.accessExceptions.length)],
+          ["Уровень по умолчанию", accessLabels[props.defaultAccessLevel]],
+          ["Основание", accessBasisLabels[props.defaultAccessBasis]],
+          ["Наследование", props.includeChildren ? "Да, на дочерние подразделения" : "Нет"],
+          ["Что проверить", accessWarnings(props.accessMode, props.accessExceptions.length, props.warningsCount).join("; ")]
         ] as [string, string][]
       },
       {
@@ -1901,11 +2338,17 @@ function Summary(props: {
     ],
     [
       accessConfigured,
+      props.accessExceptions,
+      agentsConfigured,
       previewConfigured,
       processingConfigured,
+      props.accessRules,
       props.accessMode,
       props.baseKind,
+      props.defaultAccessBasis,
+      props.defaultAccessLevel,
       props.department?.name,
+      props.includeChildren,
       props.name,
       props.processing,
       props.responsible,
@@ -2322,20 +2765,11 @@ function departmentName(departments: Department[], departmentId?: string | null)
   return departments.find((department) => department.id === departmentId)?.name || "-";
 }
 
-function getUserPickerLabel(user: User, currentUserId?: string) {
-  const label =
-    user.full_name?.trim() ||
-    [user.last_name, user.first_name, user.middle_name].filter(Boolean).join(" ") ||
-    user.email ||
-    "Пользователь";
-  return currentUserId && user.id === currentUserId ? `${label} (вы)` : label;
-}
-
-function userName(users: User[], userId?: string | null, currentUserId?: string) {
+function userName(users: ResponsibleUser[], userId?: string | null, currentUserId?: string) {
   if (!userId) return "Не указан";
   if (currentUserId && userId === currentUserId) return "Вы";
   const user = users.find((item) => item.id === userId);
-  return user?.full_name || user?.email || "Пользователь";
+  return user?.full_name || "Пользователь";
 }
 
 function optionalUuid(value: string): string | null {
@@ -2424,6 +2858,16 @@ function shortFileName(name: string, maxLength = 24) {
   return `${base.slice(0, keep)}…${extension}`;
 }
 
+function formatResponsibleUserLabel(user: ResponsibleUser) {
+  const name = user.full_name?.trim() || "Пользователь";
+  const position = user.position?.trim();
+  const department = user.department_name?.trim();
+  if (position && department) return `${name} — ${position} (${department})`;
+  if (position) return `${name} — ${position}`;
+  if (department) return `${name} (${department})`;
+  return name;
+}
+
 function formatShortPersonName(fullName?: string | null, fallback?: string | null) {
   const trimmed = fullName?.trim();
   if (!trimmed) return fallback?.trim() || "Не выбран";
@@ -2474,11 +2918,21 @@ function yesNo(value: boolean) {
 
 function accessModeLabel(value: AccessMode) {
   const labels: Record<AccessMode, string> = {
-    users: "По пользователям",
-    departments: "По подразделениям",
-    mixed: "Смешанный",
-    admins: "Только администраторы",
-    agents: "Только выбранные агенты"
+    admins: "Только владелец и администраторы",
+    everyone: "Общий доступ",
+    departments: "Выбранные подразделения",
+    users: "Выбранные пользователи",
+    roles: "Роли",
+    mixed: "Смешанный доступ"
   };
   return labels[value];
+}
+
+function accessWarnings(mode: AccessMode, exceptionsCount: number, warningsCount: number) {
+  const warnings: string[] = [];
+  if (mode === "everyone") warnings.push("Проверьте, что источники не содержат ограниченных данных");
+  if (exceptionsCount === 0) warnings.push("Исключения не настроены");
+  if (warningsCount > 0) warnings.push("Есть предупреждения по источникам");
+  if (!warnings.length) warnings.push("Критичных предупреждений нет");
+  return warnings;
 }

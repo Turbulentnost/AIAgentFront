@@ -1749,323 +1749,181 @@ label.field {
 
 .accessModeSection {
   display: grid;
-  gap: var(--access-mode-section-gap);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.accessModeSectionHead {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.accessModeInfoButton {
+.accessModes button {
   display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  padding: 0;
-  color: var(--form-icon-color);
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-}
-
-.accessModeInfoButton:hover {
-  color: var(--form-icon-hover-color);
-}
-
-.accessModeInfoButton:focus-visible {
-  outline: none;
-  box-shadow: var(--form-control-focus-ring);
-  border-radius: 999px;
-}
-
-.accessModeGrid {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: var(--access-mode-grid-gap);
-}
-
-.accessModeCard {
-  display: flex;
-  flex-direction: column;
-  align-items: stretch;
-  gap: 10px;
-  min-height: 118px;
-  padding: var(--access-mode-card-padding-y) var(--access-mode-card-padding-x);
-  color: inherit;
+  gap: 5px;
+  min-height: 88px;
+  padding: 12px;
+  color: var(--color-text-secondary);
   text-align: left;
-  background: var(--access-mode-card-bg);
-  border: 1px solid var(--access-mode-card-border);
-  border-radius: var(--access-mode-card-radius);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
   cursor: pointer;
-  transition:
-    border-color 0.15s ease,
-    background 0.15s ease,
-    box-shadow 0.15s ease;
 }
 
-.accessModeCard:hover {
-  border-color: var(--access-mode-card-selected-border);
-}
-
-.accessModeCard:focus-visible {
-  outline: none;
-  border-color: var(--access-mode-card-selected-border);
-  box-shadow: var(--form-control-focus-ring);
-}
-
-.accessModeCardSelected {
-  background: var(--access-mode-card-selected-bg);
-  border-color: var(--access-mode-card-selected-border);
-}
-
-.accessModeIcon {
-  flex-shrink: 0;
-  align-self: center;
-  width: 28px;
-  height: 28px;
-  color: var(--access-mode-icon-color);
-}
-
-.accessModeCardSelected .accessModeIcon {
-  color: var(--access-mode-icon-selected-color);
-}
-
-.accessModeContent {
-  display: grid;
-  gap: 4px;
-  width: fit-content;
-  max-width: 100%;
-  margin: 0 auto;
-}
-
-.accessModeHeading {
-  display: flex;
-  gap: 6px;
-  align-items: flex-start;
-}
-
-.accessModeRadio {
-  position: relative;
-  flex-shrink: 0;
-  display: inline-grid;
-  place-items: center;
-  width: var(--access-mode-radio-size);
-  height: var(--access-mode-radio-size);
-  margin-top: 1px;
-  border: 1.5px solid var(--access-mode-radio-border);
-  border-radius: 999px;
-  background: var(--access-mode-card-bg);
-}
-
-.accessModeCardSelected .accessModeRadio {
-  border: 2px solid var(--access-mode-radio-selected-border);
-  background: var(--access-mode-card-bg);
-}
-
-.accessModeCardSelected .accessModeRadio::after {
-  content: "";
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-  background: var(--access-mode-radio-selected-dot);
-}
-
-.accessModeTitle {
-  color: var(--access-mode-title-color);
-  font-size: var(--access-mode-title-size);
-  font-weight: var(--access-mode-title-weight);
-  line-height: var(--access-mode-title-line-height);
-}
-
-.accessModeCardSelected .accessModeTitle {
-  color: var(--access-mode-title-selected-color);
-}
-
-.accessModeDescription {
-  display: block;
-  padding-left: calc(var(--access-mode-radio-size) + 6px);
-  color: var(--access-mode-desc-color);
-  font-size: var(--access-mode-desc-size);
-  font-weight: var(--access-mode-desc-weight);
-  line-height: var(--access-mode-desc-line-height);
-}
-
-.accessReasonSection,
-.accessAgentsSection {
-  display: grid;
-  gap: var(--form-field-gap);
-}
-
-.accessReasonField {
-  position: relative;
-}
-
-.accessReasonCounter {
-  position: absolute;
-  right: 12px;
-  bottom: 10px;
+.accessModes button span {
   color: var(--color-muted);
   font-size: 11px;
-  font-weight: 500;
-  line-height: 1;
-  pointer-events: none;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
-.accessReasonInput {
-  padding-right: 72px;
+.selectedMode,
+.accessModes .selectedMode {
+  color: var(--color-primary-text);
+  background: var(--kb-selected-badge-bg);
+  border-color: var(--color-border-accent);
 }
 
-.accessAgentsIntro {
+.accessConstructorSection {
+  display: grid;
+  gap: 12px;
+}
+
+.accessConstructorSection h3 {
   margin: 0;
-  color: var(--color-muted);
-  font-size: 13px;
-  font-weight: 400;
-  line-height: 1.45;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 900;
 }
 
-.accessAgentsSearchField {
-  position: relative;
+.sectionHeaderLine {
   display: flex;
+  gap: 12px;
   align-items: center;
+  justify-content: space-between;
 }
 
-.accessAgentsSearchIcon {
-  position: absolute;
-  left: var(--form-icon-offset-x);
-  z-index: 1;
-  color: var(--form-icon-color);
-  pointer-events: none;
+.sectionHeaderLine > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
 }
 
-.accessAgentsSearchInput {
-  width: 100%;
-  min-height: var(--form-control-min-height);
-  padding: var(--form-control-padding-y) var(--form-control-padding-x);
-  padding-left: var(--form-control-padding-left-search);
-  color: var(--form-control-text-color);
-  font-size: var(--form-control-font-size);
-  font-weight: var(--form-control-font-weight);
-  line-height: var(--form-control-line-height);
-  background: var(--form-control-bg);
-  border: var(--form-control-border-width) solid var(--form-control-border-color);
-  border-radius: var(--form-control-border-radius);
-  outline: none;
-  transition: var(--form-control-transition);
+.rightsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.accessAgentsSearchInput::placeholder {
-  color: var(--form-control-placeholder-color);
-  font-size: var(--form-control-placeholder-size);
-  font-weight: var(--form-control-placeholder-weight);
-  opacity: var(--form-control-placeholder-opacity);
+.rightsGrid button,
+.modalPickList button {
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--color-text-secondary);
+  text-align: left;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.accessAgentsSearchInput:focus {
-  border-color: var(--form-control-focus-border-color);
-  box-shadow: var(--form-control-focus-ring);
-}
-
-.accessAgentsTableWrap {
-  overflow: hidden;
-  background: var(--form-control-bg);
-  border: var(--form-control-border-width) solid var(--form-control-border-color);
-  border-radius: var(--form-control-border-radius);
-}
-
-.accessAgentsTable {
+.accessRulesTable {
   width: 100%;
   border-collapse: collapse;
-  table-layout: fixed;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
 }
 
-.accessAgentsTable th,
-.accessAgentsTable td {
-  padding: 12px 14px;
+.accessRulesTable th,
+.accessRulesTable td {
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
   border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 12px;
   text-align: left;
   vertical-align: top;
 }
 
-.accessAgentsTable th {
-  color: var(--form-label-color);
+.accessRulesTable th {
+  color: var(--color-muted);
   background: var(--color-hover);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.3;
+  font-weight: 900;
 }
 
-.accessAgentsTable tr:last-child td {
+.accessRulesTable tr:last-child td {
   border-bottom: 0;
 }
 
-.accessAgentsTable th:first-child,
-.accessAgentsTable td:first-child {
-  width: 44px;
-  padding-right: 0;
+.accessRulesTable button {
+  color: var(--color-danger-text);
+  background: transparent;
+  border: 0;
+  font-weight: 800;
+  cursor: pointer;
 }
 
-.accessAgentsTable th:nth-child(2),
-.accessAgentsTable td:nth-child(2) {
-  width: 28%;
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
 }
 
-.accessAgentsTable th:nth-child(4),
-.accessAgentsTable td:nth-child(4) {
-  width: 140px;
+.accessModal {
+  display: grid;
+  gap: 16px;
+  width: min(720px, 100%);
+  max-height: calc(100vh - 64px);
+  padding: 18px;
+  overflow: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
 }
 
-.accessAgentsHeadLabel {
-  display: inline-flex;
-  gap: 4px;
+.accessModal header,
+.accessModal footer {
+  display: flex;
+  gap: 12px;
   align-items: center;
+  justify-content: space-between;
 }
 
-.accessAgentName {
-  color: var(--color-text-strong);
-  font-size: 13px;
-  font-weight: 700;
-  line-height: 1.35;
-}
-
-.accessAgentDescription {
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.45;
-}
-
-.agentStatusBadgeConnected,
-.agentStatusBadgeDisconnected {
-  display: inline-flex;
-  align-items: center;
-  min-height: 24px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1.2;
-  white-space: nowrap;
-}
-
-.agentStatusBadgeConnected {
-  color: var(--access-agent-connected-color);
-  background: var(--access-agent-connected-bg);
-}
-
-.agentStatusBadgeDisconnected {
-  color: var(--access-agent-disconnected-color);
-  background: var(--access-agent-disconnected-bg);
-}
-
-.accessAgentsEmpty {
+.accessModal h3 {
   margin: 0;
-  padding: 18px 14px;
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.accessModal header button {
+  width: 32px;
+  height: 32px;
   color: var(--color-muted);
-  font-size: 13px;
-  font-weight: 500;
-  line-height: 1.4;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.modalPickList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.modalPickList button {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+}
+
+.modalPickList span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .checkboxLine {

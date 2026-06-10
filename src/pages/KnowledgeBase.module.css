@@ -100,6 +100,11 @@
   box-shadow: var(--form-control-focus-ring);
 }
 
+.dangerButton {
+  color: #dc2626;
+  background: #fef2f2;
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
@@ -333,6 +338,89 @@
 .detailBody {
   display: grid;
   gap: 14px;
+}
+
+.sectionTitle {
+  margin: 4px 0 0;
+  color: #475569;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.statusCallout {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  color: #1e3a8a;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sourceDetailCard,
+.indexingProgressCard,
+.readinessCard {
+  padding: 12px;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.sourceDetailCard h4,
+.indexingProgressCard h4 {
+  margin: 0 0 8px;
+}
+
+.sourceActions,
+.chunkActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.sourceActions button,
+.chunkActions button,
+.chunkFilters button,
+.ruleForm button {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+  background: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.chunkFilters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ruleForm {
+  display: flex;
+  gap: 8px;
+}
+
+.ruleForm input {
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ef;
+  border-radius: 8px;
+}
+
+.answerPreview {
+  margin: 0;
+  padding: 10px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #334155;
+  font-size: 12px;
 }
 
 .infoGrid {
@@ -639,4 +727,164 @@
   .pipeline > div {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
+}
+
+.indexingBanner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: 10px;
+}
+
+.indexingBanner strong {
+  display: block;
+  margin-bottom: 2px;
+  color: #78350f;
+}
+
+.indexingBanner span {
+  color: #92400e;
+  font-size: 13px;
+}
+
+.indexingSpinner {
+  flex-shrink: 0;
+  margin-top: 2px;
+  animation: kbSpin 1s linear infinite;
+}
+
+@keyframes kbSpin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.disabledRow {
+  opacity: 0.48;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.disabledRow:hover {
+  background: transparent;
+}
+
+.disabledRow strong,
+.disabledRow small,
+.disabledRow td {
+  color: #94a3b8;
+}
+
+.indexingRow .statusBadge {
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+  animation: statusPulse 1.6s ease-in-out infinite;
+}
+
+.statusBadgeIndexing {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.statusSpinner {
+  animation: kbSpin 1s linear infinite;
+}
+
+@keyframes statusPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+  }
+}
+
+.kbQuickSearch {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.kbQuickSearch form {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.kbQuickSearch input {
+  width: 100%;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.kbQuickSearch button[type="submit"] {
+  height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: #2563eb;
+  color: #ffffff;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.kbQuickSearch button[type="submit"]:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.kbQuickSearchResults {
+  display: grid;
+  gap: 8px;
+}
+
+.kbQuickSearchResults article {
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #edf1f6;
+  border-radius: 10px;
+}
+
+.kbQuickSearchResults strong {
+  display: block;
+  margin-bottom: 2px;
+}
+
+.kbQuickSearchResults span {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.kbQuickSearchResults p {
+  margin: 6px 0 0;
+  color: #334155;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.linkButton {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #2563eb;
+  font-weight: 700;
+  cursor: pointer;
 }

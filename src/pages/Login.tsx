@@ -1,5 +1,4 @@
-import { FormEvent, useId, useState } from "react";
-import { FormCheckbox } from "@/components/form-controls";
+import { FormEvent, useId, useRef, useState } from "react";
 import {
   BarChart3,
   BrainCircuit,
@@ -74,12 +73,15 @@ const languages: { code: LanguageCode; label: string; icon: string }[] = [
 
 export default function Login() {
   const navigate = useNavigate();
-  const { isAuthenticated, login } = useAuth();
+  const { isAuthenticated, login, loginWith1C } = useAuth();
   const emailId = useId();
+  const fioId = useId();
   const passwordId = useId();
   const newPasswordId = useId();
   const confirmPasswordId = useId();
+  const [isCorporateMode, setIsCorporateMode] = useState(false);
   const [email, setEmail] = useState("");
+  const [fio, setFio] = useState("");
   const [password, setPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -90,35 +92,83 @@ export default function Login() {
   const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitInFlight = useRef(false);
   const currentLanguage = languages.find((language) => language.code === selectedLanguage) ?? languages[0];
 
   if (isAuthenticated) return <Navigate to="/" replace />;
 
+  function getCorporateLoginError(err: unknown): string {
+    if (err instanceof AxiosError) {
+      const detail = err.response?.data?.detail;
+      if (typeof detail === "string" && detail.trim()) return detail;
+      if (typeof detail === "object" && detail && "message" in detail) {
+        const message = detail.message;
+        if (typeof message === "string" && message.trim()) return message;
+      }
+      if (err.response?.status === 409) {
+        return "Вход уже выполняется. Подождите несколько секунд и повторите попытку.";
+      }
+    }
+    return "Не удалось войти через корпоративную учётную запись";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (submitInFlight.current) return;
     setError(null);
-    if (requiresPasswordChange && newPassword !== confirmPassword) {
+    if (!isCorporateMode && requiresPasswordChange && newPassword !== confirmPassword) {
       setError("Новый пароль и подтверждение не совпадают");
       return;
     }
+    submitInFlight.current = true;
     setIsSubmitting(true);
     try {
-      await login({
-        email,
-        password,
-        new_password: requiresPasswordChange ? newPassword : undefined
-      });
-      navigate("/", { replace: true });
+      if (isCorporateMode) {
+        await loginWith1C({ fio: fio.trim(), password });
+      } else {
+        await login({
+          email,
+          password,
+          new_password: requiresPasswordChange ? newPassword : undefined
+        });
+      }
+      navigate(isCorporateMode ? "/tasks" : "/", { replace: true });
     } catch (err) {
-      if (err instanceof AxiosError && err.response?.status === 428) {
+      if (!isCorporateMode && err instanceof AxiosError && err.response?.status === 428) {
         setRequiresPasswordChange(true);
         setError("Для первого входа задайте новый пароль");
+      } else if (isCorporateMode) {
+        if (err instanceof Error && err.message.includes("ФИО")) {
+          setError(err.message);
+        } else if (err instanceof AxiosError && err.response?.status === 422) {
+          setError("Укажите ФИО полностью, как в справочнике пользователей 1С");
+        } else if (err instanceof AxiosError && err.response?.status === 401) {
+          setError("Неверный пароль или нет доступа к 1С");
+        } else if (err instanceof AxiosError && err.response?.status === 503) {
+          setError("1С или OData недоступны. Проверьте ФИО и подключение к серверу.");
+        } else if (err instanceof AxiosError && err.response?.status === 404) {
+          setError("Сервис 1С недоступен. Проверьте VITE_ONEC_API_SERVER и proxy /onec-api");
+        } else {
+          setError(getCorporateLoginError(err));
+        }
       } else {
         setError(requiresPasswordChange ? "Не удалось изменить пароль" : "Неверный email или пароль");
       }
     } finally {
+      submitInFlight.current = false;
       setIsSubmitting(false);
     }
+  }
+
+  function handleCorporateLogin() {
+    setError(null);
+    setRequiresPasswordChange(false);
+    setIsCorporateMode(true);
+  }
+
+  function handlePlatformLogin() {
+    setError(null);
+    setIsCorporateMode(false);
   }
 
   return (
@@ -308,25 +358,43 @@ export default function Login() {
         <section className={styles.loginPanel} aria-labelledby="login-form-title">
           <form className={styles.form} onSubmit={handleSubmit} noValidate>
             <h2 className={styles.formTitle} id="login-form-title">
-              Вход в систему
+              {isCorporateMode ? "Вход через 1С" : "Вход в систему"}
             </h2>
 
-            <label className={styles.field} htmlFor={emailId}>
-              <span>Email или корпоративный логин</span>
-              <div className={styles.inputShell}>
-                <UserRound className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
-                <input
-                  id={emailId}
-                  autoComplete="email"
-                  inputMode="email"
-                  placeholder="name@company.com или логин"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  required
-                />
-              </div>
-            </label>
+            {isCorporateMode ? (
+              <label className={styles.field} htmlFor={fioId}>
+                <span>ФИО как в 1С</span>
+                <div className={styles.inputShell}>
+                  <UserRound className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
+                  <input
+                    id={fioId}
+                    autoComplete="name"
+                    placeholder="Иванов Иван Иванович"
+                    type="text"
+                    value={fio}
+                    onChange={(event) => setFio(event.target.value)}
+                    required
+                  />
+                </div>
+              </label>
+            ) : (
+              <label className={styles.field} htmlFor={emailId}>
+                <span>Email или корпоративный логин</span>
+                <div className={styles.inputShell}>
+                  <UserRound className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
+                  <input
+                    id={emailId}
+                    autoComplete="email"
+                    inputMode="email"
+                    placeholder="name@company.com или логин"
+                    type="email"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                  />
+                </div>
+              </label>
+            )}
 
             <label className={styles.field} htmlFor={passwordId}>
               <span>Пароль</span>
@@ -357,7 +425,7 @@ export default function Login() {
               </div>
             </label>
 
-            {requiresPasswordChange && (
+            {!isCorporateMode && requiresPasswordChange && (
               <>
                 <label className={styles.field} htmlFor={newPasswordId}>
                   <span>Новый пароль</span>
@@ -395,38 +463,64 @@ export default function Login() {
               </>
             )}
 
-            <div className={styles.formMeta}>
-              <FormCheckbox
-                checked={rememberMe}
-                label="Запомнить меня"
-                className={styles.rememberCheckbox}
-                onChange={setRememberMe}
-              />
-            </div>
+            {!isCorporateMode && (
+              <div className={styles.formMeta}>
+                <label className={styles.checkbox}>
+                  <input
+                    checked={rememberMe}
+                    type="checkbox"
+                    onChange={(event) => setRememberMe(event.target.checked)}
+                  />
+                  <span>Запомнить меня</span>
+                </label>
+              </div>
+            )}
+
+            {isCorporateMode && isSubmitting ? (
+              <p className={styles.corporateHint}>
+                Выполняем вход. Задачи из 1С загрузятся отдельным запросом после входа.
+              </p>
+            ) : null}
 
             {error && <div className={styles.errorMessage}>{error}</div>}
 
             <button className={styles.submitButton} disabled={isSubmitting} type="submit">
-              {isSubmitting ? "Входим..." : requiresPasswordChange ? "Сохранить пароль и войти" : "Войти"}
+              {isSubmitting
+                ? isCorporateMode
+                  ? "Входим..."
+                  : "Входим..."
+                : isCorporateMode
+                  ? "Войти через корпоративную учётную запись"
+                  : requiresPasswordChange
+                    ? "Сохранить пароль и войти"
+                    : "Войти"}
             </button>
 
-            <a className={styles.forgotLink} href="/login">
-              Забыли пароль?
-            </a>
+            {!isCorporateMode ? (
+              <>
+                <a className={styles.forgotLink} href="/login">
+                  Забыли пароль?
+                </a>
 
-            <div className={styles.separator}>
-              <span>или</span>
-            </div>
+                <div className={styles.separator}>
+                  <span>или</span>
+                </div>
 
-            <button className={styles.ssoButton} type="button">
-              <svg className={styles.ssoIcon} viewBox="0 0 18 18" aria-hidden="true">
-                <path d="M3 16h12" />
-                <path d="M4.25 6.25h9.5v9.75h-9.5z" />
-                <path d="M6.15 3.6h5.7v2.65h-5.7z" />
-                <path d="M7 7.9v6.2M9 7.9v6.2M11 7.9v6.2" />
-              </svg>
-              <span>Войти через корпоративную учетную запись</span>
-            </button>
+                <button className={styles.ssoButton} type="button" onClick={handleCorporateLogin}>
+                  <svg className={styles.ssoIcon} viewBox="0 0 18 18" aria-hidden="true">
+                    <path d="M3 16h12" />
+                    <path d="M4.25 6.25h9.5v9.75h-9.5z" />
+                    <path d="M6.15 3.6h5.7v2.65h-5.7z" />
+                    <path d="M7 7.9v6.2M9 7.9v6.2M11 7.9v6.2" />
+                  </svg>
+                  <span>Войти через корпоративную учетную запись</span>
+                </button>
+              </>
+            ) : (
+              <button className={styles.forgotLink} type="button" onClick={handlePlatformLogin}>
+                Вернуться к входу по email
+              </button>
+            )}
 
             <p className={styles.supportText}>
               Нет доступа? Обратитесь к администратору платформы

@@ -1,61 +1,147 @@
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/endpoints";
+import {
+  clearOneCSession,
+  getOneCCredentials,
+  saveOneCCredentials
+} from "@/auth/onecSession";
 import type { LoginPayload, User } from "@/types";
+
+export type AuthMode = "platform" | "onec";
 
 interface AuthContextValue {
   user: User | null;
+  authMode: AuthMode | null;
+  hasOneCAccess: boolean;
+  needsOneCReauth: boolean;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
+  loginWith1C: (payload: { fio: string; password: string }) => Promise<void>;
   logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+function detectAuthMode(): AuthMode | null {
+  if (localStorage.getItem("access_token")) return "platform";
+  return null;
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
-  const [hasToken, setHasToken] = useState(() => Boolean(localStorage.getItem("access_token")));
+  const [authMode, setAuthMode] = useState<AuthMode | null>(detectAuthMode);
+  const [onecCredentials, setOnecCredentials] = useState(() => getOneCCredentials());
+  const onecLoginPromise = useRef<Promise<void> | null>(null);
+
+  const hasPlatformToken = Boolean(localStorage.getItem("access_token"));
 
   const meQuery = useQuery({
     queryKey: ["auth", "me"],
     queryFn: authApi.me,
-    enabled: hasToken,
+    enabled: hasPlatformToken,
     retry: false
   });
+
+  useEffect(() => {
+    function handleOneCSessionInvalidated() {
+      clearOneCSession();
+      setOnecCredentials(null);
+      void queryClient.invalidateQueries({ queryKey: ["auth", "me"] });
+      void queryClient.invalidateQueries({ queryKey: ["onec", "tasks"] });
+    }
+
+    window.addEventListener("onec-session-invalidated", handleOneCSessionInvalidated);
+    return () => window.removeEventListener("onec-session-invalidated", handleOneCSessionInvalidated);
+  }, [queryClient]);
 
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: async (token) => {
+      clearOneCSession();
       localStorage.setItem("access_token", token.access_token);
       if (token.expires_at) localStorage.setItem("token_expires_at", token.expires_at);
-      setHasToken(true);
+      setOnecCredentials(null);
+      setAuthMode("platform");
       await queryClient.invalidateQueries({ queryKey: ["auth"] });
     }
   });
 
-  const value = useMemo<AuthContextValue>(
-    () => ({
-      user: meQuery.data ?? null,
-      isAuthenticated: Boolean(hasToken && meQuery.data),
-      isLoading: hasToken && meQuery.isLoading,
+  const login1CMutation = useMutation({
+    mutationFn: authApi.loginWith1C,
+    onSuccess: async (result, credentials) => {
+      saveOneCCredentials(credentials);
+      setOnecCredentials(credentials);
+      localStorage.setItem("access_token", result.access_token);
+      if (result.expires_at) {
+        localStorage.setItem("token_expires_at", result.expires_at);
+      }
+      setAuthMode("platform");
+      await queryClient.invalidateQueries({ queryKey: ["auth"] });
+      await queryClient.invalidateQueries({ queryKey: ["onec", "tasks"] });
+    }
+  });
+
+  const value = useMemo<AuthContextValue>(() => {
+    const platformAuthenticated = hasPlatformToken && Boolean(meQuery.data);
+    const hasOneCAccess = hasPlatformToken && Boolean(onecCredentials);
+    const needsOneCReauth =
+      meQuery.isSuccess &&
+      Boolean(meQuery.data?.has_onec_credentials) &&
+      !onecCredentials;
+    const user = platformAuthenticated && meQuery.data ? meQuery.data : null;
+
+    return {
+      user,
+      authMode: hasPlatformToken ? "platform" : authMode,
+      hasOneCAccess,
+      needsOneCReauth,
+      isAuthenticated: platformAuthenticated,
+      isLoading: hasPlatformToken && meQuery.isLoading,
       login: async (payload) => {
         await loginMutation.mutateAsync(payload);
       },
+      loginWith1C: async (payload) => {
+        if (onecLoginPromise.current) {
+          await onecLoginPromise.current;
+          return;
+        }
+        onecLoginPromise.current = login1CMutation
+          .mutateAsync(payload)
+          .then(() => undefined)
+          .finally(() => {
+            onecLoginPromise.current = null;
+          });
+        await onecLoginPromise.current;
+      },
       logout: async () => {
         try {
-          if (hasToken) await authApi.logout();
+          if (hasPlatformToken) await authApi.logout();
+        } catch {
+          // ignore logout errors
         } finally {
           localStorage.removeItem("access_token");
           localStorage.removeItem("token_expires_at");
-          setHasToken(false);
+          clearOneCSession();
+          setOnecCredentials(null);
+          setAuthMode(null);
           queryClient.clear();
         }
       }
-    }),
-    [hasToken, loginMutation, meQuery.data, meQuery.isLoading, queryClient]
-  );
+    };
+  }, [
+    authMode,
+    hasPlatformToken,
+    login1CMutation,
+    loginMutation,
+    meQuery.data,
+    meQuery.isLoading,
+    onecCredentials,
+    meQuery.isSuccess,
+    queryClient
+  ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

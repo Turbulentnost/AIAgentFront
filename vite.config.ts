@@ -7,6 +7,7 @@ const DEFAULT_API_SERVER = "http://192.168.1.157:5454";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxy = env.VITE_API_PROXY || env.VITE_API_SERVER || DEFAULT_API_SERVER;
+  const onecProxy = env.VITE_ONEC_API_SERVER || "http://192.168.0.247:8000";
 
   return {
     plugins: [react()],
@@ -22,7 +23,16 @@ export default defineConfig(({ mode }) => {
       proxy: {
         "/api": {
           target: apiProxy,
-          changeOrigin: true
+          changeOrigin: true,
+          timeout: 600000,
+          proxyTimeout: 600000
+        },
+        "/onec-api": {
+          target: onecProxy,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/onec-api/, ""),
+          timeout: 120000,
+          proxyTimeout: 120000
         }
       }
     },

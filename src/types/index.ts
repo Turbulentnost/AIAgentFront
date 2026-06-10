@@ -23,6 +23,36 @@ export type DocumentProcessingStatus =
   | "indexed"
   | "failed";
 export type TextExtractStatus = "not_started" | "processing" | "extracted" | "failed";
+export type NdChangeRequestStatus =
+  | "draft"
+  | "submitted"
+  | "detecting_document"
+  | "requires_manual_document_selection"
+  | "document_selected"
+  | "locating_change_place"
+  | "requires_manual_location_selection"
+  | "applying_changes"
+  | "ready_for_user_review"
+  | "sent_to_approval"
+  | "approved"
+  | "rejected"
+  | "completed"
+  | "failed";
+export type NdChangeLocationStatus = "found" | "candidate" | "ambiguous" | "not_found" | "confirmed";
+export type NdChangeOperationType =
+  | "replace_section"
+  | "replace_paragraph"
+  | "insert_after"
+  | "insert_before"
+  | "delete_section"
+  | "update_table"
+  | "add_table_row"
+  | "replace_appendix"
+  | "update_reference"
+  | "annul_document"
+  | "replace_document"
+  | "manual_review";
+export type NdChangeApprovalStatus = "draft" | "sent" | "approved" | "rejected" | "completed";
 
 export interface Agent {
   id: string;
@@ -41,6 +71,16 @@ export interface AgentAccess extends Agent {
   can_view_results: boolean;
   can_approve: boolean;
   can_configure: boolean;
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
 }
 export interface Task {
   id: string;
@@ -72,6 +112,36 @@ export interface TaskCreate {
   run_parameters?: Record<string, unknown>;
   requires_human_review?: boolean;
   task_metadata?: Record<string, unknown>;
+}
+
+export interface OneCSession {
+  token: string | null;
+  fio: string;
+  expires_at: string | null;
+  resolved_user: string | null;
+  resolved_user_source?: string | null;
+  token_created_at?: string;
+  reused?: boolean;
+}
+
+export interface OneCTask {
+  id: string;
+  title: string;
+  description: string | null;
+  due_date: string | null;
+  created_at: string | null;
+  author: string | null;
+  completed: boolean;
+}
+
+export interface OneCTasksResponse {
+  token: string | null;
+  count: number;
+  cached: boolean;
+  task_object?: string;
+  query?: string;
+  resolved_user: string;
+  tasks: OneCTask[];
 }
 export interface TaskStep {
   id: string;
@@ -115,6 +185,13 @@ export interface HealthResponse {
   version: string;
   checks?: Record<string, string> | null;
 }
+export interface OneCLoginResponse extends TokenResponse {
+  user: User;
+  is_created_via_1c: boolean;
+  onec_session: OneCSession;
+  token_reused?: boolean;
+}
+
 export interface TokenResponse {
   access_token: string;
   token_type: "bearer";
@@ -125,6 +202,31 @@ export interface LoginPayload {
   password: string;
   new_password?: string;
 }
+export interface ResponsibleUser {
+  id: string;
+  full_name: string | null;
+  position: string | null;
+  department_id: string | null;
+  department_name: string | null;
+}
+
+export interface EmployeeSyncResult {
+  key: string;
+  source_system: string;
+  resource: string;
+  last_synced_at: string | null;
+  next_allowed_at: string | null;
+  status: string;
+  items_count: number;
+  error_message: string | null;
+  created_count: number;
+  updated_count: number;
+  deactivated_count: number;
+  skipped_count: number;
+  missing_department_count: number;
+  synced_count: number;
+}
+
 export interface User {
   id: string;
   email: string;
@@ -135,6 +237,11 @@ export interface User {
   full_name: string | null;
   phone: string | null;
   position: string | null;
+  source_system?: string | null;
+  external_id?: string | null;
+  is_created_via_1c?: boolean;
+  has_onec_credentials?: boolean;
+  has_onec_session?: boolean;
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
@@ -266,6 +373,144 @@ export interface DocumentUploadOptions {
   department_id?: string;
   task_id?: string;
   is_knowledge_base?: boolean;
+  relative_path?: string;
+}
+
+export interface NdChangeRequestCreate {
+  reason: string;
+  release_date?: string | null;
+  effective_date?: string | null;
+  change_text: string;
+  department_id?: string | null;
+  assumed_document_id?: string | null;
+  assumed_document_code?: string | null;
+  attachments?: string[];
+  distribution_list?: string[];
+  initiator_comment?: string | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface NdChangeRequest {
+  id: string;
+  number: string;
+  reason: string;
+  release_date: string | null;
+  effective_date: string | null;
+  change_text: string;
+  initiator_user_id: string | null;
+  department_id: string | null;
+  status: NdChangeRequestStatus;
+  selected_document_id: string | null;
+  selected_document_version_id: string | null;
+  detection_confidence: number | null;
+  requires_manual_document_selection: boolean;
+  requires_manual_location_selection: boolean;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NdChangeCandidateDocument {
+  id: string;
+  change_request_id: string;
+  document_id: string;
+  document_version_id: string | null;
+  score: number;
+  rank: number;
+  match_reason: string | null;
+  matched_fragments: Array<Record<string, unknown>> | null;
+  is_selected: boolean;
+  document_title?: string | null;
+  document_code?: string | null;
+}
+
+export interface NdChangeTargetLocation {
+  id: string;
+  change_request_id: string;
+  document_id: string;
+  document_version_id: string | null;
+  section_number: string | null;
+  section_title: string | null;
+  page_number: number | null;
+  chunk_id: string | null;
+  location_type: string;
+  current_text: string | null;
+  confidence: number | null;
+  status: NdChangeLocationStatus;
+}
+
+export interface NdChangeOperation {
+  id: string;
+  change_request_id: string;
+  target_location_id: string | null;
+  operation_type: NdChangeOperationType;
+  old_text: string | null;
+  new_text: string | null;
+  diff: Array<{ section_number?: string | null; old_text?: string; new_text?: string }> | null;
+  status: string;
+  requires_manual_review: boolean;
+}
+
+export interface NdChangeDraftFile {
+  id: string;
+  change_request_id: string;
+  document_id: string | null;
+  source_document_version_id: string | null;
+  draft_bucket: string;
+  draft_object_name: string;
+  original_filename: string | null;
+  generated_filename: string;
+  file_type: string;
+  status: string;
+  file_size: number | null;
+  created_at: string;
+}
+
+export interface NdChangeApprovalParticipant {
+  id: string;
+  approval_route_id: string;
+  user_id: string | null;
+  role_name: string | null;
+  approval_order: number;
+  status: NdChangeApprovalStatus;
+  comment: string | null;
+  approved_at: string | null;
+}
+
+export interface NdChangeApprovalRoute {
+  id: string;
+  change_request_id: string;
+  status: NdChangeApprovalStatus;
+  created_by_user_id: string | null;
+  started_at: string | null;
+  finished_at: string | null;
+  participants: NdChangeApprovalParticipant[];
+}
+
+export interface NdChangeResult {
+  id: string;
+  change_request_id: string;
+  agent_id: string | null;
+  status: string;
+  summary: string | null;
+  confidence: number | null;
+  selected_document_id: string | null;
+  draft_file_id: string | null;
+  change_notice_file_id: string | null;
+  warnings: string[] | null;
+  actions: Array<Record<string, unknown>> | null;
+  metadata?: Record<string, unknown> | null;
+  created_at: string;
+}
+
+export interface NdChangePreview {
+  request: NdChangeRequest;
+  candidates: NdChangeCandidateDocument[];
+  target_locations: NdChangeTargetLocation[];
+  operations: NdChangeOperation[];
+  draft_files: NdChangeDraftFile[];
+  approval_routes: NdChangeApprovalRoute[];
+  result: NdChangeResult | null;
 }
 export interface ChunkSearchHit {
   content: string;
@@ -281,7 +526,13 @@ export interface ChunkSearchQuery {
 }
 
 export type KnowledgeBaseStatus = "draft" | "processing" | "needs_review" | "ready" | "updating" | "error" | "archived";
-export type KnowledgeBaseSourceStatus = KnowledgeBaseStatus;
+export type KnowledgeBaseSourceStatus =
+  | KnowledgeBaseStatus
+  | "excluded"
+  | "needs_ocr"
+  | "ready_to_index";
+export type KnowledgeBaseChunkQualityStatus = "unknown" | "good" | "medium" | "low" | "failed";
+export type KnowledgeBaseSourcePrecheckStatus = "pending" | "passed" | "failed";
 export type KnowledgeBaseAccessType =
   | "read"
   | "search"
@@ -290,7 +541,7 @@ export type KnowledgeBaseAccessType =
   | "reindex"
   | "manage_access"
   | "admin";
-export type KnowledgeBaseGrantType = "user" | "department" | "agent" | "admin_only";
+export type KnowledgeBaseGrantType = "user" | "department" | "role" | "organization" | "agent" | "admin_only";
 export type KnowledgeBaseAgentAccessMode = "search_only" | "search_and_cite" | "decision" | "auto_action";
 export type KnowledgeBaseIndexJobType = "full" | "source" | "chunk" | "embeddings" | "access_reindex";
 export type KnowledgeBaseIndexJobStatus = "queued" | "running" | "completed" | "failed" | "partial";
@@ -309,12 +560,21 @@ export interface KnowledgeBase {
   vector_store: string;
   qdrant_collection: string;
   last_indexed_at: string | null;
+  deleted_at?: string | null;
+  deleted_by_user_id?: string | null;
   is_public: boolean;
   sources_count: number;
   fragments_count: number;
   storage_bytes: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface KnowledgeBaseListItem extends KnowledgeBase {
+  can_access: boolean;
+  can_search: boolean;
+  can_delete: boolean;
+  indexing_active: boolean;
 }
 
 export interface KnowledgeBaseStats {
@@ -337,6 +597,10 @@ export interface KnowledgeBaseAccessGrantInput {
   reason?: string | null;
   comment?: string | null;
   responsible_user_id?: string | null;
+}
+
+export interface KnowledgeBaseAccessExceptionInput extends KnowledgeBaseAccessGrantInput {
+  is_deny: boolean;
 }
 
 export interface KnowledgeBaseCreate {
@@ -364,6 +628,11 @@ export interface KnowledgeBaseSource {
   fragments_count: number;
   file_size: number | null;
   access_snapshot: Record<string, unknown> | null;
+  precheck_status?: KnowledgeBaseSourcePrecheckStatus;
+  precheck_notes?: string | null;
+  checksum?: string | null;
+  quality_status?: KnowledgeBaseChunkQualityStatus;
+  pages_count?: number | null;
   document_title?: string | null;
   original_filename?: string | null;
   extension?: string | null;
@@ -382,6 +651,7 @@ export interface KnowledgeBaseChunk {
   exclusion_reason: string | null;
   indexed_at: string | null;
   embedding_status: string;
+  quality_status?: KnowledgeBaseChunkQualityStatus;
   clause_number: string | null;
   fragment_type: string | null;
   access_snapshot: Record<string, unknown> | null;
@@ -434,6 +704,14 @@ export interface KnowledgeBaseIndexingJob {
   created_fragments_count: number;
   updated_fragments_count: number;
   errors_count: number;
+  total_sources_count?: number;
+  total_chunks_count?: number;
+  extracted_sources_count?: number;
+  chunked_sources_count?: number;
+  embedded_chunks_count?: number;
+  qdrant_points_count?: number;
+  fulltext_chunks_count?: number;
+  processing_params?: Record<string, unknown> | null;
   duration_ms: number | null;
   started_by_user_id: string | null;
   started_at: string | null;
@@ -443,6 +721,28 @@ export interface KnowledgeBaseIndexingJob {
   qdrant_collection: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface KnowledgeBaseOverviewStats {
+  sources_total: number;
+  sources_processed: number;
+  sources_with_errors: number;
+  fragments_total: number;
+  qdrant_points: number;
+  fulltext_chunks: number;
+  quality_percent: number;
+  unresolved_errors: number;
+}
+
+export interface KnowledgeBaseReadiness {
+  sources_total: number;
+  sources_ready: number;
+  fragments_total: number;
+  fts_chunks: number;
+  quality_percent: number;
+  unresolved_errors: number;
+  can_promote_to_ready: boolean;
+  recommendation: string;
 }
 
 export interface KnowledgeBaseIndexingError {
@@ -479,4 +779,200 @@ export interface KnowledgeBaseSearchHit {
 export interface KnowledgeBaseTestSearchResponse {
   hits: KnowledgeBaseSearchHit[];
   answer_preview: string | null;
+}
+
+export type AgentBuilderSessionStatus =
+  | "draft"
+  | "planning"
+  | "executing"
+  | "needs_clarification"
+  | "generated"
+  | "needs_user_review"
+  | "approved"
+  | "failed"
+  | "archived";
+
+export type AgentBuilderPlanStepStatus = "pending" | "running" | "completed" | "failed" | "skipped";
+export type AgentBlueprintStatus =
+  | "draft"
+  | "planning"
+  | "generated"
+  | "needs_user_review"
+  | "approved"
+  | "in_development"
+  | "implemented"
+  | "archived";
+
+export interface AgentBuilderPlanStep {
+  id: string;
+  step_order: number;
+  title: string;
+  description?: string | null;
+  status: AgentBuilderPlanStepStatus;
+  started_at?: string | null;
+  finished_at?: string | null;
+  result?: Record<string, unknown> | null;
+  error_message?: string | null;
+}
+
+export interface AgentBuilderPlan {
+  id: string;
+  goal: string;
+  status: string;
+  steps: AgentBuilderPlanStep[];
+}
+
+export interface AgentBuilderAttempt {
+  id: string;
+  attempt_number: number;
+  goal?: string | null;
+  success: boolean;
+  result_summary?: string | null;
+  failure_reason?: string | null;
+  created_at: string;
+}
+
+export type AgentType = "consultant" | "action";
+
+export interface WorkflowGraphNode {
+  id: string;
+  label: string;
+  type?: string;
+  capability?: string | null;
+  goal?: string | null;
+  node_kind?: string | null;
+  status?: string | null;
+}
+
+export interface AgentTypeProposal {
+  proposed_agent_type?: string | null;
+  confidence?: number | null;
+  reasoning?: string | null;
+  confirmed: boolean;
+}
+
+export interface AgentBlueprint {
+  id: string;
+  name: string;
+  code: string;
+  description?: string | null;
+  agent_type?: string | null;
+  status: AgentBlueprintStatus;
+  version: number;
+  input_schema?: Record<string, unknown> | null;
+  output_schema?: Record<string, unknown> | null;
+  tools?: string[] | null;
+  knowledge_bases?: string[] | null;
+  workflow_graph?: {
+    nodes: WorkflowGraphNode[];
+    edges: Array<{ source: string; target: string; label?: string }>;
+  } | null;
+  human_approval_rules?: Array<Record<string, unknown>> | null;
+  prompts?: Record<string, string> | null;
+  test_cases?: Array<Record<string, unknown>> | null;
+  report_template?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface AgentBuilderSession {
+  id: string;
+  goal: string;
+  current_stage?: string | null;
+  status: AgentBuilderSessionStatus;
+  collected_requirements?: Record<string, unknown> | null;
+  validation_result?: { valid: boolean; errors: string[]; warnings: string[] } | null;
+  proposed_agent_structure?: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface AgentBuilderDesignStage {
+  id: string;
+  label: string;
+  status: "pending" | "running" | "completed";
+}
+
+export interface AgentBuilderRequiredElement {
+  key: string;
+  label: string;
+  question?: string | null;
+  required?: boolean;
+  value?: string | null;
+  status?: "pending" | "filled";
+}
+
+export interface AgentBuilderRequirementsValidation {
+  valid: boolean;
+  errors?: string[];
+  missing?: string[];
+  elements?: AgentBuilderRequiredElement[];
+}
+
+export interface AgentBuilderDesignSummary {
+  success: boolean;
+  summary_type?: string | null;
+  output_text?: string | null;
+  capabilities: string[];
+  runtime_dependencies: string[];
+  input_params: string[];
+  output_format: string[];
+  valid: boolean;
+  errors: string[];
+}
+
+export interface AgentBuilderSessionDetail extends AgentBuilderSession {
+  plan?: AgentBuilderPlan | null;
+  attempts: AgentBuilderAttempt[];
+  blueprint?: AgentBlueprint | null;
+  assistant_messages: string[];
+  clarifying_questions: string[];
+  design_stages: AgentBuilderDesignStage[];
+  required_elements: AgentBuilderRequiredElement[];
+  requirements_validation?: AgentBuilderRequirementsValidation | null;
+  design_summary?: AgentBuilderDesignSummary | null;
+  agent_type?: string | null;
+  agent_type_proposal?: AgentTypeProposal | null;
+}
+
+export interface AgentBuilderToolCatalogItem {
+  name: string;
+  description: string;
+  implemented: boolean;
+  required_permissions: string[];
+}
+
+export interface SandboxStep {
+  id: string;
+  order_index: number;
+  title?: string | null;
+  capability?: string | null;
+  tool_name?: string | null;
+  status: string;
+  request?: Record<string, unknown> | null;
+  result_summary?: Record<string, unknown> | null;
+  duration_ms?: number | null;
+  error_message?: string | null;
+}
+
+export interface SandboxRunStats {
+  total_steps?: number;
+  success_steps?: number;
+  error_steps?: number;
+  avg_duration_ms?: number;
+  total_duration_ms?: number;
+}
+
+export interface SandboxRun {
+  id: string;
+  session_id: string;
+  status: string;
+  test_query?: string | null;
+  final_answer?: string | null;
+  stats?: SandboxRunStats | null;
+  executed_graph?: {
+    nodes: WorkflowGraphNode[];
+    edges: Array<{ source: string; target: string; label?: string }>;
+  } | null;
+  error_message?: string | null;
+  steps: SandboxStep[];
 }
