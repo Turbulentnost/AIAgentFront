@@ -12,15 +12,17 @@ longRunningApiClient.interceptors.request.use((config) => {
   return config;
 });
 
-function isOneCSessionExpiredError(error: unknown): boolean {
-  const detail = (error as { response?: { data?: { detail?: { code?: string } | string } } })?.response?.data?.detail;
-  return typeof detail === "object" && detail?.code === "onec_session_expired";
+function isOneCSessionAuthError(error: unknown): boolean {
+  const detail = (error as { response?: { data?: { detail?: { code?: string } | string } } })?.response?.data
+    ?.detail;
+  if (typeof detail !== "object" || !detail?.code) return false;
+  return detail.code === "onec_session_expired" || detail.code === "onec_session_invalid";
 }
 
 longRunningApiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && !isOneCSessionExpiredError(error)) {
+    if (error.response?.status === 401 && !isOneCSessionAuthError(error)) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("token_expires_at");
     }
@@ -35,7 +37,7 @@ apiClient.interceptors.request.use((config) => {
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401 && !isOneCSessionExpiredError(error)) {
+    if (error.response?.status === 401 && !isOneCSessionAuthError(error)) {
       localStorage.removeItem("access_token");
       localStorage.removeItem("token_expires_at");
     }

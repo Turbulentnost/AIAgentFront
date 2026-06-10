@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { AlertCircle, CalendarDays, CheckCircle2, CircleDashed } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { onecTasksApi } from "@/api/onecEndpoints";
 import { tasksApi } from "@/api/endpoints";
@@ -61,29 +62,48 @@ function OneCTasksTable({ tasks }: { tasks: OneCTask[] }) {
 }
 
 export default function Tasks() {
-  const { authMode, hasOneCAccess } = useAuth();
+  const { authMode, hasOneCAccess, needsOneCReauth, isLoading: authLoading } = useAuth();
   const showOneCTasks = hasOneCAccess;
 
   const onecQuery = useQuery({
     queryKey: ["onec", "tasks"],
     queryFn: onecTasksApi.list,
-    enabled: showOneCTasks,
+    enabled: showOneCTasks && !authLoading,
     retry: false
   });
 
   const platformQuery = useQuery({
     queryKey: ["tasks", "list"],
     queryFn: () => tasksApi.list(),
-    enabled: authMode === "platform" && !showOneCTasks,
+    enabled: authMode === "platform" && !showOneCTasks && !needsOneCReauth && !authLoading,
     retry: 1
   });
+
+  if (authLoading) {
+    return <LoadingPanel title="Загружаем профиль" />;
+  }
+
+  if (needsOneCReauth) {
+    return (
+      <div className={styles.errorCard}>
+        <AlertCircle size={22} strokeWidth={2} aria-hidden="true" />
+        <div>
+          <strong>Нужно заново войти через 1С</strong>
+          <p>
+            Для каждого запроса задач теперь нужны ФИО и пароль.{" "}
+            <Link to="/login">Войдите снова через корпоративную учётную запись</Link>.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (showOneCTasks) {
     if (onecQuery.isPending) {
       return (
         <LoadingPanel
           title="Загружаем задачи из 1С"
-          subtitle="OData-запрос может занять 8–15 секунд. Пожалуйста, подождите."
+          subtitle="Каждый запрос открывает новое COM-подключение к 1С и может занять 60–90 секунд."
         />
       );
     }
@@ -94,7 +114,10 @@ export default function Tasks() {
           <AlertCircle size={22} strokeWidth={2} aria-hidden="true" />
           <div>
             <strong>Не удалось загрузить задачи из 1С</strong>
-            <p>Проверьте доступность сервера 1С и повторите попытку.</p>
+            <p>
+              Проверьте доступность сервера 1С или{" "}
+              <Link to="/login">войдите снова через корпоративную учётную запись</Link>.
+            </p>
           </div>
         </div>
       );

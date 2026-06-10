@@ -2,7 +2,13 @@ import type { OneCSession, User } from "@/types";
 
 const TOKEN_KEY = "onec_token";
 const SESSION_KEY = "onec_session";
+const CREDENTIALS_KEY = "onec_credentials";
 const ONEC_TOKEN_MAX_AGE_MS = 4 * 60 * 60 * 1000;
+
+export interface OneCCredentials {
+  fio: string;
+  password: string;
+}
 
 export function getOneCToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
@@ -34,13 +40,35 @@ export function isOneCSessionValid(session: OneCSession | null = getOneCSession(
 }
 
 export function saveOneCSession(session: OneCSession): void {
-  localStorage.setItem(TOKEN_KEY, session.token);
+  if (session.token) localStorage.setItem(TOKEN_KEY, session.token);
+  else localStorage.removeItem(TOKEN_KEY);
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
 }
 
 export function clearOneCSession(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(CREDENTIALS_KEY);
+}
+
+export function saveOneCCredentials(credentials: OneCCredentials): void {
+  sessionStorage.setItem(CREDENTIALS_KEY, JSON.stringify(credentials));
+}
+
+export function getOneCCredentials(): OneCCredentials | null {
+  const raw = sessionStorage.getItem(CREDENTIALS_KEY);
+  if (!raw) return null;
+  try {
+    const credentials = JSON.parse(raw) as OneCCredentials;
+    if (!credentials.fio || !credentials.password) return null;
+    return credentials;
+  } catch {
+    return null;
+  }
+}
+
+export function hasOneCCredentials(): boolean {
+  return getOneCCredentials() !== null;
 }
 
 export function buildOneCUser(session: OneCSession): User {
@@ -49,7 +77,7 @@ export function buildOneCUser(session: OneCSession): User {
   const [lastName, firstName, middleName] = parts;
 
   return {
-    id: `onec:${session.token.slice(0, 12)}`,
+    id: `onec:${fullName}`,
     email: "",
     username: null,
     last_name: lastName ?? null,

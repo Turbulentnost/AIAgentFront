@@ -477,7 +477,7 @@ export default function Login() {
 
             {isCorporateMode && isSubmitting ? (
               <p className={styles.corporateHint}>
-                Подключаемся к 1С и проверяем учётную запись. Это может занять до 90 секунд.
+                Выполняем вход. Задачи из 1С загрузятся отдельным запросом после входа.
               </p>
             ) : null}
 
@@ -486,7 +486,7 @@ export default function Login() {
             <button className={styles.submitButton} disabled={isSubmitting} type="submit">
               {isSubmitting
                 ? isCorporateMode
-                  ? "Подключение к 1С..."
+                  ? "Входим..."
                   : "Входим..."
                 : isCorporateMode
                   ? "Войти через корпоративную учётную запись"

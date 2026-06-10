@@ -1,7 +1,7 @@
 import axios from "axios";
 import { ONEC_API_BASE_URL, ONEC_API_SERVER } from "./onecConfig";
 import { apiClient } from "./client";
-import { getOneCToken, clearOneCSession } from "@/auth/onecSession";
+import { clearOneCSession } from "@/auth/onecSession";
 
 const defaultHeaders = {
   "Content-Type": "application/json; charset=utf-8",
@@ -15,34 +15,21 @@ export const onecApiClient = axios.create({
   headers: defaultHeaders
 });
 
-onecApiClient.interceptors.request.use((config) => {
-  const token = getOneCToken();
-  if (token) {
-    if (typeof config.headers.set === "function") {
-      config.headers.set("Authorization", `Bearer ${token}`);
-      config.headers.set("X-Auth-Token", token);
-    } else {
-      config.headers.Authorization = `Bearer ${token}`;
-      config.headers["X-Auth-Token"] = token;
-    }
-    config.params = { ...(config.params ?? {}), token };
-  }
-  return config;
-});
-
 onecApiClient.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error.response?.status === 401) {
-      clearOneCSession();
-      void apiClient
-        .delete("/auth/onec/session")
-        .catch(() => undefined)
-        .finally(() => window.dispatchEvent(new Event("onec-session-invalidated")));
-    }
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
+
+export async function invalidateOneCSession(): Promise<void> {
+  clearOneCSession();
+  try {
+    await apiClient.delete("/auth/onec/session");
+  } catch {
+    // Best-effort cleanup: local state must still be cleared.
+  } finally {
+    window.dispatchEvent(new Event("onec-session-invalidated"));
+  }
+}
 
 export async function checkOneCHealth(): Promise<boolean> {
   try {

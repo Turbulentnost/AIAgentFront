@@ -72,6 +72,16 @@ export interface AgentAccess extends Agent {
   can_approve: boolean;
   can_configure: boolean;
 }
+
+export interface Role {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  is_system: boolean;
+  created_at: string;
+  updated_at: string;
+}
 export interface Task {
   id: string;
   title: string;
@@ -105,7 +115,7 @@ export interface TaskCreate {
 }
 
 export interface OneCSession {
-  token: string;
+  token: string | null;
   fio: string;
   expires_at: string | null;
   resolved_user: string | null;
@@ -125,7 +135,7 @@ export interface OneCTask {
 }
 
 export interface OneCTasksResponse {
-  token: string;
+  token: string | null;
   count: number;
   cached: boolean;
   task_object?: string;
@@ -230,6 +240,8 @@ export interface User {
   source_system?: string | null;
   external_id?: string | null;
   is_created_via_1c?: boolean;
+  has_onec_credentials?: boolean;
+  has_onec_session?: boolean;
   is_active: boolean;
   is_superuser: boolean;
   is_verified: boolean;
@@ -502,7 +514,13 @@ export interface ChunkSearchQuery {
 }
 
 export type KnowledgeBaseStatus = "draft" | "processing" | "needs_review" | "ready" | "updating" | "error" | "archived";
-export type KnowledgeBaseSourceStatus = KnowledgeBaseStatus;
+export type KnowledgeBaseSourceStatus =
+  | KnowledgeBaseStatus
+  | "excluded"
+  | "needs_ocr"
+  | "ready_to_index";
+export type KnowledgeBaseChunkQualityStatus = "unknown" | "good" | "medium" | "low" | "failed";
+export type KnowledgeBaseSourcePrecheckStatus = "pending" | "passed" | "failed";
 export type KnowledgeBaseAccessType =
   | "read"
   | "search"
@@ -511,7 +529,7 @@ export type KnowledgeBaseAccessType =
   | "reindex"
   | "manage_access"
   | "admin";
-export type KnowledgeBaseGrantType = "user" | "department" | "agent" | "admin_only";
+export type KnowledgeBaseGrantType = "user" | "department" | "role" | "organization" | "agent" | "admin_only";
 export type KnowledgeBaseAgentAccessMode = "search_only" | "search_and_cite" | "decision" | "auto_action";
 export type KnowledgeBaseIndexJobType = "full" | "source" | "chunk" | "embeddings" | "access_reindex";
 export type KnowledgeBaseIndexJobStatus = "queued" | "running" | "completed" | "failed" | "partial";
@@ -530,12 +548,21 @@ export interface KnowledgeBase {
   vector_store: string;
   qdrant_collection: string;
   last_indexed_at: string | null;
+  deleted_at?: string | null;
+  deleted_by_user_id?: string | null;
   is_public: boolean;
   sources_count: number;
   fragments_count: number;
   storage_bytes: number;
   created_at: string;
   updated_at: string;
+}
+
+export interface KnowledgeBaseListItem extends KnowledgeBase {
+  can_access: boolean;
+  can_search: boolean;
+  can_delete: boolean;
+  indexing_active: boolean;
 }
 
 export interface KnowledgeBaseStats {
@@ -558,6 +585,10 @@ export interface KnowledgeBaseAccessGrantInput {
   reason?: string | null;
   comment?: string | null;
   responsible_user_id?: string | null;
+}
+
+export interface KnowledgeBaseAccessExceptionInput extends KnowledgeBaseAccessGrantInput {
+  is_deny: boolean;
 }
 
 export interface KnowledgeBaseCreate {
@@ -585,6 +616,11 @@ export interface KnowledgeBaseSource {
   fragments_count: number;
   file_size: number | null;
   access_snapshot: Record<string, unknown> | null;
+  precheck_status?: KnowledgeBaseSourcePrecheckStatus;
+  precheck_notes?: string | null;
+  checksum?: string | null;
+  quality_status?: KnowledgeBaseChunkQualityStatus;
+  pages_count?: number | null;
   document_title?: string | null;
   original_filename?: string | null;
   extension?: string | null;
@@ -603,6 +639,7 @@ export interface KnowledgeBaseChunk {
   exclusion_reason: string | null;
   indexed_at: string | null;
   embedding_status: string;
+  quality_status?: KnowledgeBaseChunkQualityStatus;
   clause_number: string | null;
   fragment_type: string | null;
   access_snapshot: Record<string, unknown> | null;
@@ -655,6 +692,14 @@ export interface KnowledgeBaseIndexingJob {
   created_fragments_count: number;
   updated_fragments_count: number;
   errors_count: number;
+  total_sources_count?: number;
+  total_chunks_count?: number;
+  extracted_sources_count?: number;
+  chunked_sources_count?: number;
+  embedded_chunks_count?: number;
+  qdrant_points_count?: number;
+  fulltext_chunks_count?: number;
+  processing_params?: Record<string, unknown> | null;
   duration_ms: number | null;
   started_by_user_id: string | null;
   started_at: string | null;
@@ -664,6 +709,28 @@ export interface KnowledgeBaseIndexingJob {
   qdrant_collection: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface KnowledgeBaseOverviewStats {
+  sources_total: number;
+  sources_processed: number;
+  sources_with_errors: number;
+  fragments_total: number;
+  qdrant_points: number;
+  fulltext_chunks: number;
+  quality_percent: number;
+  unresolved_errors: number;
+}
+
+export interface KnowledgeBaseReadiness {
+  sources_total: number;
+  sources_ready: number;
+  fragments_total: number;
+  fts_chunks: number;
+  quality_percent: number;
+  unresolved_errors: number;
+  can_promote_to_ready: boolean;
+  recommendation: string;
 }
 
 export interface KnowledgeBaseIndexingError {

@@ -1493,14 +1493,75 @@ label.field {
 
 .accessModes {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
 }
 
 .accessModes button {
-  min-height: 52px;
-  padding: 8px;
+  display: grid;
+  gap: 5px;
+  min-height: 88px;
+  padding: 12px;
   color: var(--color-text-secondary);
+  text-align: left;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.accessModes button span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.selectedMode,
+.accessModes .selectedMode {
+  color: var(--color-primary-text);
+  background: var(--kb-selected-badge-bg);
+  border-color: var(--color-border-accent);
+}
+
+.accessConstructorSection {
+  display: grid;
+  gap: 12px;
+}
+
+.accessConstructorSection h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.sectionHeaderLine {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.sectionHeaderLine > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.rightsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.rightsGrid button,
+.modalPickList button {
+  min-height: 42px;
+  padding: 9px 11px;
+  color: var(--color-text-secondary);
+  text-align: left;
   background: var(--color-hover);
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
@@ -1508,10 +1569,105 @@ label.field {
   cursor: pointer;
 }
 
-.accessModes .selectedMode {
-  color: var(--color-primary-text);
-  background: var(--kb-selected-badge-bg);
-  border-color: var(--color-border-accent);
+.accessRulesTable {
+  width: 100%;
+  border-collapse: collapse;
+  overflow: hidden;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+}
+
+.accessRulesTable th,
+.accessRulesTable td {
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 12px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.accessRulesTable th {
+  color: var(--color-muted);
+  background: var(--color-hover);
+  font-weight: 900;
+}
+
+.accessRulesTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.accessRulesTable button {
+  color: var(--color-danger-text);
+  background: transparent;
+  border: 0;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.45);
+}
+
+.accessModal {
+  display: grid;
+  gap: 16px;
+  width: min(720px, 100%);
+  max-height: calc(100vh - 64px);
+  padding: 18px;
+  overflow: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.accessModal header,
+.accessModal footer {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.accessModal h3 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 16px;
+}
+
+.accessModal header button {
+  width: 32px;
+  height: 32px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.modalPickList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.modalPickList button {
+  display: grid;
+  gap: 4px;
+  min-height: 58px;
+}
+
+.modalPickList span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
 }
 
 .checkboxLine {

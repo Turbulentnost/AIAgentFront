@@ -14,6 +14,8 @@ import type {
   DocumentUploadOptions,
   HealthResponse,
   KnowledgeBase,
+  KnowledgeBaseAccessExceptionInput,
+  KnowledgeBaseListItem,
   KnowledgeBaseAccessGrantInput,
   KnowledgeBaseAgentBinding,
   KnowledgeBaseAgentBindingInput,
@@ -22,6 +24,8 @@ import type {
   KnowledgeBaseIndexJobType,
   KnowledgeBaseIndexingError,
   KnowledgeBaseIndexingJob,
+  KnowledgeBaseOverviewStats,
+  KnowledgeBaseReadiness,
   KnowledgeBaseRule,
   KnowledgeBaseSource,
   KnowledgeBaseStats,
@@ -35,6 +39,7 @@ import type {
   NdChangeRequest,
   NdChangeRequestCreate,
   NdChangeTargetLocation,
+  Role,
   Task,
   TaskCreate,
   TaskResult,
@@ -89,6 +94,9 @@ export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),
   available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data)
 };
+export const rolesApi = {
+  list: () => apiClient.get<Role[]>("/roles").then((r) => r.data)
+};
 export const tasksApi = {
   list: (params?: { limit?: number; offset?: number }) =>
     apiClient.get<Task[]>("/tasks", { params }).then((r) => r.data),
@@ -130,13 +138,25 @@ export const knowledgeBasesApi = {
   listResponsibleUsers: () =>
     apiClient.get<ResponsibleUser[]>("/knowledge-bases/responsible-users").then((r) => r.data),
   list: (params?: { status?: KnowledgeBaseStatus; query?: string }) =>
-    apiClient.get<KnowledgeBase[]>("/knowledge-bases", { params }).then((r) => r.data),
+    apiClient.get<KnowledgeBaseListItem[]>("/knowledge-bases", { params }).then((r) => r.data),
   get: (knowledgeBaseId: string) => apiClient.get<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}`).then((r) => r.data),
   create: (payload: KnowledgeBaseCreate) => apiClient.post<KnowledgeBase>("/knowledge-bases", payload).then((r) => r.data),
+  delete: (knowledgeBaseId: string) =>
+    apiClient.delete<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}`).then((r) => r.data),
+  overview: (knowledgeBaseId: string) =>
+    apiClient.get<KnowledgeBaseOverviewStats>(`/knowledge-bases/${knowledgeBaseId}/overview`).then((r) => r.data),
+  readiness: (knowledgeBaseId: string) =>
+    apiClient.get<KnowledgeBaseReadiness>(`/knowledge-bases/${knowledgeBaseId}/readiness`).then((r) => r.data),
   sources: (knowledgeBaseId: string) =>
     apiClient.get<KnowledgeBaseSource[]>(`/knowledge-bases/${knowledgeBaseId}/sources`).then((r) => r.data),
   addSource: (knowledgeBaseId: string, payload: { document_id: string; document_version_id?: string | null }) =>
     apiClient.post<KnowledgeBaseSource>(`/knowledge-bases/${knowledgeBaseId}/sources`, payload).then((r) => r.data),
+  excludeSource: (knowledgeBaseId: string, sourceId: string) =>
+    apiClient.post<KnowledgeBaseSource>(`/knowledge-bases/${knowledgeBaseId}/sources/${sourceId}/exclude`).then((r) => r.data),
+  reindexSource: (knowledgeBaseId: string, sourceId: string) =>
+    apiClient.post<KnowledgeBaseIndexingJob>(`/knowledge-bases/${knowledgeBaseId}/sources/${sourceId}/reindex`).then((r) => r.data),
+  deleteSource: (knowledgeBaseId: string, sourceId: string) =>
+    apiClient.delete(`/knowledge-bases/${knowledgeBaseId}/sources/${sourceId}`).then((r) => r.data),
   chunks: (knowledgeBaseId: string) =>
     apiClient.get<KnowledgeBaseChunk[]>(`/knowledge-bases/${knowledgeBaseId}/chunks`).then((r) => r.data),
   excludeChunk: (knowledgeBaseId: string, chunkId: string, payload: { is_excluded_from_search: boolean; exclusion_reason?: string | null }) =>
@@ -144,8 +164,8 @@ export const knowledgeBasesApi = {
   rules: (knowledgeBaseId: string) =>
     apiClient.get<KnowledgeBaseRule[]>(`/knowledge-bases/${knowledgeBaseId}/rules`).then((r) => r.data),
   access: (knowledgeBaseId: string) =>
-    apiClient.get<{ grants: KnowledgeBaseAccessGrantInput[]; exceptions: KnowledgeBaseAccessGrantInput[] }>(`/knowledge-bases/${knowledgeBaseId}/access`).then((r) => r.data),
-  updateAccess: (knowledgeBaseId: string, payload: { grants: KnowledgeBaseAccessGrantInput[]; exceptions?: KnowledgeBaseAccessGrantInput[] }) =>
+    apiClient.get<{ grants: KnowledgeBaseAccessGrantInput[]; exceptions: KnowledgeBaseAccessExceptionInput[] }>(`/knowledge-bases/${knowledgeBaseId}/access`).then((r) => r.data),
+  updateAccess: (knowledgeBaseId: string, payload: { grants: KnowledgeBaseAccessGrantInput[]; exceptions?: KnowledgeBaseAccessExceptionInput[] }) =>
     apiClient.put(`/knowledge-bases/${knowledgeBaseId}/access`, payload).then((r) => r.data),
   agents: (knowledgeBaseId: string) =>
     apiClient.get<KnowledgeBaseAgentBinding[]>(`/knowledge-bases/${knowledgeBaseId}/agents`).then((r) => r.data),
@@ -157,6 +177,10 @@ export const knowledgeBasesApi = {
     apiClient.get<KnowledgeBaseIndexingJob[]>(`/knowledge-bases/${knowledgeBaseId}/index/jobs`).then((r) => r.data),
   jobErrors: (jobId: string) =>
     apiClient.get<KnowledgeBaseIndexingError[]>(`/knowledge-bases/index/jobs/${jobId}/errors`).then((r) => r.data),
+  retryIndexingError: (errorId: string) =>
+    apiClient.post<KnowledgeBaseIndexingJob>(`/knowledge-bases/index/errors/${errorId}/retry`).then((r) => r.data),
+  createRule: (knowledgeBaseId: string, payload: Partial<KnowledgeBaseRule>) =>
+    apiClient.post<KnowledgeBaseRule>(`/knowledge-bases/${knowledgeBaseId}/rules`, payload).then((r) => r.data),
   testSearch: (knowledgeBaseId: string, payload: { query: string; top_k?: number; user_id?: string | null; department_id?: string | null; agent_id?: string | null }) =>
     apiClient.post<KnowledgeBaseTestSearchResponse>(`/knowledge-bases/${knowledgeBaseId}/test-search`, payload).then((r) => r.data),
   audit: (knowledgeBaseId: string) =>
