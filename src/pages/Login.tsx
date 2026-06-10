@@ -16,6 +16,7 @@ import {
 import { AxiosError } from "axios";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
+import { AuthProfileError } from "@/auth/errors";
 import ThemeToggle from "@/components/ThemeToggle";
 import styles from "./Login.module.css";
 
@@ -112,6 +113,15 @@ export default function Login() {
     return "Не удалось войти через корпоративную учётную запись";
   }
 
+  function getNetworkLoginError(err: unknown): string | null {
+    if (!(err instanceof AxiosError)) return null;
+    if (err.response) return null;
+    if (err.code === "ERR_NETWORK" || err.message.includes("Network Error")) {
+      return "Нет ответа от сервера API. Проверьте, что бэкенд запущен и доступен по сети.";
+    }
+    return "Не удалось связаться с сервером. Попробуйте обновить страницу.";
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (submitInFlight.current) return;
@@ -151,8 +161,13 @@ export default function Login() {
         } else {
           setError(getCorporateLoginError(err));
         }
+      } else if (err instanceof AuthProfileError) {
+        setError(err.message);
       } else {
-        setError(requiresPasswordChange ? "Не удалось изменить пароль" : "Неверный email или пароль");
+        setError(
+          getNetworkLoginError(err) ??
+            (requiresPasswordChange ? "Не удалось изменить пароль" : "Неверный email или пароль")
+        );
       }
     } finally {
       submitInFlight.current = false;

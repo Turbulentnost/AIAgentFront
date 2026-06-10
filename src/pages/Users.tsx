@@ -63,7 +63,7 @@ export default function Users() {
 
   const usersQuery = useQuery({
     queryKey: ["users"],
-    queryFn: () => usersApi.list({ limit: 1000, offset: 0 }),
+    queryFn: () => usersApi.list(),
     enabled: Boolean(user?.is_superuser)
   });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });

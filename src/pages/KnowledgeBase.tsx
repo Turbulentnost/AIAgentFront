@@ -11,6 +11,7 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   ShieldCheck,
   Trash2,
   TriangleAlert
@@ -289,21 +290,20 @@ export default function KnowledgeBasePage() {
       <section className={styles.workspace}>
         <div className={styles.listPanel}>
           <div className={styles.filters}>
-            <FormSearchInput
-              className={styles.filterSearch}
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Поиск базы знаний"
-            />
-            <FormSelect
-              value={statusFilter}
-              onChange={(value) => setStatusFilter(value as KnowledgeBaseStatus | "all")}
-              placeholder="Все статусы"
-              options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
-              ariaLabel="Фильтр по статусу"
-            />
+            <label>
+              <Search size={15} />
+              <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Поиск базы знаний" />
+            </label>
+            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as KnowledgeBaseStatus | "all")}>
+              <option value="all">Все статусы</option>
+              {Object.entries(statusLabels).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
             <button type="button" className={styles.secondaryButton}>
-              <Filter size={15} strokeWidth={2} aria-hidden="true" />
+              <Filter size={15} />
               Фильтры
             </button>
           </div>
@@ -872,7 +872,6 @@ function DetailTabContent(props: {
           </div>
         ) : null}
         <form
-          className={styles.testSearchForm}
           onSubmit={(event: FormEvent<HTMLFormElement>) => {
             event.preventDefault();
             if (testQuery.trim() && canTestSearch) testSearch.mutate(testQuery.trim());

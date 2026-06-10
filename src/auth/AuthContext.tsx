@@ -8,8 +8,16 @@ import {
   saveOneCCredentials
 } from "@/auth/onecSession";
 import type { LoginPayload, User } from "@/types";
+import { AuthProfileError } from "@/auth/errors";
 
 export type AuthMode = "platform" | "onec";
+
+function isOneCSessionAuthError(error: unknown): boolean {
+  const detail = (error as { response?: { data?: { detail?: { code?: string } | string } } })?.response?.data
+    ?.detail;
+  if (typeof detail !== "object" || !detail?.code) return false;
+  return detail.code === "onec_session_expired" || detail.code === "onec_session_invalid";
+}
 
 interface AuthContextValue {
   user: User | null;
@@ -44,6 +52,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     enabled: hasPlatformToken,
     retry: false
   });
+
+  useEffect(() => {
+    if (!meQuery.isError || !hasPlatformToken) return;
+    if (isOneCSessionAuthError(meQuery.error)) return;
+
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("token_expires_at");
+    setAuthMode(null);
+    queryClient.removeQueries({ queryKey: ["auth"] });
+  }, [hasPlatformToken, meQuery.error, meQuery.isError, queryClient]);
 
   useEffect(() => {
     function handleOneCSessionInvalidated() {
@@ -102,6 +120,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: hasPlatformToken && meQuery.isLoading,
       login: async (payload) => {
         await loginMutation.mutateAsync(payload);
+        try {
+          await queryClient.fetchQuery({ queryKey: ["auth", "me"], queryFn: authApi.me });
+        } catch (error) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("token_expires_at");
+          queryClient.removeQueries({ queryKey: ["auth"] });
+          if (error instanceof Error && (error.message.includes("timeout") || error.message.includes("Timeout"))) {
+            throw new AuthProfileError("Сервер не ответил на запрос профиля за 30 секунд. Проверьте бэкенд /auth/me");
+          }
+          throw new AuthProfileError("Ошибка сервера при загрузке профиля (GET /auth/me). Обратитесь к разработчику бэкенда");
+        }
       },
       loginWith1C: async (payload) => {
         if (onecLoginPromise.current) {
