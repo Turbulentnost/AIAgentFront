@@ -7,8 +7,8 @@ import {
   ChevronDown,
   ChevronRight,
   Database,
-  FileText,
   Filter,
+  HardDrive,
   Layers3,
   LockKeyhole,
   Circle,
@@ -18,6 +18,7 @@ import {
   Send,
   ShieldCheck,
   Square,
+  SquareArrowOutUpRight,
   Trash2,
   TriangleAlert
 } from "lucide-react";
@@ -496,11 +497,34 @@ export default function KnowledgeBasePage() {
 
 function StatsGrid({ stats }: { stats?: KnowledgeBaseStats }) {
   const cards = [
-    { label: "Всего баз знаний", value: stats?.total_bases ?? 0, hint: `Активных: ${stats?.active_bases ?? 0}`, icon: Database, tone: "blue" },
-    { label: "Документы в базах", value: stats?.documents_in_bases ?? 0, hint: "Источники после обработки", icon: FileText, tone: "green" },
-    { label: "Фрагменты (chunks)", value: stats?.fragments_count ?? 0, hint: "Для RAG и правил", icon: Layers3, tone: "violet" },
-    { label: "Успешная индексация", value: `${stats?.successful_indexing_percent ?? 0}%`, hint: `Ошибок: ${stats?.errors_count ?? 0}`, icon: CheckCircle2, tone: "green" },
-    { label: "Требуют проверки", value: stats?.needs_review_count ?? 0, hint: "Нужен допуск к агентам", icon: TriangleAlert, tone: "orange" }
+    {
+      label: "Всего баз знаний",
+      value: stats?.total_bases ?? 0,
+      hint: "Доступных для просмотра и использования",
+      icon: Database,
+      tone: "blue"
+    },
+    {
+      label: "Ошибки индексации",
+      value: stats?.indexing_errors_count ?? 0,
+      hint: "Нерешённых по доступным базам",
+      icon: TriangleAlert,
+      tone: "orange"
+    },
+    {
+      label: "Общий размер",
+      value: formatBytes(stats?.storage_bytes ?? 0),
+      hint: "Суммарный объём данных",
+      icon: HardDrive,
+      tone: "violet"
+    },
+    {
+      label: "Успешная индексация",
+      value: stats?.successfully_indexed_bases ?? 0,
+      hint: "Баз со статусом «Готова»",
+      icon: CheckCircle2,
+      tone: "green"
+    }
   ];
   return (
     <section className={styles.statsGrid}>
@@ -1190,53 +1214,52 @@ function testSearchPlaceholderText(kb: KnowledgeBaseListItem, indexingActive: bo
   return "Тест поиска недоступен для текущего статуса.";
 }
 
-type SearchChatTurn = {
-  id: string;
-  question: string;
-  status: "pending" | "done" | "error";
-  answer?: string | null;
-  hits?: KnowledgeBaseSearchHit[];
-};
-
 function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; canSearch: boolean }) {
-  const [turns, setTurns] = useState<SearchChatTurn[]>([]);
+  const queryClient = useQueryClient();
   const [draft, setDraft] = useState("");
   const [topK, setTopK] = useState(5);
   const threadRef = useRef<HTMLDivElement | null>(null);
-  const pending = turns.some((turn) => turn.status === "pending");
+
+  // История поиска текущего пользователя; поллинг, пока есть активные запросы,
+  // выполняющиеся воркером в фоне.
+  const history = useQuery({
+    queryKey: ["knowledge-base-search-queries", knowledgeBaseId],
+    queryFn: () => knowledgeBasesApi.searchQueries(knowledgeBaseId),
+    refetchInterval: (query) => {
+      const items = query.state.data ?? [];
+      return items.some((item) => item.status === "pending" || item.status === "running") ? 2000 : false;
+    }
+  });
+  const turns = history.data ?? [];
+  const pending = turns.some((turn) => turn.status === "pending" || turn.status === "running");
+
+  const createQuery = useMutation({
+    mutationFn: (question: string) =>
+      knowledgeBasesApi.createSearchQuery(knowledgeBaseId, { query: question, top_k: topK }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["knowledge-base-search-queries", knowledgeBaseId] })
+  });
+  const cancelQuery = useMutation({
+    mutationFn: (searchQueryId: string) => knowledgeBasesApi.cancelSearchQuery(knowledgeBaseId, searchQueryId),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["knowledge-base-search-queries", knowledgeBaseId] })
+  });
 
   useEffect(() => {
     const node = threadRef.current;
     if (node) node.scrollTo({ top: node.scrollHeight, behavior: "smooth" });
-  }, [turns]);
-
-  const ask = async (question: string) => {
-    const id = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-    setTurns((prev) => [...prev, { id, question, status: "pending" }]);
-    try {
-      const result = await knowledgeBasesApi.testSearch(knowledgeBaseId, { query: question, top_k: topK });
-      setTurns((prev) =>
-        prev.map((turn) =>
-          turn.id === id ? { ...turn, status: "done" as const, answer: result.answer_preview, hits: result.hits } : turn
-        )
-      );
-    } catch {
-      setTurns((prev) => prev.map((turn) => (turn.id === id ? { ...turn, status: "error" as const } : turn)));
-    }
-  };
+  }, [turns.length, pending]);
 
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const question = draft.trim();
-    if (!question || !canSearch || pending) return;
+    if (!question || !canSearch || createQuery.isPending) return;
     setDraft("");
-    void ask(question);
+    createQuery.mutate(question);
   };
 
   return (
     <section className={styles.chatPanel}>
       <div className={styles.chatThread} ref={threadRef}>
-        {turns.length === 0 ? (
+        {turns.length === 0 && !history.isLoading ? (
           <div className={styles.chatEmpty}>
             <Bot size={28} />
             <p>Задайте вопрос по содержимому базы знаний — найду подходящие фрагменты и сформирую краткий ответ с источниками.</p>
@@ -1244,29 +1267,54 @@ function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; c
         ) : null}
         {turns.map((turn) => (
           <div key={turn.id} className={styles.chatTurn}>
-            <div className={styles.chatUserMsg}>{turn.question}</div>
+            <div className={styles.chatUserMsg}>{turn.query}</div>
             <div className={styles.chatBotRow}>
               <span className={styles.chatBotAvatar}>
                 <Bot size={15} />
               </span>
               <div className={styles.chatBotMsg}>
-                {turn.status === "pending" ? (
-                  <span className={styles.chatTyping}>
-                    Ищу фрагменты и формирую ответ
-                    <span className={styles.chatTypingDots}>
-                      <i />
-                      <i />
-                      <i />
+                {turn.status === "pending" || turn.status === "running" ? (
+                  <div className={styles.chatPendingRow}>
+                    <span className={styles.chatTyping}>
+                      Ищу фрагменты и формирую ответ
+                      <span className={styles.chatTypingDots}>
+                        <i />
+                        <i />
+                        <i />
+                      </span>
                     </span>
-                  </span>
+                    <button
+                      type="button"
+                      className={styles.chatCancelBtn}
+                      onClick={() => cancelQuery.mutate(turn.id)}
+                      disabled={cancelQuery.isPending}
+                    >
+                      Остановить
+                    </button>
+                  </div>
                 ) : null}
-                {turn.status === "error" ? <span>Не удалось выполнить поиск. Попробуйте ещё раз.</span> : null}
-                {turn.status === "done" ? (
+                {turn.status === "failed" ? (
+                  <span>Не удалось выполнить поиск{turn.error ? `: ${turn.error}` : ""}. Попробуйте ещё раз.</span>
+                ) : null}
+                {turn.status === "cancelled" ? <span className={styles.chatCancelled}>Поиск остановлен.</span> : null}
+                {turn.status === "completed" ? (
                   <>
                     <p className={styles.chatAnswer}>
                       {turn.answer || (turn.hits?.length ? "Готового ответа нет — посмотрите найденные фрагменты." : "По этому вопросу ничего не нашлось в базе знаний.")}
                     </p>
-                    {turn.hits && turn.hits.length > 0 ? <FragmentsDisclosure hits={turn.hits} query={turn.question} /> : null}
+                    {turn.hits && turn.hits.length > 0 ? (
+                      <>
+                        <div className={styles.chatHitsSummary}>
+                          <Layers3 size={13} />
+                          <span>Найдено {turn.hits.length} {fragmentsLabel(turn.hits.length)}</span>
+                          <i className={styles.chatHitsDot} />
+                          <span>
+                            лучший источник <b>{formatRelevance(Math.max(...turn.hits.map((hit) => hit.score)))}</b>
+                          </span>
+                        </div>
+                        <AnswerSources hits={turn.hits} query={turn.query} />
+                      </>
+                    ) : null}
                     <small className={styles.chatDisclaimer}>Ответ сформирован только на основании найденных фрагментов.</small>
                   </>
                 ) : null}
@@ -1280,7 +1328,7 @@ function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; c
           value={draft}
           onChange={(event) => setDraft(event.target.value)}
           placeholder={canSearch ? "Спросите что-нибудь по базе знаний…" : "Поиск недоступен"}
-          disabled={!canSearch || pending}
+          disabled={!canSearch}
         />
         <select
           value={topK}
@@ -1292,7 +1340,7 @@ function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; c
             <option key={value} value={value}>{value} фр.</option>
           ))}
         </select>
-        <button type="submit" disabled={!canSearch || pending || !draft.trim()} title="Отправить">
+        <button type="submit" className={styles.chatSendBtn} disabled={!canSearch || !draft.trim() || createQuery.isPending} title="Отправить">
           <Send size={15} />
         </button>
       </form>
@@ -1300,19 +1348,19 @@ function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; c
   );
 }
 
-function FragmentsDisclosure({ hits, query }: { hits: KnowledgeBaseSearchHit[]; query: string }) {
+function AnswerSources({ hits, query }: { hits: KnowledgeBaseSearchHit[]; query: string }) {
   const [open, setOpen] = useState(false);
   return (
-    <div className={styles.fragmentsBlock}>
-      <button type="button" className={styles.fragmentsPill} onClick={() => setOpen((value) => !value)}>
-        {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        <Layers3 size={13} />
-        {hits.length} {fragmentsLabel(hits.length)}
+    <div className={styles.sourcesBlock}>
+      <button type="button" className={styles.sourcesHeader} onClick={() => setOpen((value) => !value)}>
+        <Layers3 size={15} />
+        <span>Источники ответа</span>
+        {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
       </button>
       {open ? (
-        <div className={styles.fragmentsList}>
+        <div className={styles.sourcesList}>
           {hits.map((hit, index) => (
-            <FragmentCard
+            <SourceCard
               key={hit.knowledge_base_chunk_id || hit.chunk_id || `${index}-${hit.content.slice(0, 16)}`}
               hit={hit}
               index={index + 1}
@@ -1325,33 +1373,75 @@ function FragmentsDisclosure({ hits, query }: { hits: KnowledgeBaseSearchHit[]; 
   );
 }
 
-function FragmentCard({ hit, index, query }: { hit: KnowledgeBaseSearchHit; index: number; query: string }) {
+function SourceCard({
+  hit,
+  index,
+  query
+}: {
+  hit: KnowledgeBaseSearchHit;
+  index: number;
+  query: string;
+}) {
   const [expanded, setExpanded] = useState(false);
+  const blockTypeLabel = sourceBlockTypeLabel(hit);
   return (
-    <article className={styles.fragmentCard}>
-      <button type="button" className={styles.fragmentHead} onClick={() => setExpanded((value) => !value)}>
-        <span className={styles.fragmentIndex}>{index}</span>
-        <strong>{hit.document_title || "Источник"}</strong>
-        <span className={styles.fragmentScore}>{formatRelevance(hit.score)}</span>
-        {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+    <article className={styles.sourceCard}>
+      <button type="button" className={styles.sourceHead} onClick={() => setExpanded((value) => !value)}>
+        <span className={styles.sourceIndex}>{index}</span>
+        <strong className={styles.sourceTitle}>{hit.document_title || "Источник"}</strong>
+        <span className={styles.sourceScore}>{formatRelevance(hit.score)}</span>
+        {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
       </button>
-      <p className={expanded ? styles.fragmentTextFull : styles.fragmentTextClamp}>
-        {highlightSearchTerms(hit.content, query)}
-      </p>
-      {expanded ? (
-        <div className={styles.fragmentMeta}>
-          <span>Стр. {hit.page_number ?? "—"}</span>
-          <span>{hit.section_title || "Раздел не указан"}</span>
-          <span>{hit.clause_number ? `П. ${hit.clause_number}` : "Пункт не указан"}</span>
-          <span>
-            {hit.accessible
-              ? "Доступен в рабочем поиске"
-              : `В рабочем поиске недоступен (${hit.access_reason}); текст показан для проверки`}
-          </span>
+      {!expanded ? (
+        <p className={styles.sourcePreview}>{highlightSearchTerms(previewText(hit.content), query)}</p>
+      ) : (
+        <div className={styles.sourceBody}>
+          <div className={styles.sourceMetaTable}>
+            <span className={styles.sourceMetaLabel}>Документ</span>
+            <span className={styles.sourceMetaValue}>{hit.document_title || "—"}</span>
+            <span className={styles.sourceMetaLabel}>Раздел</span>
+            <span className={styles.sourceMetaValue}>{hit.section_title || "Не указан"}</span>
+            <span className={styles.sourceMetaLabel}>Страница</span>
+            <span className={styles.sourceMetaValue}>{hit.page_number ?? "—"}</span>
+            <span className={styles.sourceMetaLabel}>Тип блока</span>
+            <span className={styles.sourceMetaValue}>{blockTypeLabel}</span>
+          </div>
+          <div className={styles.sourceFragment}>
+            <span className={styles.sourceMetaLabel}>Фрагмент</span>
+            <p className={styles.sourceFragmentText}>{highlightSearchTerms(hit.content, query)}</p>
+          </div>
+          {!hit.accessible ? (
+            <small className={styles.sourceRestricted}>
+              В рабочем поиске недоступен ({hit.access_reason}); текст показан для проверки.
+            </small>
+          ) : null}
+          {hit.document_id ? (
+            <div className={styles.sourceActionsRow}>
+              <a className={styles.sourceOpenLink} href={`/documents?document=${hit.document_id}`} target="_blank" rel="noreferrer">
+                <SquareArrowOutUpRight size={13} />
+                Открыть документ
+              </a>
+            </div>
+          ) : null}
         </div>
-      ) : null}
+      )}
     </article>
   );
+}
+
+function previewText(content: string): string {
+  const flat = content.split(/\s+/).join(" ").trim();
+  return flat.length > 180 ? `${flat.slice(0, 180)}…` : flat;
+}
+
+function sourceBlockTypeLabel(hit: KnowledgeBaseSearchHit): string {
+  const meta = (hit.metadata ?? {}) as Record<string, unknown>;
+  const kind = (meta.chunk_kind as string) || (meta.fragment_type as string) || "";
+  if (kind === "table_row") return "Строка таблицы";
+  const blockTypes = meta.block_types as string[] | undefined;
+  if (blockTypes?.includes("table")) return "Таблица";
+  if (blockTypes?.includes("heading")) return "Заголовок";
+  return "Текст";
 }
 
 function fragmentsLabel(count: number): string {
@@ -1374,6 +1464,14 @@ function highlightSearchTerms(content: string, query: string): React.ReactNode {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("ru-RU").format(value);
+}
+
+function formatBytes(value?: number | null) {
+  const bytes = value ?? 0;
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} ГБ`;
 }
 
 function formatRelevance(score: number) {

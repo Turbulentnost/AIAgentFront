@@ -72,7 +72,7 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -1186,16 +1186,21 @@
   }
 }
 
-.chatComposer {
+/* Селекторы с .chatPanel повышают специфичность, чтобы перебить глобальные
+   правила .testSearch form / .testSearch button / .testSearch input. */
+
+.chatPanel form.chatComposer {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 8px;
+  align-items: center;
   padding: 10px 12px;
   border-top: 1px solid var(--color-border-subtle);
   background: var(--color-surface);
 }
 
-.chatComposer input {
+.chatPanel .chatComposer input {
+  width: 100%;
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--color-border-input);
@@ -1205,11 +1210,11 @@
   outline: none;
 }
 
-.chatComposer input:focus {
+.chatPanel .chatComposer input:focus {
   border-color: var(--color-primary-alpha-58);
 }
 
-.chatComposer select {
+.chatPanel .chatComposer select {
   height: 38px;
   padding: 0 8px;
   border: 1px solid var(--color-border-input);
@@ -1219,12 +1224,13 @@
   font-size: 12px;
 }
 
-.chatComposer button {
+.chatPanel .chatComposer button.chatSendBtn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 42px;
   height: 38px;
+  padding: 0;
   border: 0;
   border-radius: 10px;
   background: var(--color-primary);
@@ -1232,53 +1238,116 @@
   cursor: pointer;
 }
 
-.chatComposer button:disabled {
+.chatPanel .chatComposer button.chatSendBtn:disabled {
   opacity: 0.5;
   cursor: default;
 }
 
-.fragmentsBlock {
-  display: grid;
-  gap: 8px;
+.chatPendingRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 }
 
-.fragmentsPill {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  justify-self: start;
-  padding: 5px 11px;
+.chatPanel button.chatCancelBtn {
+  height: 26px;
+  padding: 0 10px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--color-surface);
-  color: var(--color-primary-text);
-  font-size: 12px;
+  color: var(--color-muted);
+  font-size: 11px;
   font-weight: 700;
   cursor: pointer;
 }
 
-.fragmentsPill:hover {
-  background: var(--color-primary-alpha-07);
+.chatPanel button.chatCancelBtn:hover {
+  color: var(--color-text);
 }
 
-.fragmentsList {
+.chatCancelled {
+  color: var(--color-muted);
+}
+
+.chatHitsSummary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 11px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.chatHitsSummary b {
+  color: var(--color-primary-text);
+}
+
+.chatHitsDot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-muted);
+}
+
+/* --- Источники ответа --- */
+
+.sourcesBlock {
   display: grid;
   gap: 8px;
-}
-
-.fragmentCard {
-  display: grid;
-  gap: 6px;
-  padding: 10px 12px;
+  min-width: 0;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 10px;
+  border-radius: 11px;
   background: var(--color-surface);
+  padding: 10px 12px;
 }
 
-.fragmentHead {
+.chatPanel button.sourcesHeader {
   display: flex;
   align-items: center;
   gap: 8px;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chatPanel button.sourcesHeader > span {
+  flex: 1;
+}
+
+.sourcesList {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.sourceCard {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  background: var(--color-hover);
+  overflow: hidden;
+}
+
+.chatPanel button.sourceHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: auto;
+  min-width: 0;
   padding: 0;
   border: 0;
   background: none;
@@ -1288,7 +1357,21 @@
   cursor: pointer;
 }
 
-.fragmentHead strong {
+.sourceIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+  background: var(--color-primary-alpha-14);
+  color: var(--color-primary-text);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sourceTitle {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -1296,63 +1379,106 @@
   white-space: nowrap;
 }
 
-.fragmentIndex {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 6px;
-  background: var(--color-primary-alpha-10);
-  color: var(--color-primary-text);
-  font-size: 11px;
-  font-weight: 800;
-}
-
-.fragmentScore {
+.sourceScore {
   flex: none;
   color: var(--color-primary-text);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   white-space: nowrap;
 }
 
-.fragmentTextClamp {
+.sourcePreview {
   display: -webkit-box;
   margin: 0;
   overflow: hidden;
   color: var(--color-slate);
   font-size: 12.5px;
   line-height: 1.5;
-  white-space: pre-wrap;
+  overflow-wrap: anywhere;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 2;
 }
 
-.fragmentTextFull {
+.sourceBody {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.sourceMetaTable {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 6px 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+
+.sourceMetaLabel {
+  color: var(--color-muted);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.sourceMetaValue {
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.sourceFragment {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+
+.sourceFragmentText {
   margin: 0;
   color: var(--color-slate);
   font-size: 12.5px;
-  line-height: 1.5;
+  line-height: 1.55;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 
-.fragmentTextClamp mark,
-.fragmentTextFull mark {
+.sourcePreview mark,
+.sourceFragmentText mark {
   padding: 0 2px;
   border-radius: 3px;
   background: var(--kb-list-mark-bg);
   color: inherit;
 }
 
-.fragmentMeta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  color: var(--color-muted);
+.sourceRestricted {
+  color: var(--color-warning, #b45309);
   font-size: 11px;
+}
+
+.sourceActionsRow {
+  display: flex;
+  gap: 8px;
+}
+
+.sourceOpenLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border: 1px solid var(--color-primary-alpha-28);
+  border-radius: 8px;
+  color: var(--color-primary-text);
+  font-size: 12px;
   font-weight: 700;
+  text-decoration: none;
+}
+
+.sourceOpenLink:hover {
+  background: var(--color-primary-alpha-07);
 }
 
 /* ── Overview tab (правый сайдбар) ── */
