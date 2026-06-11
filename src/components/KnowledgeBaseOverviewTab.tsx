@@ -34,7 +34,7 @@ const baseKindLabels: Record<BaseKind, string> = {
   process: "Процессная"
 };
 
-type DetailTab = "overview" | "sources" | "chunks" | "rules" | "access" | "agents" | "indexing" | "test" | "audit";
+type DetailTab = "overview" | "sources" | "chunks" | "rules" | "indexing" | "test" | "audit";
 
 export function KnowledgeBaseOverviewTab(props: {
   knowledgeBase: KnowledgeBaseListItem;

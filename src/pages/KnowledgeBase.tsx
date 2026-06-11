@@ -1,4 +1,5 @@
-import React, { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import React, { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
@@ -12,6 +13,7 @@ import {
   Layers3,
   LockKeyhole,
   Circle,
+  MoreVertical,
   Plus,
   RefreshCw,
   Search,
@@ -22,12 +24,11 @@ import {
   Trash2,
   TriangleAlert
 } from "lucide-react";
-import { agentsApi, knowledgeBasesApi } from "@/api/endpoints";
+import { knowledgeBasesApi } from "@/api/endpoints";
 import { useKnowledgeBaseIndexingWs } from "@/hooks/useKnowledgeBaseIndexingWs";
 import type {
   KnowledgeBase,
   KnowledgeBaseAccessGrantInput,
-  KnowledgeBaseAccessType,
   KnowledgeBaseAgentBinding,
   KnowledgeBaseChunk,
   KnowledgeBaseIndexingError,
@@ -40,17 +41,16 @@ import type {
   KnowledgeBaseStatus
 } from "@/types";
 import { KnowledgeBaseOverviewTab } from "@/components/KnowledgeBaseOverviewTab";
+import formStyles from "@/components/form-controls/form-controls.module.css";
 import styles from "./KnowledgeBase.module.css";
 
-type DetailTab = "overview" | "sources" | "chunks" | "rules" | "access" | "agents" | "indexing" | "test" | "audit";
+type DetailTab = "overview" | "sources" | "chunks" | "rules" | "indexing" | "test" | "audit";
 
 const tabs: { id: DetailTab; label: string }[] = [
   { id: "overview", label: "Обзор" },
-  { id: "sources", label: "Источники" },
+  { id: "sources", label: "Файлы" },
   { id: "chunks", label: "Фрагменты" },
   { id: "rules", label: "Правила и связи" },
-  { id: "access", label: "Доступ" },
-  { id: "agents", label: "Агенты" },
   { id: "indexing", label: "Индексация" },
   { id: "test", label: "Тест поиска" },
   { id: "audit", label: "Журнал" }
@@ -109,23 +109,6 @@ const sourceStatusLabels: Record<string, string> = {
   ready_to_index: "Готов к обработке"
 };
 
-const qualityLabels: Record<string, string> = {
-  unknown: "Неизвестно",
-  good: "Хорошее",
-  medium: "Среднее",
-  low: "Низкое",
-  failed: "Ошибка"
-};
-
-const granteeTypeLabels: Record<string, string> = {
-  user: "Пользователь",
-  department: "Подразделение",
-  organization: "Организация",
-  role: "Роль",
-  agent: "Агент",
-  admin_only: "Только администраторы"
-};
-
 const auditActionLabels: Record<string, string> = {
   "kb.created": "Создание базы",
   "kb.source_added": "Добавление источника",
@@ -136,16 +119,6 @@ const auditActionLabels: Record<string, string> = {
   "kb.access_updated": "Изменение доступа",
   "kb.agents_replaced": "Подключение агентов",
   "kb.archived": "Архивация базы"
-};
-
-const accessLabels: Record<KnowledgeBaseAccessType, string> = {
-  read: "Чтение",
-  search: "Поиск",
-  use_via_agent: "Использование через агента",
-  manage_sources: "Управление источниками",
-  reindex: "Переиндексация",
-  manage_access: "Управление доступом",
-  admin: "Администрирование"
 };
 
 export default function KnowledgeBasePage() {
@@ -401,7 +374,7 @@ export default function KnowledgeBasePage() {
 
         <aside className={styles.detailPanel}>
           {selected ? (
-            <>
+            <div className={styles.detailPanelInner}>
               {isIndexingActive ? (
                 <div className={styles.indexingBanner}>
                   <RefreshCw size={16} className={styles.indexingSpinner} />
@@ -431,26 +404,28 @@ export default function KnowledgeBasePage() {
                   <h2>{selected.name}</h2>
                   <StatusBadge status={selected.status} indexing={selected.indexing_active} />
                 </div>
-                <button
-                  type="button"
-                  className={styles.iconButton}
-                  onClick={() => startIndexing.mutate(selected.id)}
-                  disabled={startIndexing.isPending || selected.indexing_active}
-                  title="Запустить переиндексацию"
-                >
-                  <RefreshCw size={17} />
-                </button>
-                {selected.can_delete ? (
+                <div className={styles.detailHeaderActions}>
+                  {selected.can_delete ? (
+                    <button
+                      type="button"
+                      className={`${styles.iconButton} ${styles.dangerButton}`}
+                      onClick={() => handleDeleteKnowledgeBase(selected)}
+                      disabled={deleteKnowledgeBase.isPending || selected.indexing_active}
+                      title="Удалить базу знаний"
+                    >
+                      <Trash2 size={17} />
+                    </button>
+                  ) : null}
                   <button
                     type="button"
-                    className={`${styles.iconButton} ${styles.dangerButton}`}
-                    onClick={() => handleDeleteKnowledgeBase(selected)}
-                    disabled={deleteKnowledgeBase.isPending || selected.indexing_active}
-                    title="Удалить базу знаний"
+                    className={styles.iconButton}
+                    onClick={() => startIndexing.mutate(selected.id)}
+                    disabled={startIndexing.isPending || selected.indexing_active}
+                    title="Запустить переиндексацию"
                   >
-                    <Trash2 size={17} />
+                    <RefreshCw size={17} />
                   </button>
-                ) : null}
+                </div>
               </div>
               <KnowledgeBaseQuickSearch
                 knowledgeBase={selected}
@@ -468,22 +443,23 @@ export default function KnowledgeBasePage() {
                   </button>
                 ))}
               </nav>
-              <DetailTabContent
-                tab={activeTab}
-                knowledgeBase={selected}
-                sources={sources.data ?? []}
-                chunks={chunks.data ?? []}
-                rules={rules.data ?? []}
-                agents={agents.data ?? []}
-                jobs={jobs.data ?? []}
-                latestJob={latestJob}
-                isIndexingActive={isIndexingActive}
-                accessGrants={access.data?.grants ?? []}
-                accessExceptions={access.data?.exceptions ?? []}
-                audit={audit.data ?? []}
-                onTabChange={setActiveTab}
-              />
-            </>
+              <div className={styles.detailTabScroll}>
+                <DetailTabContent
+                  tab={activeTab}
+                  knowledgeBase={selected}
+                  sources={sources.data ?? []}
+                  chunks={chunks.data ?? []}
+                  rules={rules.data ?? []}
+                  agents={agents.data ?? []}
+                  jobs={jobs.data ?? []}
+                  latestJob={latestJob}
+                  isIndexingActive={isIndexingActive}
+                  accessGrants={access.data?.grants ?? []}
+                  audit={audit.data ?? []}
+                  onTabChange={setActiveTab}
+                />
+              </div>
+            </div>
           ) : (
             <div className={styles.emptyState}>Выберите базу знаний или создайте новую.</div>
           )}
@@ -558,7 +534,6 @@ function DetailTabContent(props: {
   latestJob: KnowledgeBaseIndexingJob | null;
   isIndexingActive: boolean;
   accessGrants: KnowledgeBaseAccessGrantInput[];
-  accessExceptions: KnowledgeBaseAccessGrantInput[];
   audit: Record<string, unknown>[];
   onTabChange: (tab: DetailTab) => void;
 }) {
@@ -574,7 +549,6 @@ function DetailTabContent(props: {
     latestJob,
     isIndexingActive,
     accessGrants,
-    accessExceptions,
     audit,
     onTabChange
   } = props;
@@ -592,11 +566,6 @@ function DetailTabContent(props: {
     queryKey: ["knowledge-base-readiness", knowledgeBase.id],
     queryFn: () => knowledgeBasesApi.readiness(knowledgeBase.id),
     enabled: tab === "overview" || tab === "test"
-  });
-  const platformAgents = useQuery({
-    queryKey: ["agents"],
-    queryFn: agentsApi.list,
-    enabled: tab === "agents"
   });
   const activeJob = jobs.find((job) => job.status === "running" || job.status === "queued") ?? latestJob;
   const jobErrors = useQuery({
@@ -626,14 +595,6 @@ function DetailTabContent(props: {
   const deleteSource = useMutation({
     mutationFn: (sourceId: string) => knowledgeBasesApi.deleteSource(knowledgeBase.id, sourceId),
     onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources"] })
-  });
-  const excludeChunk = useMutation({
-    mutationFn: ({ chunkId, excluded }: { chunkId: string; excluded: boolean }) =>
-      knowledgeBasesApi.excludeChunk(knowledgeBase.id, chunkId, {
-        is_excluded_from_search: excluded,
-        exclusion_reason: excluded ? "Исключён вручную" : null
-      }),
-    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ["knowledge-base-chunks"] })
   });
   const createRule = useMutation({
     mutationFn: (text: string) => knowledgeBasesApi.createRule(knowledgeBase.id, { text, priority: 100, status: "draft" }),
@@ -674,24 +635,12 @@ function DetailTabContent(props: {
   if (tab === "sources") {
     return (
       <div className={styles.detailBody}>
-        <CompactTable
-          headers={["Документ", "Тип", "Статус", "Фрагменты", "Качество", "Действия"]}
-          rows={sources.map((source) => [
-            source.document_title || source.original_filename || source.document_id,
-            source.extension || "-",
-            sourceStatusLabels[source.processing_status] ?? source.processing_status,
-            formatNumber(source.fragments_count),
-            qualityLabels[source.quality_status ?? "unknown"] ?? "-",
-            <SourceActions
-              key={source.id}
-              source={source}
-              onView={() => setSelectedSourceId(source.id)}
-              onExclude={() => excludeSource.mutate(source.id)}
-              onReindex={() => reindexSource.mutate(source.id)}
-              onDelete={() => deleteSource.mutate(source.id)}
-            />
-          ])}
-          empty="Источники ещё не добавлены."
+        <SourcesFilesTable
+          sources={sources}
+          onView={(sourceId) => setSelectedSourceId(sourceId)}
+          onExclude={(sourceId) => excludeSource.mutate(sourceId)}
+          onReindex={(sourceId) => reindexSource.mutate(sourceId)}
+          onDelete={(sourceId) => deleteSource.mutate(sourceId)}
         />
         {selectedSource ? (
           <article className={styles.sourceDetailCard}>
@@ -722,17 +671,12 @@ function DetailTabContent(props: {
             <article key={chunk.id} className={styles.chunkCard}>
               <header>
                 <strong>{chunk.document_title || "Источник не найден"}</strong>
-                <span>{chunk.embedding_status} · {qualityLabels[chunk.quality_status ?? "unknown"]}</span>
+                <span>{chunk.embedding_status}</span>
               </header>
               <p>{chunk.text || "Текст фрагмента недоступен"}</p>
               <small>
                 Пункт {chunk.clause_number || "-"} · Тип {chunk.fragment_type || "-"} · Страница {chunk.page_number ?? "-"} · Раздел {chunk.section_title || "-"}
               </small>
-              <div className={styles.chunkActions}>
-                <button type="button" onClick={() => excludeChunk.mutate({ chunkId: chunk.id, excluded: !chunk.is_excluded_from_search })}>
-                  {chunk.is_excluded_from_search ? "Вернуть в поиск" : "Исключить из поиска"}
-                </button>
-              </div>
             </article>
           ))}
           {!filteredChunks.length && <div className={styles.emptyState}>Фрагменты появятся после индексации источников.</div>}
@@ -760,55 +704,6 @@ function DetailTabContent(props: {
           empty="Структурированные правила для агентов ещё не заведены."
         />
       </div>
-    );
-  }
-
-  if (tab === "access") {
-    return (
-      <div className={styles.detailBody}>
-        <CompactTable
-          headers={["Тип", "Субъект", "Уровень", "Основание", "Срок"]}
-          rows={accessGrants.map((grant, index) => [
-            granteeTypeLabels[grant.grantee_type] ?? grant.grantee_type,
-            grant.grantee_id || "—",
-            accessLabels[grant.access_type],
-            grant.reason || "-",
-            formatDate(grant.expires_at)
-          ])}
-          empty="Доступ не настроен."
-        />
-        {accessExceptions.length > 0 ? (
-          <>
-            <h3 className={styles.sectionTitle}>Исключения</h3>
-            <CompactTable
-              headers={["Тип", "Субъект", "Уровень", "Основание"]}
-              rows={accessExceptions.map((item, index) => [
-                granteeTypeLabels[item.grantee_type] ?? item.grantee_type,
-                item.grantee_id || "—",
-                accessLabels[item.access_type],
-                item.reason || "Запрет доступа"
-              ])}
-              empty=""
-            />
-          </>
-        ) : null}
-      </div>
-    );
-  }
-
-  if (tab === "agents") {
-    const agentNameById = new Map((platformAgents.data ?? []).map((agent) => [agent.id, agent.name]));
-    return (
-      <CompactTable
-        headers={["Агент", "Режим", "Статус", "Срок"]}
-        rows={agents.map((agent) => [
-          agentNameById.get(agent.agent_id) || agent.agent_id,
-          agent.access_mode,
-          agent.is_enabled ? "Включён" : "Отключён",
-          formatDate(agent.expires_at)
-        ])}
-        empty="Ни один агент не подключён к базе знаний."
-      />
     );
   }
 
@@ -985,27 +880,205 @@ function DetailTabContent(props: {
   );
 }
 
-function SourceActions({
-  source,
-  onView,
-  onExclude,
-  onReindex,
-  onDelete
-}: {
+function SourcesFilesTable(props: {
+  sources: KnowledgeBaseSource[];
+  onView: (sourceId: string) => void;
+  onExclude: (sourceId: string) => void;
+  onReindex: (sourceId: string) => void;
+  onDelete: (sourceId: string) => void;
+}) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  return (
+    <div className={styles.sourcesTableWrap}>
+      <table className={`${styles.compactTable} ${styles.sourcesTable}`}>
+        <thead>
+          <tr>
+            <th className={styles.sourcesTableActionHead} aria-label="Действия" />
+            <th>Документ</th>
+            <th>Тип</th>
+            <th>Статус</th>
+            <th>Фрагменты</th>
+          </tr>
+        </thead>
+        <tbody>
+          {props.sources.map((source) => {
+            const documentName = source.document_title || source.original_filename || source.document_id;
+            return (
+              <tr key={source.id}>
+                <td className={styles.sourcesTableActionCell}>
+                  <SourceRowMenu
+                    source={source}
+                    open={openMenuId === source.id}
+                    onOpenChange={(open) => setOpenMenuId(open ? source.id : null)}
+                    onView={() => {
+                      setOpenMenuId(null);
+                      props.onView(source.id);
+                    }}
+                    onReindex={() => {
+                      setOpenMenuId(null);
+                      props.onReindex(source.id);
+                    }}
+                    onExclude={() => {
+                      setOpenMenuId(null);
+                      props.onExclude(source.id);
+                    }}
+                    onDelete={() => {
+                      setOpenMenuId(null);
+                      props.onDelete(source.id);
+                    }}
+                  />
+                </td>
+                <td className={styles.sourcesTableDocCell}>
+                  <span className={styles.sourcesDocTitle} title={documentName}>
+                    {documentName}
+                  </span>
+                </td>
+                <td>{source.extension || "—"}</td>
+                <td>{sourceStatusLabels[source.processing_status] ?? source.processing_status}</td>
+                <td>{formatNumber(source.fragments_count)}</td>
+              </tr>
+            );
+          })}
+          {!props.sources.length ? (
+            <tr>
+              <td colSpan={5} className={styles.emptyCell}>
+                Источники ещё не добавлены.
+              </td>
+            </tr>
+          ) : null}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function SourceRowMenu(props: {
   source: KnowledgeBaseSource;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onView: () => void;
-  onExclude: () => void;
   onReindex: () => void;
+  onExclude: () => void;
   onDelete: () => void;
 }) {
-  const indexing = source.processing_status === "processing";
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLUListElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const indexing = props.source.processing_status === "processing";
+
+  const updateMenuPosition = () => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    setMenuPosition({ top: rect.bottom + 4, left: rect.left });
+  };
+
+  useLayoutEffect(() => {
+    if (!props.open) {
+      setMenuPosition(null);
+      return;
+    }
+    updateMenuPosition();
+  }, [props.open]);
+
+  useEffect(() => {
+    if (!props.open) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      props.onOpenChange(false);
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") props.onOpenChange(false);
+    }
+
+    function handleReposition() {
+      updateMenuPosition();
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("scroll", handleReposition, true);
+    window.addEventListener("resize", handleReposition);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("scroll", handleReposition, true);
+      window.removeEventListener("resize", handleReposition);
+    };
+  }, [props.open, props.onOpenChange]);
+
+  const menu =
+    props.open && menuPosition
+      ? createPortal(
+          <ul
+            ref={menuRef}
+            className={`${formStyles.selectMenu} ${formStyles.compact} ${styles.sourceRowMenuList}`}
+            style={{ top: menuPosition.top, left: menuPosition.left }}
+            role="menu"
+          >
+            <li role="none">
+              <button type="button" className={formStyles.selectOption} role="menuitem" onClick={props.onView}>
+                Просмотр
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                className={formStyles.selectOption}
+                role="menuitem"
+                disabled={indexing}
+                onClick={props.onReindex}
+              >
+                Переобработать
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                className={formStyles.selectOption}
+                role="menuitem"
+                disabled={indexing}
+                onClick={props.onExclude}
+              >
+                Исключить
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                className={`${formStyles.selectOption} ${styles.sourceRowMenuDanger}`}
+                role="menuitem"
+                disabled={indexing}
+                onClick={props.onDelete}
+              >
+                Удалить
+              </button>
+            </li>
+          </ul>,
+          document.body
+        )
+      : null;
+
   return (
-    <div className={styles.sourceActions}>
-      <button type="button" onClick={onView}>Просмотр</button>
-      <button type="button" onClick={onReindex} disabled={indexing}>Переобработать</button>
-      <button type="button" onClick={onExclude} disabled={indexing}>Исключить</button>
-      <button type="button" onClick={onDelete} disabled={indexing}>Удалить</button>
-    </div>
+    <>
+      <div className={`${formStyles.compact} ${styles.sourceRowMenu}`}>
+        <button
+          ref={triggerRef}
+          type="button"
+          className={styles.sourceRowMenuTrigger}
+          aria-label="Действия с файлом"
+          aria-expanded={props.open}
+          aria-haspopup="menu"
+          onClick={() => props.onOpenChange(!props.open)}
+        >
+          <MoreVertical size={16} strokeWidth={2} aria-hidden="true" />
+        </button>
+      </div>
+      {menu}
+    </>
   );
 }
 
@@ -1042,26 +1115,35 @@ function KnowledgeBaseQuickSearch({
   return (
     <section className={styles.kbQuickSearch}>
       <form
+        className={styles.kbQuickSearchForm}
         onSubmit={(event: FormEvent<HTMLFormElement>) => {
           event.preventDefault();
           const trimmed = query.trim();
           if (trimmed && canSearch) search.mutate(trimmed);
         }}
       >
-        <Search size={15} aria-hidden="true" />
-        <input
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder={
-            knowledgeBase.indexing_active
-              ? "Поиск будет доступен после завершения индексации"
-              : canSearch
-                ? "Поиск по содержимому базы знаний"
-                : "Поиск доступен только для готовых баз знаний"
-          }
-          disabled={!canSearch || search.isPending}
-        />
-        <button type="submit" disabled={!canSearch || search.isPending || !query.trim()}>
+        <div className={`${formStyles.selectField} ${formStyles.compact} ${styles.kbQuickSearchField}`}>
+          <Search className={formStyles.selectSearch} size={14} strokeWidth={2} aria-hidden="true" />
+          <input
+            className={formStyles.control}
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={
+              knowledgeBase.indexing_active
+                ? "Поиск будет доступен после завершения индексации"
+                : canSearch
+                  ? "Поиск по содержимому базы знаний"
+                  : "Поиск доступен только для готовых баз знаний"
+            }
+            disabled={!canSearch || search.isPending}
+          />
+        </div>
+        <button
+          type="submit"
+          className={styles.kbQuickSearchSubmit}
+          disabled={!canSearch || search.isPending || !query.trim()}
+        >
           Найти
         </button>
       </form>
