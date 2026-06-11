@@ -1379,7 +1379,7 @@ function SearchChat({ knowledgeBaseId, canSearch }: { knowledgeBaseId: string; c
 }
 
 function AnswerSources({ hits, query }: { hits: KnowledgeBaseSearchHit[]; query: string }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   return (
     <div className={styles.sourcesBlock}>
       <button type="button" className={styles.sourcesHeader} onClick={() => setOpen((value) => !value)}>
@@ -1395,7 +1395,6 @@ function AnswerSources({ hits, query }: { hits: KnowledgeBaseSearchHit[]; query:
               hit={hit}
               index={index + 1}
               query={query}
-              defaultOpen={index === 0}
             />
           ))}
         </div>
@@ -1407,15 +1406,13 @@ function AnswerSources({ hits, query }: { hits: KnowledgeBaseSearchHit[]; query:
 function SourceCard({
   hit,
   index,
-  query,
-  defaultOpen
+  query
 }: {
   hit: KnowledgeBaseSearchHit;
   index: number;
   query: string;
-  defaultOpen?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(Boolean(defaultOpen));
+  const [expanded, setExpanded] = useState(false);
   const blockTypeLabel = sourceBlockTypeLabel(hit);
   return (
     <article className={styles.sourceCard}>
