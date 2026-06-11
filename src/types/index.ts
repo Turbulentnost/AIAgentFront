@@ -579,13 +579,9 @@ export interface KnowledgeBaseListItem extends KnowledgeBase {
 
 export interface KnowledgeBaseStats {
   total_bases: number;
-  active_bases: number;
-  documents_in_bases: number;
-  fragments_count: number;
+  indexing_errors_count: number;
   storage_bytes: number;
-  successful_indexing_percent: number;
-  errors_count: number;
-  needs_review_count: number;
+  successfully_indexed_bases: number;
 }
 
 export interface KnowledgeBaseAccessGrantInput {
@@ -783,6 +779,21 @@ export interface KnowledgeBaseSearchHit {
 export interface KnowledgeBaseTestSearchResponse {
   hits: KnowledgeBaseSearchHit[];
   answer_preview: string | null;
+}
+
+export type KnowledgeBaseSearchQueryStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+
+export interface KnowledgeBaseSearchQuery {
+  id: string;
+  knowledge_base_id: string;
+  query: string;
+  top_k: number;
+  status: KnowledgeBaseSearchQueryStatus;
+  answer: string | null;
+  hits: KnowledgeBaseSearchHit[] | null;
+  error: string | null;
+  created_at: string;
+  finished_at: string | null;
 }
 
 export type AgentBuilderSessionStatus =

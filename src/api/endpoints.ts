@@ -30,6 +30,7 @@ import type {
   KnowledgeBaseSource,
   KnowledgeBaseStats,
   KnowledgeBaseStatus,
+  KnowledgeBaseSearchQuery,
   KnowledgeBaseTestSearchResponse,
   LoginPayload,
   OneCLoginResponse,
@@ -188,6 +189,14 @@ export const knowledgeBasesApi = {
     apiClient.post<KnowledgeBaseRule>(`/knowledge-bases/${knowledgeBaseId}/rules`, payload).then((r) => r.data),
   testSearch: (knowledgeBaseId: string, payload: { query: string; top_k?: number; user_id?: string | null; department_id?: string | null; agent_id?: string | null }) =>
     apiClient.post<KnowledgeBaseTestSearchResponse>(`/knowledge-bases/${knowledgeBaseId}/test-search`, payload).then((r) => r.data),
+  searchQueries: (knowledgeBaseId: string) =>
+    apiClient.get<KnowledgeBaseSearchQuery[]>(`/knowledge-bases/${knowledgeBaseId}/search-queries`).then((r) => r.data),
+  createSearchQuery: (knowledgeBaseId: string, payload: { query: string; top_k?: number }) =>
+    apiClient.post<KnowledgeBaseSearchQuery>(`/knowledge-bases/${knowledgeBaseId}/search-queries`, payload).then((r) => r.data),
+  getSearchQuery: (knowledgeBaseId: string, searchQueryId: string) =>
+    apiClient.get<KnowledgeBaseSearchQuery>(`/knowledge-bases/${knowledgeBaseId}/search-queries/${searchQueryId}`).then((r) => r.data),
+  cancelSearchQuery: (knowledgeBaseId: string, searchQueryId: string) =>
+    apiClient.post<KnowledgeBaseSearchQuery>(`/knowledge-bases/${knowledgeBaseId}/search-queries/${searchQueryId}/cancel`).then((r) => r.data),
   audit: (knowledgeBaseId: string) =>
     apiClient.get<Record<string, unknown>[]>(`/knowledge-bases/${knowledgeBaseId}/audit`).then((r) => r.data)
 };
