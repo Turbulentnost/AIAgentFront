@@ -1,7 +1,6 @@
 import type { ComponentType } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {
-  ArrowUpRight,
   CheckCircle2,
   Database,
   Droplets,
@@ -13,14 +12,15 @@ import {
   TriangleAlert,
   Users
 } from "lucide-react";
-import { knowledgeBasesApi } from "@/api/endpoints";
+import { knowledgeBasesApi, usersApi } from "@/api/endpoints";
 import type {
   KnowledgeBaseAccessGrantInput,
   KnowledgeBaseAgentBinding,
   KnowledgeBaseListItem,
   KnowledgeBaseOverviewStats,
   KnowledgeBaseReadiness,
-  ResponsibleUser
+  ResponsibleUser,
+  User
 } from "@/types";
 import styles from "@/pages/KnowledgeBase.module.css";
 
@@ -69,9 +69,16 @@ export function KnowledgeBaseOverviewTab(props: {
     queryFn: () => knowledgeBasesApi.listResponsibleUsers()
   });
 
+  const platformUsers = useQuery({
+    queryKey: ["users"],
+    queryFn: () => usersApi.list()
+  });
+
   const metadata = detail.data?.metadata;
   const baseKind = getBaseKindLabel(metadata);
   const responsible = findResponsibleUser(responsibleUsers.data, knowledgeBase.responsible_user_id);
+  const filesCount = stats?.sources_total ?? knowledgeBase.sources_count ?? 0;
+  const storageVolume = formatStorageBytes(knowledgeBase.storage_bytes);
   const warningCount = stats?.unresolved_errors ?? 0;
   const fragmentsTotal = stats?.fragments_total ?? knowledgeBase.fragments_count ?? 0;
   const fragmentsReady = stats
@@ -82,7 +89,12 @@ export function KnowledgeBaseOverviewTab(props: {
   const qdrantReady = Boolean(stats && fragmentsTotal > 0 && stats.qdrant_points >= fragmentsTotal);
   const fulltextReady = Boolean(stats && fragmentsTotal > 0 && stats.fulltext_chunks >= fragmentsTotal);
   const connectedAgents = agents.filter((agent) => agent.is_enabled).length;
-  const accessConfigured = accessGrants.length > 0 || knowledgeBase.is_public;
+  const accessUsersList = formatAccessUsersList(
+    accessGrants,
+    platformUsers.data,
+    responsibleUsers.data,
+    knowledgeBase.is_public
+  );
   const normalSearchAvailable = searchAvailable && ["ready", "needs_review", "updating"].includes(knowledgeBase.status);
 
   const statusDescription = buildStatusDescription(knowledgeBase, stats, warningCount, isIndexingActive);
@@ -141,12 +153,6 @@ export function KnowledgeBaseOverviewTab(props: {
             <Search size={15} strokeWidth={2.2} aria-hidden="true" />
             Тестировать поиск
           </button>
-          {warningCount > 0 ? (
-            <button type="button" className={styles.overviewLinkButton} onClick={() => onTabChange("indexing")}>
-              Открыть предупреждение
-              <ArrowUpRight size={14} strokeWidth={2.2} aria-hidden="true" />
-            </button>
-          ) : null}
         </div>
       </section>
 
@@ -160,16 +166,13 @@ export function KnowledgeBaseOverviewTab(props: {
         <div className={styles.overviewGrid}>
           <div className={styles.overviewGridCol}>
             <OverviewRow label="Название" value={knowledgeBase.name} />
-            <OverviewRow label="Описание" value={knowledgeBase.description?.trim() || "—"} />
+            <OverviewRow label="Описание" value={knowledgeBase.description?.trim() || "—"} valueWrap />
             <OverviewRow label="Тип базы" value={baseKind} />
           </div>
           <div className={styles.overviewGridCol}>
-            <OverviewRow
-              label="Тематика / процесс"
-              value={knowledgeBase.topic?.trim() || knowledgeBase.process_slug?.trim() || "—"}
-            />
+            <OverviewRow label="Объем хранилища" value={storageVolume} />
             <OverviewRow label="Ответственный" value={responsible ?? "—"} />
-            <OverviewRow label="Embedding-модель" value={knowledgeBase.embedding_model?.trim() || "—"} />
+            <OverviewRow label="Кол-во файлов" value={String(filesCount)} />
           </div>
         </div>
       </section>
@@ -181,26 +184,9 @@ export function KnowledgeBaseOverviewTab(props: {
           </span>
           <h3 className={styles.overviewSectionTitle}>Индексация</h3>
         </header>
-        <div className={styles.overviewGrid}>
-          <div className={styles.overviewGridCol}>
-            <OverviewRow label="Последняя индексация" value={formatOverviewDate(knowledgeBase.last_indexed_at)} />
-            <OverviewRow
-              label="Источники"
-              value={stats ? `${stats.sources_processed} / ${stats.sources_total}` : `${knowledgeBase.sources_count} / ${knowledgeBase.sources_count}`}
-            />
-            <OverviewRow label="Фрагменты" value={`${fragmentsReady} / ${fragmentsTotal}`} />
-          </div>
-          <div className={styles.overviewGridCol}>
-            <OverviewRow label="В Qdrant" value={stats ? `${stats.qdrant_points} / ${fragmentsTotal}` : "—"} />
-            <OverviewRow
-              label="В полнотекстовом индексе"
-              value={stats ? `${stats.fulltext_chunks} / ${fragmentsTotal}` : "—"}
-            />
-            <OverviewRow
-              label="Качество извлечения"
-              value={stats ? `${stats.quality_percent}%` : "—"}
-            />
-          </div>
+        <div className={styles.overviewGridSingle}>
+          <OverviewRow label="Последняя индексация" value={formatOverviewDate(knowledgeBase.last_indexed_at)} />
+          <OverviewRow label="Фрагменты" value={`${fragmentsReady} / ${fragmentsTotal}`} />
         </div>
         {warningCount > 0 ? (
           <p className={styles.overviewWarningNote}>
@@ -224,19 +210,10 @@ export function KnowledgeBaseOverviewTab(props: {
               value={normalSearchAvailable ? "доступен" : "недоступен"}
               valueTone={normalSearchAvailable ? "success" : undefined}
             />
-            <OverviewRow
-              label="Тест поиска"
-              value={canTestSearch ? "доступен" : "недоступен"}
-              valueTone={canTestSearch ? "success" : undefined}
-            />
           </div>
           <div className={styles.overviewGridCol}>
             <OverviewRow label="Подключенные агенты" value={String(connectedAgents)} />
-            <OverviewRow
-              label="Доступ пользователей"
-              value={accessConfigured ? "настроен" : "не настроен"}
-              valueTone={accessConfigured ? "success" : undefined}
-            />
+            <OverviewRow label="Список пользователей" value={accessUsersList} valueWrap />
           </div>
         </div>
       </section>
@@ -258,12 +235,12 @@ function OverviewBadge(props: {
   );
 }
 
-function OverviewRow(props: { label: string; value: string; valueTone?: "success" }) {
+function OverviewRow(props: { label: string; value: string; valueTone?: "success"; valueWrap?: boolean }) {
   return (
     <div className={styles.overviewRow}>
       <span className={styles.overviewLabel}>{props.label}</span>
       <span
-        className={`${styles.overviewValue} ${props.valueTone === "success" ? styles.overviewValueSuccess : ""}`}
+        className={`${styles.overviewValue} ${props.valueWrap ? styles.overviewValueWrap : ""} ${props.valueTone === "success" ? styles.overviewValueSuccess : ""}`}
       >
         {props.value}
       </span>
@@ -283,17 +260,53 @@ function findResponsibleUser(users: ResponsibleUser[] | undefined, userId?: stri
   if (!userId || !users) return null;
   const user = users.find((item) => item.id === userId);
   if (!user) return null;
-  return formatResponsibleUserLabel(user);
+  return formatShortPersonName(user.full_name);
 }
 
-function formatResponsibleUserLabel(user: ResponsibleUser): string {
-  const name = user.full_name?.trim() || "Пользователь";
-  const position = user.position?.trim();
-  const department = user.department_name?.trim();
-  if (position && department) return `${name} — ${position} (${department})`;
-  if (position) return `${name} — ${position}`;
-  if (department) return `${name} (${department})`;
-  return name;
+function formatShortPersonName(fullName?: string | null): string {
+  const trimmed = fullName?.trim();
+  if (!trimmed) return "—";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0];
+  const [lastName, ...rest] = parts;
+  const initials = rest.map((part) => `${part.charAt(0).toUpperCase()}.`).join(" ");
+  return `${lastName} ${initials}`.trim();
+}
+
+function formatAccessUsersList(
+  grants: KnowledgeBaseAccessGrantInput[],
+  users: User[] | undefined,
+  responsibleUsers: ResponsibleUser[] | undefined,
+  isPublic: boolean
+): string {
+  if (isPublic) return "Все пользователи";
+
+  const userGrants = grants.filter((grant) => grant.grantee_type === "user" && grant.grantee_id);
+  if (userGrants.length === 0) return "—";
+
+  const namesById = new Map<string, string>();
+  for (const user of users ?? []) {
+    namesById.set(user.id, formatShortPersonName(user.full_name));
+  }
+  for (const user of responsibleUsers ?? []) {
+    if (!namesById.has(user.id)) {
+      namesById.set(user.id, formatShortPersonName(user.full_name));
+    }
+  }
+
+  const uniqueNames = [...new Set(
+    userGrants.map((grant) => namesById.get(grant.grantee_id!) ?? grant.grantee_id!)
+  )];
+
+  return uniqueNames.join(", ");
+}
+
+function formatStorageBytes(value?: number | null): string {
+  if (!value) return "—";
+  if (value < 1024) return `${value} Б`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} КБ`;
+  if (value < 1024 * 1024 * 1024) return `${(value / 1024 / 1024).toFixed(1)} МБ`;
+  return `${(value / 1024 / 1024 / 1024).toFixed(2)} ГБ`;
 }
 
 function formatOverviewDate(value?: string | null): string {
@@ -323,8 +336,9 @@ function buildStatusDescription(
   }
 
   const parts: string[] = [];
+  const actuallyReady = isKnowledgeBaseActuallyReady(kb, stats, isIndexingActive);
 
-  if (kb.status === "ready") {
+  if (actuallyReady) {
     parts.push("База готова к поиску и подключению агентов.");
   } else if (kb.status === "draft") {
     parts.push("База ещё не готова: добавьте источники и запустите индексацию.");
@@ -332,6 +346,8 @@ function buildStatusDescription(
     parts.push("Индексация завершена частично: проверьте предупреждения и проблемные источники.");
   } else if (kb.status === "error") {
     parts.push("Индексация завершилась с ошибкой: проверьте журнал индексации и источники.");
+  } else if (kb.status === "ready") {
+    parts.push("База почти готова: дождитесь завершения индексации всех источников и фрагментов.");
   } else {
     parts.push("Проверьте состояние индексации и готовность базы к поиску.");
   }
@@ -360,4 +376,30 @@ function buildStatusDescription(
   }
 
   return parts.join(" ");
+}
+
+function isKnowledgeBaseActuallyReady(
+  kb: KnowledgeBaseListItem,
+  stats: KnowledgeBaseOverviewStats | undefined,
+  isIndexingActive: boolean
+): boolean {
+  if (isIndexingActive || kb.indexing_active || kb.status === "processing" || kb.status === "draft" || kb.status === "error" || kb.status === "archived") {
+    return false;
+  }
+
+  if (!kb.can_search) return false;
+
+  if (!["ready", "needs_review"].includes(kb.status)) return false;
+
+  if (!stats) {
+    return kb.status === "ready" && (kb.fragments_count ?? 0) > 0;
+  }
+
+  if (stats.fragments_total === 0) return false;
+
+  const sourcesReady = stats.sources_total === 0 || stats.sources_processed >= stats.sources_total;
+  const fragmentsIndexed =
+    stats.qdrant_points >= stats.fragments_total && stats.fulltext_chunks >= stats.fragments_total;
+
+  return sourcesReady && fragmentsIndexed;
 }

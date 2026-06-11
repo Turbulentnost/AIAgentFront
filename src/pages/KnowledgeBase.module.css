@@ -1528,6 +1528,11 @@
   gap: 0 var(--form-grid-gap-x, 24px);
 }
 
+.overviewGridSingle {
+  display: grid;
+  gap: var(--summary-rows-gap);
+}
+
 .overviewGridCol {
   display: grid;
   gap: var(--summary-rows-gap);
@@ -1544,33 +1549,40 @@
 
 .overviewRow {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
 }
 
 .overviewLabel {
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
   color: var(--summary-label-color);
   font-size: var(--form-label-size, 14px);
   font-weight: var(--summary-label-weight);
   line-height: var(--summary-label-line-height);
+  white-space: nowrap;
 }
 
 .overviewValue {
-  flex: 0 1 58%;
+  flex: 0 0 auto;
   color: var(--summary-value-color);
   font-size: var(--form-control-font-size, 14px);
-  font-weight: var(--summary-value-weight);
+  font-weight: 400;
   line-height: var(--summary-value-line-height);
   text-align: right;
+  white-space: nowrap;
+}
+
+.overviewValueWrap {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: normal;
   overflow-wrap: anywhere;
 }
 
 .overviewValueSuccess {
   color: var(--color-success-text);
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .overviewWarningNote {
