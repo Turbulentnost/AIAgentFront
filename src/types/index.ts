@@ -568,6 +568,7 @@ export interface KnowledgeBase {
   storage_bytes: number;
   created_at: string;
   updated_at: string;
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface KnowledgeBaseListItem extends KnowledgeBase {

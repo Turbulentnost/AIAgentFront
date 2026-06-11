@@ -38,6 +38,7 @@ import type {
   KnowledgeBaseStats,
   KnowledgeBaseStatus
 } from "@/types";
+import { KnowledgeBaseOverviewTab } from "@/components/KnowledgeBaseOverviewTab";
 import styles from "./KnowledgeBase.module.css";
 
 type DetailTab = "overview" | "sources" | "chunks" | "rules" | "access" | "agents" | "indexing" | "test" | "audit";
@@ -566,7 +567,7 @@ function DetailTabContent(props: {
   const readiness = useQuery({
     queryKey: ["knowledge-base-readiness", knowledgeBase.id],
     queryFn: () => knowledgeBasesApi.readiness(knowledgeBase.id),
-    enabled: tab === "test"
+    enabled: tab === "overview" || tab === "test"
   });
   const platformAgents = useQuery({
     queryKey: ["agents"],
@@ -631,40 +632,18 @@ function DetailTabContent(props: {
   });
 
   if (tab === "overview") {
-    const stats = overview.data;
     return (
-      <div className={styles.detailBody}>
-        <div className={styles.statusCallout}>{statusCalloutText(knowledgeBase)}</div>
-        <InfoGrid
-          items={[
-            ["Название", knowledgeBase.name],
-            ["Описание", knowledgeBase.description || "-"],
-            ["Тематика / процесс", knowledgeBase.topic || knowledgeBase.process_slug || "-"],
-            ["Embedding-модель", knowledgeBase.embedding_model || "-"],
-            ["Последняя индексация", formatDate(knowledgeBase.last_indexed_at)]
-          ]}
-        />
-        {stats ? (
-          <InfoGrid
-            items={[
-              ["Источников", `${stats.sources_processed} / ${stats.sources_total}`],
-              ["С ошибками", stats.sources_with_errors],
-              ["Фрагментов", formatNumber(stats.fragments_total)],
-              ["В Qdrant", formatNumber(stats.qdrant_points)],
-              ["В полнотекстовом индексе", formatNumber(stats.fulltext_chunks)],
-              ["Качество извлечения", `${stats.quality_percent}%`],
-              ["Нерешённых ошибок", stats.unresolved_errors]
-            ]}
-          />
-        ) : null}
-        <div className={styles.securityCallout}>
-          <ShieldCheck size={18} />
-          <span>
-            Поиск доступен агенту только если база готова, агент явно подключён, пользователь имеет право на фрагменты,
-            документ не архивирован и срок доступа не истёк.
-          </span>
-        </div>
-      </div>
+      <KnowledgeBaseOverviewTab
+        knowledgeBase={knowledgeBase}
+        stats={overview.data}
+        statsLoading={overview.isLoading}
+        readiness={readiness.data}
+        agents={agents}
+        accessGrants={accessGrants}
+        isIndexingActive={isIndexingActive}
+        canTestSearch={canTestSearch}
+        onTabChange={onTabChange}
+      />
     );
   }
 
@@ -980,15 +959,6 @@ function DetailTabContent(props: {
       empty="Журнал действий пока пуст."
     />
   );
-}
-
-function statusCalloutText(kb: KnowledgeBaseListItem): string {
-  if (kb.indexing_active || kb.status === "processing") return "Идёт индексация: поиск будет доступен после завершения.";
-  if (kb.status === "draft") return "База не готова: добавьте источники и запустите индексацию.";
-  if (kb.status === "needs_review") return "Индексация завершена частично: проверьте ошибки и проблемные источники.";
-  if (kb.status === "ready") return "База готова к поиску и подключению агентов.";
-  if (kb.status === "error") return "Индексация завершилась с ошибкой.";
-  return statusLabels[kb.status];
 }
 
 function SourceActions({
