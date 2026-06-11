@@ -1,24 +1,23 @@
 import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
-
-export type Theme = "light" | "dark";
+import { isDarkTheme, isThemeId, type ThemeId } from "@/theme/themes";
 
 const STORAGE_KEY = "ai-platform-theme";
 
 type ThemeContextValue = {
-  theme: Theme;
+  theme: ThemeId;
   isDark: boolean;
   toggleTheme: (origin?: { x: number; y: number }) => void;
-  setTheme: (theme: Theme, origin?: { x: number; y: number }) => void;
+  setTheme: (theme: ThemeId, origin?: { x: number; y: number }) => void;
 };
 
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
-function readStoredTheme(): Theme {
+function readStoredTheme(): ThemeId {
   const stored = localStorage.getItem(STORAGE_KEY);
-  return stored === "dark" ? "dark" : "light";
+  return isThemeId(stored) ? stored : "light";
 }
 
-function applyThemeToDocument(theme: Theme, origin?: { x: number; y: number }) {
+function applyThemeToDocument(theme: ThemeId, origin?: { x: number; y: number }) {
   if (origin) {
     document.documentElement.style.setProperty("--theme-origin-x", `${origin.x}px`);
     document.documentElement.style.setProperty("--theme-origin-y", `${origin.y}px`);
@@ -29,13 +28,13 @@ function applyThemeToDocument(theme: Theme, origin?: { x: number; y: number }) {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>(() => readStoredTheme());
+  const [theme, setThemeState] = useState<ThemeId>(() => readStoredTheme());
 
   useEffect(() => {
     applyThemeToDocument(theme);
   }, []);
 
-  const setTheme = useCallback((nextTheme: Theme, origin?: { x: number; y: number }) => {
+  const setTheme = useCallback((nextTheme: ThemeId, origin?: { x: number; y: number }) => {
     const update = () => {
       applyThemeToDocument(nextTheme, origin);
       setThemeState(nextTheme);
@@ -61,7 +60,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       theme,
-      isDark: theme === "dark",
+      isDark: isDarkTheme(theme),
       toggleTheme,
       setTheme
     }),

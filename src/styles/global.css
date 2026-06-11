@@ -1,4 +1,5 @@
 @import "./tokens.css";
+@import "./themes/custom-themes.css";
 
 :root {
   --spacing-md: 16px;

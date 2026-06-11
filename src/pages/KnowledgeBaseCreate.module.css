@@ -4,7 +4,7 @@
   width: min(1380px, calc(100vw - 72px));
   min-width: 1040px;
   margin: 0 auto;
-  padding-bottom: calc(var(--nav-footer-height) + 12px);
+  padding-bottom: calc(var(--nav-footer-fab-size) + var(--nav-footer-float-offset) + 12px);
   color: var(--color-text);
 }
 
@@ -73,10 +73,7 @@
 
 .stepsCard,
 .contentCard,
-.summaryCard,
-.footerNav {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border-subtle);
+.summaryCard {
   border-radius: 12px;
   box-shadow: var(--shadow-lg);
 }
@@ -90,6 +87,17 @@
   padding: 20px 14px;
   overflow-y: auto;
   overscroll-behavior: contain;
+  background: var(--kb-steps-card-glass-bg);
+  border: 1px solid var(--kb-steps-card-glass-border);
+  box-shadow: var(--kb-steps-card-glass-shadow);
+  backdrop-filter: blur(var(--kb-steps-card-glass-blur));
+  -webkit-backdrop-filter: blur(var(--kb-steps-card-glass-blur));
+}
+
+.contentCard,
+.summaryCard {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .stepsList {
@@ -122,23 +130,150 @@
   z-index: 0;
   border-radius: 10px;
   background: transparent;
+  transition: background 0.28s ease, box-shadow 0.28s ease;
 }
 
 .stepItemActive::before {
   background: var(--kb-step-active-surface);
+  border: 1px solid var(--kb-step-active-border);
+  box-shadow: var(--kb-step-active-inset);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-/* сегмент линии: от центра текущего круга до центра следующего */
-.stepItem:not(:last-child)::after {
-  content: "";
+.stepItemDone::before {
+  background: var(--kb-step-done-surface);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.stepItemPending {
+  opacity: 0.92;
+}
+
+.stepItemLeaving {
+  pointer-events: none;
+}
+
+.stepItemLeaving .stepCopy {
+  opacity: 0.55;
+  transition: opacity 0.2s ease;
+}
+
+.stepConnector {
   position: absolute;
   top: 29px;
   left: 26px;
   z-index: 1;
   width: 2px;
   height: calc(100% + 4px);
-  background: var(--kb-step-track);
+  overflow: hidden;
   pointer-events: none;
+}
+
+.stepConnectorPending,
+.stepConnectorDashGrow,
+.stepConnectorSolid,
+.stepConnectorEnergy {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+}
+
+.stepConnectorPending {
+  background: repeating-linear-gradient(
+    180deg,
+    var(--kb-step-track) 0 5px,
+    transparent 5px 9px
+  );
+  opacity: 0.95;
+}
+
+.stepConnectorDashGrow {
+  z-index: 1;
+  background: repeating-linear-gradient(
+    180deg,
+    var(--kb-step-neon-color) 0 5px,
+    transparent 5px 9px
+  );
+  filter: drop-shadow(0 0 4px var(--kb-step-neon-glow));
+  transform: scaleY(0);
+  transform-origin: top center;
+  opacity: 0;
+}
+
+.stepConnectorSolid {
+  z-index: 2;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--kb-step-connector-solid) 72%, var(--kb-step-neon-color)),
+    var(--kb-step-connector-solid)
+  );
+  opacity: 0;
+}
+
+.stepConnectorEnergy {
+  z-index: 3;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    color-mix(in srgb, var(--kb-step-neon-color) 18%, transparent) 18%,
+    var(--kb-step-neon-color) 50%,
+    color-mix(in srgb, var(--kb-step-neon-color) 18%, transparent) 82%,
+    transparent 100%
+  );
+  background-size: 100% 42%;
+  background-repeat: no-repeat;
+  background-position: center -42%;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter:
+    drop-shadow(0 0 4px var(--kb-step-neon-glow))
+    drop-shadow(0 0 8px color-mix(in srgb, var(--color-primary) 55%, transparent));
+}
+
+.stepConnectorAnimating .stepConnectorPending {
+  opacity: 0.35;
+}
+
+.stepConnector[data-phase="draw"] .stepConnectorDashGrow {
+  animation: kbStepConnectorDraw 520ms cubic-bezier(0.42, 0, 0.22, 1) forwards;
+}
+
+.stepConnector[data-phase="bubble"] .stepConnectorDashGrow {
+  opacity: 1;
+  transform: scaleY(1);
+}
+
+.stepConnector[data-phase="solid"] .stepConnectorDashGrow {
+  opacity: 0;
+  transform: scaleY(1);
+  transition: opacity 180ms ease;
+}
+
+.stepConnector[data-phase="solid"] .stepConnectorSolid {
+  animation: kbStepConnectorSolidify 280ms ease forwards;
+}
+
+.stepConnector[data-phase="pulse"] .stepConnectorSolid {
+  opacity: 1;
+  box-shadow: 0 0 8px var(--kb-step-neon-glow);
+}
+
+.stepConnector[data-phase="pulse"] .stepConnectorEnergy {
+  animation: kbStepConnectorEnergy 620ms cubic-bezier(0.42, 0, 0.22, 1) forwards;
+}
+
+.stepConnectorDone .stepConnectorPending,
+.stepConnectorDone .stepConnectorDashGrow,
+.stepConnectorDone .stepConnectorEnergy {
+  opacity: 0;
+}
+
+.stepConnectorDone .stepConnectorSolid {
+  opacity: 1;
+  box-shadow:
+    0 0 8px var(--kb-step-neon-glow),
+    0 0 2px color-mix(in srgb, var(--kb-step-neon-color) 80%, transparent);
 }
 
 .stepItemActive {
@@ -161,10 +296,260 @@
   line-height: 1;
 }
 
-.stepItemActive .stepCircle {
+.stepCircleActive,
+.stepCircleDone,
+.stepCircleBounce,
+.stepCirclePop,
+.stepCircleHidden {
+  transition: none;
+}
+
+.stepCircleActive {
   color: var(--color-on-primary);
   background: var(--color-primary);
   font-weight: 700;
+  box-shadow: var(--kb-step-active-shadow);
+  animation: kbStepActivePulse 2.8s ease-in-out infinite;
+}
+
+.stepCircleDone {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  box-shadow: var(--kb-step-done-shadow);
+}
+
+.stepCircleBounce {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  box-shadow: var(--kb-step-active-shadow);
+  animation: kbStepCircleBubble 380ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.stepCircleInner {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  width: 100%;
+  height: 100%;
+  place-items: center;
+}
+
+.stepCirclePop {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  box-shadow: var(--kb-step-active-shadow);
+  animation: kbStepCirclePop 520ms cubic-bezier(0.22, 0.85, 0.32, 1) forwards;
+  z-index: 4;
+}
+
+.stepCircleHidden {
+  opacity: 0;
+  transform: scale(0.08);
+  visibility: hidden;
+}
+
+.stepCirclePopRing {
+  position: absolute;
+  inset: -3px;
+  z-index: 1;
+  border: 2px solid var(--kb-step-neon-color);
+  border-radius: inherit;
+  opacity: 0;
+  animation: kbStepPopRing 520ms cubic-bezier(0.22, 0.85, 0.32, 1) forwards;
+  pointer-events: none;
+}
+
+.stepConnector[data-phase="retract"] .stepConnectorSolid {
+  transform-origin: bottom center;
+  opacity: 1;
+  animation: kbStepConnectorRetractSolid 380ms cubic-bezier(0.42, 0, 0.22, 1) forwards;
+}
+
+.stepConnector[data-phase="retract"] .stepConnectorDashGrow,
+.stepConnector[data-phase="retract"] .stepConnectorEnergy {
+  opacity: 0;
+}
+
+.stepConnector[data-phase="retract"] .stepConnectorPending {
+  opacity: 0.95;
+}
+
+.stepItemDone .stepItemTitle {
+  color: var(--kb-step-title);
+}
+
+.stepItemPending .stepItemTitle {
+  color: color-mix(in srgb, var(--kb-step-title) 78%, var(--kb-step-hint));
+}
+
+@keyframes kbStepConnectorDraw {
+  0% {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+
+  12% {
+    opacity: 1;
+  }
+
+  100% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes kbStepConnectorSolidify {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes kbStepConnectorEnergy {
+  0%,
+  10% {
+    opacity: 0;
+    background-position: center -42%;
+  }
+
+  18% {
+    opacity: 1;
+  }
+
+  82% {
+    opacity: 1;
+    background-position: center 142%;
+  }
+
+  100% {
+    opacity: 0;
+    background-position: center 142%;
+  }
+}
+
+@keyframes kbStepCircleBubble {
+  0% {
+    transform: scale(1);
+  }
+
+  38% {
+    transform: scale(1.16);
+  }
+
+  58% {
+    transform: scale(0.94);
+  }
+
+  78% {
+    transform: scale(1.05);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes kbStepCirclePop {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  32% {
+    transform: scale(1.34);
+    opacity: 1;
+    filter: blur(0);
+  }
+
+  48% {
+    transform: scale(1.4);
+    opacity: 1;
+  }
+
+  68% {
+    transform: scale(0.55);
+    opacity: 0.35;
+    filter: blur(2px);
+  }
+
+  100% {
+    transform: scale(0.08);
+    opacity: 0;
+    filter: blur(4px);
+    visibility: hidden;
+  }
+}
+
+@keyframes kbStepPopRing {
+  0%,
+  38% {
+    transform: scale(1);
+    opacity: 0;
+  }
+
+  48% {
+    opacity: 0.88;
+  }
+
+  100% {
+    transform: scale(2.55);
+    opacity: 0;
+  }
+}
+
+@keyframes kbStepConnectorRetractSolid {
+  from {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scaleY(0);
+  }
+}
+
+@keyframes kbStepActivePulse {
+  0%,
+  100% {
+    box-shadow: var(--kb-step-active-shadow);
+  }
+
+  50% {
+    box-shadow:
+      0 0 18px color-mix(in srgb, var(--color-primary) 68%, transparent),
+      0 0 6px var(--kb-step-neon-color);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepCircleActive {
+    animation: none;
+  }
+
+  .stepCircleBounce,
+  .stepCirclePop,
+  .stepCirclePopRing,
+  .stepConnector[data-phase="draw"] .stepConnectorDashGrow,
+  .stepConnector[data-phase="solid"] .stepConnectorSolid,
+  .stepConnector[data-phase="pulse"] .stepConnectorEnergy,
+  .stepConnector[data-phase="retract"] .stepConnectorSolid {
+    animation: none;
+  }
+
+  .stepConnectorDashGrow,
+  .stepConnectorSolid {
+    opacity: 1;
+    transform: none;
+  }
+
+  .stepConnectorEnergy {
+    opacity: 0;
+  }
 }
 
 .stepCopy {
@@ -190,29 +575,109 @@
   line-height: 1.4;
 }
 
-.progressDot {
+.progressSteps {
+  --e: var(--footer-expand, 0);
+  display: flex;
+  gap: calc(var(--nav-step-dash-gap) + var(--e) * (var(--nav-step-dot-gap) - var(--nav-step-dash-gap)));
+  align-items: center;
+  justify-content: center;
+}
+
+.progressMark {
+  --e: var(--footer-expand, 0);
+  --dash-w: var(--nav-step-dash-width);
+  --dash-h: var(--nav-step-dash-height);
   display: grid;
-  width: var(--nav-step-dot-size);
-  height: var(--nav-step-dot-size);
   place-items: center;
+  flex: 0 0 auto;
+  width: calc((1 - var(--e)) * var(--dash-w) + var(--e) * var(--nav-step-dot-size));
+  height: calc((1 - var(--e)) * var(--dash-h) + var(--e) * var(--nav-step-dot-size));
   color: var(--nav-step-dot-color);
-  background: var(--nav-step-dot-bg);
-  border-radius: 999px;
+  background: var(--nav-step-dash-bg);
+  border-radius: calc(2px + var(--e) * 999px);
+  overflow: hidden;
+}
+
+.progressMarkActive {
+  --dash-w: var(--nav-step-dash-active-width);
+  --dash-h: var(--nav-step-dash-active-height);
+  color: color-mix(in srgb, var(--nav-step-neon-color) calc((1 - var(--e)) * 100%), var(--nav-step-dot-active-color));
+  background: color-mix(
+    in srgb,
+    var(--nav-step-neon-color) calc((1 - var(--e)) * 100%),
+    var(--nav-step-dot-active-bg)
+  );
+  box-shadow:
+    0 0 calc((1 - var(--e)) * 10px) var(--nav-step-neon-glow),
+    0 0 calc((1 - var(--e)) * 2px) color-mix(in srgb, var(--nav-step-neon-color) 80%, transparent),
+    0 0 0 calc(var(--e) * 3px) color-mix(in srgb, var(--color-primary) 18%, transparent);
+  animation: navStepNeonPulse calc((1 - min(1, var(--e) * 1.4)) * 2.8s) ease-in-out infinite;
+}
+
+.progressMarkDone {
+  color: color-mix(in srgb, var(--nav-step-neon-color) calc((1 - var(--e)) * 60%), var(--nav-step-dot-done-color));
+  background: color-mix(
+    in srgb,
+    var(--nav-step-neon-color) calc((1 - var(--e)) * 42%),
+    var(--nav-step-dot-done-bg)
+  );
+  opacity: calc(0.88 + var(--e) * 0.12);
+}
+
+.progressMarkLabel {
+  grid-area: 1 / 1;
   font-size: var(--nav-step-dot-font-size);
   font-weight: var(--nav-step-dot-font-weight);
   line-height: 1;
+  opacity: var(--e);
+  transform: scale(calc(0.35 + var(--e) * 0.65));
+  pointer-events: none;
+  user-select: none;
 }
 
-.progressDotDone,
-.progressDotActive {
-  color: var(--nav-step-dot-done-color);
-  background: var(--nav-step-dot-done-bg);
+.progressStepsCollapsed {
+  gap: var(--nav-step-dash-gap);
 }
 
-.progressDotActive {
-  color: var(--nav-step-dot-active-color);
-  background: var(--nav-step-dot-active-bg);
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+.progressStepsExpanded {
+  gap: var(--nav-step-dot-gap);
+}
+
+.progressStepsCollapsed .progressMarkLabel {
+  opacity: 0;
+  transform: scale(0);
+}
+
+.progressStepsExpanded .progressMarkLabel {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.progressStepsCollapsed .progressMark {
+  width: var(--dash-w);
+  height: var(--dash-h);
+  border-radius: 2px;
+}
+
+.progressStepsExpanded .progressMark {
+  width: var(--nav-step-dot-size);
+  height: var(--nav-step-dot-size);
+  border-radius: 999px;
+}
+
+@keyframes navStepNeonPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 8px var(--nav-step-neon-glow),
+      0 0 2px color-mix(in srgb, var(--nav-step-neon-color) 70%, transparent);
+  }
+
+  50% {
+    box-shadow:
+      0 0 14px color-mix(in srgb, var(--nav-step-neon-glow) 140%, transparent),
+      0 0 4px var(--nav-step-neon-color);
+  }
 }
 
 .contentCard {
@@ -990,12 +1455,21 @@ label.field {
 }
 
 .navError {
-  margin: 0;
+  position: fixed;
+  right: 16px;
+  bottom: calc(var(--nav-footer-fab-size) + var(--nav-footer-float-offset) + 14px);
+  left: 16px;
+  z-index: 31;
+  max-width: 560px;
+  margin: 0 auto;
   padding: 12px 16px;
   color: var(--color-danger-text);
-  background: var(--color-danger-soft);
+  background: color-mix(in srgb, var(--color-danger-soft) 92%, transparent);
   border: 1px solid var(--color-danger-border);
   border-radius: var(--form-control-border-radius);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 8px 28px color-mix(in srgb, var(--color-shadow-07) 55%, transparent);
   font-size: var(--form-control-font-size);
   font-weight: var(--form-label-weight);
   line-height: var(--form-control-line-height);
@@ -1994,44 +2468,239 @@ label.field {
 }
 
 .footerNav {
+  --footer-expand: 0;
   position: fixed;
   right: 0;
-  bottom: 0;
+  bottom: var(--nav-footer-float-offset);
   left: 0;
   z-index: 30;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  align-items: center;
-  gap: var(--nav-footer-padding-x);
-  width: min(1380px, calc(100vw - 72px));
-  min-width: 1040px;
-  margin-inline: auto;
-  padding: var(--nav-footer-padding-y) var(--nav-footer-padding-x);
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-}
-
-.pageSourcesWide .footerNav {
-  width: min(var(--kb-page-sources-max-width), calc(100vw - 24px));
-}
-
-.footerNavSide {
   display: flex;
   align-items: center;
-  min-height: var(--nav-footer-side-min-height);
+  justify-content: center;
+  width: auto;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
 }
 
-.footerNavSideRight {
-  position: relative;
-  z-index: 1;
+.footerNavClusterShell {
+  --collapse: calc(1 - var(--footer-expand, 0));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding:
+    calc(var(--collapse) * var(--nav-footer-collapsed-shell-padding-y))
+    calc(var(--collapse) * var(--nav-footer-collapsed-shell-padding-x));
+  background: color-mix(
+    in srgb,
+    var(--nav-footer-collapsed-shell-bg) calc(var(--collapse) * 100%),
+    transparent
+  );
+  border: calc(var(--collapse) * 1px) solid
+    color-mix(in srgb, var(--nav-footer-collapsed-shell-border) calc(var(--collapse) * 100%), transparent);
+  border-radius: calc(var(--collapse) * 999px);
+  box-shadow:
+    0 calc(var(--collapse) * 4px) calc(var(--collapse) * 24px)
+    color-mix(in srgb, var(--color-shadow-07) calc(var(--collapse) * 65%), transparent);
+  backdrop-filter: blur(calc(var(--collapse) * var(--nav-footer-collapsed-shell-blur)));
+  -webkit-backdrop-filter: blur(calc(var(--collapse) * var(--nav-footer-collapsed-shell-blur)));
+  pointer-events: auto;
+}
+
+.footerNavCluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(10px + var(--footer-expand) * 8px);
+  pointer-events: auto;
+}
+
+.footerNavSlot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--nav-footer-fab-size);
+  pointer-events: auto;
+}
+
+.footerNavSlotRight {
   justify-content: flex-end;
 }
 
-.progressDots {
+.footerFinalActions {
   display: flex;
-  gap: var(--nav-step-dot-gap);
+  flex-wrap: nowrap;
+  gap: calc(6px + var(--footer-expand) * 6px);
+  align-items: center;
+}
+
+.progressStepsShell {
+  --e: var(--footer-expand, 0);
+  display: flex;
   align-items: center;
   justify-content: center;
+  padding:
+    calc(var(--e) * var(--nav-footer-pill-padding-y))
+    calc(var(--e) * var(--nav-footer-pill-padding-x));
+  background: color-mix(in srgb, var(--color-surface) calc(var(--e) * 100%), transparent);
+  border: calc(var(--e) * 1px) solid color-mix(in srgb, var(--color-border-subtle) calc(var(--e) * 100%), transparent);
+  border-radius: calc(var(--e) * 999px);
+  box-shadow:
+    0 calc(var(--e) * 6px) calc(var(--e) * 22px)
+    color-mix(in srgb, var(--color-shadow-07) calc(var(--e) * 70%), transparent);
+  backdrop-filter: blur(calc(var(--e) * 10px));
+}
+
+.navMorphButton {
+  --e: var(--footer-expand, 0);
+  --fab: var(--nav-footer-fab-size);
+  --text-e: calc(var(--e) * var(--e) * var(--e));
+  position: relative;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: calc(var(--text-e) * var(--nav-button-gap));
+  width: fit-content;
+  min-width: calc((1 - var(--text-e)) * var(--fab) + var(--text-e) * 44px);
+  max-width: calc((1 - var(--text-e)) * var(--fab) + var(--text-e) * 360px);
+  min-height: calc((1 - var(--text-e)) * var(--fab) + var(--text-e) * var(--nav-button-min-height));
+  height: calc((1 - var(--text-e)) * var(--fab) + var(--text-e) * var(--nav-button-min-height));
+  padding-inline: calc(var(--text-e) * var(--nav-button-padding-x));
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: calc((1 - var(--text-e)) * 999px + var(--text-e) * var(--nav-button-radius));
+  font-size: var(--nav-button-font-size);
+  font-weight: var(--nav-button-font-weight);
+  line-height: var(--nav-button-line-height);
+  cursor: pointer;
+  transition: none;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+
+.navMorphButtonCollapsed {
+  width: var(--fab);
+  min-width: var(--fab);
+  max-width: var(--fab);
+  height: var(--fab);
+  min-height: var(--fab);
+  padding-inline: 0;
+  border-radius: 999px;
+}
+
+.navMorphButtonExpanded {
+  width: auto;
+  min-width: unset;
+  max-width: none;
+  min-height: var(--nav-button-min-height);
+  height: var(--nav-button-min-height);
+  padding-inline: var(--nav-button-padding-x);
+  border-radius: var(--nav-button-radius);
+  overflow: visible;
+}
+
+.navMorphButtonPrimary {
+  color: color-mix(in srgb, var(--color-primary-text) calc((1 - var(--text-e)) * 100%), var(--nav-button-primary-color));
+  background: color-mix(
+    in srgb,
+    var(--color-surface) calc((1 - var(--text-e)) * 100%),
+    var(--nav-button-primary-bg)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--color-border-subtle) calc((1 - var(--text-e)) * 100%),
+    transparent
+  );
+  box-shadow: 0 calc(var(--text-e) * 10px) calc(var(--text-e) * 22px)
+    color-mix(in srgb, var(--nav-button-primary-bg) calc(var(--text-e) * 18%), transparent);
+}
+
+.navMorphButtonSecondary {
+  color: var(--nav-button-secondary-color);
+  background: color-mix(
+    in srgb,
+    var(--color-surface) calc((1 - var(--text-e)) * 100%),
+    var(--nav-button-secondary-bg)
+  );
+  border-color: color-mix(
+    in srgb,
+    var(--color-border-subtle) calc((1 - var(--text-e)) * 100%),
+    var(--nav-button-secondary-border)
+  );
+}
+
+.navMorphButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.navMorphButton:focus-visible {
+  outline: none;
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.navMorphIcon {
+  display: grid;
+  flex: 0 0 auto;
+  width: calc((1 - var(--text-e)) * var(--fab) + var(--text-e) * 16px);
+  height: calc((1 - var(--text-e)) * var(--fab) + var(--text-e) * 16px);
+  place-items: center;
+}
+
+.navMorphButtonCollapsed .navMorphIcon {
+  width: var(--fab);
+  height: var(--fab);
+}
+
+.navMorphButtonExpanded .navMorphIcon {
+  width: 16px;
+  height: 16px;
+}
+
+.navMorphText {
+  flex: 0 1 auto;
+  overflow: hidden;
+  opacity: var(--text-e);
+  clip-path: inset(0 calc((1 - var(--text-e)) * 100%) 0 0);
+  pointer-events: none;
+  user-select: none;
+}
+
+.navMorphButtonCollapsed .navMorphText {
+  flex: 0 0 0;
+  width: 0;
+  max-width: 0;
+  margin: 0;
+  opacity: 0;
+  clip-path: inset(0 100% 0 0);
+}
+
+.navMorphButtonExpanded .navMorphText {
+  flex: 0 1 auto;
+  width: auto;
+  max-width: none;
+  opacity: 1;
+  clip-path: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressMarkActive {
+    animation: none;
+  }
+
+  .navMorphText {
+    clip-path: none;
+  }
+
+  .navMorphButton {
+    --text-e: var(--e);
+  }
 }
 
 /* ── Progressive summary (reference sidebar) ── */

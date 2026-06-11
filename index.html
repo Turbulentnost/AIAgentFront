@@ -3,8 +3,22 @@
   <head>
     <script>
       (function () {
+        var valid = [
+          "light",
+          "dark",
+          "cyberpunk",
+          "matrix",
+          "glassmorphism",
+          "retro",
+          "sketch",
+          "ocean",
+          "sunset",
+          "nord",
+          "sakura",
+          "amethyst"
+        ];
         var theme = localStorage.getItem("ai-platform-theme");
-        if (theme === "dark" || theme === "light") {
+        if (valid.indexOf(theme) !== -1) {
           document.documentElement.dataset.theme = theme;
         }
       })();

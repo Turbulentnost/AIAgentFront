@@ -21,7 +21,7 @@ export default function ThemeToggle({ className }: ThemeToggleProps) {
     <button
       className={`${styles.toggle} ${className ?? ""}`.trim()}
       type="button"
-      aria-label={isDark ? "Включить светлую тему" : "Включить тёмную тему"}
+      aria-label={isDark ? "Включить светлую тему" : theme === "light" ? "Включить тёмную тему" : "Переключить на светлую или тёмную тему"}
       aria-pressed={isDark}
       onClick={handleClick}
     >
@@ -29,7 +29,9 @@ export default function ThemeToggle({ className }: ThemeToggleProps) {
         <Sun className={`${styles.icon} ${styles.sun}`} size={18} strokeWidth={2} aria-hidden="true" />
         <Moon className={`${styles.icon} ${styles.moon}`} size={18} strokeWidth={2} aria-hidden="true" />
       </span>
-      <span className={styles.srOnly}>{theme === "dark" ? "Тёмная тема" : "Светлая тема"}</span>
+      <span className={styles.srOnly}>
+        {theme === "dark" ? "Тёмная тема" : theme === "light" ? "Светлая тема" : `Тема: ${theme}`}
+      </span>
     </button>
   );
 }

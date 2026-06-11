@@ -5,6 +5,7 @@ import { Link, Navigate, useNavigate } from "react-router-dom";
 import { departmentsApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import formStyles from "@/components/form-controls/form-controls.module.css";
+import ThemePicker from "@/components/ThemePicker";
 import { profileFallbacks, roleNameById } from "@/mock-data/profile";
 import type { User, UserUpdate } from "@/types";
 import styles from "./ProfileEdit.module.css";
@@ -303,6 +304,14 @@ export default function ProfileEdit() {
             </button>
           </div>
         </form>
+      </article>
+
+      <article className={styles.card}>
+        <div className={styles.sectionTitle}>
+          <h2>Внешний вид</h2>
+          <p>Выберите тему интерфейса. Базовые «Светлая» и «Тёмная» — стандартные темы платформы. Остальные — авторские стили.</p>
+        </div>
+        <ThemePicker className={styles.themePicker} />
       </article>
     </section>
   );

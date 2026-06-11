@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type DragEvent, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
@@ -35,6 +35,8 @@ import {
 import { isAxiosError } from "axios";
 import { agentsApi, departmentsApi, documentsApi, knowledgeBasesApi, rolesApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
+import AnimatedSidebarSteps from "@/components/AnimatedSidebarSteps";
+import { useFooterExpandProgress } from "@/hooks/useFooterExpandProgress";
 import DepartmentSelect from "@/components/DepartmentSelect";
 import SourceFileTree from "@/components/SourceFileTree";
 import { FormAutocomplete, FormSelect, SourceFilterBar, Switch } from "@/components/form-controls";
@@ -719,6 +721,8 @@ export default function KnowledgeBaseCreate() {
 
   const backStepLabel = stepIndex > 0 ? steps[stepIndex - 1].navLabel : null;
   const nextStepLabel = stepIndex < steps.length - 1 ? steps[stepIndex + 1].navLabel : null;
+  const footerExpandProgress = useFooterExpandProgress([stepIndex, activeStep.id]);
+  const footerExpandStyle = { "--footer-expand": footerExpandProgress } as CSSProperties;
 
   const summaryPanelProps = {
     stepIndex,
@@ -748,7 +752,10 @@ export default function KnowledgeBaseCreate() {
   };
 
   return (
-    <div className={`${styles.page} ${activeStep.id === "sources" ? styles.pageSourcesWide : ""}`}>
+    <div
+      className={`${styles.page} ${activeStep.id === "sources" ? styles.pageSourcesWide : ""}`}
+      style={footerExpandStyle}
+    >
       <header className={styles.header}>
         <Link to="/knowledge-base" className={styles.backLink}>
           <ChevronLeft size={16} />
@@ -769,22 +776,7 @@ export default function KnowledgeBaseCreate() {
 
       <main className={styles.layout}>
         <aside className={styles.stepsCard} aria-label="Этапы создания базы знаний">
-          <div className={styles.stepsList} role="list">
-            {sidebarSteps.map((step, index) => (
-              <div
-                key={step.label}
-                role="listitem"
-                aria-current={index === activeSidebarIndex ? "step" : undefined}
-                className={`${styles.stepItem} ${index === activeSidebarIndex ? styles.stepItemActive : ""}`}
-              >
-                <span className={styles.stepCircle}>{index + 1}</span>
-                <span className={styles.stepCopy}>
-                  <strong className={styles.stepItemTitle}>{step.label}</strong>
-                  <small className={styles.stepHint}>{step.hint}</small>
-                </span>
-              </div>
-            ))}
-          </div>
+          <AnimatedSidebarSteps steps={sidebarSteps} activeIndex={activeSidebarIndex} />
         </aside>
 
         <section className={`${styles.contentCard} ${activeStep.id === "sources" ? styles.contentCardSources : ""}`}>
@@ -961,39 +953,72 @@ export default function KnowledgeBaseCreate() {
         <div className={styles.createError}>{formatApiError(createKnowledgeBase.error)}</div>
       )}
 
-      {navError && <div className={styles.navError}>{navError}</div>}
+      {navError ? <div className={styles.navError}>{navError}</div> : null}
 
-      <footer className={styles.footerNav}>
-        <div className={styles.footerNavSide}>
-          {backStepLabel ? (
-            <button type="button" className={styles.navBackButton} onClick={goBack}>
-              <ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />
-              Назад: {backStepLabel}
-            </button>
-          ) : null}
-        </div>
+      <footer className={styles.footerNav} style={footerExpandStyle}>
+        <div className={styles.footerNavClusterShell} style={footerExpandStyle}>
+          <div className={styles.footerNavCluster}>
+            <div className={styles.footerNavSlot}>
+            {backStepLabel ? (
+              <MorphNavButton
+                variant="secondary"
+                expandProgress={footerExpandProgress}
+                label={`Назад: ${backStepLabel}`}
+                shortLabel="Назад"
+                onClick={goBack}
+                icon={<ChevronLeft size={16} strokeWidth={2} aria-hidden="true" />}
+              />
+            ) : null}
+          </div>
 
-        <ProgressDots activeIndex={activeSidebarIndex} />
+          <div className={styles.progressStepsShell} style={footerExpandStyle}>
+            <MorphingProgressSteps activeIndex={activeSidebarIndex} expandProgress={footerExpandProgress} />
+          </div>
 
-        <div className={`${styles.footerNavSide} ${styles.footerNavSideRight}`}>
-          {stepIndex < steps.length - 1 ? (
-            <button type="button" className={styles.navNextButton} onClick={goNext}>
-              Далее: {nextStepLabel}
-              <ChevronRight size={16} strokeWidth={2} aria-hidden="true" />
-            </button>
-          ) : (
-            <div className={styles.footerFinalActions}>
-              <button type="button" className={styles.navBackButton} onClick={() => navigate("/knowledge-base")}>
-                Отмена
-              </button>
-              <button type="button" className={styles.navBackButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: false })} disabled={!canCreateDraft || createKnowledgeBase.isPending}>
-                Сохранить как черновик
-              </button>
-              <button type="button" className={styles.navNextButton} onClick={() => createKnowledgeBase.mutate({ startIndexing: true })} disabled={!canCreateFull || createKnowledgeBase.isPending}>
-                Создать и запустить индексацию
-              </button>
+          <div className={`${styles.footerNavSlot} ${styles.footerNavSlotRight}`}>
+            {stepIndex < steps.length - 1 ? (
+              <MorphNavButton
+                variant="primary"
+                expandProgress={footerExpandProgress}
+                label={`Далее: ${nextStepLabel}`}
+                shortLabel="Далее"
+                onClick={goNext}
+                icon={<ChevronRight size={16} strokeWidth={2} aria-hidden="true" />}
+                iconAfter
+              />
+            ) : (
+              <div className={styles.footerFinalActions} style={footerExpandStyle}>
+                <MorphNavButton
+                  variant="secondary"
+                  expandProgress={footerExpandProgress}
+                  label="Отмена"
+                  shortLabel="Отмена"
+                  onClick={() => navigate("/knowledge-base")}
+                  icon={<X size={16} strokeWidth={2} aria-hidden="true" />}
+                />
+                <MorphNavButton
+                  variant="secondary"
+                  expandProgress={footerExpandProgress}
+                  label="Сохранить как черновик"
+                  shortLabel="Черновик"
+                  onClick={() => createKnowledgeBase.mutate({ startIndexing: false })}
+                  disabled={!canCreateDraft || createKnowledgeBase.isPending}
+                  icon={<FilePlus2 size={16} strokeWidth={2} aria-hidden="true" />}
+                />
+                <MorphNavButton
+                  variant="primary"
+                  expandProgress={footerExpandProgress}
+                  label="Создать и запустить индексацию"
+                  shortLabel="Создать"
+                  onClick={() => createKnowledgeBase.mutate({ startIndexing: true })}
+                  disabled={!canCreateFull || createKnowledgeBase.isPending}
+                  icon={<ChevronRight size={16} strokeWidth={2} aria-hidden="true" />}
+                  iconAfter
+                />
+              </div>
+            )}
             </div>
-          )}
+          </div>
         </div>
       </footer>
     </div>
@@ -2646,19 +2671,88 @@ function SummaryBlock({
   );
 }
 
-function ProgressDots({ activeIndex }: { activeIndex: number }) {
+function MorphNavButton({
+  expandProgress,
+  label,
+  shortLabel,
+  onClick,
+  icon,
+  variant,
+  disabled = false,
+  iconAfter = false
+}: {
+  expandProgress: number;
+  label: string;
+  shortLabel: string;
+  onClick: () => void;
+  icon: ReactNode;
+  variant: "primary" | "secondary";
+  disabled?: boolean;
+  iconAfter?: boolean;
+}) {
+  const variantClass = variant === "primary" ? styles.navMorphButtonPrimary : styles.navMorphButtonSecondary;
+  const isCollapsed = expandProgress < 0.04;
+  const isExpanded = expandProgress > 0.96;
+  const stateClass = isCollapsed
+    ? styles.navMorphButtonCollapsed
+    : isExpanded
+      ? styles.navMorphButtonExpanded
+      : "";
+
   return (
-    <div className={styles.progressDots} aria-label="Прогресс по этапам">
-      {sidebarSteps.map((step, index) => (
-        <span
-          key={step.label}
-          className={`${styles.progressDot} ${index < activeIndex ? styles.progressDotDone : ""} ${index === activeIndex ? styles.progressDotActive : ""}`}
-          aria-current={index === activeIndex ? "step" : undefined}
-          title={step.label}
-        >
-          {index + 1}
-        </span>
-      ))}
+    <button
+      type="button"
+      className={`${styles.navMorphButton} ${variantClass} ${stateClass}`.trim()}
+      style={{ "--footer-expand": expandProgress } as CSSProperties}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={isCollapsed ? shortLabel : label}
+      title={label}
+    >
+      {!iconAfter ? <span className={styles.navMorphIcon}>{icon}</span> : null}
+      <span className={styles.navMorphText} aria-hidden={isCollapsed}>
+        {label}
+      </span>
+      {iconAfter ? <span className={styles.navMorphIcon}>{icon}</span> : null}
+    </button>
+  );
+}
+
+function MorphingProgressSteps({
+  activeIndex,
+  expandProgress
+}: {
+  activeIndex: number;
+  expandProgress: number;
+}) {
+  const isCollapsed = expandProgress < 0.04;
+  const isExpanded = expandProgress > 0.96;
+  const stateClass = isCollapsed
+    ? styles.progressStepsCollapsed
+    : isExpanded
+      ? styles.progressStepsExpanded
+      : "";
+
+  return (
+    <div
+      className={`${styles.progressSteps} ${stateClass}`.trim()}
+      aria-label="Прогресс по этапам"
+      style={{ "--footer-expand": expandProgress } as CSSProperties}
+    >
+      {sidebarSteps.map((step, index) => {
+        const isDone = index < activeIndex;
+        const isActive = index === activeIndex;
+        return (
+          <span
+            key={step.label}
+            className={`${styles.progressMark} ${isDone ? styles.progressMarkDone : ""} ${isActive ? styles.progressMarkActive : ""}`}
+            aria-current={isActive ? "step" : undefined}
+            title={step.label}
+          >
+            <span className={styles.progressMarkLabel}>{index + 1}</span>
+          </span>
+        );
+      })}
     </div>
   );
 }
