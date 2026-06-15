@@ -3,7 +3,7 @@ import {
   FileDirectoryFillIcon,
   FileDirectoryOpenFillIcon
 } from "@primer/octicons-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   getDefaultExpandedFolderPaths,
   type SourceTreeNode,
@@ -11,6 +11,12 @@ import {
 } from "@/utils/sourceFileTree";
 import { getGithubFileIconColorClass, getGithubFileIconComponent } from "@/utils/githubFileIcons";
 import styles from "./SourceFileTree.module.css";
+
+export type SourceFileTreeFileMeta = {
+  statusLabel?: string;
+  metaText?: string;
+  trailing?: ReactNode;
+};
 
 function formatBytes(value?: number) {
   if (!value) return "";
@@ -37,22 +43,45 @@ function TreeNodeRow({
   node,
   depth,
   expandedPaths,
-  onToggleFolder
+  fileMetaById,
+  selectedFileId,
+  onToggleFolder,
+  onFileSelect
 }: {
   node: SourceTreeNode;
   depth: number;
   expandedPaths: Set<string>;
+  fileMetaById?: Record<string, SourceFileTreeFileMeta>;
+  selectedFileId?: string | null;
   onToggleFolder: (path: string) => void;
+  onFileSelect?: (fileId: string) => void;
 }) {
   if (node.kind === "file") {
+    const fileMeta = fileMetaById?.[node.id];
+    const isSelected = selectedFileId === node.id;
+
     return (
-      <li className={styles.row} style={{ paddingLeft: `${8 + depth * 16}px` }}>
+      <li
+        className={`${styles.row} ${fileMeta ? styles.rowRich : ""} ${isSelected ? styles.rowSelected : ""}`.trim()}
+        style={{ paddingLeft: `${8 + depth * 16}px` }}
+      >
         <span className={styles.chevronSpacer} aria-hidden="true" />
         <FileTypeIcon filename={node.name} />
-        <span className={styles.nodeName} title={node.relativePath}>
+        <button
+          type="button"
+          className={styles.fileNameButton}
+          title={node.relativePath}
+          onClick={() => onFileSelect?.(node.id)}
+        >
           {node.name}
-        </span>
-        {node.fileSize ? <span className={styles.nodeMeta}>{formatBytes(node.fileSize)}</span> : null}
+        </button>
+        {fileMeta?.statusLabel ? <span className={styles.nodeStatus}>{fileMeta.statusLabel}</span> : null}
+        {fileMeta?.metaText ? (
+          <span className={styles.nodeMeta}>{fileMeta.metaText}</span>
+        ) : node.fileSize ? (
+          <span className={styles.nodeMeta}>{formatBytes(node.fileSize)}</span>
+        ) : null}
+        {fileMeta?.trailing ? <span className={styles.nodeTrailing}>{fileMeta.trailing}</span> : null}
       </li>
     );
   }
@@ -88,7 +117,10 @@ function TreeNodeRow({
               node={child}
               depth={depth + 1}
               expandedPaths={expandedPaths}
+              fileMetaById={fileMetaById}
+              selectedFileId={selectedFileId}
               onToggleFolder={onToggleFolder}
+              onFileSelect={onFileSelect}
             />
           ))}
         </ul>
@@ -100,11 +132,17 @@ function TreeNodeRow({
 export default function SourceFileTree({
   tree,
   defaultExpandAll = true,
-  className
+  className,
+  fileMetaById,
+  selectedFileId,
+  onFileSelect
 }: {
   tree: SourceTreeRoot;
   defaultExpandAll?: boolean;
   className?: string;
+  fileMetaById?: Record<string, SourceFileTreeFileMeta>;
+  selectedFileId?: string | null;
+  onFileSelect?: (fileId: string) => void;
 }) {
   const defaultExpanded = useMemo(
     () => (defaultExpandAll ? new Set(getDefaultExpandedFolderPaths(tree)) : new Set<string>()),
@@ -138,7 +176,10 @@ export default function SourceFileTree({
             node={node}
             depth={0}
             expandedPaths={expandedPaths}
+            fileMetaById={fileMetaById}
+            selectedFileId={selectedFileId}
             onToggleFolder={toggleFolder}
+            onFileSelect={onFileSelect}
           />
         ))}
       </ul>

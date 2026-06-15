@@ -11,6 +11,7 @@ import type {
   DepartmentSyncStatus,
   EmployeeSyncResult,
   Document,
+  DocumentChunk,
   DocumentUploadOptions,
   HealthResponse,
   KnowledgeBase,
@@ -124,7 +125,7 @@ export const documentsApi = {
     if (options.department_id) formData.append("department_id", options.department_id);
     if (options.task_id) formData.append("task_id", options.task_id);
     if (options.relative_path) formData.append("relative_path", options.relative_path);
-    return apiClient.post<Document>("/documents/upload", formData).then((r) => r.data);
+    return apiClient.post<Document>("/documents/upload", formData, { timeout: 0 }).then((r) => r.data);
   },
   list: () => apiClient.get<Document[]>("/documents").then((r) => r.data),
   search: (query: string | ChunkSearchQuery) => {
@@ -134,7 +135,7 @@ export const documentsApi = {
   versions: (documentId: string) =>
     apiClient.get(`/documents/${documentId}/versions`).then((r) => r.data),
   chunks: (documentVersionId: string) =>
-    apiClient.get(`/documents/versions/${documentVersionId}/chunks`).then((r) => r.data)
+    apiClient.get<DocumentChunk[]>(`/documents/versions/${documentVersionId}/chunks`).then((r) => r.data)
 };
 
 export const knowledgeBasesApi = {

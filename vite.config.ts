@@ -24,6 +24,12 @@ export default defineConfig(({ mode }) => {
       // mount — без polling правки кода не подхватываются без перезапуска.
       watch: { usePolling: true, interval: 500 },
       proxy: {
+        "/api/v1/documents/upload": {
+          target: apiProxy,
+          changeOrigin: true,
+          timeout: 0,
+          proxyTimeout: 0
+        },
         "/api": {
           target: apiProxy,
           changeOrigin: true,

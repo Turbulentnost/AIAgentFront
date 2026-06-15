@@ -1,0 +1,213 @@
+.editor {
+  display: grid;
+  gap: 0;
+  min-width: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.treeSurface {
+  min-height: 280px;
+  padding: 4px 0;
+  border-radius: 8px;
+}
+
+.treeSurface.folderDropZoneActive {
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 8%, transparent);
+  outline: 1px dashed var(--color-primary, #2563eb);
+  outline-offset: -1px;
+}
+
+.rootList,
+.children {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.folderBlock,
+.folderDropZone {
+  display: grid;
+  gap: 0;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 12px 16px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 8px 2px 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+button.row:hover,
+.row:focus-visible {
+  background: var(--color-hover-strong);
+  outline: none;
+}
+
+li.row {
+  cursor: grab;
+}
+
+li.row:hover {
+  background: var(--color-hover-strong);
+}
+
+.pendingFolderRow {
+  display: grid;
+  grid-template-columns: 12px 16px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  min-height: 28px;
+  padding: 2px 8px 2px 0;
+}
+
+.pendingFolderField {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pendingFolderInput {
+  width: 100%;
+  min-width: 0;
+  height: 24px;
+  padding: 0 6px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary, #2563eb);
+  border-radius: 4px;
+  font: inherit;
+}
+
+.pendingFolderInputError {
+  border-color: var(--color-danger, #d14343);
+}
+
+.pendingFolderError {
+  margin: 0;
+  color: var(--color-danger, #d14343);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.contextMenuBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+}
+
+.contextMenu {
+  position: fixed;
+  z-index: 1201;
+  min-width: 168px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  box-shadow: 0 10px 30px rgb(0 0 0 / 24%);
+}
+
+.contextMenuItem {
+  display: block;
+  width: 100%;
+  padding: 8px 10px;
+  color: var(--color-text);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.contextMenuItem:hover {
+  background: var(--color-hover-strong);
+}
+
+.chevronSpacer,
+.chevronWrap {
+  display: grid;
+  width: 12px;
+  height: 16px;
+  place-items: center;
+}
+
+.chevron {
+  color: var(--color-muted);
+  transition: transform 0.16s ease;
+}
+
+.chevronOpen {
+  transform: rotate(90deg);
+}
+
+.iconCell {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+
+.folderIcon {
+  color: var(--tree-directory-icon-color);
+}
+
+.fileIcon {
+  color: var(--tree-file-icon-default);
+}
+
+.fileIcon_pdf { color: var(--tree-file-icon-pdf); }
+.fileIcon_doc, .fileIcon_docx, .fileIcon_rtf, .fileIcon_odt { color: var(--tree-file-icon-word); }
+.fileIcon_xls, .fileIcon_xlsx, .fileIcon_csv, .fileIcon_ods { color: var(--tree-file-icon-sheet); }
+.fileIcon_ppt, .fileIcon_pptx, .fileIcon_odp { color: var(--tree-file-icon-slide); }
+.fileIcon_md, .fileIcon_txt { color: var(--tree-file-icon-text); }
+.fileIcon_default { color: var(--tree-file-icon-default); }
+
+.nodeName {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 400;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.nodeMeta {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.empty {
+  margin: 0;
+  padding: 12px 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.folderDropZoneActive {
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 8%, transparent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}

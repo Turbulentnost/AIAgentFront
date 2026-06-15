@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
+  ArrowUp,
   Bot,
   Check,
   CheckCircle2,
@@ -38,7 +39,7 @@ import { useAuth } from "@/auth/AuthContext";
 import AnimatedSidebarSteps from "@/components/AnimatedSidebarSteps";
 import { useFooterExpandProgress } from "@/hooks/useFooterExpandProgress";
 import DepartmentSelect from "@/components/DepartmentSelect";
-import SourceFileTree from "@/components/SourceFileTree";
+import SourceFileTreeEditor from "@/components/SourceFileTreeEditor";
 import { FormAutocomplete, FormSelect, SourceFilterBar, Switch } from "@/components/form-controls";
 import type {
   AgentAccess,
@@ -59,7 +60,14 @@ import {
   titleFromRelativePath,
   type FolderUploadFile
 } from "@/utils/folderUpload";
-import { buildSourceFileTree, type SourceTreeRoot } from "@/utils/sourceFileTree";
+import {
+  buildFolderPath,
+  buildSourceFileTree,
+  collectAllFolderPaths,
+  mergeCustomFoldersIntoTree,
+  moveFileRelativePath,
+  type SourceTreeRoot
+} from "@/utils/sourceFileTree";
 import styles from "./KnowledgeBaseCreate.module.css";
 
 type StepId = "main" | "sources" | "readiness" | "processing" | "access" | "agents" | "preview";
@@ -401,6 +409,7 @@ export default function KnowledgeBaseCreate() {
   const [uploadTitle, setUploadTitle] = useState("");
   const [sourceOnlyCurrent, setSourceOnlyCurrent] = useState(true);
   const [stagedDropFiles, setStagedDropFiles] = useState<StagedSourceFile[]>([]);
+  const [customFolderPaths, setCustomFolderPaths] = useState<string[]>([]);
   const [uploadingStagedIds, setUploadingStagedIds] = useState<string[]>([]);
   const [rightSidebarView, setRightSidebarView] = useState<"summary" | "tree">("summary");
   const [isRightSidebarAnimating, setIsRightSidebarAnimating] = useState(false);
@@ -465,20 +474,42 @@ export default function KnowledgeBaseCreate() {
   const activeDepartments = useMemo(() => filterActiveDepartments(departments.data ?? []), [departments.data]);
   const activeStep = steps[stepIndex];
 
-  const stagedFileTree = useMemo(
-    () =>
-      buildSourceFileTree(
-        stagedDropFiles.map((item) => ({
-          id: item.id,
-          relativePath: item.relativePath,
-          fileSize: item.file.size
-        }))
-      ),
-    [stagedDropFiles]
+  const stagedFileTree = useMemo(() => {
+    const baseTree = buildSourceFileTree(
+      stagedDropFiles.map((item) => ({
+        id: item.id,
+        relativePath: item.relativePath,
+        fileSize: item.file.size
+      }))
+    );
+    return mergeCustomFoldersIntoTree(baseTree, customFolderPaths);
+  }, [customFolderPaths, stagedDropFiles]);
+
+  const createStagedFolder = useCallback(
+    (parentPath: string, name: string) => {
+      const path = buildFolderPath(parentPath, name);
+      if (!path) return false;
+      const existing = collectAllFolderPaths(stagedFileTree);
+      if (existing.has(path)) return false;
+      setCustomFolderPaths((current) => (current.includes(path) ? current : [...current, path]));
+      return true;
+    },
+    [stagedFileTree]
   );
 
+  const moveStagedFileToFolder = useCallback((fileId: string, targetFolderPath: string) => {
+    setStagedDropFiles((current) =>
+      current.map((item) =>
+        item.id === fileId
+          ? { ...item, relativePath: moveFileRelativePath(item.relativePath, targetFolderPath) }
+          : item
+      )
+    );
+  }, []);
+
   const canFlipRightSidebar =
-    stagedDropFiles.length > 0 && (activeStep.id === "sources" || activeStep.id === "readiness");
+    (stagedDropFiles.length > 0 || customFolderPaths.length > 0) &&
+    (activeStep.id === "sources" || activeStep.id === "readiness");
 
   const showRightSidebarExpand = activeStep.id === "sources" || activeStep.id === "readiness";
 
@@ -579,6 +610,8 @@ export default function KnowledgeBaseCreate() {
         setSelectedSourceIds((ids) => [...new Set([...ids, document.id])]);
         setStagedDropFiles((current) => current.filter((item) => item.id !== id));
         await queryClient.invalidateQueries({ queryKey: ["documents"] });
+      } catch (error) {
+        console.error("Не удалось загрузить файл:", staged.relativePath, error);
       } finally {
         setUploadingStagedIds((ids) => ids.filter((item) => item !== id));
       }
@@ -917,7 +950,11 @@ export default function KnowledgeBaseCreate() {
                     <Summary {...summaryPanelProps} />
                   </div>
                   <div className={styles.summaryFlipBack}>
-                    <SourceTreeSidebarPanel tree={stagedFileTree} />
+                    <SourceTreeSidebarPanel
+                      tree={stagedFileTree}
+                      onCreateFolder={createStagedFolder}
+                      onMoveFile={moveStagedFileToFolder}
+                    />
                   </div>
                 </div>
                 <div className={styles.summarySidebarFooter}>
@@ -1180,6 +1217,14 @@ function StepMain(props: {
   );
 }
 
+function folderPathLabel(relativePath: string) {
+  const normalized = relativePath.replace(/\\/g, "/");
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length <= 1) return "Корень";
+  parts.pop();
+  return parts.join("/");
+}
+
 function StepSources(props: {
   documents: Document[];
   selectedSourceIds: string[];
@@ -1213,8 +1258,24 @@ function StepSources(props: {
   const readyCount = props.readiness.filter((item) => item.level === "ok").length;
   const ocrCount = props.readiness.filter((item) => item.level === "warning").length;
   const dragDepthRef = useRef(0);
+  const stagedScrollerRef = useRef<HTMLDivElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const [dropError, setDropError] = useState<string | null>(null);
+  const [stagedSearch, setStagedSearch] = useState("");
+
+  const filteredStagedFiles = useMemo(() => {
+    const query = stagedSearch.trim().toLowerCase();
+    if (!query) return props.stagedFiles;
+    return props.stagedFiles.filter((item) =>
+      `${item.relativePath} ${item.file.name}`.toLowerCase().includes(query)
+    );
+  }, [props.stagedFiles, stagedSearch]);
+
+  const scrollStagedFiles = useCallback((direction: -1 | 1) => {
+    const scroller = stagedScrollerRef.current;
+    if (!scroller) return;
+    scroller.scrollBy({ left: direction * scroller.clientWidth, behavior: "smooth" });
+  }, []);
 
   const handleDragEnter = useCallback((event: DragEvent) => {
     event.preventDefault();
@@ -1441,44 +1502,83 @@ function StepSources(props: {
               Загрузить все
             </button>
           </div>
-          <div className={styles.sourcesStagedList}>
-            {props.stagedFiles.map((staged) => {
-              const extKey = getExtension(staged.file.name).replace(".", "") || "default";
-              const uploading = props.uploadingStagedIds.includes(staged.id);
-              return (
-                <article key={staged.id} className={styles.sourcesStagedCard}>
-                  <span className={`${styles.sourcesDocIcon} ${styles[`sourcesDocIcon_${extKey}`] ?? styles.sourcesDocIcon_default}`}>
-                    {(extKey || "file").slice(0, 4)}
-                  </span>
-                  <div className={styles.sourcesStagedCopy}>
-                    <strong title={staged.relativePath}>{shortFileName(staged.relativePath)}</strong>
-                    <small>
-                      {staged.relativePath.includes("/") ? staged.relativePath : formatBytes(staged.file.size)}
-                      {staged.relativePath.includes("/") ? ` · ${formatBytes(staged.file.size)}` : null}
-                    </small>
-                  </div>
-                  <button
-                    type="button"
-                    className={styles.sourcesStagedUpload}
-                    onClick={() => props.onUploadStaged(staged.id)}
-                    disabled={uploading}
-                    aria-label={`Загрузить ${staged.file.name}`}
+          <label className={styles.sourcesStagedSearch}>
+            <Search size={14} aria-hidden="true" />
+            <input
+              value={stagedSearch}
+              onChange={(event) => setStagedSearch(event.target.value)}
+              placeholder="Поиск по имени или пути..."
+            />
+          </label>
+          <div className={styles.sourcesStagedCarousel}>
+            <button
+              type="button"
+              className={styles.sourcesStagedNav}
+              aria-label="Прокрутить файлы назад"
+              onClick={() => scrollStagedFiles(-1)}
+            >
+              <ChevronLeft size={16} />
+            </button>
+            <div ref={stagedScrollerRef} className={styles.sourcesStagedList}>
+              {filteredStagedFiles.map((staged) => {
+                const extKey = getExtension(staged.file.name).replace(".", "") || "default";
+                const uploading = props.uploadingStagedIds.includes(staged.id);
+                return (
+                  <article
+                    key={staged.id}
+                    className={`${styles.sourcesStagedCard} ${uploading ? styles.sourcesStagedCardUploading : ""}`}
+                    draggable={!uploading}
+                    title={staged.relativePath}
+                    onDragStart={(event) => {
+                      event.dataTransfer.setData("application/x-staged-file-id", staged.id);
+                      event.dataTransfer.effectAllowed = "move";
+                    }}
                   >
-                    {uploading ? "…" : "Загрузить"}
-                  </button>
-                  <button
-                    type="button"
-                    className={styles.sourcesStagedRemove}
-                    onClick={() => props.onRemoveStaged(staged.id)}
-                    disabled={uploading}
-                    aria-label={`Удалить ${staged.file.name}`}
-                  >
-                    <X size={14} />
-                  </button>
-                </article>
-              );
-            })}
+                    <span className={`${styles.sourcesDocIcon} ${styles[`sourcesDocIcon_${extKey}`] ?? styles.sourcesDocIcon_default}`}>
+                      {(extKey || "file").slice(0, 4)}
+                    </span>
+                    <p className={styles.sourcesStagedName}>{staged.file.name}</p>
+                    <button
+                      type="button"
+                      className={styles.sourcesStagedUpload}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        props.onUploadStaged(staged.id);
+                      }}
+                      disabled={uploading}
+                      aria-label={`Загрузить ${staged.file.name}`}
+                      title="Загрузить"
+                    >
+                      {uploading ? <span aria-hidden="true">…</span> : <ArrowUp size={12} strokeWidth={2.5} />}
+                    </button>
+                    <button
+                      type="button"
+                      className={styles.sourcesStagedRemove}
+                      onClick={() => props.onRemoveStaged(staged.id)}
+                      disabled={uploading}
+                      aria-label={`Удалить ${staged.file.name}`}
+                    >
+                      <X size={12} />
+                    </button>
+                  </article>
+                );
+              })}
+              {!filteredStagedFiles.length ? (
+                <p className={styles.sourcesStagedEmpty}>Ничего не найдено по запросу «{stagedSearch}»</p>
+              ) : null}
+            </div>
+            <button
+              type="button"
+              className={styles.sourcesStagedNav}
+              aria-label="Прокрутить файлы вперёд"
+              onClick={() => scrollStagedFiles(1)}
+            >
+              <ChevronRight size={16} />
+            </button>
           </div>
+          <p className={styles.sourcesStagedHint}>
+            Правый клик по структуре справа — создать папку. Перетащите карточки в нужные папки перед загрузкой.
+          </p>
         </section>
       ) : null}
 
@@ -2217,7 +2317,15 @@ function StepPreview(props: {
   );
 }
 
-function SourceTreeSidebarPanel({ tree }: { tree: SourceTreeRoot }) {
+function SourceTreeSidebarPanel({
+  tree,
+  onCreateFolder,
+  onMoveFile
+}: {
+  tree: SourceTreeRoot;
+  onCreateFolder: (parentPath: string, name: string) => boolean;
+  onMoveFile: (fileId: string, targetFolderPath: string) => void;
+}) {
   return (
     <section className={styles.sourceTreeSidebar} aria-label="Структура загруженных файлов">
       <div className={styles.sourceTreeHead}>
@@ -2227,7 +2335,7 @@ function SourceTreeSidebarPanel({ tree }: { tree: SourceTreeRoot }) {
         </p>
       </div>
       <div className={styles.sourceTreeBody}>
-        <SourceFileTree tree={tree} defaultExpandAll />
+        <SourceFileTreeEditor tree={tree} onCreateFolder={onCreateFolder} onMoveFile={onMoveFile} />
       </div>
     </section>
   );

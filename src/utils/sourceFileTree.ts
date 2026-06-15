@@ -79,6 +79,81 @@ function getOrCreateFolder(parent: SourceTreeFolderNode, folderName: string, fol
   return folder;
 }
 
+export function normalizeFolderPath(path: string) {
+  return normalizeRelativePath(path);
+}
+
+export function sanitizeFolderName(name: string) {
+  const cleaned = name.trim().replace(/[\\/:*?"<>|]+/g, "").replace(/\s+/g, " ");
+  return cleaned || null;
+}
+
+export function buildFolderPath(parentPath: string, name: string) {
+  const folderName = sanitizeFolderName(name);
+  if (!folderName) return null;
+  const parent = normalizeFolderPath(parentPath);
+  return parent ? `${parent}/${folderName}` : folderName;
+}
+
+export function buildFileRelativePath(folderPath: string, fileName: string) {
+  const folder = normalizeFolderPath(folderPath);
+  const normalizedName = normalizeRelativePath(fileName);
+  const baseName = normalizedName.split("/").filter(Boolean).pop() || normalizedName;
+  if (!baseName) return folder;
+  return folder ? `${folder}/${baseName}` : baseName;
+}
+
+export function moveFileRelativePath(currentPath: string, targetFolderPath: string) {
+  const fileName = normalizeRelativePath(currentPath).split("/").filter(Boolean).pop() || currentPath;
+  return buildFileRelativePath(targetFolderPath, fileName);
+}
+
+function cloneTreeNode(node: SourceTreeNode): SourceTreeNode {
+  if (node.kind === "file") return { ...node };
+  return {
+    kind: "folder",
+    name: node.name,
+    relativePath: node.relativePath,
+    children: node.children.map(cloneTreeNode)
+  };
+}
+
+export function mergeCustomFoldersIntoTree(tree: SourceTreeRoot, customFolderPaths: string[]): SourceTreeRoot {
+  const root: SourceTreeFolderNode = {
+    kind: "folder",
+    name: "",
+    relativePath: "",
+    children: tree.children.map(cloneTreeNode)
+  };
+
+  for (const rawPath of customFolderPaths) {
+    const normalizedPath = normalizeFolderPath(rawPath);
+    if (!normalizedPath) continue;
+
+    const segments = normalizedPath.split("/").filter(Boolean);
+    let currentFolder = root;
+    let folderPath = "";
+
+    for (const segment of segments) {
+      folderPath = folderPath ? `${folderPath}/${segment}` : segment;
+      currentFolder = getOrCreateFolder(currentFolder, segment, folderPath);
+    }
+  }
+
+  sortTreeNodes(root.children);
+  const stats = countTreeNodes(root.children);
+
+  return {
+    children: root.children,
+    fileCount: stats.fileCount,
+    folderCount: stats.folderCount
+  };
+}
+
+export function collectAllFolderPaths(tree: SourceTreeRoot) {
+  return new Set(collectFolderPaths(tree.children));
+}
+
 export function buildSourceFileTree(items: SourceTreeFileInput[]): SourceTreeRoot {
   const root: SourceTreeFolderNode = {
     kind: "folder",

@@ -24,13 +24,14 @@ import {
   Trash2,
   TriangleAlert
 } from "lucide-react";
-import { knowledgeBasesApi } from "@/api/endpoints";
+import { documentsApi, knowledgeBasesApi } from "@/api/endpoints";
 import { useKnowledgeBaseIndexingWs } from "@/hooks/useKnowledgeBaseIndexingWs";
 import type {
   KnowledgeBase,
   KnowledgeBaseAccessGrantInput,
   KnowledgeBaseAgentBinding,
   KnowledgeBaseChunk,
+  DocumentChunk,
   KnowledgeBaseIndexingError,
   KnowledgeBaseIndexingJob,
   KnowledgeBaseListItem,
@@ -41,7 +42,9 @@ import type {
   KnowledgeBaseStatus
 } from "@/types";
 import { KnowledgeBaseOverviewTab } from "@/components/KnowledgeBaseOverviewTab";
+import SourceFileTree, { type SourceFileTreeFileMeta } from "@/components/SourceFileTree";
 import formStyles from "@/components/form-controls/form-controls.module.css";
+import { buildSourceFileTree } from "@/utils/sourceFileTree";
 import styles from "./KnowledgeBase.module.css";
 
 type DetailTab = "overview" | "sources" | "chunks" | "rules" | "indexing" | "test" | "audit";
@@ -79,6 +82,7 @@ const jobStatusLabels: Record<KnowledgeBaseIndexingJob["status"], string> = {
 const indexingStageLabels: Record<string, string> = {
   precheck: "Проверка источников",
   text_extraction: "Извлечение текста и структуры",
+  ocr_extraction: "Извлечение данных OCR",
   chunking: "Разбиение на фрагменты",
   embeddings: "Создание embeddings",
   qdrant: "Индексация в Qdrant",
@@ -206,11 +210,10 @@ export default function KnowledgeBasePage() {
   const latestJob = jobs.data?.[0] ?? null;
   const isIndexingActive = Boolean(
     selected &&
-      (selected.indexing_active ||
-        selected.status === "processing" ||
-        selected.status === "updating" ||
-        latestJob?.status === "queued" ||
-        latestJob?.status === "running")
+      latestJob?.status !== "cancelled" &&
+      (latestJob?.status === "queued" ||
+        latestJob?.status === "running" ||
+        selected.indexing_active)
   );
 
   useKnowledgeBaseIndexingWs(selected?.id, Boolean(canViewSelected && isIndexingActive));
@@ -239,11 +242,33 @@ export default function KnowledgeBasePage() {
         reason: "Остановка по запросу пользователя",
         force: true
       }),
-    onSuccess: async () => {
+    onSuccess: async (job, knowledgeBaseId) => {
+      queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
+        items?.map((item) =>
+          item.id === knowledgeBaseId
+            ? {
+                ...item,
+                indexing_active: false,
+                status: item.fragments_count > 0 ? "ready" : "draft"
+              }
+            : item
+        )
+      );
+      queryClient.setQueryData<KnowledgeBaseIndexingJob[]>(
+        ["knowledge-base-jobs", knowledgeBaseId],
+        (existing) => {
+          const jobs = existing ?? [];
+          const hasJob = jobs.some((entry) => entry.id === job.id);
+          const nextJob = { ...job, status: "cancelled" as const, cancel_requested: true };
+          return hasJob ? jobs.map((entry) => (entry.id === job.id ? { ...entry, ...nextJob } : entry)) : [nextJob, ...jobs];
+        }
+      );
       await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      if (selected?.id) {
-        await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", selected.id] });
-      }
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", knowledgeBaseId] });
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", knowledgeBaseId] });
+    },
+    onError: () => {
+      window.alert("Не удалось остановить индексацию. Попробуйте ещё раз.");
     }
   });
 
@@ -395,7 +420,7 @@ export default function KnowledgeBasePage() {
                     disabled={cancelIndexing.isPending}
                   >
                     <Square size={14} />
-                    Остановить
+                    {cancelIndexing.isPending ? "Останавливаем..." : "Остановить"}
                   </button>
                 </div>
               ) : null}
@@ -609,6 +634,12 @@ function DetailTabContent(props: {
     !(isIndexingActive && (knowledgeBase.fragments_count ?? 0) === 0);
   const testSearchPlaceholder = testSearchPlaceholderText(knowledgeBase, isIndexingActive);
   const selectedSource = sources.find((s) => s.id === selectedSourceId) ?? null;
+  const selectedSourceChunks = selectedSource ? chunks.filter((chunk) => chunk.source_id === selectedSource.id) : [];
+  const selectedDocumentChunks = useQuery({
+    queryKey: ["document-version-chunks", selectedSource?.document_version_id],
+    queryFn: () => documentsApi.chunks(selectedSource!.document_version_id),
+    enabled: Boolean(selectedSource?.document_version_id)
+  });
   const filteredChunks = chunks.filter((chunk) => {
     if (chunkFilter === "excluded") return chunk.is_excluded_from_search;
     if (chunkFilter === "errors") return chunk.embedding_status === "failed" || chunk.quality_status === "low" || chunk.quality_status === "failed";
@@ -635,22 +666,21 @@ function DetailTabContent(props: {
   if (tab === "sources") {
     return (
       <div className={styles.detailBody}>
-        <SourcesFilesTable
+        <SourcesFilesTree
           sources={sources}
+          selectedSourceId={selectedSourceId}
           onView={(sourceId) => setSelectedSourceId(sourceId)}
           onExclude={(sourceId) => excludeSource.mutate(sourceId)}
           onReindex={(sourceId) => reindexSource.mutate(sourceId)}
           onDelete={(sourceId) => deleteSource.mutate(sourceId)}
         />
         {selectedSource ? (
-          <article className={styles.sourceDetailCard}>
-            <h4>{selectedSource.document_title || selectedSource.original_filename}</h4>
-            <p>Версия: {selectedSource.document_version_id}</p>
-            <p>Страниц: {selectedSource.pages_count ?? "-"} · Фрагментов: {selectedSource.fragments_count}</p>
-            <p>Статус: {sourceStatusLabels[selectedSource.processing_status] ?? selectedSource.processing_status}</p>
-            <p>OCR: {selectedSource.processing_status === "needs_ocr" ? "требуется" : "не требовался"}</p>
-            <p>Ошибки: {selectedSource.precheck_notes || "нет"}</p>
-          </article>
+          <ExtractedSourceViewer
+            source={selectedSource}
+            kbChunks={selectedSourceChunks}
+            documentChunks={selectedDocumentChunks.data ?? []}
+            loading={selectedDocumentChunks.isLoading}
+          />
         ) : null}
       </div>
     );
@@ -880,8 +910,201 @@ function DetailTabContent(props: {
   );
 }
 
-function SourcesFilesTable(props: {
+function sourceRelativePath(source: KnowledgeBaseSource) {
+  return source.relative_path || source.original_filename || source.document_title || source.document_id;
+}
+
+type ExtractedContentBlock =
+  | { kind: "text"; id: string; text: string; chunk: ExtractedViewerChunk }
+  | { kind: "table"; id: string; tableKey: string; caption?: string; headers: string[]; rows: string[][]; chunks: ExtractedViewerChunk[] };
+
+type ExtractedViewerChunk = {
+  id: string;
+  source_id: string;
+  text?: string | null;
+  metadata?: Record<string, unknown> | null;
+  chunk_index?: number | null;
+  page_number?: number | null;
+  section_title?: string | null;
+  fragment_type?: string | null;
+};
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((item) => (item == null ? "" : String(item)));
+}
+
+function sourceBlockMetadata(chunk: ExtractedViewerChunk) {
+  const metadata = chunk.metadata ?? {};
+  const sourceBlocks = metadata.source_blocks;
+  if (Array.isArray(sourceBlocks) && sourceBlocks[0] && typeof sourceBlocks[0] === "object") {
+    return sourceBlocks[0] as Record<string, unknown>;
+  }
+  return metadata;
+}
+
+function tableKeyFromMetadata(metadata: Record<string, unknown>) {
+  return [
+    metadata.table_caption,
+    metadata.sheet_name,
+    metadata.page_number,
+    metadata.table_index,
+    metadata.cell_range
+  ].map((item) => String(item ?? "")).join("|");
+}
+
+function buildExtractedContentBlocks(chunks: ExtractedViewerChunk[]): ExtractedContentBlock[] {
+  const blocks: ExtractedContentBlock[] = [];
+  const ordered = [...chunks].sort((left, right) => {
+    const leftIndex = left.chunk_index ?? Number.MAX_SAFE_INTEGER;
+    const rightIndex = right.chunk_index ?? Number.MAX_SAFE_INTEGER;
+    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
+    return (left.page_number ?? 0) - (right.page_number ?? 0);
+  });
+
+  for (const chunk of ordered) {
+    const metadata = sourceBlockMetadata(chunk);
+    const headers = asStringArray(metadata.headers);
+    const rowValues = asStringArray(metadata.row_values);
+    const isTableRow = (metadata.fragment_type === "table_row" || metadata.chunk_kind === "table_row" || chunk.fragment_type === "table_row") && rowValues.length > 0;
+
+    if (isTableRow) {
+      const key = tableKeyFromMetadata(metadata);
+      const last = blocks[blocks.length - 1];
+      const normalizedHeaders = Array.from({ length: Math.max(headers.length, rowValues.length) }, (_, index) => headers[index] || `Колонка ${index + 1}`);
+      if (last?.kind === "table" && last.tableKey === key) {
+        last.rows.push(rowValues);
+        last.chunks.push(chunk);
+      } else {
+        blocks.push({
+          kind: "table",
+          id: `${key || chunk.id}-${blocks.length}`,
+          tableKey: key,
+          caption: String(metadata.table_caption || metadata.sheet_name || chunk.section_title || ""),
+          headers: normalizedHeaders,
+          rows: [rowValues],
+          chunks: [chunk]
+        });
+      }
+      continue;
+    }
+
+    const text = (chunk.text || "").trim();
+    if (text) blocks.push({ kind: "text", id: chunk.id, text, chunk });
+  }
+
+  return blocks;
+}
+
+function documentChunkToViewerChunk(source: KnowledgeBaseSource, chunk: DocumentChunk): ExtractedViewerChunk {
+  const metadata = chunk.metadata ?? chunk.chunk_metadata ?? null;
+  const sourceBlocks = metadata?.source_blocks;
+  const firstSourceBlock = Array.isArray(sourceBlocks) && sourceBlocks[0] && typeof sourceBlocks[0] === "object"
+    ? sourceBlocks[0] as Record<string, unknown>
+    : metadata ?? {};
+
+  return {
+    id: chunk.id,
+    source_id: source.id,
+    text: chunk.content || chunk.text,
+    metadata,
+    chunk_index: chunk.chunk_index,
+    page_number: chunk.page_number,
+    section_title: chunk.section_title,
+    fragment_type: String(firstSourceBlock.fragment_type || firstSourceBlock.chunk_kind || "")
+  };
+}
+
+function ExtractedSourceViewer({
+  source,
+  kbChunks,
+  documentChunks,
+  loading
+}: {
+  source: KnowledgeBaseSource;
+  kbChunks: KnowledgeBaseChunk[];
+  documentChunks: DocumentChunk[];
+  loading: boolean;
+}) {
+  const viewerChunks = useMemo<ExtractedViewerChunk[]>(
+    () => (documentChunks.length ? documentChunks.map((chunk) => documentChunkToViewerChunk(source, chunk)) : kbChunks),
+    [documentChunks, kbChunks, source]
+  );
+  const blocks = useMemo(() => buildExtractedContentBlocks(viewerChunks), [viewerChunks]);
+  const sourceName = source.document_title || source.original_filename || source.document_id;
+
+  return (
+    <article className={styles.sourceDetailCard}>
+      <header className={styles.extractedViewerHeader}>
+        <div>
+          <h4>{sourceName}</h4>
+          <p>
+            Страниц: {source.pages_count ?? "-"} · Фрагментов: {source.fragments_count} · Статус:{" "}
+            {sourceStatusLabels[source.processing_status] ?? source.processing_status}
+          </p>
+        </div>
+        <span>{source.last_indexed_at ? `Индексировано: ${formatDate(source.last_indexed_at)}` : "Не индексировано"}</span>
+      </header>
+
+      {source.precheck_notes ? <p className={styles.extractedWarning}>Ошибки: {source.precheck_notes}</p> : null}
+
+      <div className={styles.extractedContent}>
+        {blocks.map((block) =>
+          block.kind === "table" ? (
+            <ExtractedTable key={block.id} block={block} />
+          ) : (
+            <section key={block.id} className={styles.extractedTextBlock}>
+              {block.chunk.section_title ? <h5>{block.chunk.section_title}</h5> : null}
+              {block.text.split(/\n{2,}/).map((paragraph, index) => (
+                <p key={`${block.id}-${index}`}>{paragraph}</p>
+              ))}
+              <small>
+                Стр. {block.chunk.page_number ?? "-"} · Тип {block.chunk.fragment_type || "-"}
+              </small>
+            </section>
+          )
+        )}
+        {loading && !blocks.length ? (
+          <div className={styles.emptyState}>Загружаем извлечённый текст...</div>
+        ) : !blocks.length ? (
+          <div className={styles.emptyState}>Извлечённый текст пока недоступен. Запустите индексацию или дождитесь обработки документа.</div>
+        ) : null}
+      </div>
+    </article>
+  );
+}
+
+function ExtractedTable({ block }: { block: Extract<ExtractedContentBlock, { kind: "table" }> }) {
+  return (
+    <section className={styles.extractedTableBlock}>
+      {block.caption ? <h5>{block.caption}</h5> : null}
+      <div className={styles.extractedTableScroll}>
+        <table className={styles.extractedTable}>
+          <thead>
+            <tr>
+              {block.headers.map((header, index) => (
+                <th key={`${header}-${index}`}>{header || `Колонка ${index + 1}`}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {block.headers.map((_, cellIndex) => (
+                  <td key={cellIndex}>{row[cellIndex] || "—"}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function SourcesFilesTree(props: {
   sources: KnowledgeBaseSource[];
+  selectedSourceId: string | null;
   onView: (sourceId: string) => void;
   onExclude: (sourceId: string) => void;
   onReindex: (sourceId: string) => void;
@@ -889,66 +1112,67 @@ function SourcesFilesTable(props: {
 }) {
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
+  const tree = useMemo(
+    () =>
+      buildSourceFileTree(
+        props.sources.map((source) => ({
+          id: source.id,
+          relativePath: sourceRelativePath(source),
+          fileSize: source.file_size ?? undefined
+        }))
+      ),
+    [props.sources]
+  );
+
+  const fileMetaById = useMemo(() => {
+    const map: Record<string, SourceFileTreeFileMeta> = {};
+    for (const source of props.sources) {
+      map[source.id] = {
+        statusLabel: sourceStatusLabels[source.processing_status] ?? source.processing_status,
+        metaText: `${formatNumber(source.fragments_count)} фр.`,
+        trailing: (
+          <SourceRowMenu
+            source={source}
+            open={openMenuId === source.id}
+            onOpenChange={(open) => setOpenMenuId(open ? source.id : null)}
+            onView={() => {
+              setOpenMenuId(null);
+              props.onView(source.id);
+            }}
+            onReindex={() => {
+              setOpenMenuId(null);
+              props.onReindex(source.id);
+            }}
+            onExclude={() => {
+              setOpenMenuId(null);
+              props.onExclude(source.id);
+            }}
+            onDelete={() => {
+              setOpenMenuId(null);
+              props.onDelete(source.id);
+            }}
+          />
+        )
+      };
+    }
+    return map;
+  }, [openMenuId, props]);
+
   return (
-    <div className={styles.sourcesTableWrap}>
-      <table className={`${styles.compactTable} ${styles.sourcesTable}`}>
-        <thead>
-          <tr>
-            <th className={styles.sourcesTableActionHead} aria-label="Действия" />
-            <th>Документ</th>
-            <th>Тип</th>
-            <th>Статус</th>
-            <th>Фрагменты</th>
-          </tr>
-        </thead>
-        <tbody>
-          {props.sources.map((source) => {
-            const documentName = source.document_title || source.original_filename || source.document_id;
-            return (
-              <tr key={source.id}>
-                <td className={styles.sourcesTableActionCell}>
-                  <SourceRowMenu
-                    source={source}
-                    open={openMenuId === source.id}
-                    onOpenChange={(open) => setOpenMenuId(open ? source.id : null)}
-                    onView={() => {
-                      setOpenMenuId(null);
-                      props.onView(source.id);
-                    }}
-                    onReindex={() => {
-                      setOpenMenuId(null);
-                      props.onReindex(source.id);
-                    }}
-                    onExclude={() => {
-                      setOpenMenuId(null);
-                      props.onExclude(source.id);
-                    }}
-                    onDelete={() => {
-                      setOpenMenuId(null);
-                      props.onDelete(source.id);
-                    }}
-                  />
-                </td>
-                <td className={styles.sourcesTableDocCell}>
-                  <span className={styles.sourcesDocTitle} title={documentName}>
-                    {documentName}
-                  </span>
-                </td>
-                <td>{source.extension || "—"}</td>
-                <td>{sourceStatusLabels[source.processing_status] ?? source.processing_status}</td>
-                <td>{formatNumber(source.fragments_count)}</td>
-              </tr>
-            );
-          })}
-          {!props.sources.length ? (
-            <tr>
-              <td colSpan={5} className={styles.emptyCell}>
-                Источники ещё не добавлены.
-              </td>
-            </tr>
-          ) : null}
-        </tbody>
-      </table>
+    <div className={styles.sourcesTreeWrap}>
+      <div className={styles.sourcesTreeHead}>
+        <span>Структура</span>
+        <span>Статус</span>
+        <span>Фрагменты</span>
+        <span aria-hidden="true" />
+      </div>
+      <SourceFileTree
+        className={styles.sourcesTreeBody}
+        tree={tree}
+        fileMetaById={fileMetaById}
+        selectedFileId={props.selectedSourceId}
+        onFileSelect={props.onView}
+      />
     </div>
   );
 }
@@ -1240,6 +1464,7 @@ function buildIndexingStages(
       { id: "queue", label: "Ожидание worker", status: "running", detail: "Задание в очереди" },
       { id: "precheck", label: "Проверка источников", status: "pending" },
       { id: "text_extraction", label: "Извлечение текста и структуры", status: "pending" },
+      { id: "ocr_extraction", label: "Извлечение данных OCR", status: "pending" },
       { id: "chunking", label: "Разбиение на фрагменты", status: "pending" },
       { id: "embeddings", label: "Создание embeddings", status: "pending" },
       { id: "qdrant", label: "Индексация в Qdrant", status: "pending" },
@@ -1248,12 +1473,20 @@ function buildIndexingStages(
     ];
   }
   const current = String(job.processing_params?.current_stage ?? "");
-  const stageOrder = ["precheck", "text_extraction", "chunking", "embeddings", "qdrant", "fulltext", "quality_control", "stopping", "stopped"];
+  const stageOrder = ["precheck", "text_extraction", "ocr_extraction", "chunking", "embeddings", "qdrant", "fulltext", "quality_control", "stopping", "stopped"];
   const currentIndex = stageOrder.indexOf(current);
+  const ocrSourcesCount = Number(job.processing_params?.ocr_sources_count ?? 0);
 
   const defs = [
     { id: "precheck", label: "Проверка источников", done: (job.total_sources_count ?? 0) > 0 },
     { id: "text_extraction", label: "Извлечение текста и структуры", done: (job.extracted_sources_count ?? 0) > 0, detail: `${job.extracted_sources_count ?? 0}/${totalSources}` },
+    {
+      id: "ocr_extraction",
+      label: "Извлечение данных OCR",
+      done: currentIndex > stageOrder.indexOf("ocr_extraction") || (job.chunked_sources_count ?? 0) > 0,
+      detail: ocrSourcesCount > 0 ? `${ocrSourcesCount}/${totalSources}` : undefined,
+      hidden: ocrSourcesCount === 0 && current !== "ocr_extraction"
+    },
     { id: "chunking", label: "Разбиение на фрагменты", done: (job.chunked_sources_count ?? 0) > 0, detail: `${job.chunked_sources_count ?? 0}/${totalSources}` },
     { id: "embeddings", label: "Создание embeddings", done: (job.embedded_chunks_count ?? 0) > 0, detail: `${job.embedded_chunks_count ?? 0}/${totalChunks}` },
     { id: "qdrant", label: "Индексация в Qdrant", done: (job.qdrant_points_count ?? 0) > 0, detail: `${job.qdrant_points_count ?? 0}/${totalChunks}` },
@@ -1264,14 +1497,13 @@ function buildIndexingStages(
   return defs.map((stage) => {
     const stageIndex = stageOrder.indexOf(stage.id);
     let status: IndexingStageStatus = "pending";
-    if (current === stage.id || (currentIndex === -1 && !stage.done && defs.findIndex((item) => item.id === stage.id) === defs.findIndex((item) => !item.done))) {
+    if (current === stage.id) {
       status = "running";
     } else if (stage.done || (currentIndex >= 0 && stageIndex < currentIndex)) {
       status = "done";
     }
-    if (current === stage.id) status = "running";
     return { ...stage, status };
-  });
+  }).filter((stage) => !stage.hidden);
 }
 
 function formatJobDuration(job: KnowledgeBaseIndexingJob) {

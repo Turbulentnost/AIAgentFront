@@ -126,6 +126,8 @@ function applyIndexingMessage(queryClient: QueryClient, message: KnowledgeBaseIn
   );
 
   if (["completed", "failed", "cancelled", "partial"].includes(message.event)) {
+    void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+    void queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", kbId] });
     void queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", kbId] });
     void queryClient.invalidateQueries({ queryKey: ["knowledge-base-chunks", kbId] });
     void queryClient.invalidateQueries({ queryKey: ["knowledge-bases", "stats"] });

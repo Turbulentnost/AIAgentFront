@@ -376,6 +376,27 @@ export interface DocumentUploadOptions {
   relative_path?: string;
 }
 
+export interface DocumentChunk {
+  id: string;
+  document_id: string | null;
+  document_version_id: string;
+  chunk_index: number;
+  text: string | null;
+  content?: string | null;
+  page_number: number | null;
+  section_title: string | null;
+  token_count: number | null;
+  qdrant_collection: string | null;
+  qdrant_point_id: string | null;
+  embedding_model: string | null;
+  is_indexed: boolean;
+  metadata?: Record<string, unknown> | null;
+  chunk_metadata?: Record<string, unknown> | null;
+  vector_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface NdChangeRequestCreate {
   reason: string;
   release_date?: string | null;
@@ -633,6 +654,7 @@ export interface KnowledgeBaseSource {
   document_title?: string | null;
   original_filename?: string | null;
   extension?: string | null;
+  relative_path?: string | null;
   department_id?: string | null;
   linked_agents_count?: number;
   created_at: string;
@@ -653,6 +675,8 @@ export interface KnowledgeBaseChunk {
   fragment_type: string | null;
   access_snapshot: Record<string, unknown> | null;
   text?: string | null;
+  metadata?: Record<string, unknown> | null;
+  chunk_index?: number | null;
   document_id?: string | null;
   document_title?: string | null;
   page_number?: number | null;

@@ -352,6 +352,117 @@
   margin: 0 0 8px;
 }
 
+.extractedViewerHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+
+.extractedViewerHeader p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.extractedViewerHeader > span {
+  flex-shrink: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.extractedWarning {
+  margin: 0 0 12px;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.extractedContent {
+  display: grid;
+  gap: 12px;
+  max-height: min(68vh, 760px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.extractedTextBlock,
+.extractedTableBlock {
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+}
+
+.extractedTextBlock h5,
+.extractedTableBlock h5 {
+  margin: 0 0 8px;
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.extractedTextBlock p {
+  margin: 0 0 8px;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+}
+
+.extractedTextBlock p:last-of-type {
+  margin-bottom: 6px;
+}
+
+.extractedTextBlock small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.extractedTableScroll {
+  overflow: auto;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.extractedTable {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  color: var(--color-text);
+  font-size: 12px;
+}
+
+.extractedTable th,
+.extractedTable td {
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border-subtle);
+  border-right: 1px solid var(--color-border-subtle);
+  white-space: pre-wrap;
+}
+
+.extractedTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--color-text-strong);
+  background: var(--color-hover);
+  font-weight: 700;
+}
+
+.extractedTable tr:last-child td {
+  border-bottom: 0;
+}
+
+.extractedTable th:last-child,
+.extractedTable td:last-child {
+  border-right: 0;
+}
+
 .sourceActions,
 .chunkActions {
   display: flex;
@@ -387,6 +498,30 @@
 
 .sourcesTableWrap {
   overflow: visible;
+}
+
+.sourcesTreeWrap {
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-card);
+  border-radius: 12px;
+}
+
+.sourcesTreeHead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 112px 88px 36px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 8px 8px 36px;
+  color: var(--summary-label-color);
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--color-hover);
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.sourcesTreeBody {
+  padding: 6px 4px 8px;
 }
 
 .compactTable .actionsCell {
