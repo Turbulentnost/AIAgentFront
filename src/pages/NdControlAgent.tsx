@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Building2, FolderPlus, LayoutPanelLeft, FileText, Database, BookOpen, Layers } from "lucide-react";
+import { Plus, X, Building2, FolderPlus, LayoutPanelLeft, FileText, Database, BookOpen, Layers, Trash2 } from "lucide-react";
 import { knowledgeBasesApi, ndControlApi } from "@/api/endpoints";
 import { FormSearchInput } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
@@ -120,6 +120,7 @@ export default function NdControlAgent() {
   const [selectedKbIds, setSelectedKbIds] = useState<string[]>([]);
   const [editingCard, setEditingCard] = useState<NdDocumentCard | null>(null);
   const [cardForm, setCardForm] = useState<NdDocumentCardUpdate>({});
+  const [deptPendingDelete, setDeptPendingDelete] = useState<NdControlDepartment | null>(null);
 
   const permissions = useQuery({
     queryKey: ["nd-control", "permissions"],
@@ -140,8 +141,13 @@ export default function NdControlAgent() {
   );
 
   useEffect(() => {
-    if (!selectedDeptId && departments.data?.length) {
-      setSelectedDeptId(departments.data[0].id);
+    const list = departments.data ?? [];
+    if (!list.length) {
+      if (selectedDeptId !== null) setSelectedDeptId(null);
+      return;
+    }
+    if (!selectedDeptId || !list.some((dept) => dept.id === selectedDeptId)) {
+      setSelectedDeptId(list[0].id);
     }
   }, [departments.data, selectedDeptId]);
 
@@ -168,6 +174,18 @@ export default function NdControlAgent() {
       setNewDeptName("");
       setSelectedKbIds([]);
       setSelectedDeptId(dept.id);
+      await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
+    }
+  });
+
+  const deleteDepartment = useMutation({
+    mutationFn: (departmentId: string) => ndControlApi.deleteDepartment(departmentId),
+    onSuccess: async (_data, departmentId) => {
+      setDeptPendingDelete(null);
+      if (selectedDeptId === departmentId) {
+        const remaining = (departments.data ?? []).filter((dept) => dept.id !== departmentId);
+        setSelectedDeptId(remaining[0]?.id ?? null);
+      }
       await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
     }
   });
@@ -267,7 +285,10 @@ export default function NdControlAgent() {
                   key={dept.id}
                   dept={dept}
                   active={dept.id === selectedDeptId}
+                  canDelete={canManage}
+                  isDeleting={deleteDepartment.isPending && deptPendingDelete?.id === dept.id}
                   onSelect={() => setSelectedDeptId(dept.id)}
+                  onDelete={() => setDeptPendingDelete(dept)}
                 />
               ))}
             </div>
@@ -335,6 +356,36 @@ export default function NdControlAgent() {
         onClose={closeCreateDepartment}
         onSubmit={handleCreateDepartment}
       />
+
+      {deptPendingDelete ? (
+        <div className={styles.modalBackdrop} onClick={() => !deleteDepartment.isPending && setDeptPendingDelete(null)}>
+          <div className={styles.confirmModal} onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <h2>Удалить отдел?</h2>
+            <p>
+              Отдел «{deptPendingDelete.name}» будет скрыт из списка. Привязанные карточки документов сохранятся в
+              системе.
+            </p>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryBtn}
+                disabled={deleteDepartment.isPending}
+                onClick={() => setDeptPendingDelete(null)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                className={styles.dangerBtn}
+                disabled={deleteDepartment.isPending}
+                onClick={() => deleteDepartment.mutate(deptPendingDelete.id)}
+              >
+                {deleteDepartment.isPending ? "Удаляем…" : "Удалить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {editingCard ? (
         <div className={styles.modalBackdrop} onClick={() => setEditingCard(null)}>
@@ -524,36 +575,56 @@ function EmptyState({
 function DeptButton({
   dept,
   active,
-  onSelect
+  canDelete,
+  isDeleting,
+  onSelect,
+  onDelete
 }: {
   dept: NdControlDepartment;
   active: boolean;
+  canDelete: boolean;
+  isDeleting: boolean;
   onSelect: () => void;
+  onDelete: () => void;
 }) {
   const { Icon, tone } = deptIconOptions[deptIconIndex(dept.id)];
 
   return (
-    <button
-      type="button"
-      className={`${styles.deptItem} ${active ? styles.deptItemActive : ""}`}
-      onClick={onSelect}
-    >
-      <span className={`${styles.deptIcon} ${styles[`deptIcon_${tone}`]}`} aria-hidden="true">
-        <Icon size={18} strokeWidth={2} />
-      </span>
-      <span className={styles.deptContent}>
-        <span className={styles.deptName}>{dept.name}</span>
-        <span className={styles.deptMeta}>
-          <Database size={12} strokeWidth={2} aria-hidden="true" />
-          {dept.knowledge_bases_count} баз
-          <span className={styles.deptMetaDot} aria-hidden="true">
-            ·
-          </span>
-          <FileText size={12} strokeWidth={2} aria-hidden="true" />
-          {dept.cards_count} карточек
+    <div className={`${styles.deptRow} ${active ? styles.deptRowActive : ""}`}>
+      <button
+        type="button"
+        className={`${styles.deptItem} ${active ? styles.deptItemActive : ""}`}
+        onClick={onSelect}
+      >
+        <span className={`${styles.deptIcon} ${styles[`deptIcon_${tone}`]}`} aria-hidden="true">
+          <Icon size={18} strokeWidth={2} />
         </span>
-      </span>
-    </button>
+        <span className={styles.deptContent}>
+          <span className={styles.deptName}>{dept.name}</span>
+          <span className={styles.deptMeta}>
+            <Database size={12} strokeWidth={2} aria-hidden="true" />
+            {dept.knowledge_bases_count} баз
+            <span className={styles.deptMetaDot} aria-hidden="true">
+              ·
+            </span>
+            <FileText size={12} strokeWidth={2} aria-hidden="true" />
+            {dept.cards_count} карточек
+          </span>
+        </span>
+      </button>
+      {canDelete ? (
+        <button
+          type="button"
+          className={styles.deptDeleteBtn}
+          aria-label={`Удалить отдел ${dept.name}`}
+          title="Удалить отдел"
+          disabled={isDeleting}
+          onClick={onDelete}
+        >
+          <Trash2 size={16} strokeWidth={2} />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
