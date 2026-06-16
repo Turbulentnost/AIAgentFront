@@ -42,6 +42,16 @@ function RichRowSpacers() {
   );
 }
 
+function richFolderRowPaddingLeft(depth: number) {
+  if (depth <= 0) return "0";
+  return `calc(${depth} * var(--source-tree-folder-icon-size, 16px))`;
+}
+
+function richFileRowPaddingLeft(depth: number) {
+  if (depth <= 0) return "0";
+  return `calc(${depth} * var(--source-tree-folder-icon-size, 16px) + var(--source-tree-chevron-col, 12px) + var(--source-tree-row-gap, 6px))`;
+}
+
 function TreeNodeRow({
   node,
   depth,
@@ -49,6 +59,7 @@ function TreeNodeRow({
   fileMetaById,
   richLayout,
   selectedFileId,
+  folderNamePrefix,
   onToggleFolder,
   onFileSelect
 }: {
@@ -58,20 +69,24 @@ function TreeNodeRow({
   fileMetaById?: Record<string, SourceFileTreeFileMeta>;
   richLayout: boolean;
   selectedFileId?: string | null;
+  folderNamePrefix?: string;
   onToggleFolder: (path: string) => void;
   onFileSelect?: (fileId: string) => void;
 }) {
-  const indentStyle = richLayout ? { paddingLeft: `${depth * 16}px` } : { paddingLeft: `${8 + depth * 16}px` };
+  const indentStyle = richLayout ? undefined : { paddingLeft: `${8 + depth * 16}px` };
+  const richFolderRowStyle = richLayout ? { paddingLeft: richFolderRowPaddingLeft(depth) } : indentStyle;
+  const richFileRowStyle = richLayout ? { paddingLeft: richFileRowPaddingLeft(depth) } : indentStyle;
 
   if (node.kind === "file") {
     const fileMeta = fileMetaById?.[node.id];
     const isSelected = selectedFileId === node.id;
     const useRichRow = richLayout || Boolean(fileMeta);
+    const richFileRowStyle = richLayout ? { paddingLeft: richFileRowPaddingLeft(depth) } : indentStyle;
 
     return (
       <li
         className={`${styles.row} ${useRichRow ? styles.rowRich : ""} ${isSelected ? styles.rowSelected : ""}`.trim()}
-        style={useRichRow ? undefined : indentStyle}
+        style={richLayout ? richFileRowStyle : indentStyle}
         onClick={() => onFileSelect?.(node.id)}
         onKeyDown={(event) => {
           if (event.key === "Enter" || event.key === " ") {
@@ -83,9 +98,9 @@ function TreeNodeRow({
         tabIndex={0}
         aria-pressed={isSelected}
       >
-        <span className={styles.chevronSpacer} aria-hidden="true" />
+        {!richLayout ? <span className={styles.chevronSpacer} aria-hidden="true" /> : null}
         <FileTypeIcon filename={node.name} />
-        <span className={useRichRow ? styles.nameCell : undefined} style={useRichRow ? indentStyle : undefined}>
+        <span className={useRichRow ? styles.nameCell : undefined} style={useRichRow && !richLayout ? indentStyle : undefined}>
           <span className={styles.fileNameButton} title={node.relativePath}>
             {node.name}
           </span>
@@ -118,13 +133,14 @@ function TreeNodeRow({
   const isOpen = expandedPaths.has(node.relativePath);
   const FolderIcon = isOpen ? FileDirectoryOpenFillIcon : FileDirectoryFillIcon;
   const rowClassName = `${styles.row} ${richLayout ? styles.rowRich : ""}`.trim();
+  const folderDisplayName = folderNamePrefix ? `${folderNamePrefix} / ${node.name}` : node.name;
 
   return (
     <li className={styles.folderBlock}>
       <button
         type="button"
         className={rowClassName}
-        style={richLayout ? undefined : indentStyle}
+        style={richLayout ? richFolderRowStyle : indentStyle}
         aria-expanded={isOpen}
         onClick={() => onToggleFolder(node.relativePath)}
       >
@@ -137,8 +153,10 @@ function TreeNodeRow({
         <span className={`${styles.iconCell} ${styles.folderIcon}`} aria-hidden="true">
           <FolderIcon size={16} />
         </span>
-        <span className={richLayout ? styles.nameCell : undefined} style={richLayout ? indentStyle : undefined}>
-          <span className={styles.nodeName}>{node.name}</span>
+        <span className={richLayout ? styles.nameCell : undefined} style={richLayout ? undefined : indentStyle}>
+          <span className={styles.nodeName} title={folderDisplayName}>
+            {folderDisplayName}
+          </span>
         </span>
         {richLayout ? <RichRowSpacers /> : null}
       </button>
@@ -153,6 +171,7 @@ function TreeNodeRow({
               fileMetaById={fileMetaById}
               richLayout={richLayout}
               selectedFileId={selectedFileId}
+              folderNamePrefix={child.kind === "folder" ? folderDisplayName : undefined}
               onToggleFolder={onToggleFolder}
               onFileSelect={onFileSelect}
             />

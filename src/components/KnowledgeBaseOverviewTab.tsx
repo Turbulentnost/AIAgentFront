@@ -135,88 +135,92 @@ export function KnowledgeBaseOverviewTab(props: {
         </div>
       </section>
 
-      <section className={styles.overviewSection}>
-        <header className={styles.overviewSectionHead}>
-          <span className={`${styles.overviewSectionIcon} ${styles.overviewIconWarning}`} aria-hidden="true">
-            <Lightbulb size={16} strokeWidth={2.2} />
-          </span>
-          <h3 className={styles.overviewSectionTitle}>Что сделать дальше</h3>
-        </header>
-        <p className={styles.overviewSectionDesc}>{nextStepsDescription}</p>
-        <div className={styles.overviewActions}>
-          <button
-            type="button"
-            className={styles.overviewPrimaryButton}
-            onClick={() => onTabChange("test")}
-            disabled={!canTestSearch}
-          >
-            <Search size={15} strokeWidth={2.2} aria-hidden="true" />
-            Тестировать поиск
-          </button>
-        </div>
-      </section>
+      <div className={styles.overviewTileRow}>
+        <section className={`${styles.overviewSection} ${styles.overviewSectionTile}`}>
+          <header className={styles.overviewSectionHead}>
+            <span className={`${styles.overviewSectionIcon} ${styles.overviewIconWarning}`} aria-hidden="true">
+              <Lightbulb size={16} strokeWidth={2.2} />
+            </span>
+            <h3 className={styles.overviewSectionTitle}>Что сделать дальше</h3>
+          </header>
+          <div className={styles.overviewSectionBody}>
+            <p className={`${styles.overviewSectionDesc} ${styles.overviewSectionDescTile}`}>{nextStepsDescription}</p>
+            <div className={styles.overviewActions}>
+              <button
+                type="button"
+                className={styles.overviewPrimaryButton}
+                onClick={() => onTabChange("test")}
+                disabled={!canTestSearch}
+              >
+                <Search size={15} strokeWidth={2.2} aria-hidden="true" />
+                Тестировать поиск
+              </button>
+            </div>
+          </div>
+        </section>
 
-      <section className={styles.overviewSection}>
-        <header className={styles.overviewSectionHead}>
-          <span className={`${styles.overviewSectionIcon} ${styles.overviewIconInfo}`} aria-hidden="true">
-            <Info size={16} strokeWidth={2.2} />
-          </span>
-          <h3 className={styles.overviewSectionTitle}>Основная информация</h3>
-        </header>
-        <div className={styles.overviewGrid}>
-          <div className={styles.overviewGridCol}>
-            <OverviewRow label="Название" value={knowledgeBase.name} />
-            <OverviewRow label="Описание" value={knowledgeBase.description?.trim() || "—"} valueWrap />
-            <OverviewRow label="Тип базы" value={baseKind} />
+        <section className={`${styles.overviewSection} ${styles.overviewSectionTile}`}>
+          <header className={styles.overviewSectionHead}>
+            <span className={`${styles.overviewSectionIcon} ${styles.overviewIconInfo}`} aria-hidden="true">
+              <Database size={16} strokeWidth={2.2} />
+            </span>
+            <h3 className={styles.overviewSectionTitle}>Индексация</h3>
+          </header>
+          <div className={styles.overviewSectionBody}>
+            <div className={styles.overviewGridSingle}>
+              <OverviewRow label="Последняя индексация" value={formatOverviewDate(knowledgeBase.last_indexed_at)} />
+              <OverviewRow label="Фрагменты" value={`${fragmentsReady} / ${fragmentsTotal}`} />
+            </div>
+            {warningCount > 0 ? (
+              <p className={styles.overviewWarningNote}>
+                <TriangleAlert size={14} strokeWidth={2.2} aria-hidden="true" />
+                {formatWarningNote(warningCount)}
+              </p>
+            ) : null}
           </div>
-          <div className={styles.overviewGridCol}>
-            <OverviewRow label="Объем хранилища" value={storageVolume} />
-            <OverviewRow label="Ответственный" value={responsible ?? "—"} />
-            <OverviewRow label="Кол-во файлов" value={String(filesCount)} />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
-      <section className={styles.overviewSection}>
-        <header className={styles.overviewSectionHead}>
-          <span className={`${styles.overviewSectionIcon} ${styles.overviewIconInfo}`} aria-hidden="true">
-            <Database size={16} strokeWidth={2.2} />
-          </span>
-          <h3 className={styles.overviewSectionTitle}>Индексация</h3>
-        </header>
-        <div className={styles.overviewGridSingle}>
-          <OverviewRow label="Последняя индексация" value={formatOverviewDate(knowledgeBase.last_indexed_at)} />
-          <OverviewRow label="Фрагменты" value={`${fragmentsReady} / ${fragmentsTotal}`} />
-        </div>
-        {warningCount > 0 ? (
-          <p className={styles.overviewWarningNote}>
-            <TriangleAlert size={14} strokeWidth={2.2} aria-hidden="true" />
-            {formatWarningNote(warningCount)}
-          </p>
-        ) : null}
-      </section>
+      <div className={styles.overviewTileRow}>
+        <section className={`${styles.overviewSection} ${styles.overviewSectionTile}`}>
+          <header className={styles.overviewSectionHead}>
+            <span className={`${styles.overviewSectionIcon} ${styles.overviewIconInfo}`} aria-hidden="true">
+              <Info size={16} strokeWidth={2.2} />
+            </span>
+            <h3 className={styles.overviewSectionTitle}>Основная информация</h3>
+          </header>
+          <div className={styles.overviewSectionBody}>
+            <div className={styles.overviewGridSingle}>
+              <OverviewRow label="Название" value={knowledgeBase.name} />
+              <OverviewRow label="Описание" value={knowledgeBase.description?.trim() || "—"} valueWrap />
+              <OverviewRow label="Тип базы" value={baseKind} />
+              <OverviewRow label="Объем хранилища" value={storageVolume} />
+              <OverviewRow label="Ответственный" value={responsible ?? "—"} />
+              <OverviewRow label="Кол-во файлов" value={String(filesCount)} />
+            </div>
+          </div>
+        </section>
 
-      <section className={styles.overviewSection}>
-        <header className={styles.overviewSectionHead}>
-          <span className={`${styles.overviewSectionIcon} ${styles.overviewIconMuted}`} aria-hidden="true">
-            <Users size={16} strokeWidth={2.2} />
-          </span>
-          <h3 className={styles.overviewSectionTitle}>Использование</h3>
-        </header>
-        <div className={styles.overviewGrid}>
-          <div className={styles.overviewGridCol}>
-            <OverviewRow
-              label="Обычный поиск"
-              value={normalSearchAvailable ? "доступен" : "недоступен"}
-              valueTone={normalSearchAvailable ? "success" : undefined}
-            />
+        <section className={`${styles.overviewSection} ${styles.overviewSectionTile}`}>
+          <header className={styles.overviewSectionHead}>
+            <span className={`${styles.overviewSectionIcon} ${styles.overviewIconMuted}`} aria-hidden="true">
+              <Users size={16} strokeWidth={2.2} />
+            </span>
+            <h3 className={styles.overviewSectionTitle}>Использование</h3>
+          </header>
+          <div className={styles.overviewSectionBody}>
+            <div className={styles.overviewGridSingle}>
+              <OverviewRow
+                label="Обычный поиск"
+                value={normalSearchAvailable ? "доступен" : "недоступен"}
+                valueTone={normalSearchAvailable ? "success" : undefined}
+              />
+              <OverviewRow label="Подключенные агенты" value={String(connectedAgents)} />
+              <OverviewRow label="Список пользователей" value={accessUsersList} valueWrap />
+            </div>
           </div>
-          <div className={styles.overviewGridCol}>
-            <OverviewRow label="Подключенные агенты" value={String(connectedAgents)} />
-            <OverviewRow label="Список пользователей" value={accessUsersList} valueWrap />
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
