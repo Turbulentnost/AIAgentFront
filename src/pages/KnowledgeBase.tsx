@@ -4,27 +4,31 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosError } from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
+  Archive,
+  BadgeCheck,
   Bot,
   Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
-  Database,
-  Filter,
-  HardDrive,
-  Layers3,
-  LockKeyhole,
   Circle,
+  CircleAlert,
+  Database,
+  FileText,
+  Layers3,
+  LibraryBig,
+  LockKeyhole,
   MoreVertical,
   Plus,
   RefreshCw,
   Search,
   Send,
   ShieldCheck,
+  Sparkles,
   Square,
   SquareArrowOutUpRight,
   Trash2,
-  TriangleAlert
+  Upload
 } from "lucide-react";
 import { documentsApi, knowledgeBasesApi } from "@/api/endpoints";
 import { useKnowledgeBaseIndexingWs } from "@/hooks/useKnowledgeBaseIndexingWs";
@@ -53,8 +57,10 @@ import {
   type ExtractedContentBlock,
   type ExtractedViewerChunk
 } from "@/utils/extractedVisionText";
+import { FormSearchInput, FormSelect } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import { buildSourceFileTree } from "@/utils/sourceFileTree";
+import { isCancelledJobStatus, isKnowledgeBaseIndexingActive } from "@/utils/knowledgeBaseIndexing";
 import styles from "./KnowledgeBase.module.css";
 
 type DetailTab = "overview" | "sources" | "chunks" | "rules" | "indexing" | "test" | "audit";
@@ -222,11 +228,7 @@ export default function KnowledgeBasePage() {
 
   const latestJob = jobs.data?.[0] ?? null;
   const isIndexingActive = Boolean(
-    selected &&
-      latestJob?.status !== "cancelled" &&
-      (latestJob?.status === "queued" ||
-        latestJob?.status === "running" ||
-        selected.indexing_active)
+    selected && isKnowledgeBaseIndexingActive(selected, latestJob)
   );
 
   useKnowledgeBaseIndexingWs(selected?.id, Boolean(canViewSelected && isIndexingActive));
@@ -261,8 +263,7 @@ export default function KnowledgeBasePage() {
           item.id === knowledgeBaseId
             ? {
                 ...item,
-                indexing_active: false,
-                status: item.fragments_count > 0 ? "ready" : "draft"
+                indexing_active: false
               }
             : item
         )
@@ -272,7 +273,7 @@ export default function KnowledgeBasePage() {
         (existing) => {
           const jobs = existing ?? [];
           const hasJob = jobs.some((entry) => entry.id === job.id);
-          const nextJob = { ...job, status: "cancelled" as const, cancel_requested: true };
+          const nextJob = { ...job, cancel_requested: true };
           return hasJob ? jobs.map((entry) => (entry.id === job.id ? { ...entry, ...nextJob } : entry)) : [nextJob, ...jobs];
         }
       );
@@ -280,7 +281,13 @@ export default function KnowledgeBasePage() {
       await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", knowledgeBaseId] });
       await queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", knowledgeBaseId] });
     },
-    onError: () => {
+    onError: async (error, knowledgeBaseId) => {
+      if (error instanceof AxiosError && error.response?.status === 409) {
+        await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+        await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", knowledgeBaseId] });
+        await queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", knowledgeBaseId] });
+        return;
+      }
       window.alert("Не удалось остановить индексацию. Попробуйте ещё раз.");
     }
   });
@@ -348,10 +355,6 @@ export default function KnowledgeBasePage() {
             индексация и проверяемый RAG-поиск.
           </p>
         </div>
-        <button className={styles.primaryButton} type="button" onClick={() => navigate("/knowledge-base/create")}>
-          <Plus size={16} />
-          Создать базу знаний
-        </button>
       </section>
 
       <StatsGrid stats={stats.data} />
@@ -359,65 +362,66 @@ export default function KnowledgeBasePage() {
       <section className={styles.workspace}>
         <div className={styles.listPanel}>
           <div className={styles.filters}>
-            <label>
-              <Search size={15} />
-              <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder="Поиск базы знаний" />
-            </label>
-            <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as KnowledgeBaseStatus | "all")}>
-              <option value="all">Все статусы</option>
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <button type="button" className={styles.secondaryButton}>
-              <Filter size={15} />
-              Фильтры
-            </button>
+            <FormSearchInput
+              compact
+              className={styles.filterSearch}
+              value={searchQuery}
+              onChange={setSearchQuery}
+              placeholder="Поиск базы знаний"
+            />
+            <FormSelect
+              compact
+              className={styles.filterSelect}
+              value={statusFilter}
+              onChange={(value) => setStatusFilter(value as KnowledgeBaseStatus | "all")}
+              options={Object.entries(statusLabels).map(([value, label]) => ({ value, label }))}
+              placeholder="Все статусы"
+              ariaLabel="Статус базы знаний"
+            />
           </div>
 
-          <table className={styles.kbTable}>
-            <thead>
-              <tr>
-                <th>Название базы знаний</th>
-                <th>Источники</th>
-                <th>Фрагменты</th>
-                <th>Статус</th>
-                <th>Обновлено</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(knowledgeBases.data ?? []).map((item) => {
-                const isDisabled = !item.can_access;
-                const isSelected = selected?.id === item.id;
-                return (
-                  <tr
-                    key={item.id}
-                    className={[
-                      isSelected ? styles.selectedRow : "",
-                      isDisabled ? styles.disabledRow : "",
-                      item.indexing_active ? styles.indexingRow : ""
-                    ]
-                      .filter(Boolean)
-                      .join(" ")}
-                    onClick={() => {
-                      if (isDisabled) return;
-                      setSelectedId(item.id);
-                      setActiveTab("overview");
-                      setSearchParams(
-                        (prev) => {
-                          const next = new URLSearchParams(prev);
-                          next.set("kb", item.id);
-                          return next;
-                        },
-                        { replace: true }
-                      );
-                    }}
-                    aria-disabled={isDisabled}
-                    title={isDisabled ? "Нет доступа к этой базе знаний" : undefined}
-                  >
-                    <td>
+          <div className={styles.kbTableScroll}>
+            <table className={styles.kbTable}>
+              <thead>
+                <tr>
+                  <th>Название базы знаний</th>
+                  <th>Источники</th>
+                  <th>Фрагменты</th>
+                  <th>Статус</th>
+                  <th>Обновлено</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(knowledgeBases.data ?? []).map((item) => {
+                  const isDisabled = !item.can_access;
+                  const isSelected = selected?.id === item.id;
+                  return (
+                    <tr
+                      key={item.id}
+                      className={[
+                        isSelected ? styles.selectedRow : "",
+                        isDisabled ? styles.disabledRow : "",
+                        item.indexing_active ? styles.indexingRow : ""
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                      onClick={() => {
+                        if (isDisabled) return;
+                        setSelectedId(item.id);
+                        setActiveTab("overview");
+                        setSearchParams(
+                          (prev) => {
+                            const next = new URLSearchParams(prev);
+                            next.set("kb", item.id);
+                            return next;
+                          },
+                          { replace: true }
+                        );
+                      }}
+                      aria-disabled={isDisabled}
+                      title={isDisabled ? "Нет доступа к этой базе знаний" : undefined}
+                    >
+                      <td>
                       <strong>{item.name}</strong>
                       <small>
                         {isDisabled
@@ -441,8 +445,21 @@ export default function KnowledgeBasePage() {
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
+
+          <div className={styles.kbCreateFooter}>
+            <button
+              type="button"
+              className={styles.kbCreateButton}
+              onClick={() => navigate("/knowledge-base/create")}
+              title="Создать базу знаний"
+              aria-label="Создать базу знаний"
+            >
+              <Plus size={18} strokeWidth={2.5} aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <aside className={styles.detailPanel}>
@@ -557,34 +574,41 @@ export default function KnowledgeBasePage() {
 }
 
 function StatsGrid({ stats }: { stats?: KnowledgeBaseStats }) {
+  const statIconColors = {
+    blue: "var(--color-primary)",
+    orange: "var(--color-warning)",
+    violet: "var(--color-violet)",
+    green: "var(--color-success)"
+  } as const;
+
   const cards = [
     {
       label: "Всего баз знаний",
       value: stats?.total_bases ?? 0,
       hint: "Доступных для просмотра и использования",
-      icon: Database,
-      tone: "blue"
+      icon: LibraryBig,
+      tone: "blue" as const
     },
     {
       label: "Ошибки индексации",
       value: stats?.indexing_errors_count ?? 0,
       hint: "Нерешённых по доступным базам",
-      icon: TriangleAlert,
-      tone: "orange"
+      icon: CircleAlert,
+      tone: "orange" as const
     },
     {
       label: "Общий размер",
       value: formatBytes(stats?.storage_bytes ?? 0),
       hint: "Суммарный объём данных",
-      icon: HardDrive,
-      tone: "violet"
+      icon: Archive,
+      tone: "violet" as const
     },
     {
       label: "Успешная индексация",
       value: stats?.successfully_indexed_bases ?? 0,
       hint: "Баз со статусом «Готова»",
-      icon: CheckCircle2,
-      tone: "green"
+      icon: BadgeCheck,
+      tone: "green" as const
     }
   ];
   return (
@@ -593,8 +617,8 @@ function StatsGrid({ stats }: { stats?: KnowledgeBaseStats }) {
         const Icon = card.icon;
         return (
           <article key={card.label} className={styles.statCard}>
-            <span className={`${styles.statIcon} ${styles[card.tone]}`}>
-              <Icon size={22} />
+            <span className={`${styles.statIcon} ${styles[`statIcon_${card.tone}`]}`} aria-hidden="true">
+              <Icon size={20} strokeWidth={2.2} color={statIconColors[card.tone]} />
             </span>
             <div>
               <small>{card.label}</small>
@@ -1435,17 +1459,44 @@ function CompactTable({ headers, rows, empty }: { headers: string[]; rows: React
 }
 
 function Pipeline() {
-  const steps = ["Загрузка документа", "Извлечение текста", "Проверка качества", "Разрешение на использование", "Разбиение на фрагменты", "Создание embeddings", "Индексация в Qdrant", "Доступ для ИИ-агентов"];
+  const steps = [
+    { label: "Загрузка документа", icon: Upload, tone: "blue" as const },
+    { label: "Извлечение текста", icon: FileText, tone: "blue" as const },
+    { label: "Проверка качества", icon: ShieldCheck, tone: "green" as const },
+    { label: "Разрешение на использование", icon: LockKeyhole, tone: "violet" as const },
+    { label: "Разбиение на фрагменты", icon: Layers3, tone: "blue" as const },
+    { label: "Создание embeddings", icon: Sparkles, tone: "violet" as const },
+    { label: "Индексация в Qdrant", icon: Database, tone: "green" as const },
+    { label: "Доступ для ИИ-агентов", icon: Bot, tone: "blue" as const }
+  ];
+
   return (
-    <section className={styles.pipeline}>
-      <h2>Как документ становится частью базы знаний</h2>
-      <div>
-        {steps.map((step, index) => (
-          <article key={step}>
-            <span>{index + 1}</span>
-            <p>{step}</p>
-          </article>
-        ))}
+    <section className={styles.pipeline} aria-labelledby="kb-pipeline-title">
+      <h2 id="kb-pipeline-title" className={styles.pipelineTitle}>
+        Как документ становится частью базы знаний
+      </h2>
+        <div className={styles.pipelineBoard}>
+        <svg className={styles.pipelineLineSvg} viewBox="0 0 960 8" aria-hidden="true">
+          <path className={styles.pipelineLineBase} d="M16 4 H944" strokeDasharray="4 6" />
+        </svg>
+        <div className={styles.pipelineSteps}>
+          {steps.map((step) => {
+            const Icon = step.icon;
+            return (
+              <article
+                key={step.label}
+                className={`${styles.pipelineStep} ${styles[`pipelineStep_${step.tone}`]}`}
+              >
+                <div className={styles.pipelineStepBody}>
+                  <span className={`${styles.pipelineStepIcon} ${styles[`pipelineStepIcon_${step.tone}`]}`}>
+                    <Icon size={18} strokeWidth={2.1} color="#ffffff" aria-hidden="true" />
+                  </span>
+                  <p className={styles.pipelineStepLabel}>{step.label}</p>
+                </div>
+              </article>
+            );
+          })}
+        </div>
       </div>
     </section>
   );

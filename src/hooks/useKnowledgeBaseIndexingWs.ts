@@ -7,6 +7,7 @@ import type {
   KnowledgeBaseListItem,
   KnowledgeBaseStatus
 } from "@/types";
+import { isCancelledJobStatus } from "@/utils/knowledgeBaseIndexing";
 
 export interface KnowledgeBaseIndexingWsJob {
   id: string;
@@ -104,6 +105,8 @@ function mergeWsJob(
 
 function applyIndexingMessage(queryClient: QueryClient, message: KnowledgeBaseIndexingWsMessage) {
   const kbId = message.knowledge_base_id;
+  const jobCancelled = message.job ? isCancelledJobStatus(message.job.status) : false;
+  const indexingActive = jobCancelled ? false : message.indexing_active;
 
   if (message.job) {
     queryClient.setQueryData<KnowledgeBaseIndexingJob[]>(["knowledge-base-jobs", kbId], (jobs) =>
@@ -117,7 +120,7 @@ function applyIndexingMessage(queryClient: QueryClient, message: KnowledgeBaseIn
         ? {
             ...item,
             status: message.knowledge_base_status,
-            indexing_active: message.indexing_active,
+            indexing_active: indexingActive,
             fragments_count: message.fragments_count,
             sources_count: message.sources_count
           }
@@ -125,7 +128,7 @@ function applyIndexingMessage(queryClient: QueryClient, message: KnowledgeBaseIn
     )
   );
 
-  if (["completed", "failed", "cancelled", "partial"].includes(message.event)) {
+  if (["completed", "failed", "cancelled", "partial"].includes(message.event) || jobCancelled) {
     void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
     void queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", kbId] });
     void queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", kbId] });
