@@ -6,13 +6,14 @@ import {
   useMemo,
   useRef,
   useState,
-  type DragEvent
+  type DragEvent,
+  type AnimationEvent
 } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router-dom";
-import { CloudUpload, Download, ExternalLink, Info, Lock, Search, Upload, X } from "lucide-react";
+import { CloudUpload, Download, ExternalLink, Lock, Upload, X } from "lucide-react";
 import { departmentsApi, documentsApi } from "@/api/endpoints";
-import { FormSelect } from "@/components/form-controls";
+import { FormSearchInput, FormSelect } from "@/components/form-controls";
 import { collectDroppedSourceFiles } from "@/utils/collectDroppedEntries";
 import { createId } from "@/utils/createId";
 import type {
@@ -146,6 +147,202 @@ function documentAccessLabel(document: DocumentListItem) {
   return document.department_id ? "Подразделение" : "Общий";
 }
 
+type SidebarView = "upload" | "detail";
+
+type SidebarUploadFormProps = {
+  styles: Record<string, string>;
+  formId: string;
+  isDragOver: boolean;
+  title: string;
+  documentType: DocumentType;
+  file: File | null;
+  error: string | null;
+  uploadPending: boolean;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onTitleChange: (value: string) => void;
+  onDocumentTypeChange: (value: DocumentType) => void;
+  onFileChange: (file: File | null) => void;
+  onDragEnter: (event: DragEvent) => void;
+  onDragLeave: (event: DragEvent) => void;
+  onDragOver: (event: DragEvent) => void;
+  onDrop: (event: DragEvent) => void;
+};
+
+type StagedFilesBottomPanelProps = {
+  styles: Record<string, string>;
+  stagedFiles: StagedFile[];
+  uploadingStagedIds: string[];
+  onUploadStaged: (id: string) => void;
+  onUploadAllStaged: () => void;
+  onRemoveStaged: (id: string) => void;
+};
+
+function StagedFilesBottomPanel({
+  styles,
+  stagedFiles,
+  uploadingStagedIds,
+  onUploadStaged,
+  onUploadAllStaged,
+  onRemoveStaged
+}: StagedFilesBottomPanelProps) {
+  return (
+    <section className={styles.stagedBottomPanel} aria-label="Добавленные файлы для загрузки">
+      <div className={styles.stagedBottomHeader}>
+        <h2 className={styles.stagedBottomTitle}>Добавленные файлы ({stagedFiles.length})</h2>
+        <button
+          type="button"
+          className={styles.linkButton}
+          onClick={onUploadAllStaged}
+          disabled={stagedFiles.every((item) => uploadingStagedIds.includes(item.id))}
+        >
+          Загрузить все
+        </button>
+      </div>
+      <div className={styles.stagedSliderTrack}>
+        {stagedFiles.map((staged) => {
+          const extKey = getExtension(staged.file.name).replace(".", "") || "file";
+          const uploading = uploadingStagedIds.includes(staged.id);
+          const fileName = staged.file.name;
+          return (
+            <article
+              key={staged.id}
+              className={`${styles.stagedSliderCard} ${uploading ? styles.stagedSliderCardUploading : ""}`.trim()}
+              title={staged.relativePath}
+            >
+              <span className={styles.stagedIcon}>{extKey.slice(0, 4)}</span>
+              <div className={styles.stagedSliderCopy}>
+                <strong>{fileName}</strong>
+                <small>{formatBytes(staged.file.size)}</small>
+              </div>
+              <button
+                type="button"
+                className={styles.stagedUpload}
+                onClick={() => onUploadStaged(staged.id)}
+                disabled={uploading}
+                aria-label={`Загрузить ${fileName}`}
+              >
+                {uploading ? "…" : "Загрузить"}
+              </button>
+              <button
+                type="button"
+                className={styles.stagedRemove}
+                onClick={() => onRemoveStaged(staged.id)}
+                disabled={uploading}
+                aria-label={`Удалить ${fileName}`}
+              >
+                <X size={14} />
+              </button>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function SidebarUploadForm({
+  styles,
+  formId,
+  isDragOver,
+  title,
+  documentType,
+  file,
+  error,
+  uploadPending,
+  onSubmit,
+  onTitleChange,
+  onDocumentTypeChange,
+  onFileChange,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+  onDrop
+}: SidebarUploadFormProps) {
+  return (
+    <form id={formId} className={styles.sidebarUploadForm} onSubmit={onSubmit}>
+      <div className={styles.sidebarUploadHead}>
+        <h2 className={styles.sidebarUploadTitle}>Новый документ</h2>
+        <p className={styles.uploadIntro}>Перетащите файлы или папку в область ниже либо выберите файл вручную.</p>
+      </div>
+
+      <div
+        className={`${styles.dropZone} ${styles.dropZoneSidebar} ${isDragOver ? styles.dropZoneDragOver : ""}`}
+        onDragEnter={onDragEnter}
+        onDragLeave={onDragLeave}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
+      >
+        {isDragOver ? (
+          <div className={styles.dropOverlay} aria-hidden="true">
+            <span className={`${styles.dropOverlayIcon} ${styles.dropOverlayIconSidebar}`}>
+              <Upload size={22} strokeWidth={2} />
+            </span>
+            <strong>Отпустите файлы или папку</strong>
+            <span>PDF, DOCX, XLSX, PPTX, TXT</span>
+          </div>
+        ) : null}
+        <div className={styles.dropZoneInner}>
+          <span className={`${styles.dropZoneIcon} ${styles.dropZoneIconSidebar}`}>
+            <CloudUpload size={20} strokeWidth={2} />
+          </span>
+          <strong>Перетащите файлы сюда</strong>
+          <span>или выберите файл кнопкой ниже</span>
+        </div>
+      </div>
+
+      <div className={styles.uploadForm}>
+        <label className={styles.field}>
+          <span className={styles.fieldLabel}>Название</span>
+          <input
+            className={styles.control}
+            placeholder="Необязательно — по умолчанию из имени файла"
+            value={title}
+            onChange={(event) => onTitleChange(event.target.value)}
+          />
+        </label>
+
+        <div className={styles.field}>
+          <span className={styles.fieldLabel}>Тип документа</span>
+          <FormSelect
+            value={documentType}
+            onChange={(value) => onDocumentTypeChange(value as DocumentType)}
+            options={documentTypes}
+            ariaLabel="Тип документа"
+          />
+        </div>
+
+        <div className={styles.uploadActions}>
+          <label className={styles.fileButton}>
+            Выбрать файл
+            <input
+              type="file"
+              accept={acceptAttr}
+              onChange={(event) => {
+                onFileChange(event.target.files?.[0] ?? null);
+              }}
+            />
+          </label>
+          <button type="submit" className={styles.submitButton} disabled={!file || uploadPending}>
+            {uploadPending ? "Загружаем..." : "Загрузить"}
+          </button>
+        </div>
+
+        {file ? <p className={styles.selectedFileName}>Выбран файл: {file.name}</p> : null}
+        {error ? (
+          <p className={styles.error} role="alert">
+            {error}
+          </p>
+        ) : null}
+      </div>
+
+      <p className={styles.callout}>
+        После загрузки документ появится в реестре. Добавьте его как источник в разделе «База знаний», когда текст будет
+        извлечён.
+      </p>
+    </form>
+  );
+}
+
 export default function Documents() {
   const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,6 +370,15 @@ export default function Documents() {
   } | null>(null);
   const previewUrlRef = useRef<string | null>(null);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(searchParams.get("document"));
+  const [sidebarView, setSidebarView] = useState<SidebarView>(() =>
+    searchParams.get("document") ? "detail" : "upload"
+  );
+  const [detailPanelDocument, setDetailPanelDocument] = useState<DocumentListItem | null>(null);
+  const [isDetailExiting, setIsDetailExiting] = useState(false);
+  const [isDetailEntering, setIsDetailEntering] = useState(false);
+  const [isUploadExiting, setIsUploadExiting] = useState(false);
+  const [isUploadEntering, setIsUploadEntering] = useState(false);
+  const pendingDetailRef = useRef<DocumentListItem | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -220,6 +426,131 @@ export default function Documents() {
     if (requestedId) setSelectedDocumentId(requestedId);
   }, [searchParams]);
 
+  useEffect(() => {
+    if (!selectedDocument || detailPanelDocument || isDetailExiting || isUploadExiting) return;
+    if (sidebarView !== "detail") return;
+    setDetailPanelDocument(selectedDocument);
+    if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      setIsDetailEntering(true);
+    }
+  }, [selectedDocument, detailPanelDocument, sidebarView, isDetailExiting, isUploadExiting]);
+
+  useEffect(() => {
+    if (!selectedDocument || !detailPanelDocument || selectedDocument.id !== detailPanelDocument.id) return;
+    setDetailPanelDocument(selectedDocument);
+  }, [selectedDocument, detailPanelDocument?.id]);
+
+  const finalizeDetailClose = useCallback(() => {
+    setIsDetailExiting(false);
+    setIsDetailEntering(false);
+    setIsUploadExiting(false);
+    setSelectedDocumentId(null);
+    setSelectedDocumentSnapshot(null);
+    setDetailPanelDocument(null);
+    setFileActionError(null);
+    pendingDetailRef.current = null;
+    setSidebarView("upload");
+    setIsUploadEntering(false);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("document");
+        return next;
+      },
+      { replace: true }
+    );
+  }, [setSearchParams]);
+
+  const showDocumentInSidebar = useCallback(
+    (document: DocumentListItem, animate = true) => {
+      setSelectedDocumentId(document.id);
+      setSelectedDocumentSnapshot(document);
+      setFileActionError(null);
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          next.set("document", document.id);
+          return next;
+        },
+        { replace: true }
+      );
+
+      if (!animate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+        setIsDetailExiting(false);
+        setIsDetailEntering(false);
+        setIsUploadExiting(false);
+        setIsUploadEntering(false);
+        pendingDetailRef.current = null;
+        setDetailPanelDocument(document);
+        setSidebarView("detail");
+        return;
+      }
+
+      if (detailPanelDocument?.id === document.id && sidebarView === "detail" && !isDetailExiting) {
+        return;
+      }
+
+      setIsDetailExiting(false);
+      setIsUploadEntering(false);
+
+      if (sidebarView === "upload" && !isUploadExiting) {
+        pendingDetailRef.current = document;
+        setIsUploadExiting(true);
+        return;
+      }
+
+      setDetailPanelDocument(document);
+      setSidebarView("detail");
+      setIsDetailEntering(true);
+    },
+    [detailPanelDocument, sidebarView, isDetailExiting, isUploadExiting, setSearchParams]
+  );
+
+  const closeSelectedDocument = useCallback(() => {
+    if (!detailPanelDocument && !selectedDocumentId) return;
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      finalizeDetailClose();
+      return;
+    }
+    setIsDetailExiting(true);
+  }, [detailPanelDocument, selectedDocumentId, finalizeDetailClose]);
+
+  const handleDetailPaneAnimationEnd = useCallback(
+    (event: AnimationEvent<HTMLDivElement>) => {
+      if (event.target !== event.currentTarget) return;
+      if (isDetailExiting) {
+        finalizeDetailClose();
+        setIsUploadEntering(true);
+        return;
+      }
+      if (isDetailEntering) {
+        setIsDetailEntering(false);
+      }
+    },
+    [finalizeDetailClose, isDetailExiting, isDetailEntering]
+  );
+
+  const handleUploadPaneAnimationEnd = useCallback(
+    (event: AnimationEvent<HTMLDivElement>) => {
+      if (event.target !== event.currentTarget) return;
+      if (isUploadExiting) {
+        setIsUploadExiting(false);
+        const document = pendingDetailRef.current;
+        pendingDetailRef.current = null;
+        if (document) {
+          setDetailPanelDocument(document);
+          setSidebarView("detail");
+          setIsDetailEntering(true);
+        }
+        return;
+      }
+      if (isUploadEntering) {
+        setIsUploadEntering(false);
+      }
+    },
+    [isUploadExiting, isUploadEntering]
+  );
+
   const closeDocumentPreview = useCallback(() => {
     if (previewUrlRef.current) {
       URL.revokeObjectURL(previewUrlRef.current);
@@ -241,17 +572,8 @@ export default function Documents() {
       setError(null);
       setFile(null);
       setTitle("");
-      setSelectedDocumentId(doc.id);
-      setSelectedDocumentSnapshot({ ...doc, can_access: true });
       setRegistryPage(1);
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.set("document", doc.id);
-          return next;
-        },
-        { replace: true }
-      );
+      showDocumentInSidebar({ ...doc, can_access: true });
       void queryClient.invalidateQueries({ queryKey: ["documents"] });
     },
     onError: () => setError("Не удалось загрузить документ")
@@ -380,17 +702,7 @@ export default function Documents() {
   }
 
   function selectDocument(document: DocumentListItem) {
-    setSelectedDocumentId(document.id);
-    setSelectedDocumentSnapshot(document);
-    setFileActionError(null);
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("document", document.id);
-        return next;
-      },
-      { replace: true }
-    );
+    showDocumentInSidebar(document);
   }
 
   function handleOpenDocument(document: DocumentListItem) {
@@ -464,14 +776,14 @@ export default function Documents() {
 
       <section className={styles.registryPanel}>
         <div className={styles.registryToolbar}>
-          <label className={styles.registrySearch}>
-            <Search size={15} />
-            <input
+          <div className={styles.registrySearchWrap}>
+            <FormSearchInput
+              compact
               value={registrySearch}
-              onChange={(event) => setRegistrySearch(event.target.value)}
+              onChange={setRegistrySearch}
               placeholder="Поиск по названию или файлу"
             />
-          </label>
+          </div>
           <span className={styles.registryCount}>
             {registryTotal
               ? `${registryRangeStart}–${registryRangeEnd} из ${registryTotal}`
@@ -484,63 +796,79 @@ export default function Documents() {
         <div className={styles.registryWorkspace}>
           <div className={styles.registryListColumn}>
             <div className={styles.registryTableWrap}>
-              <table className={styles.registryTable}>
-                <thead>
-                  <tr>
-                    <th>Документ</th>
-                    <th>Тип</th>
-                    <th>Статус</th>
-                    <th>Подразделение</th>
-                    <th>Доступ</th>
-                    <th>Обновлено</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {registryDocuments.map((document) => {
-                    const isSelected = selectedDocumentId === document.id;
-                    const isDisabled = !document.can_access;
-                    return (
-                      <tr
-                        key={document.id}
-                        className={[
-                          isSelected ? styles.registryRowSelected : "",
-                          isDisabled ? styles.registryRowLocked : ""
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        onClick={() => selectDocument(document)}
-                        title={isDisabled ? "Документ виден в реестре, но содержимое недоступно для чтения" : undefined}
-                      >
-                        <td>
-                          <strong>{document.title}</strong>
-                          <small>{document.original_filename || "—"}</small>
-                        </td>
-                        <td>{documentTypeLabel(document.document_type)}</td>
-                        <td>{processingStatusLabels[document.processing_status] ?? document.processing_status}</td>
-                        <td>{departmentName(departments, document.department_id)}</td>
-                        <td>
-                          {isDisabled ? (
-                            <span className={styles.accessLocked}>
-                              <Lock size={13} />
-                              {documentAccessLabel(document)}
-                            </span>
-                          ) : (
-                            documentAccessLabel(document)
-                          )}
-                        </td>
-                        <td>{formatDate(document.updated_at)}</td>
-                      </tr>
-                    );
-                  })}
-                  {!registryDocuments.length && (
+              <div className={styles.registryTableScroll}>
+                <table className={styles.registryTable}>
+                  <colgroup>
+                    <col className={styles.colDocument} />
+                    <col className={styles.colType} />
+                    <col className={styles.colStatus} />
+                    <col className={styles.colDepartment} />
+                    <col className={styles.colAccess} />
+                    <col className={styles.colUpdated} />
+                  </colgroup>
+                  <thead className={styles.registryTableHead}>
                     <tr>
-                      <td colSpan={6} className={styles.registryEmpty}>
-                        {documentsQuery.isLoading ? "Загружаем реестр..." : "Документы не найдены."}
-                      </td>
+                      <th>Документ</th>
+                      <th>Тип</th>
+                      <th>Статус</th>
+                      <th>Подразделение</th>
+                      <th>Доступ</th>
+                      <th>Обновлено</th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {registryDocuments.map((document) => {
+                      const isSelected = selectedDocumentId === document.id;
+                      const isDisabled = !document.can_access;
+                      return (
+                        <tr
+                          key={document.id}
+                          className={[
+                            isSelected ? styles.registryRowSelected : "",
+                            isDisabled ? styles.registryRowLocked : ""
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          onClick={() => selectDocument(document)}
+                          title={isDisabled ? "Документ виден в реестре, но содержимое недоступно для чтения" : undefined}
+                        >
+                          <td className={styles.documentCell}>
+                            <strong title={document.title}>{document.title}</strong>
+                            <small title={document.original_filename || undefined}>
+                              {document.original_filename || "—"}
+                            </small>
+                          </td>
+                          <td className={styles.cellNowrap}>{documentTypeLabel(document.document_type)}</td>
+                          <td className={styles.cellNowrap}>
+                            {processingStatusLabels[document.processing_status] ?? document.processing_status}
+                          </td>
+                          <td className={styles.cellEllipsis} title={departmentName(departments, document.department_id)}>
+                            {departmentName(departments, document.department_id)}
+                          </td>
+                          <td className={styles.cellNowrap}>
+                            {isDisabled ? (
+                              <span className={styles.accessLocked}>
+                                <Lock size={13} />
+                                {documentAccessLabel(document)}
+                              </span>
+                            ) : (
+                              documentAccessLabel(document)
+                            )}
+                          </td>
+                          <td className={styles.cellNowrap}>{formatDate(document.updated_at)}</td>
+                        </tr>
+                      );
+                    })}
+                    {!registryDocuments.length && (
+                      <tr>
+                        <td colSpan={6} className={styles.registryEmpty}>
+                          {documentsQuery.isLoading ? "Загружаем реестр..." : "Документы не найдены."}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {registryTotalPages > 1 ? (
@@ -585,225 +913,176 @@ export default function Documents() {
             ) : null}
           </div>
 
-          <aside className={styles.registryDetail}>
-            {!selectedDocument ? (
-              <p className={styles.registryDetailEmpty}>Выберите документ в таблице, чтобы посмотреть сведения.</p>
-            ) : !selectedDocument.can_access ? (
-              <div className={styles.registryDetailLocked}>
-                <Lock size={18} />
-                <strong>{selectedDocument.title}</strong>
-                <p>Документ отображается в общем реестре, но у вас нет прав на чтение его содержимого.</p>
-                <small>Подразделение: {departmentName(departments, selectedDocument.department_id)}</small>
-              </div>
-            ) : (
-              <div className={styles.registryDetailBody}>
-                <h2>{selectedDocument.title}</h2>
-                <div className={styles.registryDetailActions}>
-                  {isPreviewableDocument(selectedDocument) ? (
-                    <button
-                      type="button"
-                      className={styles.detailActionButton}
-                      disabled={fileActionPending !== null}
-                      onClick={() => handleOpenDocument(selectedDocument)}
-                    >
-                      <ExternalLink size={15} />
-                      {fileActionPending === "open" ? "Открываем..." : "Открыть"}
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    className={styles.detailActionButton}
-                    disabled={fileActionPending !== null}
-                    onClick={() => void handleDownloadDocument(selectedDocument)}
-                  >
-                    <Download size={15} />
-                    {fileActionPending === "download" ? "Скачиваем..." : "Скачать"}
-                  </button>
+          <aside className={styles.detailPanel}>
+            {detailPanelDocument && !isUploadExiting ? (
+              <button
+                type="button"
+                className={styles.detailCloseButton}
+                onClick={closeSelectedDocument}
+                aria-label="Закрыть сведения о документе"
+              >
+                <X size={16} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+            ) : null}
+            <div className={styles.sidebarStage}>
+              {detailPanelDocument && !isUploadExiting ? (
+                <div
+                  className={`${styles.sidebarPane} ${styles.sidebarPaneDetail} ${isDetailExiting ? styles.sidebarPaneExitDown : ""} ${isDetailEntering ? styles.sidebarPaneEnterUp : ""}`.trim()}
+                  onAnimationEnd={handleDetailPaneAnimationEnd}
+                >
+                  <div className={styles.detailPanelInner}>
+                    {!detailPanelDocument.can_access ? (
+                      <section className={styles.detailSection}>
+                        <div className={styles.detailSectionHead}>
+                          <span className={styles.detailSectionIcon}>
+                            <Lock size={16} strokeWidth={2} aria-hidden="true" />
+                          </span>
+                          <div>
+                            <h2 className={styles.detailSectionTitle}>{detailPanelDocument.title}</h2>
+                            <p className={styles.detailSectionDesc}>
+                              Документ отображается в общем реестре, но у вас нет прав на чтение его содержимого.
+                            </p>
+                          </div>
+                        </div>
+                        <div className={styles.summaryRows}>
+                          <div className={styles.summaryRow}>
+                            <span className={styles.summaryLabel}>Подразделение</span>
+                            <span className={styles.summaryValue}>
+                              {departmentName(departments, detailPanelDocument.department_id)}
+                            </span>
+                          </div>
+                        </div>
+                      </section>
+                    ) : (
+                      <>
+                        <div className={styles.detailHeader}>
+                          <div className={styles.detailHeaderMain}>
+                            <h2>{detailPanelDocument.title}</h2>
+                            <span className={styles.detailStatusBadge}>
+                              {processingStatusLabels[detailPanelDocument.processing_status] ??
+                                detailPanelDocument.processing_status}
+                            </span>
+                          </div>
+                          <div className={styles.detailHeaderActions}>
+                            {isPreviewableDocument(detailPanelDocument) ? (
+                              <button
+                                type="button"
+                                className={styles.detailActionButton}
+                                disabled={fileActionPending !== null}
+                                onClick={() => handleOpenDocument(detailPanelDocument)}
+                              >
+                                <ExternalLink size={15} strokeWidth={2} aria-hidden="true" />
+                                {fileActionPending === "open" ? "Открываем..." : "Открыть"}
+                              </button>
+                            ) : null}
+                            <button
+                              type="button"
+                              className={`${styles.detailActionButton} ${!isPreviewableDocument(detailPanelDocument) ? styles.detailActionButtonWide : ""}`.trim()}
+                              disabled={fileActionPending !== null}
+                              onClick={() => void handleDownloadDocument(detailPanelDocument)}
+                            >
+                              <Download size={15} strokeWidth={2} aria-hidden="true" />
+                              {fileActionPending === "download" ? "Скачиваем..." : "Скачать"}
+                            </button>
+                          </div>
+                        </div>
+
+                        {fileActionError ? (
+                          <p className={styles.fileActionError} role="alert">
+                            {fileActionError}
+                          </p>
+                        ) : null}
+
+                        <section className={styles.detailSection}>
+                          <h3 className={styles.detailSectionTitle}>Сведения о документе</h3>
+                          <div className={styles.summaryRows}>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Файл</span>
+                              <span className={`${styles.summaryValue} ${styles.summaryValueWrap}`}>
+                                {detailPanelDocument.original_filename || "—"}
+                              </span>
+                            </div>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Тип</span>
+                              <span className={styles.summaryValue}>
+                                {documentTypeLabel(detailPanelDocument.document_type)}
+                              </span>
+                            </div>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Подразделение</span>
+                              <span className={`${styles.summaryValue} ${styles.summaryValueWrap}`}>
+                                {departmentName(departments, detailPanelDocument.department_id)}
+                              </span>
+                            </div>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Размер</span>
+                              <span className={styles.summaryValue}>{formatBytes(detailPanelDocument.file_size)}</span>
+                            </div>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Версия</span>
+                              <span className={styles.summaryValue}>{detailPanelDocument.version || 1}</span>
+                            </div>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Индексация</span>
+                              <span className={styles.summaryValue}>
+                                {detailPanelDocument.is_indexed ? "Да" : "Нет"}
+                              </span>
+                            </div>
+                            <div className={styles.summaryRow}>
+                              <span className={styles.summaryLabel}>Загружен</span>
+                              <span className={styles.summaryValue}>{formatDate(detailPanelDocument.created_at)}</span>
+                            </div>
+                          </div>
+                        </section>
+                      </>
+                    )}
+                  </div>
                 </div>
-                {fileActionError ? (
-                  <p className={styles.fileActionError} role="alert">
-                    {fileActionError}
-                  </p>
-                ) : null}
-                <div className={styles.summaryRows}>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Файл</span>
-                    <span className={styles.summaryValue}>{selectedDocument.original_filename || "—"}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Тип</span>
-                    <span className={styles.summaryValue}>{documentTypeLabel(selectedDocument.document_type)}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Статус</span>
-                    <span className={styles.summaryValue}>
-                      {processingStatusLabels[selectedDocument.processing_status] ?? selectedDocument.processing_status}
-                    </span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Подразделение</span>
-                    <span className={styles.summaryValue}>
-                      {departmentName(departments, selectedDocument.department_id)}
-                    </span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Размер</span>
-                    <span className={styles.summaryValue}>{formatBytes(selectedDocument.file_size)}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Версия</span>
-                    <span className={styles.summaryValue}>{selectedDocument.version || 1}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Индексация</span>
-                    <span className={styles.summaryValue}>{selectedDocument.is_indexed ? "Да" : "Нет"}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Загружен</span>
-                    <span className={styles.summaryValue}>{formatDate(selectedDocument.created_at)}</span>
-                  </div>
+              ) : null}
+
+              {sidebarView === "upload" && !isDetailExiting ? (
+                <div
+                  className={`${styles.sidebarPane} ${styles.sidebarUploadPanel} ${isUploadExiting ? styles.sidebarPaneExitDown : ""} ${isUploadEntering ? styles.sidebarPaneEnterUp : ""}`.trim()}
+                  onAnimationEnd={handleUploadPaneAnimationEnd}
+                >
+                  <SidebarUploadForm
+                    styles={styles}
+                    formId={formId}
+                    isDragOver={isDragOver}
+                    title={title}
+                    documentType={documentType}
+                    file={file}
+                    error={error}
+                    uploadPending={uploadMutation.isPending}
+                    onSubmit={handleSubmit}
+                    onTitleChange={setTitle}
+                    onDocumentTypeChange={setDocumentType}
+                    onFileChange={(nextFile) => {
+                      setFile(nextFile);
+                      setError(null);
+                    }}
+                    onDragEnter={handleDragEnter}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={handleDragOver}
+                    onDrop={handleDrop}
+                  />
                 </div>
-              </div>
-            )}
+              ) : null}
+            </div>
           </aside>
         </div>
       </section>
 
-      <div className={styles.layout}>
-        <form id={formId} className={styles.uploadCard} onSubmit={handleSubmit}>
-          <div>
-            <h2>Новый документ</h2>
-            <p className={styles.uploadIntro}>Перетащите файлы или папку в область ниже либо выберите файл вручную.</p>
-          </div>
-
-          <div
-            className={`${styles.dropZone} ${isDragOver ? styles.dropZoneDragOver : ""}`}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
-          >
-            {isDragOver ? (
-              <div className={styles.dropOverlay} aria-hidden="true">
-                <span className={styles.dropOverlayIcon}>
-                  <Upload size={28} strokeWidth={2} />
-                </span>
-                <strong>Отпустите файлы или папку для добавления</strong>
-                <span>PDF, DOCX, XLSX, PPTX, TXT — с сохранением вложенных папок</span>
-              </div>
-            ) : null}
-            <div className={styles.dropZoneInner}>
-              <span className={styles.dropZoneIcon}>
-                <CloudUpload size={24} strokeWidth={2} />
-              </span>
-              <strong>Перетащите файлы сюда</strong>
-              <span>или выберите файл кнопкой ниже</span>
-            </div>
-          </div>
-
-          <div className={styles.uploadForm}>
-            <div className={styles.formGrid}>
-              <label className={`${styles.field} ${styles.wideField}`}>
-                <span className={styles.fieldLabel}>Название</span>
-                <input
-                  className={styles.control}
-                  placeholder="Необязательно — по умолчанию из имени файла"
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                />
-              </label>
-
-              <div className={styles.field}>
-                <span className={styles.fieldLabel}>Тип документа</span>
-                <FormSelect
-                  value={documentType}
-                  onChange={(value) => setDocumentType(value as DocumentType)}
-                  options={documentTypes}
-                  ariaLabel="Тип документа"
-                />
-              </div>
-            </div>
-
-            <div className={styles.uploadActions}>
-              <label className={styles.fileButton}>
-                Выбрать файл
-                <input
-                  type="file"
-                  accept={acceptAttr}
-                  onChange={(event) => {
-                    setFile(event.target.files?.[0] ?? null);
-                    setError(null);
-                  }}
-                />
-              </label>
-              <button
-                type="submit"
-                className={styles.submitButton}
-                disabled={!file || uploadMutation.isPending}
-              >
-                {uploadMutation.isPending ? "Загружаем..." : "Загрузить"}
-              </button>
-            </div>
-
-            {file ? <p className={styles.selectedFileName}>Выбран файл: {file.name}</p> : null}
-            {error ? <p className={styles.error} role="alert">{error}</p> : null}
-          </div>
-
-          {stagedFiles.length > 0 ? (
-            <section className={styles.stagedSection} aria-label="Файлы для загрузки">
-              <div className={styles.stagedHeader}>
-                <h3>Добавленные файлы ({stagedFiles.length})</h3>
-                <button
-                  type="button"
-                  className={styles.linkButton}
-                  onClick={uploadAllStaged}
-                  disabled={stagedFiles.every((item) => uploadingStagedIds.includes(item.id))}
-                >
-                  Загрузить все
-                </button>
-              </div>
-              <div className={styles.stagedList}>
-                {stagedFiles.map((staged) => {
-                  const extKey = getExtension(staged.file.name).replace(".", "") || "file";
-                  const uploading = uploadingStagedIds.includes(staged.id);
-                  return (
-                    <article key={staged.id} className={styles.stagedCard}>
-                      <span className={styles.stagedIcon}>{extKey.slice(0, 4)}</span>
-                      <div className={styles.stagedCopy}>
-                        <strong title={staged.relativePath}>{staged.relativePath}</strong>
-                        <small>{formatBytes(staged.file.size)}</small>
-                      </div>
-                      <button
-                        type="button"
-                        className={styles.stagedUpload}
-                        onClick={() => uploadStagedFile(staged.id)}
-                        disabled={uploading}
-                        aria-label={`Загрузить ${staged.file.name}`}
-                      >
-                        {uploading ? "…" : "Загрузить"}
-                      </button>
-                      <button
-                        type="button"
-                        className={styles.stagedRemove}
-                        onClick={() => removeStaged(staged.id)}
-                        disabled={uploading}
-                        aria-label={`Удалить ${staged.file.name}`}
-                      >
-                        <X size={14} />
-                      </button>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          ) : null}
-
-          <div className={styles.callout}>
-            <Info size={16} strokeWidth={2} aria-hidden="true" />
-            <span>После загрузки документ появится в реестре. Добавьте его как источник в разделе «База знаний», когда текст будет извлечён.</span>
-          </div>
-        </form>
-
+      {stagedFiles.length > 0 ? (
+        <StagedFilesBottomPanel
+          styles={styles}
+          stagedFiles={stagedFiles}
+          uploadingStagedIds={uploadingStagedIds}
+          onUploadStaged={uploadStagedFile}
+          onUploadAllStaged={uploadAllStaged}
+          onRemoveStaged={removeStaged}
+        />
+      ) : (
         <aside className={styles.summaryCard} aria-live="polite">
           <h2>Последняя загрузка</h2>
           {!uploaded ? (
@@ -841,7 +1120,7 @@ export default function Documents() {
             </div>
           )}
         </aside>
-      </div>
+      )}
 
       {documentPreview ? (
         <div className={styles.previewOverlay} role="dialog" aria-modal="true" aria-label={`Просмотр: ${documentPreview.title}`}>
