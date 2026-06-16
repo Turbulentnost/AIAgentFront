@@ -87,19 +87,46 @@
   gap: 8px;
 }
 
+.deptCard {
+  position: relative;
+  border: 1px solid transparent;
+  border-radius: var(--form-control-border-radius);
+  transition: var(--form-control-transition);
+}
+
+.deptCard:hover {
+  background: var(--color-hover-strong);
+}
+
+.deptCardActive {
+  border-color: var(--form-control-focus-border-color);
+  background: color-mix(in srgb, var(--nav-button-primary-bg) 8%, transparent);
+}
+
+.deptCard:hover .deptDeleteBtn,
+.deptCard:focus-within .deptDeleteBtn {
+  opacity: 1;
+  pointer-events: auto;
+}
+
 .deptItem {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
   gap: 12px;
   width: 100%;
-  padding: 12px;
-  border: 1px solid transparent;
-  border-radius: 10px;
+  padding: 12px 36px 12px 12px;
+  border: 0;
+  border-radius: inherit;
   background: transparent;
   color: inherit;
   text-align: left;
   cursor: pointer;
+  outline: none;
+}
+
+.deptItem:focus-visible {
+  box-shadow: inset var(--form-control-focus-ring);
 }
 
 .deptIcon {
@@ -140,13 +167,43 @@
   min-width: 0;
 }
 
-.deptItem:hover {
-  background: rgba(255, 255, 255, 0.04);
+.deptDeleteBtn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--form-icon-clear-button-size);
+  height: var(--form-icon-clear-button-size);
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--form-icon-color);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  outline: none;
+  transition: opacity 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
 }
 
-.deptItemActive {
-  border-color: rgba(59, 130, 246, 0.45);
-  background: rgba(59, 130, 246, 0.08);
+.deptDeleteBtn:hover:not(:disabled) {
+  color: var(--form-required-color);
+}
+
+.deptDeleteBtn:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  color: var(--form-required-color);
+  box-shadow: var(--form-control-focus-ring);
+}
+
+.deptDeleteBtn:disabled {
+  cursor: wait;
+  opacity: 0.45;
+  pointer-events: none;
 }
 
 .deptName {
@@ -168,22 +225,31 @@
 
 .addBtn {
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid rgba(96, 165, 250, 0.55);
-  background: rgba(59, 130, 246, 0.18);
-  color: #93c5fd;
+  width: var(--nav-button-min-height);
+  min-width: var(--nav-button-min-height);
+  height: var(--nav-button-min-height);
+  min-height: var(--nav-button-min-height);
+  padding: 0;
+  border: 1px solid var(--nav-button-secondary-border);
+  border-radius: var(--nav-button-radius);
+  background: var(--nav-button-secondary-bg);
+  color: var(--nav-button-secondary-color);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  outline: none;
+  transition: var(--nav-button-transition);
 }
 
 .addBtn:hover {
-  background: rgba(59, 130, 246, 0.28);
-  border-color: rgba(147, 197, 253, 0.75);
-  color: #dbeafe;
+  border-color: var(--form-control-focus-border-color);
+  color: var(--nav-button-primary-bg);
+}
+
+.addBtn:focus-visible {
+  border-color: var(--form-control-focus-border-color);
+  box-shadow: var(--form-control-focus-ring);
 }
 
 .addBtn:disabled {

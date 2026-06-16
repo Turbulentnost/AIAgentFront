@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X, Building2, FolderPlus, LayoutPanelLeft, FileText, Database, BookOpen, Layers } from "lucide-react";
+import { Plus, X, Building2, FolderPlus, LayoutPanelLeft, FileText, Database, BookOpen, Layers, Trash2 } from "lucide-react";
 import { knowledgeBasesApi, ndControlApi } from "@/api/endpoints";
 import { FormSearchInput } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
@@ -172,6 +172,16 @@ export default function NdControlAgent() {
     }
   });
 
+  const deleteDepartment = useMutation({
+    mutationFn: (departmentId: string) => ndControlApi.deleteDepartment(departmentId),
+    onSuccess: async (_data, departmentId) => {
+      if (selectedDeptId === departmentId) {
+        setSelectedDeptId(null);
+      }
+      await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
+    }
+  });
+
   const updateCard = useMutation({
     mutationFn: () => ndControlApi.updateDocumentCard(editingCard!.id, cardForm),
     onSuccess: async () => {
@@ -239,7 +249,7 @@ export default function NdControlAgent() {
                 aria-label="Создать отдел"
                 onClick={() => setShowCreateDept(true)}
               >
-                <Plus size={18} strokeWidth={2.2} />
+                <Plus size={20} strokeWidth={2.2} />
               </button>
             ) : null}
           </div>
@@ -267,7 +277,15 @@ export default function NdControlAgent() {
                   key={dept.id}
                   dept={dept}
                   active={dept.id === selectedDeptId}
+                  canDelete={canManage}
+                  isDeleting={deleteDepartment.isPending && deleteDepartment.variables === dept.id}
                   onSelect={() => setSelectedDeptId(dept.id)}
+                  onDelete={() => {
+                    if (!window.confirm(`Удалить отдел «${dept.name}»? Связанные карточки документов будут удалены.`)) {
+                      return;
+                    }
+                    deleteDepartment.mutate(dept.id);
+                  }}
                 />
               ))}
             </div>
@@ -524,36 +542,55 @@ function EmptyState({
 function DeptButton({
   dept,
   active,
-  onSelect
+  canDelete,
+  isDeleting,
+  onSelect,
+  onDelete
 }: {
   dept: NdControlDepartment;
   active: boolean;
+  canDelete: boolean;
+  isDeleting: boolean;
   onSelect: () => void;
+  onDelete: () => void;
 }) {
   const { Icon, tone } = deptIconOptions[deptIconIndex(dept.id)];
 
   return (
-    <button
-      type="button"
-      className={`${styles.deptItem} ${active ? styles.deptItemActive : ""}`}
-      onClick={onSelect}
-    >
-      <span className={`${styles.deptIcon} ${styles[`deptIcon_${tone}`]}`} aria-hidden="true">
-        <Icon size={18} strokeWidth={2} />
-      </span>
-      <span className={styles.deptContent}>
-        <span className={styles.deptName}>{dept.name}</span>
-        <span className={styles.deptMeta}>
-          <Database size={12} strokeWidth={2} aria-hidden="true" />
-          {dept.knowledge_bases_count} баз
-          <span className={styles.deptMetaDot} aria-hidden="true">
-            ·
-          </span>
-          <FileText size={12} strokeWidth={2} aria-hidden="true" />
-          {dept.cards_count} карточек
+    <div className={`${styles.deptCard} ${active ? styles.deptCardActive : ""}`}>
+      <button type="button" className={styles.deptItem} onClick={onSelect}>
+        <span className={`${styles.deptIcon} ${styles[`deptIcon_${tone}`]}`} aria-hidden="true">
+          <Icon size={18} strokeWidth={2} />
         </span>
-      </span>
-    </button>
+        <span className={styles.deptContent}>
+          <span className={styles.deptName}>{dept.name}</span>
+          <span className={styles.deptMeta}>
+            <Database size={12} strokeWidth={2} aria-hidden="true" />
+            {dept.knowledge_bases_count} баз
+            <span className={styles.deptMetaDot} aria-hidden="true">
+              ·
+            </span>
+            <FileText size={12} strokeWidth={2} aria-hidden="true" />
+            {dept.cards_count} карточек
+          </span>
+        </span>
+      </button>
+      {canDelete ? (
+        <button
+          type="button"
+          className={styles.deptDeleteBtn}
+          aria-label={`Удалить отдел ${dept.name}`}
+          title="Удалить отдел"
+          disabled={isDeleting}
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete();
+          }}
+        >
+          <Trash2 size={14} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+      ) : null}
+    </div>
   );
 }
 
