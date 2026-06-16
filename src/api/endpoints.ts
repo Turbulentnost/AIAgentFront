@@ -127,7 +127,18 @@ export const documentsApi = {
     if (options.department_id) formData.append("department_id", options.department_id);
     if (options.task_id) formData.append("task_id", options.task_id);
     if (options.relative_path) formData.append("relative_path", options.relative_path);
-    return apiClient.post<Document>("/documents/upload", formData, { timeout: 0 }).then((r) => r.data);
+    return apiClient
+      .post<Document>("/documents/upload", formData, {
+        timeout: 0,
+        onUploadProgress: (event) => {
+          if (!options.onUploadProgress) return;
+          const total = event.total || file.size;
+          if (!total) return;
+          const progress = Math.min(100, Math.round((event.loaded * 100) / total));
+          options.onUploadProgress(progress);
+        }
+      })
+      .then((r) => r.data);
   },
   list: (params?: { page?: number; size?: number; query?: string }) =>
     apiClient.get<Page<DocumentListItem>>("/documents", { params }).then((r) => r.data),

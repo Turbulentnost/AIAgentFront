@@ -206,6 +206,25 @@ li.row:hover {
   background: color-mix(in srgb, var(--color-primary, #2563eb) 8%, transparent);
 }
 
+.folderBlockDropTarget {
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--color-primary, #2563eb) 8%, transparent);
+  outline: 1px dashed var(--color-primary, #2563eb);
+  outline-offset: -1px;
+}
+
+.folderBlockDropTarget .folderDropZone {
+  cursor: grabbing;
+}
+
+.folderDropZone[draggable="true"] {
+  cursor: grab;
+}
+
+.folderDropZone[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .chevron {
     transition: none;

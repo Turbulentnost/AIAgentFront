@@ -63,14 +63,18 @@ import {
 import {
   buildFolderPath,
   buildSourceFileTree,
+  canMoveFolderToTarget,
   collectAllFolderPaths,
+  isPathInsideFolder,
   mergeCustomFoldersIntoTree,
   moveFileRelativePath,
+  moveFolderSubtreeRootPath,
+  remapPathUnderFolder,
   type SourceTreeRoot
 } from "@/utils/sourceFileTree";
 import styles from "./KnowledgeBaseCreate.module.css";
 
-type StepId = "main" | "sources" | "readiness" | "processing" | "access" | "agents" | "preview";
+type StepId = "main" | "sources" | "processing" | "access" | "agents" | "preview";
 type BaseKind = "normative" | "technical" | "project" | "contract" | "process";
 type AccessMode = "admins" | "everyone" | "departments" | "users" | "roles" | "mixed";
 type AccessSubjectType = "organization" | "department" | "user" | "role";
@@ -225,17 +229,16 @@ const RIGHT_SIDEBAR_FLIP_MS = 540;
 
 const sidebarSteps = [
   { label: "Основные сведения", hint: "Информация о базе знаний", stepIndexes: [0] },
-  { label: "Источники", hint: "Выбор документов и файлов", stepIndexes: [1, 2] },
-  { label: "Обработка", hint: "Извлечение и индексация", stepIndexes: [3] },
-  { label: "Доступ пользователей", hint: "Права пользователей", stepIndexes: [4] },
-  { label: "Подключение агентов", hint: "Доступ агентов к базе", stepIndexes: [5] },
-  { label: "Проверка и создание", hint: "Итоговая проверка", stepIndexes: [6] }
+  { label: "Источники", hint: "Выбор документов и файлов", stepIndexes: [1] },
+  { label: "Обработка", hint: "Извлечение и индексация", stepIndexes: [2] },
+  { label: "Доступ пользователей", hint: "Права пользователей", stepIndexes: [3] },
+  { label: "Подключение агентов", hint: "Доступ агентов к базе", stepIndexes: [4] },
+  { label: "Проверка и создание", hint: "Итоговая проверка", stepIndexes: [5] }
 ] as const;
 
 const steps: { id: StepId; label: string; hint: string; navLabel: string }[] = [
   { id: "main", label: "Основные сведения", hint: "Информация о базе знаний", navLabel: "Основные сведения" },
   { id: "sources", label: "Источники", hint: "Выбор документов и файлов", navLabel: "Выбор источников" },
-  { id: "readiness", label: "Источники", hint: "Проверка готовности документов", navLabel: "Проверка готовности" },
   { id: "processing", label: "Обработка", hint: "Извлечение и индексация", navLabel: "Обработка" },
   { id: "access", label: "Доступ пользователей", hint: "Права пользователей", navLabel: "Настройка доступа" },
   { id: "agents", label: "Подключение агентов", hint: "Подключение ИИ-агентов", navLabel: "Подключение агентов" },
@@ -411,6 +414,8 @@ export default function KnowledgeBaseCreate() {
   const [stagedDropFiles, setStagedDropFiles] = useState<StagedSourceFile[]>([]);
   const [customFolderPaths, setCustomFolderPaths] = useState<string[]>([]);
   const [uploadingStagedIds, setUploadingStagedIds] = useState<string[]>([]);
+  const [stagedUploadProgress, setStagedUploadProgress] = useState<Record<string, number>>({});
+  const [stagedUploadBatch, setStagedUploadBatch] = useState<{ total: number; completed: number } | null>(null);
   const [rightSidebarView, setRightSidebarView] = useState<"summary" | "tree">("summary");
   const [isRightSidebarAnimating, setIsRightSidebarAnimating] = useState(false);
   const [isRightSidebarExpanded, setIsRightSidebarExpanded] = useState(false);
@@ -507,11 +512,37 @@ export default function KnowledgeBaseCreate() {
     );
   }, []);
 
+  const moveStagedFolderToFolder = useCallback((sourceFolderPath: string, targetFolderPath: string) => {
+    if (!canMoveFolderToTarget(sourceFolderPath, targetFolderPath)) return;
+
+    const newFolderRoot = moveFolderSubtreeRootPath(sourceFolderPath, targetFolderPath);
+    if (!newFolderRoot || newFolderRoot === sourceFolderPath) return;
+
+    setStagedDropFiles((current) =>
+      current.map((item) => {
+        const nextPath = remapPathUnderFolder(item.relativePath, sourceFolderPath, newFolderRoot);
+        return nextPath === item.relativePath ? item : { ...item, relativePath: nextPath };
+      })
+    );
+
+    setCustomFolderPaths((current) => {
+      const next = new Set<string>();
+      for (const path of current) {
+        if (path === sourceFolderPath || isPathInsideFolder(sourceFolderPath, path)) {
+          next.add(remapPathUnderFolder(path, sourceFolderPath, newFolderRoot));
+        } else {
+          next.add(path);
+        }
+      }
+      return [...next];
+    });
+  }, []);
+
   const canFlipRightSidebar =
     (stagedDropFiles.length > 0 || customFolderPaths.length > 0) &&
-    (activeStep.id === "sources" || activeStep.id === "readiness");
+    activeStep.id === "sources";
 
-  const showRightSidebarExpand = activeStep.id === "sources" || activeStep.id === "readiness";
+  const showRightSidebarExpand = activeStep.id === "sources";
 
   useEffect(() => {
     if (!canFlipRightSidebar) {
@@ -600,12 +631,16 @@ export default function KnowledgeBaseCreate() {
       const staged = stagedDropFiles.find((item) => item.id === id);
       if (!staged || uploadingStagedIds.includes(id)) return;
       setUploadingStagedIds((ids) => [...ids, id]);
+      setStagedUploadProgress((current) => ({ ...current, [id]: 0 }));
       try {
         const title = titleFromRelativePath(staged.relativePath);
         const document = await documentsApi.upload(staged.file, {
           title,
           document_type: "other",
-          relative_path: staged.relativePath
+          relative_path: staged.relativePath,
+          onUploadProgress: (progress) => {
+            setStagedUploadProgress((current) => ({ ...current, [id]: progress }));
+          }
         });
         setSelectedSourceIds((ids) => [...new Set([...ids, document.id])]);
         setStagedDropFiles((current) => current.filter((item) => item.id !== id));
@@ -614,14 +649,27 @@ export default function KnowledgeBaseCreate() {
         console.error("Не удалось загрузить файл:", staged.relativePath, error);
       } finally {
         setUploadingStagedIds((ids) => ids.filter((item) => item !== id));
+        setStagedUploadProgress((current) => {
+          const next = { ...current };
+          delete next[id];
+          return next;
+        });
+        setStagedUploadBatch((batch) => {
+          if (!batch) return null;
+          const completed = batch.completed + 1;
+          return completed >= batch.total ? null : { ...batch, completed };
+        });
       }
     },
     [queryClient, stagedDropFiles, uploadingStagedIds]
   );
 
   const uploadAllStagedFiles = useCallback(async () => {
-    for (const staged of stagedDropFiles) {
-      if (!uploadingStagedIds.includes(staged.id)) await uploadStagedFile(staged.id);
+    const pending = stagedDropFiles.filter((staged) => !uploadingStagedIds.includes(staged.id));
+    if (!pending.length) return;
+    setStagedUploadBatch({ total: pending.length, completed: 0 });
+    for (const staged of pending) {
+      await uploadStagedFile(staged.id);
     }
   }, [stagedDropFiles, uploadStagedFile, uploadingStagedIds]);
 
@@ -864,6 +912,8 @@ export default function KnowledgeBaseCreate() {
               onUpload={() => uploadFile && uploadDocument.mutate()}
               stagedFiles={stagedDropFiles}
               uploadingStagedIds={uploadingStagedIds}
+              stagedUploadProgress={stagedUploadProgress}
+              stagedUploadBatch={stagedUploadBatch}
               onStageFiles={stageDropFiles}
               onStageIncoming={stageIncomingFiles}
               onRemoveStaged={removeStagedFile}
@@ -871,7 +921,6 @@ export default function KnowledgeBaseCreate() {
               onUploadAllStaged={uploadAllStagedFiles}
             />
           )}
-          {activeStep.id === "readiness" && <StepReadiness checks={readiness} />}
           {activeStep.id === "processing" && <StepProcessing settings={processing} onChange={setProcessing} />}
           {activeStep.id === "access" && (
             <StepAccess
@@ -954,6 +1003,7 @@ export default function KnowledgeBaseCreate() {
                       tree={stagedFileTree}
                       onCreateFolder={createStagedFolder}
                       onMoveFile={moveStagedFileToFolder}
+                      onMoveFolder={moveStagedFolderToFolder}
                     />
                   </div>
                 </div>
@@ -1240,6 +1290,8 @@ function StepSources(props: {
   uploadPending: boolean;
   stagedFiles: StagedSourceFile[];
   uploadingStagedIds: string[];
+  stagedUploadProgress: Record<string, number>;
+  stagedUploadBatch: { total: number; completed: number } | null;
   onSearch: (value: string) => void;
   onTypeFilter: (value: DocumentType | "all") => void;
   onDepartmentFilter: (value: string) => void;
@@ -1270,6 +1322,35 @@ function StepSources(props: {
       `${item.relativePath} ${item.file.name}`.toLowerCase().includes(query)
     );
   }, [props.stagedFiles, stagedSearch]);
+
+  const stagedUploadState = useMemo(() => {
+    if (!props.uploadingStagedIds.length) return null;
+
+    const currentId = props.uploadingStagedIds[props.uploadingStagedIds.length - 1];
+    const currentFile = props.stagedFiles.find((item) => item.id === currentId);
+    const currentProgress = currentId ? props.stagedUploadProgress[currentId] ?? 0 : 0;
+
+    if (props.stagedUploadBatch) {
+      const { total, completed } = props.stagedUploadBatch;
+      const overall = Math.min(100, Math.round(((completed * 100) + currentProgress) / total));
+      return {
+        label: `Загрузка ${completed + 1} из ${total}`,
+        detail: currentFile?.file.name ?? "",
+        percent: overall
+      };
+    }
+
+    return {
+      label: "Загрузка файла",
+      detail: currentFile?.file.name ?? "",
+      percent: currentProgress
+    };
+  }, [
+    props.stagedFiles,
+    props.stagedUploadBatch,
+    props.stagedUploadProgress,
+    props.uploadingStagedIds
+  ]);
 
   const scrollStagedFiles = useCallback((direction: -1 | 1) => {
     const scroller = stagedScrollerRef.current;
@@ -1334,7 +1415,7 @@ function StepSources(props: {
   }, []);
 
   return (
-    <div className={styles.stepBody}>
+    <div className={`${styles.stepBody} ${styles.sourcesStepBody}`}>
       <header className={`${styles.stepTitle} ${styles.sourcesStepIntro}`}>
         <span><FileText size={20} /></span>
         <div>
@@ -1374,6 +1455,7 @@ function StepSources(props: {
             <span>PDF, DOCX, XLSX, PPTX, TXT — структура папок сохранится</span>
           </div>
         ) : null}
+        <div className={styles.sourcesTableScroll}>
         <table className={styles.sourcesTable}>
           <colgroup>
             <col className={styles.sourcesColCheck} />
@@ -1462,6 +1544,7 @@ function StepSources(props: {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {dropError ? <p className={styles.createError} role="alert">{dropError}</p> : null}
@@ -1512,7 +1595,7 @@ function StepSources(props: {
               type="button"
               className={styles.linkButton}
               onClick={props.onUploadAllStaged}
-              disabled={props.stagedFiles.every((item) => props.uploadingStagedIds.includes(item.id))}
+              disabled={props.uploadingStagedIds.length > 0}
             >
               Загрузить все
             </button>
@@ -1538,6 +1621,7 @@ function StepSources(props: {
               {filteredStagedFiles.map((staged) => {
                 const extKey = getExtension(staged.file.name).replace(".", "") || "default";
                 const uploading = props.uploadingStagedIds.includes(staged.id);
+                const uploadProgress = props.stagedUploadProgress[staged.id] ?? 0;
                 return (
                   <article
                     key={staged.id}
@@ -1575,6 +1659,13 @@ function StepSources(props: {
                     >
                       <X size={12} />
                     </button>
+                    {uploading ? (
+                      <span
+                        className={styles.sourcesStagedCardProgress}
+                        style={{ width: `${uploadProgress}%` }}
+                        aria-hidden="true"
+                      />
+                    ) : null}
                   </article>
                 );
               })}
@@ -1591,6 +1682,30 @@ function StepSources(props: {
               <ChevronRight size={16} />
             </button>
           </div>
+          {stagedUploadState ? (
+            <div className={styles.sourcesStagedProgress} role="status" aria-live="polite">
+              <div className={styles.sourcesStagedProgressMeta}>
+                <span>{stagedUploadState.label}</span>
+                <span>{stagedUploadState.percent}%</span>
+              </div>
+              <div
+                className={styles.sourcesStagedProgressTrack}
+                role="progressbar"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={stagedUploadState.percent}
+                aria-label={stagedUploadState.label}
+              >
+                <span
+                  className={styles.sourcesStagedProgressFill}
+                  style={{ width: `${stagedUploadState.percent}%` }}
+                />
+              </div>
+              {stagedUploadState.detail ? (
+                <p className={styles.sourcesStagedProgressDetail}>{stagedUploadState.detail}</p>
+              ) : null}
+            </div>
+          ) : null}
           <p className={styles.sourcesStagedHint}>
             Правый клик по структуре справа — создать папку. Перетащите карточки в нужные папки перед загрузкой.
           </p>
@@ -1603,26 +1718,6 @@ function StepSources(props: {
           text={`Проверка источников: ${readyCount} ${pluralDocs(readyCount)} ${readyCount === 1 ? "готов" : "готовы"} к индексации${ocrCount ? `, ${ocrCount} ${pluralDocs(ocrCount)} ${ocrCount === 1 ? "требует" : "требуют"} OCR` : ""}.`}
         />
       ) : null}
-    </div>
-  );
-}
-
-function StepReadiness({ checks }: { checks: ReturnType<typeof checkDocumentReadiness>[] }) {
-  return (
-    <div className={styles.stepBody}>
-      <StepTitle icon={AlertTriangle} title="Проверка готовности документов" text="Система проверяет существование, статус, расширение, обработку, актуальность и версии источников." />
-      <div className={styles.checkList}>
-        {checks.map((check) => (
-          <article key={check.document.id} className={styles[`check_${check.level}`]}>
-            {check.level === "ok" ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-            <div>
-              <strong>{check.document.title}</strong>
-              <p>{check.message}</p>
-            </div>
-          </article>
-        ))}
-        {!checks.length && <div className={styles.emptyCell}>Сначала выберите источники.</div>}
-      </div>
     </div>
   );
 }
@@ -2335,11 +2430,13 @@ function StepPreview(props: {
 function SourceTreeSidebarPanel({
   tree,
   onCreateFolder,
-  onMoveFile
+  onMoveFile,
+  onMoveFolder
 }: {
   tree: SourceTreeRoot;
   onCreateFolder: (parentPath: string, name: string) => boolean;
   onMoveFile: (fileId: string, targetFolderPath: string) => void;
+  onMoveFolder: (sourceFolderPath: string, targetFolderPath: string) => void;
 }) {
   return (
     <section className={styles.sourceTreeSidebar} aria-label="Структура загруженных файлов">
@@ -2350,7 +2447,12 @@ function SourceTreeSidebarPanel({
         </p>
       </div>
       <div className={styles.sourceTreeBody}>
-        <SourceFileTreeEditor tree={tree} onCreateFolder={onCreateFolder} onMoveFile={onMoveFile} />
+        <SourceFileTreeEditor
+          tree={tree}
+          onCreateFolder={onCreateFolder}
+          onMoveFile={onMoveFile}
+          onMoveFolder={onMoveFolder}
+        />
       </div>
     </section>
   );
@@ -2382,10 +2484,10 @@ function Summary(props: {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const sourcesConfigured = props.stepIndex >= 2 || (props.stepIndex === 1 && props.selectedDocuments.length > 0);
-  const processingConfigured = props.stepIndex >= 3;
-  const accessConfigured = props.stepIndex >= 4;
-  const agentsConfigured = props.stepIndex >= 5;
-  const previewConfigured = props.stepIndex >= 6;
+  const processingConfigured = props.stepIndex >= 2;
+  const accessConfigured = props.stepIndex >= 3;
+  const agentsConfigured = props.stepIndex >= 4;
+  const previewConfigured = props.stepIndex >= 5;
 
   const selectedSize = useMemo(
     () => props.selectedDocuments.reduce((sum, document) => sum + (document.file_size ?? 0), 0),
@@ -2431,7 +2533,7 @@ function Summary(props: {
       {
         id: "processing",
         title: "Обработка и индексация",
-        stepIndex: 3,
+        stepIndex: 2,
         configured: processingConfigured,
         collapsedStatus: processingConfigured ? "Настроено" : "Не настроено",
         checklistSubtitle: "Текущие настройки",
@@ -2440,7 +2542,7 @@ function Summary(props: {
       {
         id: "access",
         title: "Доступ пользователей",
-        stepIndex: 4,
+        stepIndex: 3,
         configured: accessConfigured,
         collapsedStatus: accessConfigured ? accessModeLabel(props.accessMode) : "Не настроено",
         rows: [
@@ -2456,7 +2558,7 @@ function Summary(props: {
       {
         id: "agents",
         title: "Подключение агентов",
-        stepIndex: 5,
+        stepIndex: 4,
         configured: agentsConfigured,
         collapsedStatus: agentsConfigured
           ? `${Object.keys(props.selectedAgents).length} агентов`
@@ -2466,7 +2568,7 @@ function Summary(props: {
       {
         id: "preview",
         title: "Проверка и создание",
-        stepIndex: 6,
+        stepIndex: 5,
         configured: previewConfigured,
         collapsedStatus: previewConfigured ? "Готово к проверке" : "Не выполнено",
         rows: previewConfigured ? ([["Статус", "Ожидает подтверждения"]] as [string, string][]) : undefined
@@ -2504,11 +2606,10 @@ function Summary(props: {
     const stepSectionIds: Partial<Record<number, string>> = {
       0: "main",
       1: "sources",
-      2: "sources",
-      3: "processing",
-      4: "access",
-      5: "agents",
-      6: "preview"
+      2: "processing",
+      3: "access",
+      4: "agents",
+      5: "preview"
     };
     const id = stepSectionIds[props.stepIndex];
     if (id) setExpanded((state) => ({ ...state, [id]: true }));

@@ -691,6 +691,14 @@
   padding: 24px 18px;
 }
 
+.sourcesStepBody {
+  gap: 20px;
+}
+
+.sourcesStepBody .sourcesTableWrap {
+  flex: none;
+}
+
 .summaryCard {
   position: sticky;
   top: calc(var(--layout-topbar-height) + var(--layout-sticky-gap));
@@ -2777,16 +2785,24 @@ label.field {
 
 .sourcesTableWrap {
   position: relative;
+  display: flex;
+  flex-direction: column;
   width: 100%;
   max-width: 100%;
   min-height: 180px;
-  overflow-x: auto;
-  overflow-y: hidden;
+  max-height: min(520px, calc(100vh - var(--layout-topbar-height) - 340px));
   border: 1px solid var(--kb-table-border);
   border-radius: 10px;
   background: var(--color-surface);
-  -webkit-overflow-scrolling: touch;
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.sourcesTableScroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .sourcesTableWrapDragOver {
@@ -2811,7 +2827,7 @@ label.field {
   text-align: center;
   background: var(--kb-drop-overlay-bg);
   border: 2px dashed var(--kb-drop-overlay-border);
-  border-radius: 10px;
+  border-radius: inherit;
   pointer-events: none;
 }
 
@@ -2922,8 +2938,59 @@ label.field {
 }
 
 .sourcesStagedCardUploading {
-  opacity: 0.55;
+  opacity: 0.85;
   cursor: wait;
+}
+
+.sourcesStagedCardProgress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  border-radius: 0 999px 999px 0;
+  background: var(--kb-list-progress-fill);
+  transition: width 0.18s ease;
+}
+
+.sourcesStagedProgress {
+  display: grid;
+  gap: 6px;
+  padding: 0 40px;
+}
+
+.sourcesStagedProgressMeta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.sourcesStagedProgressTrack {
+  height: 4px;
+  border-radius: 999px;
+  background: var(--kb-list-progress-track);
+  overflow: hidden;
+}
+
+.sourcesStagedProgressFill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--kb-list-progress-fill);
+  transition: width 0.18s ease;
+}
+
+.sourcesStagedProgressDetail {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sourcesStagedName {
@@ -3078,6 +3145,9 @@ label.field {
 }
 
 .sourcesTable th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   padding: 10px 8px;
   color: var(--color-muted);
   background: var(--kb-table-head-bg);
