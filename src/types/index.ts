@@ -614,6 +614,7 @@ export interface KnowledgeBaseListItem extends KnowledgeBase {
   can_search: boolean;
   can_delete: boolean;
   can_confirm_review: boolean;
+  can_manage_access: boolean;
   indexing_active: boolean;
 }
 

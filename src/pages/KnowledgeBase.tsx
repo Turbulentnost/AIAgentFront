@@ -14,6 +14,7 @@ import {
   Circle,
   CircleAlert,
   Database,
+  Edit3,
   FileText,
   Layers3,
   LibraryBig,
@@ -48,6 +49,7 @@ import type {
   KnowledgeBaseStatus
 } from "@/types";
 import { KnowledgeBaseOverviewTab } from "@/components/KnowledgeBaseOverviewTab";
+import { KnowledgeBaseAccessEditor } from "@/components/KnowledgeBaseAccessEditor";
 import SourceFileTree, { type SourceFileTreeFileMeta } from "@/components/SourceFileTree";
 import {
   buildBlocksFromExtractedPayload,
@@ -151,6 +153,7 @@ export default function KnowledgeBasePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DetailTab>("overview");
+  const [isAccessEditMode, setIsAccessEditMode] = useState(false);
 
   const stats = useQuery({ queryKey: ["knowledge-bases", "stats"], queryFn: knowledgeBasesApi.stats });
   const knowledgeBases = useQuery({
@@ -251,6 +254,10 @@ export default function KnowledgeBasePage() {
     queryFn: () => knowledgeBasesApi.audit(selected!.id),
     enabled: canViewSelected
   });
+
+  useEffect(() => {
+    setIsAccessEditMode(false);
+  }, [selected?.id]);
 
   const cancelIndexing = useMutation({
     mutationFn: (knowledgeBaseId: string) =>
@@ -515,6 +522,17 @@ export default function KnowledgeBasePage() {
                   <StatusBadge status={selected.status} indexing={shouldShowKnowledgeBaseIndexingBadge(selected, latestJob)} />
                 </div>
                 <div className={styles.detailHeaderActions}>
+                  {selected.can_manage_access ? (
+                    <button
+                      type="button"
+                      className={`${styles.iconButton} ${isAccessEditMode ? styles.iconButtonActive : ""}`}
+                      onClick={() => setIsAccessEditMode((current) => !current)}
+                      disabled={selected.indexing_active}
+                      title="Редактировать доступ к базе знаний"
+                    >
+                      <Edit3 size={17} />
+                    </button>
+                  ) : null}
                   {(selected.can_confirm_review ||
                     (selected.can_delete && selected.status === "needs_review" && !selected.indexing_active)) ? (
                     <button
@@ -549,40 +567,52 @@ export default function KnowledgeBasePage() {
                   </button>
                 </div>
               </div>
-              <KnowledgeBaseQuickSearch
-                knowledgeBase={selected}
-                onOpenFullSearch={() => setActiveTab("test")}
-              />
-              <nav className={styles.tabs}>
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    className={activeTab === tab.id ? styles.activeTab : undefined}
-                    onClick={() => setActiveTab(tab.id)}
+              {isAccessEditMode ? (
+                <div className={styles.detailTabScroll}>
+                  <KnowledgeBaseAccessEditor
+                    knowledgeBase={selected}
+                    grants={access.data?.grants ?? []}
+                    onClose={() => setIsAccessEditMode(false)}
+                  />
+                </div>
+              ) : (
+                <>
+                  <KnowledgeBaseQuickSearch
+                    knowledgeBase={selected}
+                    onOpenFullSearch={() => setActiveTab("test")}
+                  />
+                  <nav className={styles.tabs}>
+                    {tabs.map((tab) => (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        className={activeTab === tab.id ? styles.activeTab : undefined}
+                        onClick={() => setActiveTab(tab.id)}
+                      >
+                        {tab.label}
+                      </button>
+                    ))}
+                  </nav>
+                  <div
+                    className={`${styles.detailTabScroll} ${activeTab === "sources" ? styles.detailTabScrollSources : ""} ${activeTab === "chunks" ? styles.detailTabScrollChunks : ""} ${activeTab === "test" ? styles.detailTabScrollTest : ""}`.trim()}
                   >
-                    {tab.label}
-                  </button>
-                ))}
-              </nav>
-              <div
-                className={`${styles.detailTabScroll} ${activeTab === "sources" ? styles.detailTabScrollSources : ""} ${activeTab === "chunks" ? styles.detailTabScrollChunks : ""} ${activeTab === "test" ? styles.detailTabScrollTest : ""}`.trim()}
-              >
-                <DetailTabContent
-                  tab={activeTab}
-                  knowledgeBase={selected}
-                  sources={sources.data ?? []}
-                  chunks={chunks.data ?? []}
-                  rules={rules.data ?? []}
-                  agents={agents.data ?? []}
-                  jobs={jobs.data ?? []}
-                  latestJob={latestJob}
-                  isIndexingActive={isIndexingActive}
-                  accessGrants={access.data?.grants ?? []}
-                  audit={audit.data ?? []}
-                  onTabChange={setActiveTab}
-                />
-              </div>
+                    <DetailTabContent
+                      tab={activeTab}
+                      knowledgeBase={selected}
+                      sources={sources.data ?? []}
+                      chunks={chunks.data ?? []}
+                      rules={rules.data ?? []}
+                      agents={agents.data ?? []}
+                      jobs={jobs.data ?? []}
+                      latestJob={latestJob}
+                      isIndexingActive={isIndexingActive}
+                      accessGrants={access.data?.grants ?? []}
+                      audit={audit.data ?? []}
+                      onTabChange={setActiveTab}
+                    />
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             <div className={styles.emptyState}>Выберите базу знаний или создайте новую.</div>
@@ -1909,7 +1939,7 @@ function sourceBlockTypeLabel(hit: KnowledgeBaseSearchHit): string {
   return "Текст";
 }
 
-function fragmentsLabel(count: number): string {
+function fragmentsLabel(count: number): string {  
   const mod10 = count % 10;
   const mod100 = count % 100;
   if (mod10 === 1 && mod100 !== 11) return "фрагмент";

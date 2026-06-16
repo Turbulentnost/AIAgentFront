@@ -1,10 +1,11 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Building2, FolderPlus, LayoutPanelLeft, FileText, Database, BookOpen, Layers } from "lucide-react";
 import { knowledgeBasesApi, ndControlApi } from "@/api/endpoints";
 import { FormSearchInput } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
+import CreateDepartmentModal from "@/pages/CreateDepartmentModal";
 import type {
   NdConfidentialityLevel,
   NdControlDepartment,
@@ -51,6 +52,18 @@ const documentTypeLabels = Object.fromEntries(documentTypeOptions.map((o) => [o.
 >;
 const qmsLevelLabels = Object.fromEntries(qmsLevelOptions.map((o) => [o.value, o.label])) as Record<NdQmsLevel, string>;
 const statusLabels = Object.fromEntries(statusOptions.map((o) => [o.value, o.label])) as Record<NdDocumentCardStatus, string>;
+
+const deptIconOptions = [
+  { Icon: Building2, tone: "blue" as const },
+  { Icon: Database, tone: "purple" as const },
+  { Icon: BookOpen, tone: "green" as const },
+  { Icon: Layers, tone: "amber" as const }
+];
+
+function deptIconIndex(id: string) {
+  const hash = id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return hash % deptIconOptions.length;
+}
 
 function parseLines(value: string): string[] {
   return value
@@ -104,7 +117,6 @@ export default function NdControlAgent() {
   const [cardSearch, setCardSearch] = useState("");
   const [showCreateDept, setShowCreateDept] = useState(false);
   const [newDeptName, setNewDeptName] = useState("");
-  const [newDeptDescription, setNewDeptDescription] = useState("");
   const [selectedKbIds, setSelectedKbIds] = useState<string[]>([]);
   const [editingCard, setEditingCard] = useState<NdDocumentCard | null>(null);
   const [cardForm, setCardForm] = useState<NdDocumentCardUpdate>({});
@@ -149,13 +161,11 @@ export default function NdControlAgent() {
     mutationFn: () =>
       ndControlApi.createDepartment({
         name: newDeptName.trim(),
-        description: newDeptDescription.trim() || null,
         knowledge_base_ids: selectedKbIds
       }),
     onSuccess: async (dept) => {
       setShowCreateDept(false);
       setNewDeptName("");
-      setNewDeptDescription("");
       setSelectedKbIds([]);
       setSelectedDeptId(dept.id);
       await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
@@ -175,8 +185,13 @@ export default function NdControlAgent() {
     setCardForm(cardToForm(card));
   };
 
-  const handleCreateDepartment = (event: FormEvent) => {
-    event.preventDefault();
+  const closeCreateDepartment = () => {
+    setShowCreateDept(false);
+    setNewDeptName("");
+    setSelectedKbIds([]);
+  };
+
+  const handleCreateDepartment = () => {
     if (!newDeptName.trim() || selectedKbIds.length === 0) return;
     createDepartment.mutate();
   };
@@ -212,24 +227,39 @@ export default function NdControlAgent() {
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHead}>
-            <h2 className={styles.sidebarTitle}>Отделы агента</h2>
+            <h2 className={styles.sidebarTitle}>
+              <Layers size={18} strokeWidth={2} aria-hidden="true" />
+              Отделы агента
+            </h2>
             {canManage ? (
               <button
                 type="button"
                 className={styles.addBtn}
                 title="Создать отдел"
+                aria-label="Создать отдел"
                 onClick={() => setShowCreateDept(true)}
               >
-                <Plus size={16} />
+                <Plus size={18} strokeWidth={2.2} />
               </button>
             ) : null}
           </div>
           {departments.isLoading ? (
-            <div className={styles.empty}>Загрузка отделов…</div>
+            <EmptyState icon={Building2} text="Загрузка отделов…" />
           ) : !departments.data?.length ? (
-            <div className={styles.empty}>
-              {canManage ? "Создайте первый отдел и привяжите базу знаний." : "Отделы ещё не созданы."}
-            </div>
+            <EmptyState
+              icon={FolderPlus}
+              text={
+                canManage ? "Создайте первый отдел и привяжите базу знаний." : "Отделы ещё не созданы."
+              }
+              action={
+                canManage ? (
+                  <button type="button" className={styles.emptyActionBtn} onClick={() => setShowCreateDept(true)}>
+                    <Plus size={16} strokeWidth={2.2} />
+                    Создать отдел
+                  </button>
+                ) : undefined
+              }
+            />
           ) : (
             <div className={styles.deptList}>
               {departments.data.map((dept) => (
@@ -247,17 +277,18 @@ export default function NdControlAgent() {
         <section className={styles.main}>
           <div className={styles.toolbar}>
             <FormSearchInput
+              className={styles.searchField}
               value={cardSearch}
               onChange={setCardSearch}
               placeholder="Поиск по коду или наименованию"
             />
           </div>
           {cards.isLoading ? (
-            <div className={styles.empty}>Загрузка карточек…</div>
+            <EmptyState icon={FileText} text="Загрузка карточек…" />
           ) : !selectedDeptId ? (
-            <div className={styles.empty}>Выберите отдел слева.</div>
+            <EmptyState icon={LayoutPanelLeft} text="Выберите отдел слева." />
           ) : !cards.data?.items.length ? (
-            <div className={styles.empty}>Карточки документов пока не созданы для этого отдела.</div>
+            <EmptyState icon={FileText} text="Карточки документов пока не созданы для этого отдела." />
           ) : (
             <div className={styles.tableWrap}>
               <table className={styles.table}>
@@ -293,72 +324,17 @@ export default function NdControlAgent() {
         </section>
       </div>
 
-      {showCreateDept ? (
-        <div className={styles.modalBackdrop} onClick={() => setShowCreateDept(false)}>
-          <form className={styles.modal} onClick={(e) => e.stopPropagation()} onSubmit={handleCreateDepartment}>
-            <h2>Новый отдел агента</h2>
-            <div className={styles.formGrid}>
-              <div className={`${styles.field} ${styles.formGridFull}`}>
-                <label htmlFor="dept-name">Название отдела</label>
-                <input
-                  id="dept-name"
-                  className={formStyles.control}
-                  value={newDeptName}
-                  onChange={(e) => setNewDeptName(e.target.value)}
-                  required
-                />
-              </div>
-              <div className={`${styles.field} ${styles.formGridFull}`}>
-                <label htmlFor="dept-desc">Описание</label>
-                <textarea
-                  id="dept-desc"
-                  className={formStyles.control}
-                  rows={2}
-                  value={newDeptDescription}
-                  onChange={(e) => setNewDeptDescription(e.target.value)}
-                />
-              </div>
-              <div className={`${styles.field} ${styles.formGridFull}`}>
-                <label>Базы знаний (минимум одна)</label>
-                <div className={styles.kbList}>
-                  {accessibleKbs.map((kb) => (
-                    <label key={kb.id} className={styles.kbOption}>
-                      <input
-                        type="checkbox"
-                        checked={selectedKbIds.includes(kb.id)}
-                        onChange={(e) => {
-                          setSelectedKbIds((current) =>
-                            e.target.checked ? [...current, kb.id] : current.filter((id) => id !== kb.id)
-                          );
-                        }}
-                      />
-                      <span>
-                        {kb.name}
-                        <span className={styles.deptMeta}> · {kb.sources_count} источников</span>
-                      </span>
-                    </label>
-                  ))}
-                  {!accessibleKbs.length ? (
-                    <span className={styles.deptMeta}>Нет доступных баз знаний.</span>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-            <div className={styles.modalActions}>
-              <button type="button" className={styles.secondaryBtn} onClick={() => setShowCreateDept(false)}>
-                Отмена
-              </button>
-              <button
-                type="submit"
-                className={styles.primaryBtn}
-                disabled={createDepartment.isPending || !newDeptName.trim() || selectedKbIds.length === 0}
-              >
-                {createDepartment.isPending ? "Создаём…" : "Создать"}
-              </button>
-            </div>
-          </form>
-        </div>
-      ) : null}
+      <CreateDepartmentModal
+        open={showCreateDept}
+        name={newDeptName}
+        selectedKbIds={selectedKbIds}
+        knowledgeBases={accessibleKbs}
+        isSubmitting={createDepartment.isPending}
+        onNameChange={setNewDeptName}
+        onSelectedKbIdsChange={setSelectedKbIds}
+        onClose={closeCreateDepartment}
+        onSubmit={handleCreateDepartment}
+      />
 
       {editingCard ? (
         <div className={styles.modalBackdrop} onClick={() => setEditingCard(null)}>
@@ -525,6 +501,26 @@ export default function NdControlAgent() {
   );
 }
 
+function EmptyState({
+  icon: Icon,
+  text,
+  action
+}: {
+  icon: typeof Building2;
+  text: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className={styles.emptyState}>
+      <span className={styles.emptyIcon} aria-hidden="true">
+        <Icon size={28} strokeWidth={1.8} />
+      </span>
+      <p>{text}</p>
+      {action}
+    </div>
+  );
+}
+
 function DeptButton({
   dept,
   active,
@@ -534,15 +530,28 @@ function DeptButton({
   active: boolean;
   onSelect: () => void;
 }) {
+  const { Icon, tone } = deptIconOptions[deptIconIndex(dept.id)];
+
   return (
     <button
       type="button"
       className={`${styles.deptItem} ${active ? styles.deptItemActive : ""}`}
       onClick={onSelect}
     >
-      <span className={styles.deptName}>{dept.name}</span>
-      <span className={styles.deptMeta}>
-        {dept.knowledge_bases_count} баз · {dept.cards_count} карточек
+      <span className={`${styles.deptIcon} ${styles[`deptIcon_${tone}`]}`} aria-hidden="true">
+        <Icon size={18} strokeWidth={2} />
+      </span>
+      <span className={styles.deptContent}>
+        <span className={styles.deptName}>{dept.name}</span>
+        <span className={styles.deptMeta}>
+          <Database size={12} strokeWidth={2} aria-hidden="true" />
+          {dept.knowledge_bases_count} баз
+          <span className={styles.deptMetaDot} aria-hidden="true">
+            ·
+          </span>
+          <FileText size={12} strokeWidth={2} aria-hidden="true" />
+          {dept.cards_count} карточек
+        </span>
       </span>
     </button>
   );
