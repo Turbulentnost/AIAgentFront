@@ -191,7 +191,7 @@ export function KnowledgeBaseOverviewTab(props: {
           </header>
           <div className={styles.overviewSectionBody}>
             <div className={styles.overviewGridSingle}>
-              <OverviewRow label="Название" value={knowledgeBase.name} />
+              <OverviewRow label="Название" value={knowledgeBase.name} valueWrap />
               <OverviewRow label="Описание" value={knowledgeBase.description?.trim() || "—"} valueWrap />
               <OverviewRow label="Тип базы" value={baseKind} />
               <OverviewRow label="Объем хранилища" value={storageVolume} />

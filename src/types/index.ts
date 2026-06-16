@@ -391,6 +391,7 @@ export interface DocumentUploadOptions {
   task_id?: string;
   is_knowledge_base?: boolean;
   relative_path?: string;
+  onUploadProgress?: (progress: number) => void;
 }
 
 export interface DocumentChunk {

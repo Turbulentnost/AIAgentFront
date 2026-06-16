@@ -108,6 +108,43 @@ export function moveFileRelativePath(currentPath: string, targetFolderPath: stri
   return buildFileRelativePath(targetFolderPath, fileName);
 }
 
+export function isPathInsideFolder(folderPath: string, candidatePath: string) {
+  const folder = normalizeFolderPath(folderPath);
+  const candidate = normalizeFolderPath(candidatePath);
+  if (!folder) return !candidate;
+  if (!candidate) return false;
+  if (candidate === folder) return true;
+  return candidate.startsWith(`${folder}/`);
+}
+
+export function remapPathUnderFolder(path: string, sourceFolderPath: string, newFolderRootPath: string) {
+  const normalized = normalizeRelativePath(path);
+  const source = normalizeFolderPath(sourceFolderPath);
+  const newRoot = normalizeFolderPath(newFolderRootPath);
+  if (!source) return normalized;
+  if (normalized === source || normalized.startsWith(`${source}/`)) {
+    const suffix = normalized.slice(source.length);
+    return `${newRoot}${suffix}`;
+  }
+  return normalized;
+}
+
+export function moveFolderSubtreeRootPath(sourceFolderPath: string, targetFolderPath: string) {
+  const segments = normalizeFolderPath(sourceFolderPath).split("/").filter(Boolean);
+  const folderName = segments.pop();
+  if (!folderName) return normalizeFolderPath(sourceFolderPath);
+  return buildFolderPath(targetFolderPath, folderName) ?? normalizeFolderPath(sourceFolderPath);
+}
+
+export function canMoveFolderToTarget(sourceFolderPath: string, targetFolderPath: string) {
+  const source = normalizeFolderPath(sourceFolderPath);
+  const target = normalizeFolderPath(targetFolderPath);
+  if (!source) return false;
+  if (source === target) return false;
+  if (isPathInsideFolder(source, target)) return false;
+  return true;
+}
+
 function cloneTreeNode(node: SourceTreeNode): SourceTreeNode {
   if (node.kind === "file") return { ...node };
   return {

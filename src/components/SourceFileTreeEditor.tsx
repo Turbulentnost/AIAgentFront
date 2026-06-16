@@ -6,6 +6,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent } from "react";
 import { createPortal } from "react-dom";
 import {
+  canMoveFolderToTarget,
   getDefaultExpandedFolderPaths,
   type SourceTreeNode,
   type SourceTreeRoot
@@ -14,6 +15,7 @@ import { getGithubFileIconColorClass, getGithubFileIconComponent } from "@/utils
 import styles from "./SourceFileTreeEditor.module.css";
 
 const STAGED_FILE_MIME = "application/x-staged-file-id";
+const STAGED_FOLDER_MIME = "application/x-staged-folder-path";
 const DEFAULT_NEW_FOLDER_NAME = "Новая папка";
 
 type PendingCreate = {
@@ -28,6 +30,10 @@ type ContextMenuState = {
   depth: number;
 };
 
+type StagedDragPayload =
+  | { kind: "file"; id: string }
+  | { kind: "folder"; path: string };
+
 function formatBytes(value?: number) {
   if (!value) return "";
   if (value < 1024) return `${value} B`;
@@ -39,6 +45,29 @@ function parentPathOf(relativePath: string) {
   const parts = relativePath.replace(/\\/g, "/").split("/").filter(Boolean);
   parts.pop();
   return parts.join("/");
+}
+
+function hasStagedDrag(dataTransfer: DataTransfer) {
+  return (
+    dataTransfer.types.includes(STAGED_FILE_MIME) ||
+    dataTransfer.types.includes(STAGED_FOLDER_MIME) ||
+    dataTransfer.types.includes("text/plain")
+  );
+}
+
+function readStagedDragPayload(dataTransfer: DataTransfer): StagedDragPayload | null {
+  const folderPath = dataTransfer.getData(STAGED_FOLDER_MIME);
+  if (folderPath) return { kind: "folder", path: folderPath };
+
+  const fileId = dataTransfer.getData(STAGED_FILE_MIME) || dataTransfer.getData("text/plain");
+  if (fileId) return { kind: "file", id: fileId };
+
+  return null;
+}
+
+function isDragLeaveCurrentTarget(event: DragEvent<HTMLElement>) {
+  const next = event.relatedTarget as Node | null;
+  return Boolean(next && event.currentTarget.contains(next));
 }
 
 function FileTypeIcon({ filename }: { filename: string }) {
@@ -53,10 +82,6 @@ function FileTypeIcon({ filename }: { filename: string }) {
       <Icon size={16} />
     </span>
   );
-}
-
-function readStagedFileId(dataTransfer: DataTransfer) {
-  return dataTransfer.getData(STAGED_FILE_MIME) || dataTransfer.getData("text/plain");
 }
 
 function PendingFolderRow({
@@ -131,11 +156,15 @@ function TreeNodeRow({
   depth,
   expandedPaths,
   dropTargetPath,
+  draggingFolderPath,
   pendingCreate,
   createError,
   onToggleFolder,
   onDropTargetChange,
+  onFolderDragStart,
+  onFolderDragEnd,
   onMoveFile,
+  onMoveFolder,
   onOpenContextMenu,
   onConfirmCreate,
   onCancelCreate
@@ -144,15 +173,57 @@ function TreeNodeRow({
   depth: number;
   expandedPaths: Set<string>;
   dropTargetPath: string | null;
+  draggingFolderPath: string | null;
   pendingCreate: PendingCreate | null;
   createError: string | null;
   onToggleFolder: (path: string) => void;
   onDropTargetChange: (path: string | null) => void;
+  onFolderDragStart: (path: string) => void;
+  onFolderDragEnd: () => void;
   onMoveFile: (fileId: string, targetFolderPath: string) => void;
+  onMoveFolder: (sourceFolderPath: string, targetFolderPath: string) => void;
   onOpenContextMenu: (event: MouseEvent, parentPath: string, depth: number) => void;
   onConfirmCreate: (name: string) => void;
   onCancelCreate: () => void;
 }) {
+  const handleFolderDragOver = useCallback(
+    (event: DragEvent<HTMLElement>, targetFolderPath: string) => {
+      if (!hasStagedDrag(event.dataTransfer)) return;
+
+      if (draggingFolderPath && !canMoveFolderToTarget(draggingFolderPath, targetFolderPath)) {
+        event.dataTransfer.dropEffect = "none";
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+      event.dataTransfer.dropEffect = "move";
+      onDropTargetChange(targetFolderPath);
+    },
+    [draggingFolderPath, onDropTargetChange]
+  );
+
+  const handleFolderDrop = useCallback(
+    (event: DragEvent<HTMLElement>, targetFolderPath: string) => {
+      const payload = readStagedDragPayload(event.dataTransfer);
+      if (!payload) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      onDropTargetChange(null);
+      onFolderDragEnd();
+
+      if (payload.kind === "file") {
+        onMoveFile(payload.id, targetFolderPath);
+        return;
+      }
+
+      if (!canMoveFolderToTarget(payload.path, targetFolderPath)) return;
+      onMoveFolder(payload.path, targetFolderPath);
+    },
+    [onDropTargetChange, onFolderDragEnd, onMoveFile, onMoveFolder]
+  );
+
   if (node.kind === "file") {
     return (
       <li
@@ -181,25 +252,26 @@ function TreeNodeRow({
   const showPendingInside = pendingCreate?.parentPath === node.relativePath;
 
   return (
-    <li className={styles.folderBlock}>
+    <li
+      className={`${styles.folderBlock} ${isDropTarget ? styles.folderBlockDropTarget : ""}`}
+      onDragOver={(event) => handleFolderDragOver(event, node.relativePath)}
+      onDragLeave={(event) => {
+        if (isDragLeaveCurrentTarget(event)) return;
+        if (dropTargetPath === node.relativePath) onDropTargetChange(null);
+      }}
+      onDrop={(event) => handleFolderDrop(event, node.relativePath)}
+    >
       <div
-        className={`${styles.folderDropZone} ${isDropTarget ? styles.folderDropZoneActive : ""}`}
+        className={styles.folderDropZone}
+        draggable
         onContextMenu={(event) => onOpenContextMenu(event, node.relativePath, depth + 1)}
-        onDragOver={(event) => {
-          if (!readStagedFileId(event.dataTransfer)) return;
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "move";
-          onDropTargetChange(node.relativePath);
-        }}
-        onDragLeave={() => onDropTargetChange(null)}
-        onDrop={(event) => {
-          const fileId = readStagedFileId(event.dataTransfer);
-          if (!fileId) return;
-          event.preventDefault();
+        onDragStart={(event) => {
           event.stopPropagation();
-          onDropTargetChange(null);
-          onMoveFile(fileId, node.relativePath);
+          event.dataTransfer.setData(STAGED_FOLDER_MIME, node.relativePath);
+          event.dataTransfer.effectAllowed = "move";
+          onFolderDragStart(node.relativePath);
         }}
+        onDragEnd={onFolderDragEnd}
       >
         <button
           type="button"
@@ -230,11 +302,15 @@ function TreeNodeRow({
               depth={depth + 1}
               expandedPaths={expandedPaths}
               dropTargetPath={dropTargetPath}
+              draggingFolderPath={draggingFolderPath}
               pendingCreate={pendingCreate}
               createError={createError}
               onToggleFolder={onToggleFolder}
               onDropTargetChange={onDropTargetChange}
+              onFolderDragStart={onFolderDragStart}
+              onFolderDragEnd={onFolderDragEnd}
               onMoveFile={onMoveFile}
+              onMoveFolder={onMoveFolder}
               onOpenContextMenu={onOpenContextMenu}
               onConfirmCreate={onConfirmCreate}
               onCancelCreate={onCancelCreate}
@@ -290,11 +366,13 @@ function ContextMenu({
 export default function SourceFileTreeEditor({
   tree,
   onCreateFolder,
-  onMoveFile
+  onMoveFile,
+  onMoveFolder
 }: {
   tree: SourceTreeRoot;
   onCreateFolder: (parentPath: string, name: string) => boolean;
   onMoveFile: (fileId: string, targetFolderPath: string) => void;
+  onMoveFolder: (sourceFolderPath: string, targetFolderPath: string) => void;
 }) {
   const defaultExpanded = useMemo(
     () => new Set(getDefaultExpandedFolderPaths(tree)),
@@ -302,6 +380,7 @@ export default function SourceFileTreeEditor({
   );
   const [expandedPaths, setExpandedPaths] = useState(defaultExpanded);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const [draggingFolderPath, setDraggingFolderPath] = useState<string | null>(null);
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
   const [pendingCreate, setPendingCreate] = useState<PendingCreate | null>(null);
   const [createError, setCreateError] = useState<string | null>(null);
@@ -309,6 +388,15 @@ export default function SourceFileTreeEditor({
   useEffect(() => {
     setExpandedPaths(new Set(getDefaultExpandedFolderPaths(tree)));
   }, [tree.fileCount, tree.folderCount]);
+
+  useEffect(() => {
+    const resetDragState = () => {
+      setDraggingFolderPath(null);
+      setDropTargetPath(null);
+    };
+    window.addEventListener("dragend", resetDragState);
+    return () => window.removeEventListener("dragend", resetDragState);
+  }, []);
 
   const openContextMenu = useCallback((event: MouseEvent, parentPath: string, depth: number) => {
     event.preventDefault();
@@ -361,26 +449,74 @@ export default function SourceFileTreeEditor({
     openContextMenu(event, "", 0);
   }, [openContextMenu]);
 
+  const expandFolder = useCallback((path: string) => {
+    if (!path) return;
+    setExpandedPaths((current) => new Set([...current, path]));
+  }, []);
+
+  const handleMoveFile = useCallback(
+    (fileId: string, targetFolderPath: string) => {
+      onMoveFile(fileId, targetFolderPath);
+      expandFolder(targetFolderPath);
+    },
+    [expandFolder, onMoveFile]
+  );
+
+  const handleMoveFolder = useCallback(
+    (sourceFolderPath: string, targetFolderPath: string) => {
+      onMoveFolder(sourceFolderPath, targetFolderPath);
+      expandFolder(targetFolderPath);
+    },
+    [expandFolder, onMoveFolder]
+  );
+
+  const handleRootDragOver = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      if (!hasStagedDrag(event.dataTransfer)) return;
+
+      if (draggingFolderPath && !canMoveFolderToTarget(draggingFolderPath, "")) {
+        event.dataTransfer.dropEffect = "none";
+        return;
+      }
+
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      setDropTargetPath("");
+    },
+    [draggingFolderPath]
+  );
+
+  const handleRootDrop = useCallback(
+    (event: DragEvent<HTMLDivElement>) => {
+      const payload = readStagedDragPayload(event.dataTransfer);
+      if (!payload) return;
+
+      event.preventDefault();
+      setDropTargetPath(null);
+      setDraggingFolderPath(null);
+
+      if (payload.kind === "file") {
+        handleMoveFile(payload.id, "");
+        return;
+      }
+
+      if (!canMoveFolderToTarget(payload.path, "")) return;
+      handleMoveFolder(payload.path, "");
+    },
+    [handleMoveFile, handleMoveFolder]
+  );
+
   return (
     <div className={styles.editor}>
       <div
         className={`${styles.treeSurface} ${dropTargetPath === "" ? styles.folderDropZoneActive : ""}`}
         onContextMenu={openRootContextMenu}
-        onDragOver={(event) => {
-          if (!readStagedFileId(event.dataTransfer)) return;
-          event.preventDefault();
-          setDropTargetPath("");
-        }}
-        onDragLeave={() => {
+        onDragOver={handleRootDragOver}
+        onDragLeave={(event) => {
+          if (isDragLeaveCurrentTarget(event)) return;
           if (dropTargetPath === "") setDropTargetPath(null);
         }}
-        onDrop={(event) => {
-          const fileId = readStagedFileId(event.dataTransfer);
-          if (!fileId) return;
-          event.preventDefault();
-          setDropTargetPath(null);
-          onMoveFile(fileId, "");
-        }}
+        onDrop={handleRootDrop}
       >
         {!tree.children.length && !pendingCreate ? (
           <p className={styles.empty}>Правый клик — создать папку. Перетащите файлы для структуры базы знаний.</p>
@@ -393,11 +529,15 @@ export default function SourceFileTreeEditor({
                 depth={0}
                 expandedPaths={expandedPaths}
                 dropTargetPath={dropTargetPath}
+                draggingFolderPath={draggingFolderPath}
                 pendingCreate={pendingCreate}
                 createError={createError}
                 onToggleFolder={toggleFolder}
                 onDropTargetChange={setDropTargetPath}
-                onMoveFile={onMoveFile}
+                onFolderDragStart={setDraggingFolderPath}
+                onFolderDragEnd={() => setDraggingFolderPath(null)}
+                onMoveFile={handleMoveFile}
+                onMoveFolder={handleMoveFolder}
                 onOpenContextMenu={openContextMenu}
                 onConfirmCreate={confirmCreate}
                 onCancelCreate={cancelCreate}

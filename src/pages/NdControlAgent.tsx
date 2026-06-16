@@ -257,7 +257,7 @@ export default function NdControlAgent() {
                 aria-label="Создать отдел"
                 onClick={() => setShowCreateDept(true)}
               >
-                <Plus size={18} strokeWidth={2.2} />
+                <Plus size={20} strokeWidth={2.4} />
               </button>
             ) : null}
           </div>
@@ -271,8 +271,8 @@ export default function NdControlAgent() {
               }
               action={
                 canManage ? (
-                  <button type="button" className={styles.emptyActionBtn} onClick={() => setShowCreateDept(true)}>
-                    <Plus size={16} strokeWidth={2.2} />
+              <button type="button" className={styles.emptyActionBtn} onClick={() => setShowCreateDept(true)}>
+                    <Plus size={18} strokeWidth={2.4} />
                     Создать отдел
                   </button>
                 ) : undefined
@@ -564,7 +564,7 @@ function EmptyState({
   return (
     <div className={styles.emptyState}>
       <span className={styles.emptyIcon} aria-hidden="true">
-        <Icon size={28} strokeWidth={1.8} />
+        <Icon size={32} strokeWidth={1.75} />
       </span>
       <p>{text}</p>
       {action}

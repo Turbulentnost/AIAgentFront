@@ -1,5 +1,6 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { BookOpen, Database, FileText, Plus, Search, X } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import { BookOpen, Check, Database, FileText, Info, X } from "lucide-react";
+import { FormSearchInput } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import type { KnowledgeBaseListItem, KnowledgeBaseStatus } from "@/types";
 import styles from "./CreateDepartmentModal.module.css";
@@ -64,59 +65,26 @@ export default function CreateDepartmentModal({
   onSubmit
 }: CreateDepartmentModalProps) {
   const [kbSearch, setKbSearch] = useState("");
-  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!open) {
-      setKbSearch("");
-      setSuggestionsOpen(false);
-    }
+    if (!open) setKbSearch("");
   }, [open]);
 
-  useEffect(() => {
-    if (!suggestionsOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!pickerRef.current?.contains(event.target as Node)) {
-        setSuggestionsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [suggestionsOpen]);
-
-  const selectedKbs = useMemo(
-    () =>
-      selectedKbIds
-        .map((id) => knowledgeBases.find((kb) => kb.id === id))
-        .filter((kb): kb is KnowledgeBaseListItem => Boolean(kb)),
-    [knowledgeBases, selectedKbIds]
-  );
-
-  const addableKbs = useMemo(() => {
+  const filteredKbs = useMemo(() => {
     const query = kbSearch.trim().toLowerCase();
+    if (!query) return knowledgeBases;
     return knowledgeBases.filter((kb) => {
-      if (selectedKbIds.includes(kb.id)) return false;
-      if (!query) return true;
       const haystack = `${kb.name} ${kb.description ?? ""} ${kb.topic ?? ""}`.toLowerCase();
       return haystack.includes(query);
     });
-  }, [kbSearch, knowledgeBases, selectedKbIds]);
+  }, [kbSearch, knowledgeBases]);
 
-  const addKb = (kbId: string) => {
-    if (selectedKbIds.includes(kbId)) return;
+  const toggleKb = (kbId: string) => {
+    if (selectedKbIds.includes(kbId)) {
+      onSelectedKbIdsChange(selectedKbIds.filter((id) => id !== kbId));
+      return;
+    }
     onSelectedKbIdsChange([...selectedKbIds, kbId]);
-    setKbSearch("");
-    setSuggestionsOpen(false);
-  };
-
-  const removeKb = (kbId: string) => {
-    onSelectedKbIdsChange(selectedKbIds.filter((id) => id !== kbId));
-  };
-
-  const handleAddFromSearch = () => {
-    const first = addableKbs[0];
-    if (first) addKb(first.id);
   };
 
   const handleSubmit = (event: FormEvent) => {
@@ -133,118 +101,111 @@ export default function CreateDepartmentModal({
     <div className={styles.backdrop} onClick={onClose}>
       <form className={styles.modal} onClick={(event) => event.stopPropagation()} onSubmit={handleSubmit}>
         <header className={styles.header}>
-          <h2>Создать отдел</h2>
+          <div className={styles.headerText}>
+            <h2>Создать отдел</h2>
+            <p>Быстро добавьте отдел агента и привяжите базы знаний с нормативными документами.</p>
+          </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
             <X size={18} strokeWidth={2} />
           </button>
         </header>
 
         <div className={styles.body}>
-          <div className={styles.field}>
-            <label htmlFor="create-dept-name">Название отдела</label>
-            <input
-              id="create-dept-name"
-              className={formStyles.control}
-              value={name}
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Введите название отдела"
-              autoFocus
-              required
-            />
-          </div>
-
-          <div className={styles.field}>
-            <div className={styles.kbHead}>
-              <label htmlFor="create-dept-kb-search">Базы знаний</label>
-              <span className={styles.kbHint}>Можно прикрепить несколько баз знаний</span>
+          <section className={styles.leftColumn}>
+            <div className={styles.field}>
+              <label htmlFor="create-dept-name">
+                Название отдела <span className={styles.required}>*</span>
+              </label>
+              <input
+                id="create-dept-name"
+                className={formStyles.control}
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="тестовый отдел 1"
+                autoFocus
+                required
+              />
             </div>
 
-            <div className={styles.kbPicker} ref={pickerRef}>
-              <div className={styles.kbSearchRow}>
-                <div className={`${formStyles.selectField} ${styles.kbSearchField}`}>
-                  <Search className={formStyles.selectSearch} size={16} strokeWidth={2} aria-hidden="true" />
-                  <input
-                    id="create-dept-kb-search"
-                    className={formStyles.control}
-                    type="search"
-                    value={kbSearch}
-                    placeholder="Добавить базу знаний"
-                    onChange={(event) => {
-                      setKbSearch(event.target.value);
-                      setSuggestionsOpen(true);
-                    }}
-                    onFocus={() => setSuggestionsOpen(true)}
-                  />
-                </div>
-                <button
-                  type="button"
-                  className={styles.kbAddBtn}
-                  aria-label="Добавить базу знаний"
-                  disabled={!addableKbs.length}
-                  onClick={handleAddFromSearch}
-                >
-                  <Plus size={18} strokeWidth={2.2} />
-                </button>
+            <div className={styles.infoCallout}>
+              <Info size={18} strokeWidth={2} aria-hidden="true" />
+              <p>
+                Введите название и выберите базы знаний справа. Можно отметить несколько карточек — документы
+                подтянутся из всех выбранных баз.
+              </p>
+            </div>
+
+            <div className={styles.selectedCounter}>
+              <span>Выбрано баз</span>
+              <strong>{selectedKbIds.length}</strong>
+            </div>
+          </section>
+
+          <section className={styles.rightColumn}>
+            <div className={styles.kbPanelHead}>
+              <div>
+                <h3>Базы знаний</h3>
+                <p>Нажмите на карточку, чтобы прикрепить или открепить базу</p>
               </div>
-
-              {suggestionsOpen && addableKbs.length ? (
-                <ul className={styles.kbSuggestions} role="listbox">
-                  {addableKbs.slice(0, 6).map((kb) => (
-                    <li key={kb.id}>
-                      <button type="button" role="option" onClick={() => addKb(kb.id)}>
-                        <span className={styles.suggestionTitle}>{kb.name}</span>
-                        <span className={styles.suggestionMeta}>
-                          {formatDocCount(kb.sources_count)} · {getKbStatusPresentation(kb).label}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              ) : null}
+              <span className={styles.kbCounter}>
+                {selectedKbIds.length}/{knowledgeBases.length}
+              </span>
             </div>
 
-            {selectedKbs.length ? (
-              <ul className={styles.kbSelectedList}>
-                {selectedKbs.map((kb, index) => {
+            <FormSearchInput
+              className={styles.kbSearch}
+              value={kbSearch}
+              onChange={setKbSearch}
+              placeholder="Поиск по названию или тематике"
+            />
+
+            {!knowledgeBases.length ? (
+              <p className={styles.kbEmpty}>Нет доступных баз знаний.</p>
+            ) : !filteredKbs.length ? (
+              <p className={styles.kbEmpty}>По запросу ничего не найдено.</p>
+            ) : (
+              <ul className={styles.kbCardGrid}>
+                {filteredKbs.map((kb, index) => {
+                  const selected = selectedKbIds.includes(kb.id);
                   const { Icon, tone } = kbIconOptions[index % kbIconOptions.length];
                   const status = getKbStatusPresentation(kb);
                   return (
-                    <li key={kb.id} className={styles.kbSelectedCard}>
-                      <span className={`${styles.kbIcon} ${styles[`kbIcon_${tone}`]}`}>
-                        <Icon size={18} strokeWidth={2} aria-hidden="true" />
-                      </span>
-                      <div className={styles.kbSelectedBody}>
-                        <div className={styles.kbSelectedTop}>
-                          <strong>{kb.name}</strong>
-                          <span className={`${styles.kbStatus} ${styles[`kbStatus_${status.tone}`]}`}>
-                            {status.label}
-                          </span>
-                        </div>
-                        <p>{kb.description || kb.topic || "Описание не задано"}</p>
-                        <span className={styles.kbDocCount}>{formatDocCount(kb.sources_count)}</span>
-                      </div>
+                    <li key={kb.id}>
                       <button
                         type="button"
-                        className={styles.kbRemoveBtn}
-                        aria-label={`Убрать ${kb.name}`}
-                        onClick={() => removeKb(kb.id)}
+                        className={`${styles.kbCard} ${selected ? styles.kbCardSelected : ""}`}
+                        aria-pressed={selected}
+                        onClick={() => toggleKb(kb.id)}
                       >
-                        <X size={16} strokeWidth={2} />
+                        <span className={`${styles.kbCardCheck} ${selected ? styles.kbCardCheckSelected : ""}`}>
+                          {selected ? <Check size={14} strokeWidth={2.8} /> : null}
+                        </span>
+                        <span className={`${styles.kbIcon} ${styles[`kbIcon_${tone}`]}`}>
+                          <Icon size={18} strokeWidth={2} aria-hidden="true" />
+                        </span>
+                        <span className={styles.kbCardBody}>
+                          <span className={styles.kbCardTop}>
+                            <strong>{kb.name}</strong>
+                            <span className={`${styles.kbStatus} ${styles[`kbStatus_${status.tone}`]}`}>
+                              {status.label}
+                            </span>
+                          </span>
+                          <span className={styles.kbDocCount}>{formatDocCount(kb.sources_count)}</span>
+                          <span className={styles.kbCardDesc}>
+                            {kb.description || kb.topic || "Описание не задано"}
+                          </span>
+                        </span>
                       </button>
                     </li>
                   );
                 })}
               </ul>
-            ) : (
-              <p className={styles.kbEmpty}>
-                {knowledgeBases.length ? "Выберите хотя бы одну базу знаний." : "Нет доступных баз знаний."}
-              </p>
             )}
-          </div>
+          </section>
         </div>
 
         <footer className={styles.footer}>
-          <button type="button" className={styles.secondaryBtn} onClick={onClose}>
+          <button type="button" className={styles.secondaryBtn} onClick={onClose} disabled={isSubmitting}>
             Отмена
           </button>
           <button type="submit" className={styles.primaryBtn} disabled={!canSubmit}>

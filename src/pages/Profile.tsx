@@ -184,6 +184,7 @@ export default function Profile() {
   const [passwordVisibility, setPasswordVisibility] = useState<PasswordVisibility>(emptyPasswordVisibility);
   const passwordModalCloseTimerRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cameraButtonRef = useRef<HTMLButtonElement>(null);
   const [isCameraBouncing, setIsCameraBouncing] = useState(false);
 
   const departmentsQuery = useQuery({
@@ -301,8 +302,15 @@ export default function Profile() {
     return [...fromApi, ...mockProfileActivities.slice(fromApi.length)].slice(0, 3);
   }, [tasksQuery.data]);
 
+  function releaseAvatarPickerFocus() {
+    cameraButtonRef.current?.blur();
+    fileInputRef.current?.blur();
+  }
+
   function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
+    event.target.value = "";
+    releaseAvatarPickerFocus();
     if (file) uploadMutation.mutate(file);
   }
 
@@ -310,6 +318,21 @@ export default function Profile() {
     setIsCameraBouncing(true);
     fileInputRef.current?.click();
     window.setTimeout(() => setIsCameraBouncing(false), 450);
+
+    let pickerOpened = false;
+
+    function handleWindowBlur() {
+      pickerOpened = true;
+      window.removeEventListener("blur", handleWindowBlur);
+    }
+
+    function handleWindowFocus() {
+      window.removeEventListener("focus", handleWindowFocus);
+      if (pickerOpened) releaseAvatarPickerFocus();
+    }
+
+    window.addEventListener("blur", handleWindowBlur);
+    window.addEventListener("focus", handleWindowFocus);
   }
 
   function handlePasswordSubmit(event: FormEvent<HTMLFormElement>) {
@@ -358,6 +381,7 @@ export default function Profile() {
             )}
             <span className={styles.avatarOverlay} aria-hidden="true" />
             <button
+              ref={cameraButtonRef}
               className={`${styles.cameraButton} ${isCameraBouncing ? styles.cameraBounce : ""}`}
               type="button"
               aria-label="Загрузить фото профиля"
