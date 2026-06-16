@@ -23,5 +23,18 @@ export function isKnowledgeBaseIndexingActive(
   if (latestJob && isActiveJobStatus(latestJob.status)) {
     return true;
   }
+  if (kb.status === "ready" || kb.status === "needs_review") {
+    return false;
+  }
   return Boolean(kb.indexing_active);
+}
+
+export function shouldShowKnowledgeBaseIndexingBadge(
+  kb: Pick<KnowledgeBaseListItem, "indexing_active" | "status">,
+  latestJob?: KnowledgeBaseIndexingJob | null
+): boolean {
+  if (!isKnowledgeBaseIndexingActive(kb, latestJob)) {
+    return false;
+  }
+  return kb.status === "processing" || kb.status === "updating" || kb.status === "draft";
 }

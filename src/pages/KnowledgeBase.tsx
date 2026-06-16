@@ -60,7 +60,7 @@ import {
 import { FormSearchInput, FormSelect } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import { buildSourceFileTree } from "@/utils/sourceFileTree";
-import { isCancelledJobStatus, isKnowledgeBaseIndexingActive } from "@/utils/knowledgeBaseIndexing";
+import { isKnowledgeBaseIndexingActive, isActiveJobStatus, shouldShowKnowledgeBaseIndexingBadge } from "@/utils/knowledgeBaseIndexing";
 import styles from "./KnowledgeBase.module.css";
 
 type DetailTab = "overview" | "sources" | "chunks" | "rules" | "indexing" | "test" | "audit";
@@ -256,41 +256,58 @@ export default function KnowledgeBasePage() {
       knowledgeBasesApi.cancelIndexing(knowledgeBaseId, {
         reason: "Остановка по запросу пользователя",
         force: true
-      }),
-    onSuccess: async (job, knowledgeBaseId) => {
-      queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
-        items?.map((item) =>
-          item.id === knowledgeBaseId
-            ? {
-                ...item,
-                indexing_active: false
-              }
-            : item
-        )
-      );
+      })
+  });
+
+  const applyCancelSuccess = (job: KnowledgeBaseIndexingJob | undefined, knowledgeBaseId: string) => {
+    queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
+      items?.map((item) =>
+        item.id === knowledgeBaseId
+          ? {
+              ...item,
+              indexing_active: false,
+              status: item.fragments_count > 0 ? "ready" : item.status
+            }
+          : item
+      )
+    );
+    if (job?.id) {
       queryClient.setQueryData<KnowledgeBaseIndexingJob[]>(
         ["knowledge-base-jobs", knowledgeBaseId],
         (existing) => {
-          const jobs = existing ?? [];
-          const hasJob = jobs.some((entry) => entry.id === job.id);
+          const jobsList = existing ?? [];
+          const hasJob = jobsList.some((entry) => entry.id === job.id);
           const nextJob = { ...job, cancel_requested: true };
-          return hasJob ? jobs.map((entry) => (entry.id === job.id ? { ...entry, ...nextJob } : entry)) : [nextJob, ...jobs];
+          return hasJob
+            ? jobsList.map((entry) => (entry.id === job.id ? { ...entry, ...nextJob } : entry))
+            : [nextJob, ...jobsList];
         }
       );
-      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-      await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", knowledgeBaseId] });
-      await queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", knowledgeBaseId] });
-    },
-    onError: async (error, knowledgeBaseId) => {
-      if (error instanceof AxiosError && error.response?.status === 409) {
-        await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
-        await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", knowledgeBaseId] });
-        await queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", knowledgeBaseId] });
-        return;
+    }
+  };
+
+  const refreshAfterCancel = async (knowledgeBaseId: string) => {
+    await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+    await queryClient.invalidateQueries({ queryKey: ["knowledge-base-jobs", knowledgeBaseId] });
+    await queryClient.invalidateQueries({ queryKey: ["knowledge-base-sources", knowledgeBaseId] });
+  };
+
+  const handleCancelIndexing = async (knowledgeBaseId: string) => {
+    try {
+      const job = await cancelIndexing.mutateAsync(knowledgeBaseId);
+      applyCancelSuccess(job, knowledgeBaseId);
+      await refreshAfterCancel(knowledgeBaseId);
+    } catch (error) {
+      if (error instanceof AxiosError) {
+        const httpStatus = error.response?.status;
+        if (httpStatus === 409 || httpStatus === 404) {
+          await refreshAfterCancel(knowledgeBaseId);
+          return;
+        }
       }
       window.alert("Не удалось остановить индексацию. Попробуйте ещё раз.");
     }
-  });
+  };
 
   const startIndexing = useMutation({
     mutationFn: (knowledgeBaseId: string) => knowledgeBasesApi.index(knowledgeBaseId, { job_type: "full" }),
@@ -432,7 +449,7 @@ export default function KnowledgeBasePage() {
                     <td>{isDisabled ? "—" : item.sources_count}</td>
                     <td>{isDisabled ? "—" : formatNumber(item.fragments_count)}</td>
                     <td>
-                      <StatusBadge status={item.status} indexing={item.indexing_active} />
+                      <StatusBadge status={item.status} indexing={shouldShowKnowledgeBaseIndexingBadge(item)} />
                     </td>
                     <td>{formatDate(item.updated_at)}</td>
                   </tr>
@@ -481,7 +498,7 @@ export default function KnowledgeBasePage() {
                   <button
                     type="button"
                     className={styles.dangerButton}
-                    onClick={() => selected && cancelIndexing.mutate(selected.id)}
+                    onClick={() => selected && void handleCancelIndexing(selected.id)}
                     disabled={cancelIndexing.isPending}
                   >
                     <Square size={14} />
@@ -492,7 +509,7 @@ export default function KnowledgeBasePage() {
               <div className={styles.detailHeader}>
                 <div>
                   <h2>{selected.name}</h2>
-                  <StatusBadge status={selected.status} indexing={selected.indexing_active} />
+                  <StatusBadge status={selected.status} indexing={shouldShowKnowledgeBaseIndexingBadge(selected, latestJob)} />
                 </div>
                 <div className={styles.detailHeaderActions}>
                   {(selected.can_confirm_review ||
@@ -688,7 +705,7 @@ function DetailTabContent(props: {
     queryFn: () => knowledgeBasesApi.readiness(knowledgeBase.id),
     enabled: tab === "overview" || tab === "test"
   });
-  const activeJob = jobs.find((job) => job.status === "running" || job.status === "queued") ?? latestJob;
+  const activeJob = jobs.find((job) => isActiveJobStatus(job.status)) ?? latestJob;
   const jobErrors = useQuery({
     queryKey: ["knowledge-base-job-errors", activeJob?.id],
     queryFn: () => knowledgeBasesApi.jobErrors(activeJob!.id),
@@ -852,7 +869,7 @@ function DetailTabContent(props: {
           job.errors_count === 0
         )
     );
-    const progressJob = activeJob && (activeJob.status === "running" || activeJob.status === "queued") ? activeJob : null;
+    const progressJob = activeJob && isActiveJobStatus(activeJob.status) ? activeJob : null;
     const totalSources = progressJob?.total_sources_count || sources.length || 1;
     const totalChunks = progressJob?.total_chunks_count || knowledgeBase.fragments_count || 1;
     const stages = buildIndexingStages(progressJob, totalSources, totalChunks);
@@ -1331,14 +1348,13 @@ function SourceRowMenu(props: {
 }
 
 function StatusBadge({ status, indexing = false }: { status: KnowledgeBaseStatus; indexing?: boolean }) {
-  const label = indexing && (status === "processing" || status === "updating" || status === "draft")
-    ? "Индексация..."
-    : statusLabels[status];
+  const showIndexing = indexing && (status === "processing" || status === "updating" || status === "draft");
+  const label = showIndexing ? "Индексация..." : statusLabels[status];
   return (
     <span
-      className={`${styles.statusBadge} ${styles[`status_${indexing ? "processing" : status}`]} ${indexing ? styles.statusBadgeIndexing : ""}`}
+      className={`${styles.statusBadge} ${styles[`status_${showIndexing ? "processing" : status}`]} ${showIndexing ? styles.statusBadgeIndexing : ""}`}
     >
-      {indexing ? <RefreshCw size={12} className={styles.statusSpinner} aria-hidden="true" /> : null}
+      {showIndexing ? <RefreshCw size={12} className={styles.statusSpinner} aria-hidden="true" /> : null}
       {label}
     </span>
   );
