@@ -443,8 +443,8 @@ export default function KnowledgeBaseCreate() {
   );
 
   const documents = useQuery({
-    queryKey: ["documents"],
-    queryFn: documentsApi.list,
+    queryKey: ["documents", "all"],
+    queryFn: () => documentsApi.list({ page: 1, size: 5000 }),
     enabled: canLoadReferenceData
   });
   const departments = useQuery({
@@ -538,14 +538,14 @@ export default function KnowledgeBaseCreate() {
 
   const activeSidebarIndex = getSidebarActiveIndex(stepIndex);
   const selectedDocuments = useMemo(
-    () => (documents.data ?? []).filter((document) => selectedSourceIds.includes(document.id)),
-    [documents.data, selectedSourceIds]
+    () => (documents.data?.items ?? []).filter((document) => selectedSourceIds.includes(document.id)),
+    [documents.data?.items, selectedSourceIds]
   );
   const readiness = useMemo(() => selectedDocuments.map((document) => checkDocumentReadiness(document)), [selectedDocuments]);
   const warnings = readiness.filter((item) => item.level !== "ok");
   const filteredDocuments = useMemo(
     () =>
-      (documents.data ?? []).filter((document) => {
+      (documents.data?.items ?? []).filter((document) => {
         const extension = getExtension(document.original_filename);
         const matchesSearch = `${document.title} ${document.original_filename ?? ""}`.toLowerCase().includes(sourceSearch.toLowerCase());
         const matchesType = sourceTypeFilter === "all" || document.document_type === sourceTypeFilter;
@@ -556,7 +556,7 @@ export default function KnowledgeBaseCreate() {
           !sourceOnlyCurrent || document.processing_status === "indexed" || document.processing_status === "text_extracted";
         return matchesSearch && matchesType && matchesDepartment && matchesStatus && matchesExtension && matchesCurrent;
       }),
-    [documents.data, extensionFilter, sourceDepartmentFilter, sourceOnlyCurrent, sourceSearch, sourceStatusFilter, sourceTypeFilter]
+    [documents.data?.items, extensionFilter, sourceDepartmentFilter, sourceOnlyCurrent, sourceSearch, sourceStatusFilter, sourceTypeFilter]
   );
 
   const uploadDocument = useMutation({
@@ -1404,13 +1404,28 @@ function StepSources(props: {
           <tbody>
             {props.documents.map((document) => {
               const selected = props.selectedSourceIds.includes(document.id);
+              const canAccess = document.can_access !== false;
               const extension = getExtension(document.original_filename);
               const extKey = extension.replace(".", "") || "default";
               const tableStatus = documentTableStatus(document);
               return (
-                <tr key={document.id} className={selected ? styles.sourcesTableRowSelected : undefined}>
+                <tr
+                  key={document.id}
+                  className={[
+                    selected ? styles.sourcesTableRowSelected : undefined,
+                    !canAccess ? styles.sourcesTableRowLocked : undefined
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   <td className={styles.sourcesCheckCell}>
-                    <input type="checkbox" checked={selected} onChange={() => props.onToggleSource(document.id)} aria-label={`Выбрать ${document.title}`} />
+                    <input
+                      type="checkbox"
+                      checked={selected}
+                      disabled={!canAccess}
+                      onChange={() => props.onToggleSource(document.id)}
+                      aria-label={`Выбрать ${document.title}`}
+                    />
                   </td>
                   <td className={styles.sourcesDocColumn}>
                     <div className={styles.sourcesDocCell}>
@@ -3004,6 +3019,7 @@ function documentMetaLine(document: Document) {
 }
 
 function documentAccessLabel(document: Document) {
+  if (document.can_access === false) return "Нет доступа";
   const metadata = document.metadata;
   const access =
     metadata && typeof metadata === "object" && "access" in metadata ? String(metadata.access) : null;

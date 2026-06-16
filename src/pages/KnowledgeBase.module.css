@@ -70,6 +70,11 @@
   background: var(--color-danger-surface);
 }
 
+.successButton {
+  color: var(--color-success-text);
+  background: var(--color-success-surface);
+}
+
 .statsGrid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -317,6 +322,7 @@
 .detailBody {
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .sectionTitle {
@@ -383,10 +389,32 @@
 
 .extractedContent {
   display: grid;
-  gap: 12px;
+  gap: 16px;
   max-height: min(68vh, 760px);
   overflow: auto;
   padding-right: 4px;
+}
+
+.extractedPage {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--color-surface) 88%, var(--color-bg));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+}
+
+.extractedPageLabel {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.extractedPageBody {
+  display: grid;
+  gap: 10px;
 }
 
 .extractedTextBlock,
@@ -501,6 +529,13 @@
 }
 
 .sourcesTreeWrap {
+  --source-tree-status-col: 76px;
+  --source-tree-fragments-col: 68px;
+  --source-tree-actions-col: 32px;
+  --source-tree-leading-col: 34px;
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border-card);
@@ -508,11 +543,11 @@
 }
 
 .sourcesTreeHead {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 112px 88px 36px;
-  gap: 8px;
+  display: flex;
   align-items: center;
-  padding: 8px 8px 8px 36px;
+  gap: 6px;
+  min-width: 0;
+  padding: 8px;
   color: var(--summary-label-color);
   font-size: 12px;
   font-weight: 600;
@@ -520,7 +555,35 @@
   border-bottom: 1px solid var(--color-border-subtle);
 }
 
+.sourcesTreeHead span:nth-child(1) {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-left: calc(var(--source-tree-leading-col) + 6px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sourcesTreeHead span:nth-child(2) {
+  flex: 0 0 var(--source-tree-status-col);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sourcesTreeHead span:nth-child(3) {
+  flex: 0 0 var(--source-tree-fragments-col);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.sourcesTreeHead span:nth-child(4) {
+  flex: 0 0 var(--source-tree-actions-col);
+}
+
 .sourcesTreeBody {
+  min-width: 0;
+  max-width: 100%;
+  width: 100%;
   padding: 6px 4px 8px;
 }
 

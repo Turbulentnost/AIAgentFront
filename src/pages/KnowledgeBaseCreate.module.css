@@ -3141,6 +3141,10 @@ label.field {
   background: var(--kb-table-row-selected) !important;
 }
 
+.sourcesTableRowLocked {
+  opacity: 0.72;
+}
+
 .sourcesDocCell {
   display: flex;
   gap: 8px;

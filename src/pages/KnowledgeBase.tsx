@@ -1,9 +1,11 @@
 import React, { FormEvent, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   Bot,
+  Check,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -43,6 +45,14 @@ import type {
 } from "@/types";
 import { KnowledgeBaseOverviewTab } from "@/components/KnowledgeBaseOverviewTab";
 import SourceFileTree, { type SourceFileTreeFileMeta } from "@/components/SourceFileTree";
+import {
+  buildBlocksFromExtractedPayload,
+  buildExtractedContentBlocks,
+  documentChunkToViewerChunk,
+  groupExtractedBlocksByPage,
+  type ExtractedContentBlock,
+  type ExtractedViewerChunk
+} from "@/utils/extractedVisionText";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import { buildSourceFileTree } from "@/utils/sourceFileTree";
 import styles from "./KnowledgeBase.module.css";
@@ -122,13 +132,14 @@ const auditActionLabels: Record<string, string> = {
   "kb.test_search": "Тестовый поиск",
   "kb.access_updated": "Изменение доступа",
   "kb.agents_replaced": "Подключение агентов",
-  "kb.archived": "Архивация базы"
+  "kb.archived": "Архивация базы",
+  "kb.review_confirmed": "Подтверждение проверки"
 };
 
 export default function KnowledgeBasePage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [statusFilter, setStatusFilter] = useState<KnowledgeBaseStatus | "all">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -155,21 +166,23 @@ export default function KnowledgeBasePage() {
     return items.find((item) => item.can_access) ?? null;
   }, [knowledgeBases.data, selectedId]);
 
+  const kbFromUrl = searchParams.get("kb");
+
   useEffect(() => {
-    const requestedId = searchParams.get("kb");
     const items = knowledgeBases.data ?? [];
-    if (requestedId) {
-      const requested = items.find((item) => item.id === requestedId);
-      if (requested?.can_access) {
-        setSelectedId(requestedId);
-        return;
+    if (!items.length) return;
+
+    setSelectedId((current) => {
+      if (current && items.some((item) => item.id === current && item.can_access)) {
+        return current;
       }
-    }
-    if (!selectedId || !items.find((item) => item.id === selectedId && item.can_access)) {
-      const firstAccessible = items.find((item) => item.can_access);
-      if (firstAccessible) setSelectedId(firstAccessible.id);
-    }
-  }, [knowledgeBases.data, searchParams, selectedId]);
+      if (kbFromUrl) {
+        const fromUrl = items.find((item) => item.id === kbFromUrl && item.can_access);
+        if (fromUrl) return kbFromUrl;
+      }
+      return items.find((item) => item.can_access)?.id ?? null;
+    });
+  }, [knowledgeBases.data, kbFromUrl]);
 
   useEffect(() => {
     if (!hasActiveIndexingInList) return;
@@ -290,6 +303,33 @@ export default function KnowledgeBasePage() {
     }
   });
 
+  const confirmReview = useMutation({
+    mutationFn: (knowledgeBaseId: string) => knowledgeBasesApi.confirmReview(knowledgeBaseId),
+    onSuccess: async (_kb, knowledgeBaseId) => {
+      queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
+        items?.map((item) =>
+          item.id === knowledgeBaseId
+            ? { ...item, status: "ready", can_confirm_review: false }
+            : item
+        )
+      );
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-bases", "stats"] });
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-base-readiness", knowledgeBaseId] });
+      await queryClient.invalidateQueries({ queryKey: ["knowledge-base-audit", knowledgeBaseId] });
+    },
+    onError: (error) => {
+      if (error instanceof AxiosError) {
+        const detail = error.response?.data?.detail;
+        if (typeof detail === "string" && detail.trim()) {
+          window.alert(detail);
+          return;
+        }
+      }
+      window.alert("Не удалось подтвердить базу знаний. Попробуйте снова.");
+    }
+  });
+
   function handleDeleteKnowledgeBase(knowledgeBase: KnowledgeBaseListItem) {
     const confirmed = window.confirm(
       `Удалить базу знаний "${knowledgeBase.name}"? Она будет перенесена в архив.`
@@ -365,6 +405,14 @@ export default function KnowledgeBasePage() {
                       if (isDisabled) return;
                       setSelectedId(item.id);
                       setActiveTab("overview");
+                      setSearchParams(
+                        (prev) => {
+                          const next = new URLSearchParams(prev);
+                          next.set("kb", item.id);
+                          return next;
+                        },
+                        { replace: true }
+                      );
                     }}
                     aria-disabled={isDisabled}
                     title={isDisabled ? "Нет доступа к этой базе знаний" : undefined}
@@ -430,6 +478,18 @@ export default function KnowledgeBasePage() {
                   <StatusBadge status={selected.status} indexing={selected.indexing_active} />
                 </div>
                 <div className={styles.detailHeaderActions}>
+                  {(selected.can_confirm_review ||
+                    (selected.can_delete && selected.status === "needs_review" && !selected.indexing_active)) ? (
+                    <button
+                      type="button"
+                      className={`${styles.iconButton} ${styles.successButton}`}
+                      onClick={() => confirmReview.mutate(selected.id)}
+                      disabled={confirmReview.isPending || selected.indexing_active}
+                      title="Подтвердить проверку и перевести в статус «Готова»"
+                    >
+                      <Check size={17} />
+                    </button>
+                  ) : null}
                   {selected.can_delete ? (
                     <button
                       type="button"
@@ -582,6 +642,18 @@ function DetailTabContent(props: {
   const [chunkFilter, setChunkFilter] = useState<"all" | "excluded" | "errors" | "ocr">("all");
   const [newRuleText, setNewRuleText] = useState("");
 
+  useEffect(() => {
+    setSelectedSourceId(null);
+  }, [knowledgeBase.id]);
+
+  useEffect(() => {
+    if (tab !== "sources" || !sources.length) return;
+    setSelectedSourceId((current) => {
+      if (current && sources.some((source) => source.id === current)) return current;
+      return sources[0]?.id ?? null;
+    });
+  }, [tab, knowledgeBase.id, sources]);
+
   const overview = useQuery({
     queryKey: ["knowledge-base-overview", knowledgeBase.id],
     queryFn: () => knowledgeBasesApi.overview(knowledgeBase.id),
@@ -640,6 +712,12 @@ function DetailTabContent(props: {
     queryFn: () => documentsApi.chunks(selectedSource!.document_version_id),
     enabled: Boolean(selectedSource?.document_version_id)
   });
+  const selectedExtractedText = useQuery({
+    queryKey: ["document-extracted-text", selectedSource?.document_version_id],
+    queryFn: () => documentsApi.extractedText(selectedSource!.document_version_id),
+    enabled: Boolean(selectedSource?.document_version_id),
+    retry: false
+  });
   const filteredChunks = chunks.filter((chunk) => {
     if (chunkFilter === "excluded") return chunk.is_excluded_from_search;
     if (chunkFilter === "errors") return chunk.embedding_status === "failed" || chunk.quality_status === "low" || chunk.quality_status === "failed";
@@ -676,10 +754,12 @@ function DetailTabContent(props: {
         />
         {selectedSource ? (
           <ExtractedSourceViewer
+            key={selectedSource.id}
             source={selectedSource}
             kbChunks={selectedSourceChunks}
             documentChunks={selectedDocumentChunks.data ?? []}
-            loading={selectedDocumentChunks.isLoading}
+            extractedText={selectedExtractedText.data ?? null}
+            loading={selectedDocumentChunks.isLoading || selectedExtractedText.isLoading}
           />
         ) : null}
       </div>
@@ -914,123 +994,36 @@ function sourceRelativePath(source: KnowledgeBaseSource) {
   return source.relative_path || source.original_filename || source.document_title || source.document_id;
 }
 
-type ExtractedContentBlock =
-  | { kind: "text"; id: string; text: string; chunk: ExtractedViewerChunk }
-  | { kind: "table"; id: string; tableKey: string; caption?: string; headers: string[]; rows: string[][]; chunks: ExtractedViewerChunk[] };
-
-type ExtractedViewerChunk = {
-  id: string;
-  source_id: string;
-  text?: string | null;
-  metadata?: Record<string, unknown> | null;
-  chunk_index?: number | null;
-  page_number?: number | null;
-  section_title?: string | null;
-  fragment_type?: string | null;
-};
-
-function asStringArray(value: unknown): string[] {
-  if (!Array.isArray(value)) return [];
-  return value.map((item) => (item == null ? "" : String(item)));
-}
-
-function sourceBlockMetadata(chunk: ExtractedViewerChunk) {
-  const metadata = chunk.metadata ?? {};
-  const sourceBlocks = metadata.source_blocks;
-  if (Array.isArray(sourceBlocks) && sourceBlocks[0] && typeof sourceBlocks[0] === "object") {
-    return sourceBlocks[0] as Record<string, unknown>;
-  }
-  return metadata;
-}
-
-function tableKeyFromMetadata(metadata: Record<string, unknown>) {
-  return [
-    metadata.table_caption,
-    metadata.sheet_name,
-    metadata.page_number,
-    metadata.table_index,
-    metadata.cell_range
-  ].map((item) => String(item ?? "")).join("|");
-}
-
-function buildExtractedContentBlocks(chunks: ExtractedViewerChunk[]): ExtractedContentBlock[] {
-  const blocks: ExtractedContentBlock[] = [];
-  const ordered = [...chunks].sort((left, right) => {
-    const leftIndex = left.chunk_index ?? Number.MAX_SAFE_INTEGER;
-    const rightIndex = right.chunk_index ?? Number.MAX_SAFE_INTEGER;
-    if (leftIndex !== rightIndex) return leftIndex - rightIndex;
-    return (left.page_number ?? 0) - (right.page_number ?? 0);
-  });
-
-  for (const chunk of ordered) {
-    const metadata = sourceBlockMetadata(chunk);
-    const headers = asStringArray(metadata.headers);
-    const rowValues = asStringArray(metadata.row_values);
-    const isTableRow = (metadata.fragment_type === "table_row" || metadata.chunk_kind === "table_row" || chunk.fragment_type === "table_row") && rowValues.length > 0;
-
-    if (isTableRow) {
-      const key = tableKeyFromMetadata(metadata);
-      const last = blocks[blocks.length - 1];
-      const normalizedHeaders = Array.from({ length: Math.max(headers.length, rowValues.length) }, (_, index) => headers[index] || `Колонка ${index + 1}`);
-      if (last?.kind === "table" && last.tableKey === key) {
-        last.rows.push(rowValues);
-        last.chunks.push(chunk);
-      } else {
-        blocks.push({
-          kind: "table",
-          id: `${key || chunk.id}-${blocks.length}`,
-          tableKey: key,
-          caption: String(metadata.table_caption || metadata.sheet_name || chunk.section_title || ""),
-          headers: normalizedHeaders,
-          rows: [rowValues],
-          chunks: [chunk]
-        });
-      }
-      continue;
-    }
-
-    const text = (chunk.text || "").trim();
-    if (text) blocks.push({ kind: "text", id: chunk.id, text, chunk });
-  }
-
-  return blocks;
-}
-
-function documentChunkToViewerChunk(source: KnowledgeBaseSource, chunk: DocumentChunk): ExtractedViewerChunk {
-  const metadata = chunk.metadata ?? chunk.chunk_metadata ?? null;
-  const sourceBlocks = metadata?.source_blocks;
-  const firstSourceBlock = Array.isArray(sourceBlocks) && sourceBlocks[0] && typeof sourceBlocks[0] === "object"
-    ? sourceBlocks[0] as Record<string, unknown>
-    : metadata ?? {};
-
-  return {
-    id: chunk.id,
-    source_id: source.id,
-    text: chunk.content || chunk.text,
-    metadata,
-    chunk_index: chunk.chunk_index,
-    page_number: chunk.page_number,
-    section_title: chunk.section_title,
-    fragment_type: String(firstSourceBlock.fragment_type || firstSourceBlock.chunk_kind || "")
-  };
-}
-
 function ExtractedSourceViewer({
   source,
   kbChunks,
   documentChunks,
+  extractedText,
   loading
 }: {
   source: KnowledgeBaseSource;
   kbChunks: KnowledgeBaseChunk[];
   documentChunks: DocumentChunk[];
+  extractedText: Record<string, unknown> | null;
   loading: boolean;
 }) {
   const viewerChunks = useMemo<ExtractedViewerChunk[]>(
     () => (documentChunks.length ? documentChunks.map((chunk) => documentChunkToViewerChunk(source, chunk)) : kbChunks),
     [documentChunks, kbChunks, source]
   );
-  const blocks = useMemo(() => buildExtractedContentBlocks(viewerChunks), [viewerChunks]);
+  const blocks = useMemo(() => {
+    if (extractedText) {
+      return buildBlocksFromExtractedPayload(extractedText);
+    }
+    return buildExtractedContentBlocks(viewerChunks);
+  }, [extractedText, viewerChunks]);
+  const pageGroups = useMemo(() => groupExtractedBlocksByPage(blocks), [blocks]);
+  const pagesCount = useMemo(() => {
+    if (typeof extractedText?.pages === "object" && Array.isArray(extractedText.pages)) {
+      return extractedText.pages.length;
+    }
+    return source.pages_count;
+  }, [extractedText, source.pages_count]);
   const sourceName = source.document_title || source.original_filename || source.document_id;
 
   return (
@@ -1039,7 +1032,7 @@ function ExtractedSourceViewer({
         <div>
           <h4>{sourceName}</h4>
           <p>
-            Страниц: {source.pages_count ?? "-"} · Фрагментов: {source.fragments_count} · Статус:{" "}
+            Страниц: {pagesCount ?? "-"} · Фрагментов: {source.fragments_count} · Статус:{" "}
             {sourceStatusLabels[source.processing_status] ?? source.processing_status}
           </p>
         </div>
@@ -1049,21 +1042,27 @@ function ExtractedSourceViewer({
       {source.precheck_notes ? <p className={styles.extractedWarning}>Ошибки: {source.precheck_notes}</p> : null}
 
       <div className={styles.extractedContent}>
-        {blocks.map((block) =>
-          block.kind === "table" ? (
-            <ExtractedTable key={block.id} block={block} />
-          ) : (
-            <section key={block.id} className={styles.extractedTextBlock}>
-              {block.chunk.section_title ? <h5>{block.chunk.section_title}</h5> : null}
-              {block.text.split(/\n{2,}/).map((paragraph, index) => (
-                <p key={`${block.id}-${index}`}>{paragraph}</p>
-              ))}
-              <small>
-                Стр. {block.chunk.page_number ?? "-"} · Тип {block.chunk.fragment_type || "-"}
-              </small>
-            </section>
-          )
-        )}
+        {pageGroups.map(({ pageNumber, blocks: pageBlocks }) => (
+          <section key={String(pageNumber)} className={styles.extractedPage}>
+            {pageNumber !== "unknown" ? <div className={styles.extractedPageLabel}>Страница {pageNumber}</div> : null}
+            <div className={styles.extractedPageBody}>
+              {pageBlocks.map((block) =>
+                block.kind === "table" ? (
+                  <ExtractedTable key={block.id} block={block} />
+                ) : (
+                  <section key={block.id} className={styles.extractedTextBlock}>
+                    {block.chunk.section_title ? <h5>{block.chunk.section_title}</h5> : null}
+                    {block.text.split(/\n{2,}/).map((paragraph, index) => (
+                      <p key={`${block.id}-${index}`} style={block.alignment}>
+                        {paragraph}
+                      </p>
+                    ))}
+                  </section>
+                )
+              )}
+            </div>
+          </section>
+        ))}
         {loading && !blocks.length ? (
           <div className={styles.emptyState}>Загружаем извлечённый текст...</div>
         ) : !blocks.length ? (
@@ -1170,6 +1169,7 @@ function SourcesFilesTree(props: {
         className={styles.sourcesTreeBody}
         tree={tree}
         fileMetaById={fileMetaById}
+        richLayout
         selectedFileId={props.selectedSourceId}
         onFileSelect={props.onView}
       />

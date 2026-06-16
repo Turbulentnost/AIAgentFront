@@ -1,8 +1,14 @@
 .tree {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
   color: var(--color-text);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.treeRich {
+  overflow: hidden;
 }
 
 .rootList,
@@ -12,11 +18,13 @@
   margin: 0;
   padding: 0;
   list-style: none;
+  min-width: 0;
 }
 
 .folderBlock {
   display: grid;
   gap: 0;
+  min-width: 0;
 }
 
 .row {
@@ -25,14 +33,17 @@
   gap: 8px;
   align-items: center;
   width: 100%;
+  min-width: 0;
+  max-width: 100%;
   min-height: 28px;
-  padding: 2px 8px 2px 0;
+  padding: 2px 8px 2px 8px;
   color: inherit;
   text-align: left;
   background: transparent;
   border: 0;
   border-radius: 6px;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 button.row:hover,
@@ -42,7 +53,7 @@ button.row:hover,
 }
 
 li.row {
-  cursor: default;
+  cursor: pointer;
 }
 
 li.row:hover {
@@ -50,7 +61,83 @@ li.row:hover {
 }
 
 .rowRich {
-  grid-template-columns: 12px 16px minmax(0, 1fr) auto auto auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.rowRich > * {
+  min-width: 0;
+}
+
+.rowRich .chevronSpacer,
+.rowRich .chevronWrap {
+  flex: 0 0 12px;
+  width: 12px;
+  min-width: 12px;
+}
+
+.rowRich .iconCell {
+  flex: 0 0 16px;
+  width: 16px;
+  min-width: 16px;
+}
+
+.nameCell {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.nodeStatus {
+  flex: 0 0 var(--source-tree-status-col, 76px);
+  width: var(--source-tree-status-col, 76px);
+  min-width: var(--source-tree-status-col, 76px);
+  max-width: var(--source-tree-status-col, 76px);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.nodeMeta {
+  flex: 0 0 var(--source-tree-fragments-col, 68px);
+  width: var(--source-tree-fragments-col, 68px);
+  min-width: var(--source-tree-fragments-col, 68px);
+  max-width: var(--source-tree-fragments-col, 68px);
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 400;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: right;
+}
+
+.nodeTrailing {
+  display: inline-flex;
+  flex: 0 0 var(--source-tree-actions-col, 32px);
+  align-items: center;
+  justify-content: flex-end;
+  width: var(--source-tree-actions-col, 32px);
+  min-width: var(--source-tree-actions-col, 32px);
+  max-width: var(--source-tree-actions-col, 32px);
+}
+
+.nodeStatusEmpty,
+.nodeMetaEmpty,
+.nodeTrailingEmpty {
+  flex-shrink: 0;
+  pointer-events: none;
 }
 
 .rowSelected {
@@ -58,8 +145,11 @@ li.row:hover {
 }
 
 .fileNameButton {
-  overflow: hidden;
+  display: block;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   padding: 0;
   color: var(--color-text-strong);
   font: inherit;
@@ -75,24 +165,13 @@ li.row:hover {
   color: var(--color-primary);
 }
 
-.nodeStatus {
-  color: var(--color-muted);
-  font-size: 11px;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.nodeTrailing {
-  display: inline-flex;
-  align-items: center;
-}
-
 .chevronSpacer,
 .chevronWrap {
   display: grid;
   width: 12px;
   height: 16px;
   place-items: center;
+  flex-shrink: 0;
 }
 
 .chevron {
@@ -196,19 +275,15 @@ li.row:hover {
 }
 
 .nodeName {
-  overflow: hidden;
+  display: block;
+  width: 100%;
   min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   color: var(--color-text-strong);
   font-size: 13px;
   font-weight: 400;
   text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.nodeMeta {
-  color: var(--color-muted);
-  font-size: 11px;
-  font-weight: 400;
   white-space: nowrap;
 }
 

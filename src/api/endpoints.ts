@@ -12,7 +12,9 @@ import type {
   EmployeeSyncResult,
   Document,
   DocumentChunk,
+  DocumentListItem,
   DocumentUploadOptions,
+  Page,
   HealthResponse,
   KnowledgeBase,
   KnowledgeBaseAccessExceptionInput,
@@ -127,7 +129,12 @@ export const documentsApi = {
     if (options.relative_path) formData.append("relative_path", options.relative_path);
     return apiClient.post<Document>("/documents/upload", formData, { timeout: 0 }).then((r) => r.data);
   },
-  list: () => apiClient.get<Document[]>("/documents").then((r) => r.data),
+  list: (params?: { page?: number; size?: number; query?: string }) =>
+    apiClient.get<Page<DocumentListItem>>("/documents", { params }).then((r) => r.data),
+  file: (documentId: string, disposition: "inline" | "attachment" = "attachment") =>
+    apiClient
+      .get<Blob>(`/documents/${documentId}/file`, { params: { disposition }, responseType: "blob" })
+      .then((r) => r.data),
   search: (query: string | ChunkSearchQuery) => {
     const body = typeof query === "string" ? { query, top_k: 5 } : query;
     return apiClient.post<ChunkSearchHit[]>("/documents/search", body).then((r) => r.data);
@@ -135,7 +142,9 @@ export const documentsApi = {
   versions: (documentId: string) =>
     apiClient.get(`/documents/${documentId}/versions`).then((r) => r.data),
   chunks: (documentVersionId: string) =>
-    apiClient.get<DocumentChunk[]>(`/documents/versions/${documentVersionId}/chunks`).then((r) => r.data)
+    apiClient.get<DocumentChunk[]>(`/documents/versions/${documentVersionId}/chunks`).then((r) => r.data),
+  extractedText: (documentVersionId: string) =>
+    apiClient.get<Record<string, unknown>>(`/documents/versions/${documentVersionId}/extracted-text`).then((r) => r.data)
 };
 
 export const knowledgeBasesApi = {
@@ -148,6 +157,8 @@ export const knowledgeBasesApi = {
   create: (payload: KnowledgeBaseCreate) => apiClient.post<KnowledgeBase>("/knowledge-bases", payload).then((r) => r.data),
   delete: (knowledgeBaseId: string) =>
     apiClient.delete<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}`).then((r) => r.data),
+  confirmReview: (knowledgeBaseId: string) =>
+    apiClient.post<KnowledgeBase>(`/knowledge-bases/${knowledgeBaseId}/confirm-review`).then((r) => r.data),
   overview: (knowledgeBaseId: string) =>
     apiClient.get<KnowledgeBaseOverviewStats>(`/knowledge-bases/${knowledgeBaseId}/overview`).then((r) => r.data),
   readiness: (knowledgeBaseId: string) =>

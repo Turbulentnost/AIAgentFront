@@ -366,6 +366,18 @@ export interface Document {
   metadata?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
+  can_access?: boolean;
+}
+
+export interface DocumentListItem extends Document {
+  can_access: boolean;
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  size: number;
 }
 export interface DocumentUploadOptions {
   title?: string;
@@ -596,6 +608,7 @@ export interface KnowledgeBaseListItem extends KnowledgeBase {
   can_access: boolean;
   can_search: boolean;
   can_delete: boolean;
+  can_confirm_review: boolean;
   indexing_active: boolean;
 }
 
