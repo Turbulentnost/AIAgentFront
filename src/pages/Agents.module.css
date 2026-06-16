@@ -103,7 +103,9 @@
   grid-template-columns: var(--agents-art-size) minmax(0, 1fr);
   gap: 18px;
   align-items: start;
+  min-width: 0;
   padding: var(--agents-card-padding);
+  overflow: hidden;
   background: var(--agents-card-bg);
   border: 1px solid var(--agents-card-border);
   border-radius: var(--agents-card-radius);
@@ -132,6 +134,80 @@
   place-items: center;
 }
 
+.agentArtEditable {
+  position: relative;
+}
+
+.agentArtOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background: var(--color-overlay);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.agentArtEditable:hover .agentArtOverlay,
+.agentArtEditable:focus-within .agentArtOverlay {
+  opacity: 1;
+}
+
+.agentArtCamera {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 2;
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-avatar-placeholder);
+  border-radius: 999px;
+  box-shadow: 0 8px 22px var(--color-shadow-16);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease,
+    top 0.22s ease,
+    left 0.22s ease,
+    right 0.22s ease,
+    bottom 0.22s ease,
+    width 0.22s ease,
+    height 0.22s ease;
+}
+
+.agentArtCamera:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+.agentArtEditable:hover .agentArtCamera,
+.agentArtEditable:focus-within .agentArtCamera {
+  top: 50%;
+  right: auto;
+  bottom: auto;
+  left: 50%;
+  width: 40px;
+  height: 40px;
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+
+.agentArtCamera:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.agentArtFileInput {
+  display: none;
+}
+
 .agentArt img {
   display: block;
   width: 100%;
@@ -143,6 +219,7 @@
   display: grid;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
 }
 
 .agentBodyHead {
@@ -151,24 +228,40 @@
   align-items: flex-start;
   justify-content: space-between;
   min-width: 0;
+  overflow: hidden;
 }
 
 .agentTitle {
   margin: 0;
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-text-strong);
   font-size: var(--summary-section-title-size);
   font-weight: var(--summary-section-title-weight);
   line-height: var(--summary-section-title-line-height);
+  overflow-wrap: anywhere;
 }
 
 .agentDescription {
   margin: 0;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
   color: var(--color-text-secondary);
   font-size: var(--form-control-font-size);
   font-weight: var(--form-control-font-weight);
   line-height: 1.5;
+  text-align: justify;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .agentMeta {

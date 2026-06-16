@@ -190,9 +190,11 @@
 .launchCard {
   display: grid;
   grid-template-columns: clamp(94px, 13.5vh, 118px) minmax(0, 1fr);
-  align-items: center;
+  align-items: start;
+  min-width: 0;
   height: var(--launch-card-height);
   padding: clamp(10px, 1.9vh, 16px) clamp(12px, 1.4vw, 20px);
+  overflow: hidden;
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: 9px;
@@ -212,9 +214,79 @@
   transform: translateY(-5px);
 }
 
+.dashboardMorphing .hero,
+.dashboardMorphing .statsGrid,
+.dashboardMorphing .bottomGrid,
+.dashboardMorphing .recommendedPanel {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.985);
+  pointer-events: none;
+  transition:
+    opacity 0.42s ease,
+    transform 0.42s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.dashboardMorphing .quickLaunch h2 {
+  opacity: 0;
+  transition: opacity 0.28s ease;
+}
+
+.dashboardMorphing .launchGrid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.launchCardMorphing {
+  z-index: 5;
+  grid-column: 1 / -1;
+  min-height: clamp(220px, 42vh, 360px);
+  border-color: var(--color-primary-alpha-28);
+  box-shadow:
+    0 24px 56px var(--color-shadow-12),
+    0 8px 28px var(--color-primary-alpha-12);
+  transform: translateY(0) scale(1);
+  animation: launchCardMorph 0.52s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.launchCardMorphing .launchArt {
+  width: clamp(96px, 16vh, 128px);
+  height: clamp(96px, 16vh, 128px);
+}
+
+.launchCardMorphing .launchBody p,
+.launchCardMorphing .launchHead .status {
+  opacity: 0.55;
+}
+
+@keyframes launchCardMorph {
+  from {
+    min-height: var(--launch-card-height);
+    transform: translateY(0) scale(1);
+  }
+
+  to {
+    min-height: clamp(220px, 42vh, 360px);
+    transform: translateY(-4px) scale(1.02);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboardMorphing .hero,
+  .dashboardMorphing .statsGrid,
+  .dashboardMorphing .bottomGrid,
+  .dashboardMorphing .recommendedPanel,
+  .dashboardMorphing .quickLaunch h2 {
+    transition: none;
+  }
+
+  .launchCardMorphing {
+    animation: none;
+  }
+}
+
 .launchArt {
   position: relative;
   display: grid;
+  align-self: start;
   place-items: center;
   width: var(--launch-art-size);
   height: var(--launch-art-size);
@@ -260,36 +332,70 @@
   background: linear-gradient(145deg, var(--color-gradient-launch-c) 0%, var(--color-gradient-launch-d) 100%);
 }
 
-.launchBody {
+.launchArtHasIcon {
+  color: transparent;
+  background: var(--agents-art-bg, #ffffff);
+  isolation: isolate;
+}
+
+.launchArtHasIcon::before,
+.launchArtHasIcon::after {
+  display: none;
+}
+
+.launchArt img {
   position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  view-transition-name: none;
+}
+
+.launchBody {
   display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   align-content: start;
-  gap: 0;
+  gap: 6px 8px;
   height: calc(var(--launch-card-height) - clamp(20px, 3.8vh, 32px));
   min-width: 0;
+  overflow: hidden;
   padding-left: 5px;
 }
 
 .launchHead {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 6px 8px;
+  min-width: 0;
 }
 
 .launchHead h3 {
   margin: 0;
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-text);
   font-size: clamp(12px, 1.72vh, 15px);
   font-weight: 800;
   line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .status {
   display: inline-flex;
-  flex: 0 0 auto;
+  grid-column: 2;
+  grid-row: 1;
   align-items: center;
   gap: 5px;
+  flex: 0 0 auto;
   height: clamp(18px, 2.6vh, 22px);
   padding: 0 8px;
   color: var(--color-success);
@@ -298,6 +404,7 @@
   font-size: clamp(9px, 1.25vh, 11px);
   font-weight: 800;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .status span {
@@ -308,18 +415,31 @@
 }
 
 .launchBody p {
-  max-width: calc(100% - 92px);
+  grid-column: 1;
+  grid-row: 2;
+  align-self: start;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   margin: 0;
+  padding-top: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-text-secondary);
   font-size: clamp(10px, 1.5vh, 12px);
   font-weight: 500;
   line-height: 1.45;
+  text-align: justify;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .launchBody button {
-  position: absolute;
-  right: 0;
-  bottom: 0;
+  grid-column: 2;
+  grid-row: 2;
+  align-self: end;
   justify-self: end;
   min-width: clamp(74px, 10.4vh, 88px);
   height: clamp(27px, 4vh, 32px);
@@ -332,6 +452,7 @@
   font-size: clamp(10px, 1.42vh, 12px);
   font-weight: 800;
   line-height: 1;
+  white-space: nowrap;
 }
 
 .launchBody button:hover {

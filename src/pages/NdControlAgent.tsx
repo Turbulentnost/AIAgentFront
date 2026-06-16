@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus, X } from "lucide-react";
 import { knowledgeBasesApi, ndControlApi } from "@/api/endpoints";
@@ -96,6 +97,8 @@ function cardToForm(card: NdDocumentCard): NdDocumentCardUpdate {
 }
 
 export default function NdControlAgent() {
+  const location = useLocation();
+  const enteredFromLaunch = (location.state as { from?: string } | null)?.from === "agent-launch";
   const queryClient = useQueryClient();
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [cardSearch, setCardSearch] = useState("");
@@ -195,7 +198,7 @@ export default function NdControlAgent() {
   }
 
   return (
-    <div className={styles.page}>
+    <div className={`${styles.page} ${enteredFromLaunch ? styles.pageEnter : ""}`}>
       <header className={styles.header}>
         <div>
           <h1>Агент контроля НД и внесения изменений</h1>

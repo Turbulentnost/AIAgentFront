@@ -108,7 +108,12 @@ export const positionsApi = {
 };
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),
-  available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data)
+  available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data),
+  uploadIcon: (agentId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post<Agent>(`/agents/${agentId}/icon`, formData).then((r) => r.data);
+  }
 };
 export const rolesApi = {
   list: () => apiClient.get<Role[]>("/roles").then((r) => r.data)

@@ -18,6 +18,11 @@ import { Link, useNavigate } from "react-router-dom";
 import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
+  AGENT_LAUNCH_MORPH_MS,
+  isNdControlAgent,
+  navigateToAgentLaunch
+} from "@/utils/agentLaunch";
+import {
   dashboardActivities,
   dashboardStats,
   dashboardSummary,
@@ -118,6 +123,7 @@ export default function Dashboard() {
   const { user } = useAuth();
   const greetingName = getGreetingName(user);
   const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
+  const [launchMorphAgentId, setLaunchMorphAgentId] = useState<string | null>(null);
 
   const agentsQuery = useQuery({
     queryKey: ["agents", "available"],
@@ -148,8 +154,31 @@ export default function Dashboard() {
     }, RECOMMENDED_SWEEP_MS);
   }
 
+  function handleAgentLaunch(agent: AgentAccess, event: MouseEvent<HTMLButtonElement>) {
+    if (!agent.can_run || launchMorphAgentId) return;
+
+    if (isNdControlAgent(agent)) {
+      if (agent.icon_url) {
+        navigateToAgentLaunch(navigate, agent);
+        return;
+      }
+
+      setLaunchMorphAgentId(agent.id);
+      window.setTimeout(() => {
+        navigateToAgentLaunch(navigate, agent);
+        setLaunchMorphAgentId(null);
+      }, AGENT_LAUNCH_MORPH_MS);
+      return;
+    }
+
+    navigate("/tasks", { state: { agentId: agent.id, agentName: agent.name } });
+  }
+
   return (
-    <section className={styles.dashboard} aria-labelledby="dashboard-title">
+    <section
+      className={`${styles.dashboard} ${launchMorphAgentId ? styles.dashboardMorphing : ""}`}
+      aria-labelledby="dashboard-title"
+    >
       <div className={styles.hero}>
         <h1 id="dashboard-title">Добро пожаловать, {greetingName}</h1>
         <p>
@@ -195,11 +224,24 @@ export default function Dashboard() {
             {launchAgents.map((agent) => {
               const icon = getAgentLaunchIcon(agent);
               const Icon = launchIcons[icon];
+              const isMorphing = launchMorphAgentId === agent.id;
+              const isHiddenByMorph = Boolean(launchMorphAgentId && !isMorphing);
+
+              if (isHiddenByMorph) return null;
 
               return (
-                <article className={styles.launchCard} key={agent.id}>
-                  <div className={`${styles.launchArt} ${styles[icon]}`}>
-                    <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
+                <article
+                  className={`${styles.launchCard} ${isMorphing ? styles.launchCardMorphing : ""}`}
+                  key={agent.id}
+                >
+                  <div
+                    className={`${styles.launchArt} ${agent.icon_url ? styles.launchArtHasIcon : styles[icon]}`}
+                  >
+                    {agent.icon_url ? (
+                      <img src={agent.icon_url} alt="" loading="lazy" />
+                    ) : (
+                      <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
+                    )}
                   </div>
                   <div className={styles.launchBody}>
                     <div className={styles.launchHead}>
@@ -212,10 +254,10 @@ export default function Dashboard() {
                     <p>{agent.purpose || agent.slug}</p>
                     <button
                       type="button"
-                      disabled={!agent.can_run}
-                      onClick={() => navigate("/tasks", { state: { agentId: agent.id, agentName: agent.name } })}
+                      disabled={!agent.can_run || Boolean(launchMorphAgentId)}
+                      onClick={(event) => handleAgentLaunch(agent, event)}
                     >
-                      {agent.can_run ? "Запустить" : "Нет доступа"}
+                      {isMorphing ? "Открываем…" : agent.can_run ? "Запустить" : "Нет доступа"}
                     </button>
                   </div>
                 </article>

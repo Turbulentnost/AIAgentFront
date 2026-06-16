@@ -444,10 +444,16 @@
   min-height: 24px;
   margin: 0 0 5px;
   overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   color: var(--color-text-secondary);
   font-size: 10px;
   font-weight: var(--form-control-font-weight);
   line-height: 1.35;
+  text-align: justify;
+  text-overflow: ellipsis;
+  overflow-wrap: anywhere;
 }
 
 .accessBadge {

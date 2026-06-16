@@ -1013,3 +1013,39 @@
     animation: none !important;
   }
 }
+
+[data-agent-launch="active"] ::view-transition-old(root) {
+  animation: agent-launch-fade-out 0.42s ease forwards;
+  z-index: 1;
+}
+
+[data-agent-launch="active"] img {
+  view-transition-name: none;
+}
+
+[data-agent-launch="active"] ::view-transition-new(root) {
+  animation: agent-launch-fade-in 0.42s ease forwards;
+  z-index: 2;
+}
+
+@keyframes agent-launch-fade-out {
+  from {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  to {
+    opacity: 0;
+    transform: scale(0.992);
+  }
+}
+
+@keyframes agent-launch-fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}

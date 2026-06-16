@@ -60,6 +60,7 @@ export interface Agent {
   slug: string;
   purpose: string | null;
   status: AgentStatus;
+  icon_url?: string | null;
   department_id?: string | null;
   owner_id?: string | null;
   created_at: string;
