@@ -213,6 +213,46 @@ export function getDefaultExpandedFolderPaths(tree: SourceTreeRoot) {
   return collectFolderPaths(tree.children);
 }
 
+function shouldCollapseFolderChain(folder: SourceTreeFolderNode) {
+  const files = folder.children.filter((child) => child.kind === "file");
+  const folders = folder.children.filter((child) => child.kind === "folder");
+  return files.length === 0 && folders.length === 1;
+}
+
+function collapseFolderNode(folder: SourceTreeFolderNode): SourceTreeFolderNode {
+  const names = [folder.name];
+  let current = folder;
+
+  while (shouldCollapseFolderChain(current)) {
+    const nextFolder = current.children.find((child): child is SourceTreeFolderNode => child.kind === "folder");
+    if (!nextFolder) break;
+    current = nextFolder;
+    names.push(current.name);
+  }
+
+  return {
+    kind: "folder",
+    name: names.join(" / "),
+    relativePath: current.relativePath,
+    children: current.children.map((child) => (child.kind === "folder" ? collapseFolderNode(child) : child))
+  };
+}
+
+export function collapseLinearFolderChains(nodes: SourceTreeNode[]): SourceTreeNode[] {
+  return nodes.map((node) => (node.kind === "folder" ? collapseFolderNode(node) : node));
+}
+
+export function collapseLinearFolderChainsInTree(tree: SourceTreeRoot): SourceTreeRoot {
+  const children = collapseLinearFolderChains(tree.children);
+  const stats = countTreeNodes(children);
+
+  return {
+    children,
+    fileCount: stats.fileCount,
+    folderCount: stats.folderCount
+  };
+}
+
 export function findTreeNodeByPath(nodes: SourceTreeNode[], relativePath: string): SourceTreeNode | null {
   const normalized = normalizeRelativePath(relativePath);
   if (!normalized) return null;

@@ -59,8 +59,9 @@ import {
 } from "@/utils/extractedVisionText";
 import { FormSearchInput, FormSelect } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
-import { buildSourceFileTree } from "@/utils/sourceFileTree";
 import { isKnowledgeBaseIndexingActive, isActiveJobStatus, shouldShowKnowledgeBaseIndexingBadge } from "@/utils/knowledgeBaseIndexing";
+import { buildSourceFileTree, collapseLinearFolderChainsInTree } from "@/utils/sourceFileTree";
+import { isCancelledJobStatus } from "@/utils/knowledgeBaseIndexing";
 import styles from "./KnowledgeBase.module.css";
 
 type DetailTab = "overview" | "sources" | "chunks" | "rules" | "indexing" | "test" | "audit";
@@ -397,18 +398,19 @@ export default function KnowledgeBasePage() {
             />
           </div>
 
-          <div className={styles.kbTableScroll}>
-            <table className={styles.kbTable}>
-              <thead>
-                <tr>
-                  <th>Название базы знаний</th>
-                  <th>Источники</th>
-                  <th>Фрагменты</th>
-                  <th>Статус</th>
-                  <th>Обновлено</th>
-                </tr>
-              </thead>
-              <tbody>
+          <div className={styles.kbTableWrap}>
+            <div className={styles.kbTableScroll}>
+              <table className={styles.kbTable}>
+                <thead className={styles.kbTableHead}>
+                  <tr>
+                    <th>Название базы знаний</th>
+                    <th>Источники</th>
+                    <th>Фрагменты</th>
+                    <th>Статус</th>
+                    <th className={styles.compactTableColDate}>Обновлено</th>
+                  </tr>
+                </thead>
+                <tbody>
                 {(knowledgeBases.data ?? []).map((item) => {
                   const isDisabled = !item.can_access;
                   const isSelected = selected?.id === item.id;
@@ -451,7 +453,7 @@ export default function KnowledgeBasePage() {
                     <td>
                       <StatusBadge status={item.status} indexing={shouldShowKnowledgeBaseIndexingBadge(item)} />
                     </td>
-                    <td>{formatDate(item.updated_at)}</td>
+                    <td className={styles.compactTableColDate}>{formatDate(item.updated_at)}</td>
                   </tr>
                 );
               })}
@@ -464,6 +466,7 @@ export default function KnowledgeBasePage() {
               )}
               </tbody>
             </table>
+            </div>
           </div>
 
           <div className={styles.kbCreateFooter}>
@@ -562,7 +565,9 @@ export default function KnowledgeBasePage() {
                   </button>
                 ))}
               </nav>
-              <div className={styles.detailTabScroll}>
+              <div
+                className={`${styles.detailTabScroll} ${activeTab === "sources" ? styles.detailTabScrollSources : ""} ${activeTab === "chunks" ? styles.detailTabScrollChunks : ""} ${activeTab === "test" ? styles.detailTabScrollTest : ""}`.trim()}
+              >
                 <DetailTabContent
                   tab={activeTab}
                   knowledgeBase={selected}
@@ -784,7 +789,7 @@ function DetailTabContent(props: {
 
   if (tab === "sources") {
     return (
-      <div className={styles.detailBody}>
+      <div className={`${styles.detailBody} ${styles.detailBodySources}`}>
         <SourcesFilesTree
           sources={sources}
           selectedSourceId={selectedSourceId}
@@ -812,7 +817,12 @@ function DetailTabContent(props: {
       <div className={styles.detailBody}>
         <div className={styles.chunkFilters}>
           {(["all", "excluded", "errors", "ocr"] as const).map((value) => (
-            <button key={value} type="button" className={chunkFilter === value ? styles.activeTab : undefined} onClick={() => setChunkFilter(value)}>
+            <button
+              key={value}
+              type="button"
+              className={`${styles.chunkFilterButton} ${chunkFilter === value ? styles.chunkFilterButtonActive : ""}`.trim()}
+              onClick={() => setChunkFilter(value)}
+            >
               {value === "all" ? "Все" : value === "excluded" ? "Исключённые" : value === "errors" ? "Ошибки" : "OCR"}
             </button>
           ))}
@@ -840,14 +850,28 @@ function DetailTabContent(props: {
     return (
       <div className={styles.detailBody}>
         <form
-          className={styles.ruleForm}
+          className={styles.kbQuickSearchForm}
           onSubmit={(event) => {
             event.preventDefault();
             if (newRuleText.trim()) createRule.mutate(newRuleText.trim());
           }}
         >
-          <input value={newRuleText} onChange={(e) => setNewRuleText(e.target.value)} placeholder="Текст нового правила" />
-          <button type="submit" disabled={createRule.isPending}>Добавить правило</button>
+          <div className={`${formStyles.selectField} ${formStyles.compact} ${styles.kbQuickSearchField}`}>
+            <input
+              className={formStyles.control}
+              value={newRuleText}
+              onChange={(e) => setNewRuleText(e.target.value)}
+              placeholder="Текст нового правила"
+              disabled={createRule.isPending}
+            />
+          </div>
+          <button
+            type="submit"
+            className={styles.kbQuickSearchSubmit}
+            disabled={createRule.isPending || !newRuleText.trim()}
+          >
+            Добавить правило
+          </button>
         </form>
         <CompactTable
           headers={["Правило", "Область", "Условие", "Действие", "Приоритет", "Статус"]}
@@ -875,55 +899,69 @@ function DetailTabContent(props: {
     const stages = buildIndexingStages(progressJob, totalSources, totalChunks);
     const params = progressJob?.processing_params ?? latestJob?.processing_params ?? {};
 
+    const indexingParams = [
+      { label: "Режим", value: progressJob ? jobTypeLabels[progressJob.job_type] : "—" },
+      { label: "Chunk size", value: String(params.chunk_size ?? "—") },
+      { label: "Overlap", value: String(params.chunk_overlap ?? "—") },
+      {
+        label: "Embedding",
+        value: progressJob?.embedding_model || String(params.embedding_model ?? "—"),
+        wrap: true
+      },
+      { label: "Qdrant", value: progressJob?.qdrant_collection || "—", wrap: true }
+    ];
+
     return (
-      <div className={styles.indexingLayout}>
-        <section className={styles.indexingMainColumn}>
-          {progressJob ? (
-            <article className={styles.indexingProgressCard}>
-              <header className={styles.indexingProgressHeader}>
-                <div>
-                  <h3 className={styles.sectionTitle}>Текущая индексация</h3>
-                  <p className={styles.indexingProgressMeta}>
-                    {progressJob.cancel_requested
-                      ? "Остановка запрошена — завершение текущего этапа"
-                      : `${jobTypeLabels[progressJob.job_type] ?? progressJob.job_type} · ${jobStatusLabels[progressJob.status]}`}
-                  </p>
-                </div>
-                <span className={styles.indexingDuration}>
-                  {formatJobDuration(progressJob)}
-                </span>
-              </header>
-              <div className={styles.progressBars}>
-                <div>
-                  <span>Источники: {progressJob.processed_sources_count} / {totalSources}</span>
-                  <div className={styles.progressTrack}>
-                    <div className={styles.progressFill} style={{ width: `${percent(progressJob.processed_sources_count, totalSources)}%` }} />
-                  </div>
-                </div>
-                <div>
-                  <span>Фрагменты: {progressJob.embedded_chunks_count ?? 0} / {totalChunks}</span>
-                  <div className={styles.progressTrack}>
-                    <div className={styles.progressFill} style={{ width: `${percent(progressJob.embedded_chunks_count ?? 0, totalChunks)}%` }} />
-                  </div>
+      <div className={styles.indexingTab}>
+        {progressJob ? (
+          <article className={styles.indexingProgressCard}>
+            <header className={styles.indexingProgressHeader}>
+              <div>
+                <h3 className={styles.sectionTitle}>Текущая индексация</h3>
+                <p className={styles.indexingProgressMeta}>
+                  {progressJob.cancel_requested
+                    ? "Остановка запрошена — завершение текущего этапа"
+                    : `${jobTypeLabels[progressJob.job_type] ?? progressJob.job_type} · ${jobStatusLabels[progressJob.status]}`}
+                </p>
+              </div>
+              <span className={styles.indexingDuration}>
+                {formatJobDuration(progressJob)}
+              </span>
+            </header>
+            <div className={styles.progressBars}>
+              <div>
+                <span>Источники: {progressJob.processed_sources_count} / {totalSources}</span>
+                <div className={styles.progressTrack}>
+                  <div className={styles.progressFill} style={{ width: `${percent(progressJob.processed_sources_count, totalSources)}%` }} />
                 </div>
               </div>
-              <ul className={styles.indexingPipeline}>
-                {stages.map((stage) => (
-                  <li key={stage.id} className={styles[`pipeline_${stage.status}`]}>
-                    {stage.status === "done" ? <CheckCircle2 size={16} /> : stage.status === "running" ? <RefreshCw size={16} className={styles.indexingSpinner} /> : <Circle size={16} />}
-                    <div>
-                      <strong>{stage.label}</strong>
-                      {stage.detail ? <span>{stage.detail}</span> : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            </article>
-          ) : (
-            <div className={styles.emptyState}>Активная индексация не выполняется. Запустите обработку источников.</div>
-          )}
+              <div>
+                <span>Фрагменты: {progressJob.embedded_chunks_count ?? 0} / {totalChunks}</span>
+                <div className={styles.progressTrack}>
+                  <div className={styles.progressFill} style={{ width: `${percent(progressJob.embedded_chunks_count ?? 0, totalChunks)}%` }} />
+                </div>
+              </div>
+            </div>
+            <ul className={styles.indexingPipeline}>
+              {stages.map((stage) => (
+                <li key={stage.id} className={styles[`pipeline_${stage.status}`]}>
+                  {stage.status === "done" ? <CheckCircle2 size={16} /> : stage.status === "running" ? <RefreshCw size={16} className={styles.indexingSpinner} /> : <Circle size={16} />}
+                  <div>
+                    <strong>{stage.label}</strong>
+                    {stage.detail ? <span>{stage.detail}</span> : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ) : (
+          <div className={styles.indexingIdleState}>Активная индексация не выполняется. Запустите обработку источников.</div>
+        )}
+        <section className={styles.indexingSideCard}>
           <h3 className={styles.sectionTitle}>По файлам</h3>
           <CompactTable
+            wrapClassName={styles.indexingTableWrap}
+            tableClassName={styles.indexingFilesTable}
             headers={["Файл", "Статус", "Чанков", "Embeddings", "Последняя индексация"]}
             rows={sources.map((source) => {
               const sourceChunks = chunks.filter((chunk) => chunk.source_id === source.id);
@@ -945,57 +983,68 @@ function DetailTabContent(props: {
             empty="Источники ещё не добавлены."
           />
         </section>
-        <aside className={styles.indexingSideColumn}>
-          {jobHistory.length > 0 ? (
-            <section className={styles.indexingSideCard}>
-              <h3 className={styles.sectionTitle}>История индексации</h3>
-              <CompactTable
-                headers={["Запуск", "Режим", "Статус", "Источники", "Фрагменты", "Ошибки"]}
-                rows={jobHistory.slice(0, 8).map((job) => [
-                  formatDate(job.started_at || job.created_at),
-                  jobTypeLabels[job.job_type] ?? job.job_type,
-                  jobStatusLabels[job.status] ?? job.status,
-                  `${job.processed_sources_count} / ${job.total_sources_count || job.processed_sources_count}`,
-                  formatNumber(job.created_fragments_count + job.updated_fragments_count),
-                  formatNumber(job.errors_count)
-                ])}
-                empty="Заданий индексации ещё не было."
-              />
-            </section>
-          ) : null}
+        {jobHistory.length > 0 ? (
           <section className={styles.indexingSideCard}>
-            <h3 className={styles.sectionTitle}>
-              Ошибки индексации
-              {(jobErrors.data ?? []).length ? <span className={styles.errorBadge}>{(jobErrors.data ?? []).length}</span> : null}
-            </h3>
+            <h3 className={styles.sectionTitle}>История индексации</h3>
             <CompactTable
-              headers={["Источник", "Этап", "Ошибка", "Рекомендация", "Действие"]}
-              rows={(jobErrors.data ?? []).map((error: KnowledgeBaseIndexingError) => {
-                const source = sources.find((item) => item.id === error.source_id);
-                return [
-                  source?.document_title || source?.original_filename || "—",
-                  error.error_type,
-                  error.user_message || error.technical_message || "-",
-                  error.recommended_action || "Повторите обработку",
-                  <button key={error.id} type="button" onClick={() => retryError.mutate(error.id)} disabled={retryError.isPending}>
-                    Повторить
-                  </button>
-                ];
-              })}
-              empty="Ошибок индексации нет."
+              wrapClassName={styles.indexingTableWrap}
+              tableClassName={styles.indexingHistoryTable}
+              headers={["Режим", "Статус", "Источники", "Фрагменты", "Ошибки", "Запуск"]}
+              rows={jobHistory.slice(0, 8).map((job) => [
+                jobTypeLabels[job.job_type] ?? job.job_type,
+                jobStatusLabels[job.status] ?? job.status,
+                `${job.processed_sources_count} / ${job.total_sources_count || job.processed_sources_count}`,
+                formatNumber(job.created_fragments_count + job.updated_fragments_count),
+                formatNumber(job.errors_count),
+                formatDate(job.started_at || job.created_at)
+              ])}
+              empty="Заданий индексации ещё не было."
             />
           </section>
-          <section className={styles.indexingSideCard}>
-            <h3 className={styles.sectionTitle}>Параметры индексации</h3>
-            <div className={styles.paramsGrid}>
-              <div><span>Режим</span><strong>{progressJob ? jobTypeLabels[progressJob.job_type] : "—"}</strong></div>
-              <div><span>Chunk size</span><strong>{String(params.chunk_size ?? "—")}</strong></div>
-              <div><span>Overlap</span><strong>{String(params.chunk_overlap ?? "—")}</strong></div>
-              <div><span>Embedding</span><strong>{progressJob?.embedding_model || String(params.embedding_model ?? "—")}</strong></div>
-              <div><span>Qdrant</span><strong>{progressJob?.qdrant_collection || "—"}</strong></div>
-            </div>
-          </section>
-        </aside>
+        ) : null}
+        <section className={styles.indexingSideCard}>
+          <h3 className={styles.sectionTitle}>
+            Ошибки индексации
+            {(jobErrors.data ?? []).length ? <span className={styles.errorBadge}>{(jobErrors.data ?? []).length}</span> : null}
+          </h3>
+          <CompactTable
+            wrapClassName={styles.indexingTableWrap}
+            tableClassName={styles.indexingErrorsTable}
+            headers={["Источник", "Этап", "Ошибка", "Рекомендация", "Действие"]}
+            rows={(jobErrors.data ?? []).map((error: KnowledgeBaseIndexingError) => {
+              const source = sources.find((item) => item.id === error.source_id);
+              return [
+                source?.document_title || source?.original_filename || "—",
+                error.error_type,
+                error.user_message || error.technical_message || "-",
+                error.recommended_action || "Повторите обработку",
+                <button
+                  key={error.id}
+                  type="button"
+                  className={styles.indexingRetryButton}
+                  onClick={() => retryError.mutate(error.id)}
+                  disabled={retryError.isPending}
+                >
+                  Повторить
+                </button>
+              ];
+            })}
+            empty="Ошибок индексации нет."
+          />
+        </section>
+        <section className={styles.indexingParamsCard}>
+          <h3 className={styles.sectionTitle}>Параметры индексации</h3>
+          <div className={styles.indexingParamsRow}>
+            {indexingParams.map((item) => (
+              <div key={item.label} className={styles.indexingParamItem}>
+                <span className={styles.indexingParamLabel}>{item.label}</span>
+                <strong className={`${styles.indexingParamValue} ${item.wrap ? styles.indexingParamValueWrap : ""}`.trim()}>
+                  {item.value}
+                </strong>
+              </div>
+            ))}
+          </div>
+        </section>
       </div>
     );
   }
@@ -1019,15 +1068,19 @@ function DetailTabContent(props: {
   }
 
   return (
-    <CompactTable
-      headers={["Действие", "Пользователь", "Дата"]}
-      rows={audit.map((item) => [
-        auditActionLabels[String(item.action ?? "")] ?? String(item.action ?? "-"),
-        String(item.actor_id ?? "-"),
-        formatDate(String(item.created_at ?? ""))
-      ])}
-      empty="Журнал действий пока пуст."
-    />
+    <div className={styles.detailBody}>
+      <CompactTable
+        wrapClassName={styles.auditTableWrap}
+        tableClassName={styles.auditTable}
+        headers={["Действие", "Пользователь", "Дата"]}
+        rows={audit.map((item) => [
+          auditActionLabels[String(item.action ?? "")] ?? String(item.action ?? "-"),
+          String(item.actor_id ?? "-"),
+          formatDate(String(item.created_at ?? item.occurred_at ?? item.timestamp ?? ""))
+        ])}
+        empty="Журнал действий пока пуст."
+      />
+    </div>
   );
 }
 
@@ -1154,12 +1207,14 @@ function SourcesFilesTree(props: {
 
   const tree = useMemo(
     () =>
-      buildSourceFileTree(
-        props.sources.map((source) => ({
-          id: source.id,
-          relativePath: sourceRelativePath(source),
-          fileSize: source.file_size ?? undefined
-        }))
+      collapseLinearFolderChainsInTree(
+        buildSourceFileTree(
+          props.sources.map((source) => ({
+            id: source.id,
+            relativePath: sourceRelativePath(source),
+            fileSize: source.file_size ?? undefined
+          }))
+        )
       ),
     [props.sources]
   );
@@ -1442,34 +1497,63 @@ function InfoGrid({ items }: { items: [string, string | number | null | undefine
   );
 }
 
-function CompactTable({ headers, rows, empty }: { headers: string[]; rows: React.ReactNode[][]; empty: string }) {
+function isDateTableColumn(header: string) {
+  return header === "Дата" || header === "Запуск" || header === "Обновлено" || header === "Последняя индексация";
+}
+
+function CompactTable({
+  headers,
+  rows,
+  empty,
+  wrapClassName,
+  tableClassName
+}: {
+  headers: string[];
+  rows: React.ReactNode[][];
+  empty: string;
+  wrapClassName?: string;
+  tableClassName?: string;
+}) {
   const actionsColumnIndex = headers.length - 1;
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.compactTable}>
-        <thead>
-          <tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => (
-            <tr key={index}>
-              {row.map((cell, cellIndex) => (
-                <td
-                  key={`${index}-${cellIndex}`}
-                  className={cellIndex === actionsColumnIndex && headers[actionsColumnIndex] === "Действия" ? styles.actionsCell : undefined}
-                >
-                  {cell}
-                </td>
+    <div className={[styles.tableWrap, wrapClassName].filter(Boolean).join(" ")}>
+      <div className={styles.tableWrapScroll}>
+        <table className={[styles.compactTable, tableClassName].filter(Boolean).join(" ")}>
+          <thead className={styles.compactTableHead}>
+            <tr>
+              {headers.map((header) => (
+                <th key={header} className={isDateTableColumn(header) ? styles.compactTableColDate : undefined}>
+                  {header}
+                </th>
               ))}
             </tr>
-          ))}
-          {!rows.length && (
-            <tr>
-              <td colSpan={headers.length} className={styles.emptyCell}>{empty}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows.map((row, index) => (
+              <tr key={index}>
+                {row.map((cell, cellIndex) => (
+                  <td
+                    key={`${index}-${cellIndex}`}
+                    className={[
+                      cellIndex === actionsColumnIndex && headers[actionsColumnIndex] === "Действия" ? styles.actionsCell : "",
+                      isDateTableColumn(headers[cellIndex] ?? "") ? styles.compactTableColDate : ""
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
+                  >
+                    {cell}
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {!rows.length && (
+              <tr>
+                <td colSpan={headers.length} className={styles.emptyCell}>{empty}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
