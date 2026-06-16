@@ -68,6 +68,12 @@
   background: var(--color-danger-surface);
 }
 
+.iconButtonActive {
+  color: var(--color-primary-text);
+  background: var(--color-primary-alpha-10);
+  box-shadow: inset 0 0 0 1px var(--color-primary-alpha-22);
+}
+
 .successButton {
   color: var(--color-success-text);
   background: var(--color-success-surface);
@@ -3130,8 +3136,6 @@
 .overviewTab {
   display: grid;
   gap: var(--summary-sections-gap);
-  container-type: inline-size;
-  container-name: overview-tab;
 }
 
 .overviewLoading {
@@ -3165,7 +3169,6 @@
   min-width: 0;
   height: 100%;
   padding: 12px;
-  overflow: hidden;
 }
 
 .overviewSectionTile .overviewSectionBody {
@@ -3352,8 +3355,6 @@
 .overviewGridSingle {
   display: grid;
   gap: var(--summary-rows-gap);
-  width: 100%;
-  min-width: 0;
 }
 
 .overviewGridCol {
@@ -3378,12 +3379,8 @@
 }
 
 .overviewSectionTile .overviewRow {
-  display: grid;
-  grid-template-columns: minmax(0, 9.25rem) minmax(0, 1fr);
-  gap: 6px 10px;
-  align-items: start;
-  width: 100%;
-  min-width: 0;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .overviewLabel {
@@ -3396,9 +3393,8 @@
 }
 
 .overviewSectionTile .overviewLabel {
-  min-width: 0;
+  flex: 0 1 46%;
   white-space: normal;
-  line-height: 1.35;
 }
 
 .overviewValue {
@@ -3412,19 +3408,17 @@
 }
 
 .overviewSectionTile .overviewValue {
+  flex: 1 1 auto;
   min-width: 0;
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.overviewSectionTile .overviewValueWrap {
-  overflow: visible;
-  text-overflow: unset;
+.overviewValueWrap {
+  flex: 1 1 auto;
+  min-width: 0;
   white-space: normal;
   overflow-wrap: anywhere;
-  word-break: break-word;
-  hyphens: auto;
 }
 
 .overviewValueSuccess {
@@ -3465,8 +3459,241 @@
   }
 }
 
-@container overview-tab (max-width: 520px) {
-  .overviewTileRow {
+/* ── Access editor (inline KB edit) ── */
+.accessEditor {
+  display: grid;
+  gap: 14px;
+  min-height: 0;
+}
+
+.accessEditorHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.accessEditorHeader h3 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.accessEditorHeader p {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.accessEditorTabs {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  width: fit-content;
+  background: var(--color-surface-muted, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+}
+
+.accessEditorTab,
+.accessEditorTabActive {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.accessEditorTabActive {
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: 0 1px 3px var(--color-shadow-06);
+}
+
+.accessEditorSection,
+.accessEditorAddPanel {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  background: var(--summary-block-bg);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--summary-block-radius);
+}
+
+.accessEditorSection h4,
+.accessEditorAddPanel h4 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.accessEditorHint,
+.accessEditorEmpty,
+.accessEditorLoading {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.accessEditorTable {
+  display: grid;
+  gap: 8px;
+}
+
+.accessEditorHead,
+.accessEditorRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 0.9fr) 72px 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.accessEditorHeadAccount,
+.accessEditorRowAccount {
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, 0.9fr) 36px;
+}
+
+.accessEditorHead {
+  padding: 0 4px;
+  color: var(--summary-label-color);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.accessEditorRow {
+  padding: 8px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.accessEditorSubject {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.accessEditorSubject strong,
+.accessEditorInheritedItem strong {
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.accessEditorSubject span,
+.accessEditorInheritedItem span {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.accessEditorCheckbox,
+.accessEditorCheckboxInline {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.accessEditorInheritedList {
+  display: grid;
+  gap: 8px;
+}
+
+.accessEditorInheritedItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.accessEditorInheritedMeta {
+  display: grid;
+  gap: 2px;
+  text-align: right;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.accessEditorAddForm {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 220px);
+  gap: 8px;
+  align-items: center;
+}
+
+.accessEditorCheckboxInline {
+  grid-column: 1 / -1;
+}
+
+.accessEditorCandidates {
+  display: grid;
+  gap: 6px;
+}
+
+.accessEditorCandidate {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.accessEditorCandidateSelected {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary-alpha-14);
+}
+
+.accessEditorCandidate strong {
+  color: var(--color-text-strong);
+  font-size: 12px;
+}
+
+.accessEditorCandidate span {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.accessEditorFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.accessEditorError {
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+@media (max-width: 900px) {
+  .accessEditorHead,
+  .accessEditorRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .accessEditorAddForm {
     grid-template-columns: minmax(0, 1fr);
   }
 }

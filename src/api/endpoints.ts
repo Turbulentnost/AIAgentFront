@@ -16,6 +16,7 @@ import type {
   DocumentUploadOptions,
   Page,
   HealthResponse,
+  Position,
   KnowledgeBase,
   KnowledgeBaseAccessExceptionInput,
   KnowledgeBaseListItem,
@@ -43,6 +44,11 @@ import type {
   NdChangeRequest,
   NdChangeRequestCreate,
   NdChangeTargetLocation,
+  NdControlDepartment,
+  NdControlDepartmentCreate,
+  NdControlPermissions,
+  NdDocumentCard,
+  NdDocumentCardUpdate,
   Role,
   Task,
   TaskCreate,
@@ -81,7 +87,7 @@ export const usersApi = {
     apiClient.get<ResponsibleUser[]>("/users/responsible-candidates").then((r) => r.data),
   syncFrom1C: () => apiClient.post<EmployeeSyncResult>("/users/sync").then((r) => r.data),
   get: (userId: string) => apiClient.get<User>(`/users/${userId}`).then((r) => r.data),
-  create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
+  create: (payload: UserCreate) => apiClient.post<User>("/admin/users", payload).then((r) => r.data),
   update: (userId: string, payload: UserUpdate) =>
     apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
@@ -97,9 +103,17 @@ export const departmentsApi = {
   syncStatus: () => apiClient.get<DepartmentSyncStatus>("/departments/sync/status").then((r) => r.data),
   syncFrom1C: () => apiClient.post<DepartmentSyncStatus>("/departments/sync").then((r) => r.data)
 };
+export const positionsApi = {
+  list: () => apiClient.get<Position[]>("/positions").then((r) => r.data)
+};
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),
-  available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data)
+  available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data),
+  uploadIcon: (agentId: string, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient.post<Agent>(`/agents/${agentId}/icon`, formData).then((r) => r.data);
+  }
 };
 export const rolesApi = {
   list: () => apiClient.get<Role[]>("/roles").then((r) => r.data)
@@ -201,7 +215,9 @@ export const knowledgeBasesApi = {
   index: (knowledgeBaseId: string, payload: { job_type: KnowledgeBaseIndexJobType; source_id?: string | null }) =>
     apiClient.post<KnowledgeBaseIndexingJob>(`/knowledge-bases/${knowledgeBaseId}/index`, payload).then((r) => r.data),
   cancelIndexing: (knowledgeBaseId: string, payload: { reason?: string | null; force?: boolean } = {}) =>
-    apiClient.post<KnowledgeBaseIndexingJob>(`/knowledge-bases/${knowledgeBaseId}/index/cancel`, payload).then((r) => r.data),
+    longRunningApiClient
+      .post<KnowledgeBaseIndexingJob>(`/knowledge-bases/${knowledgeBaseId}/index/cancel`, payload)
+      .then((r) => r.data),
   jobs: (knowledgeBaseId: string) =>
     apiClient.get<KnowledgeBaseIndexingJob[]>(`/knowledge-bases/${knowledgeBaseId}/index/jobs`).then((r) => r.data),
   jobErrors: (jobId: string) =>
@@ -278,4 +294,33 @@ export const ndChangeRequestsApi = {
     apiClient.get<Blob>(`/nd-change-requests/${requestId}/download-draft`, { responseType: "blob" }).then((r) => r.data),
   downloadNotice: (requestId: string) =>
     apiClient.get<Blob>(`/nd-change-requests/${requestId}/download-notice`, { responseType: "blob" }).then((r) => r.data)
+};
+
+export const ndControlApi = {
+  permissions: () => apiClient.get<NdControlPermissions>("/nd-control/me/permissions").then((r) => r.data),
+  listDepartments: () => apiClient.get<NdControlDepartment[]>("/nd-control/departments").then((r) => r.data),
+  createDepartment: (payload: NdControlDepartmentCreate) =>
+    apiClient.post<NdControlDepartment>("/nd-control/departments", payload).then((r) => r.data),
+  updateDepartment: (departmentId: string, payload: { name?: string; description?: string | null; sort_order?: number }) =>
+    apiClient.patch<NdControlDepartment>(`/nd-control/departments/${departmentId}`, payload).then((r) => r.data),
+  deleteDepartment: (departmentId: string) =>
+    apiClient.delete(`/nd-control/departments/${departmentId}`).then((r) => r.data),
+  setDepartmentKnowledgeBases: (departmentId: string, knowledge_base_ids: string[]) =>
+    apiClient
+      .put<NdControlDepartment>(`/nd-control/departments/${departmentId}/knowledge-bases`, { knowledge_base_ids })
+      .then((r) => r.data),
+  listDocumentCards: (params: {
+    department_id?: string;
+    knowledge_base_id?: string;
+    query?: string;
+    page?: number;
+    size?: number;
+  } = {}) =>
+    apiClient
+      .get<Page<NdDocumentCard>>("/nd-control/document-cards", { params })
+      .then((r) => r.data),
+  getDocumentCard: (cardId: string) =>
+    apiClient.get<NdDocumentCard>(`/nd-control/document-cards/${cardId}`).then((r) => r.data),
+  updateDocumentCard: (cardId: string, payload: NdDocumentCardUpdate) =>
+    apiClient.patch<NdDocumentCard>(`/nd-control/document-cards/${cardId}`, payload).then((r) => r.data)
 };

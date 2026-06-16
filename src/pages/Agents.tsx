@@ -1,6 +1,9 @@
-import { useMemo, useState } from "react";
-import { FolderOpen, Users } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
+import { useMemo, useRef, useState } from "react";
+import { Camera, FolderOpen, Users } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/auth/AuthContext";
+import { isNdControlAgent, navigateToAgentLaunch } from "@/utils/agentLaunch";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { FormSelect } from "@/components/form-controls";
 import type { AgentAccess, AgentStatus, Task } from "@/types";
@@ -102,14 +105,87 @@ function AgentStatusBadge({ status }: { status: AgentStatus }) {
   );
 }
 
+function AgentIconArt({
+  agent,
+  variant
+}: {
+  agent: AgentAccess;
+  variant: "full" | "compact";
+}) {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const isAdmin = Boolean(user?.is_superuser);
+  const iconSrc = agent.icon_url ?? AGENT_ILLUSTRATION;
+  const artClass = variant === "compact" ? styles.compactArt : styles.agentArt;
+
+  const uploadMutation = useMutation({
+    mutationFn: (file: File) => agentsApi.uploadIcon(agent.id, file),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["agents", "available"] });
+    }
+  });
+
+  const stopCardOpen = (event: React.MouseEvent | React.KeyboardEvent) => {
+    event.stopPropagation();
+  };
+
+  const handleCameraClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    stopCardOpen(event);
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    stopCardOpen(event);
+    const file = event.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+    }
+    event.target.value = "";
+  };
+
+  return (
+    <div
+      className={`${artClass} ${isAdmin ? styles.agentArtEditable : ""}`}
+      onClick={isAdmin ? stopCardOpen : undefined}
+    >
+      <img src={iconSrc} alt="" loading="lazy" />
+      {isAdmin ? (
+        <>
+          <span className={styles.agentArtOverlay} aria-hidden="true" />
+          <button
+            type="button"
+            className={styles.agentArtCamera}
+            aria-label={agent.icon_url ? "Изменить иконку агента" : "Задать иконку агента"}
+            onClick={handleCameraClick}
+            disabled={uploadMutation.isPending}
+          >
+            <Camera size={variant === "compact" ? 18 : 20} strokeWidth={2.1} aria-hidden="true" />
+          </button>
+          <input
+            ref={fileInputRef}
+            className={styles.agentArtFileInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            onChange={handleFileChange}
+            onClick={stopCardOpen}
+          />
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function AgentCard({
   agent,
   usageCount,
-  compact = false
+  compact = false,
+  onOpen
 }: {
   agent: AgentAccess;
   usageCount: number;
   compact?: boolean;
+  onOpen?: (event: React.MouseEvent<HTMLElement>) => void;
 }) {
   const capability = getCapabilityLabel(agent);
   const description =
@@ -118,11 +194,24 @@ function AgentCard({
 
   if (compact) {
     return (
-      <article className={styles.compactCard}>
+      <article
+        className={styles.compactCard}
+        onClick={onOpen}
+        onKeyDown={
+          onOpen
+            ? (event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  onOpen(event as unknown as React.MouseEvent<HTMLElement>);
+                }
+              }
+            : undefined
+        }
+        role={onOpen ? "button" : undefined}
+        tabIndex={onOpen ? 0 : undefined}
+      >
         <AgentStatusBadge status={agent.status} />
-        <div className={styles.compactArt}>
-          <img src={AGENT_ILLUSTRATION} alt="" loading="lazy" />
-        </div>
+        <AgentIconArt agent={agent} variant="compact" />
         <h3 className={styles.compactTitle}>{agent.name}</h3>
         <div className={styles.compactMeta}>
           <span className={styles.compactMetaRow}>
@@ -139,10 +228,24 @@ function AgentCard({
   }
 
   return (
-    <article className={styles.agentCard}>
-      <div className={styles.agentArt}>
-        <img src={AGENT_ILLUSTRATION} alt="" loading="lazy" />
-      </div>
+    <article
+      className={styles.agentCard}
+      onClick={onOpen}
+      onKeyDown={
+        onOpen
+          ? (event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                onOpen(event as unknown as React.MouseEvent<HTMLElement>);
+              }
+            }
+          : undefined
+      }
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      style={onOpen ? { cursor: "pointer" } : undefined}
+    >
+      <AgentIconArt agent={agent} variant="full" />
       <div className={styles.agentBody}>
         <div className={styles.agentBodyHead}>
           <h2 className={styles.agentTitle}>{agent.name}</h2>
@@ -165,6 +268,7 @@ function AgentCard({
 }
 
 export default function Agents() {
+  const navigate = useNavigate();
   const [kindTab, setKindTab] = useState<KindTab>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -220,6 +324,11 @@ export default function Agents() {
     () => pickRecommended(agentsQuery.data ?? []),
     [agentsQuery.data]
   );
+
+  const openAgent = (agent: AgentAccess) => {
+    if (!isNdControlAgent(agent)) return;
+    navigateToAgentLaunch(navigate, agent);
+  };
 
   const isLoading = agentsQuery.isLoading || departmentsQuery.isLoading;
   const isError = agentsQuery.isError;
@@ -291,6 +400,7 @@ export default function Agents() {
                   key={agent.id}
                   agent={agent}
                   usageCount={usageByAgent.get(agent.id) ?? 0}
+                  onOpen={isNdControlAgent(agent) ? () => openAgent(agent) : undefined}
                 />
               ))}
             </div>
@@ -311,6 +421,7 @@ export default function Agents() {
                   agent={agent}
                   usageCount={usageByAgent.get(agent.id) ?? 0}
                   compact
+                  onOpen={isNdControlAgent(agent) ? () => openAgent(agent) : undefined}
                 />
               ))}
             </div>
