@@ -1,8 +1,9 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { departmentsApi, usersApi } from "@/api/endpoints";
+import { departmentsApi, positionsApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
+import PositionSelect from "@/components/PositionSelect";
 import { FormSearchInput } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import type { Department, User, UserCreate } from "@/types";
@@ -67,8 +68,14 @@ export default function Users() {
     enabled: Boolean(user?.is_superuser)
   });
   const departmentsQuery = useQuery({ queryKey: ["departments"], queryFn: departmentsApi.list });
+  const positionsQuery = useQuery({
+    queryKey: ["positions"],
+    queryFn: positionsApi.list,
+    enabled: Boolean(user?.is_superuser)
+  });
 
   const departments = departmentsQuery.data ?? [];
+  const positions = positionsQuery.data ?? [];
   const filteredUsers = useMemo(
     () => (usersQuery.data ?? []).filter((item) => matchesUserSearch(item, search, departments)),
     [departments, search, usersQuery.data]
@@ -179,11 +186,14 @@ export default function Users() {
 
             <label className={styles.field}>
               <span className={styles.fieldLabel}>Должность</span>
-              <input
-                className={`${formStyles.control} ${styles.compactControl}`}
-                placeholder="Инженер-конструктор"
-                value={form.position}
-                onChange={(event) => setForm({ ...form, position: event.target.value })}
+              <PositionSelect
+                value={form.position || ""}
+                onChange={(value) => setForm({ ...form, position: value || undefined })}
+                positions={positions}
+                loading={positionsQuery.isLoading}
+                placeholder="Выберите должность"
+                ariaLabel="Должность"
+                compact
               />
             </label>
 

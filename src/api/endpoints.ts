@@ -16,6 +16,7 @@ import type {
   DocumentUploadOptions,
   Page,
   HealthResponse,
+  Position,
   KnowledgeBase,
   KnowledgeBaseAccessExceptionInput,
   KnowledgeBaseListItem,
@@ -81,7 +82,7 @@ export const usersApi = {
     apiClient.get<ResponsibleUser[]>("/users/responsible-candidates").then((r) => r.data),
   syncFrom1C: () => apiClient.post<EmployeeSyncResult>("/users/sync").then((r) => r.data),
   get: (userId: string) => apiClient.get<User>(`/users/${userId}`).then((r) => r.data),
-  create: (payload: UserCreate) => apiClient.post<User>("/users", payload).then((r) => r.data),
+  create: (payload: UserCreate) => apiClient.post<User>("/admin/users", payload).then((r) => r.data),
   update: (userId: string, payload: UserUpdate) =>
     apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
@@ -96,6 +97,9 @@ export const departmentsApi = {
   create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data),
   syncStatus: () => apiClient.get<DepartmentSyncStatus>("/departments/sync/status").then((r) => r.data),
   syncFrom1C: () => apiClient.post<DepartmentSyncStatus>("/departments/sync").then((r) => r.data)
+};
+export const positionsApi = {
+  list: () => apiClient.get<Position[]>("/positions").then((r) => r.data)
 };
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),

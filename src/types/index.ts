@@ -227,6 +227,10 @@ export interface EmployeeSyncResult {
   synced_count: number;
 }
 
+export interface Position {
+  name: string;
+}
+
 export interface User {
   id: string;
   email: string;
