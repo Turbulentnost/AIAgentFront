@@ -1033,3 +1033,77 @@ export interface SandboxRun {
   error_message?: string | null;
   steps: SandboxStep[];
 }
+
+export type NdDocumentType = "policy" | "regulation" | "procedure" | "sto" | "instruction";
+export type NdQmsLevel = "strategic" | "organizational" | "process" | "technical" | "operational";
+export type NdDocumentCardStatus = "active" | "draft" | "superseded" | "archived";
+export type NdConfidentialityLevel = "public" | "restricted" | "confidential";
+
+export interface NdControlPermissions {
+  can_manage_departments: boolean;
+  can_access_agent: boolean;
+}
+
+export interface NdControlDepartment {
+  id: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_by_user_id: string | null;
+  knowledge_bases_count: number;
+  cards_count: number;
+  knowledge_base_ids: string[];
+}
+
+export interface NdControlDepartmentCreate {
+  name: string;
+  description?: string | null;
+  knowledge_base_ids: string[];
+}
+
+export interface NdDocumentCard {
+  id: string;
+  department_id: string;
+  knowledge_base_id: string;
+  knowledge_base_source_id: string;
+  document_id: string;
+  document_version_id: string;
+  document_code: string | null;
+  document_name: string | null;
+  document_type: NdDocumentType | null;
+  qms_level: NdQmsLevel | null;
+  version: string | null;
+  status: NdDocumentCardStatus;
+  approval_date: string | null;
+  effective_date: string | null;
+  process_owner: string | null;
+  author: string | null;
+  reviewer: string | null;
+  approver: string | null;
+  owner_department: string | null;
+  scope: string | null;
+  related_processes: string[] | null;
+  related_departments: string[] | null;
+  related_documents: string[] | null;
+  normative_references: string[] | null;
+  record_forms: string[] | null;
+  retention_period: string | null;
+  original_storage_location: string | null;
+  electronic_storage_location: string | null;
+  has_process_diagram: boolean;
+  has_acknowledgement_sheet: boolean;
+  acknowledgement_targets: string[] | null;
+  confidentiality_level: NdConfidentialityLevel | null;
+  change_history: Array<Record<string, unknown>> | null;
+  approval_history: Array<Record<string, unknown>> | null;
+  attachments: string[] | null;
+  archived_versions: string[] | null;
+}
+
+export type NdDocumentCardUpdate = Partial<
+  Omit<
+    NdDocumentCard,
+    "id" | "department_id" | "knowledge_base_id" | "knowledge_base_source_id" | "document_id" | "document_version_id"
+  >
+>;

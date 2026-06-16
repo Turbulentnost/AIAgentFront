@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { FolderOpen, Users } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { FormSelect } from "@/components/form-controls";
 import type { AgentAccess, AgentStatus, Task } from "@/types";
@@ -105,11 +106,13 @@ function AgentStatusBadge({ status }: { status: AgentStatus }) {
 function AgentCard({
   agent,
   usageCount,
-  compact = false
+  compact = false,
+  onOpen
 }: {
   agent: AgentAccess;
   usageCount: number;
   compact?: boolean;
+  onOpen?: () => void;
 }) {
   const capability = getCapabilityLabel(agent);
   const description =
@@ -118,7 +121,7 @@ function AgentCard({
 
   if (compact) {
     return (
-      <article className={styles.compactCard}>
+      <article className={styles.compactCard} onClick={onOpen} role={onOpen ? "button" : undefined} tabIndex={onOpen ? 0 : undefined}>
         <AgentStatusBadge status={agent.status} />
         <div className={styles.compactArt}>
           <img src={AGENT_ILLUSTRATION} alt="" loading="lazy" />
@@ -139,7 +142,13 @@ function AgentCard({
   }
 
   return (
-    <article className={styles.agentCard}>
+    <article
+      className={styles.agentCard}
+      onClick={onOpen}
+      role={onOpen ? "button" : undefined}
+      tabIndex={onOpen ? 0 : undefined}
+      style={onOpen ? { cursor: "pointer" } : undefined}
+    >
       <div className={styles.agentArt}>
         <img src={AGENT_ILLUSTRATION} alt="" loading="lazy" />
       </div>
@@ -165,6 +174,7 @@ function AgentCard({
 }
 
 export default function Agents() {
+  const navigate = useNavigate();
   const [kindTab, setKindTab] = useState<KindTab>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -220,6 +230,12 @@ export default function Agents() {
     () => pickRecommended(agentsQuery.data ?? []),
     [agentsQuery.data]
   );
+
+  const openAgent = (agent: AgentAccess) => {
+    if (agent.slug === "nd_control_agent") {
+      navigate("/agents/nd-control");
+    }
+  };
 
   const isLoading = agentsQuery.isLoading || departmentsQuery.isLoading;
   const isError = agentsQuery.isError;
@@ -291,6 +307,7 @@ export default function Agents() {
                   key={agent.id}
                   agent={agent}
                   usageCount={usageByAgent.get(agent.id) ?? 0}
+                  onOpen={agent.slug === "nd_control_agent" ? () => openAgent(agent) : undefined}
                 />
               ))}
             </div>
@@ -311,6 +328,7 @@ export default function Agents() {
                   agent={agent}
                   usageCount={usageByAgent.get(agent.id) ?? 0}
                   compact
+                  onOpen={agent.slug === "nd_control_agent" ? () => openAgent(agent) : undefined}
                 />
               ))}
             </div>
