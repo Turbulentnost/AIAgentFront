@@ -2,6 +2,9 @@ import { apiClient, longRunningApiClient } from "./client";
 import type {
   Agent,
   AgentAccess,
+  AgentAccessManagement,
+  AgentDepartmentGrantInput,
+  AgentUserGrantInput,
   BrowserRun,
   BrowserRunResult,
   ChunkSearchHit,
@@ -118,6 +121,10 @@ export const positionsApi = {
 export const agentsApi = {
   list: () => apiClient.get<Agent[]>("/agents").then((r) => r.data),
   available: () => apiClient.get<AgentAccess[]>("/agents/available").then((r) => r.data),
+  access: (agentId: string) =>
+    apiClient.get<AgentAccessManagement>(`/agents/${agentId}/access`).then((r) => r.data),
+  updateAccess: (agentId: string, payload: { department_grants: AgentDepartmentGrantInput[]; user_grants: AgentUserGrantInput[] }) =>
+    apiClient.put<AgentAccessManagement>(`/agents/${agentId}/access`, payload).then((r) => r.data),
   uploadIcon: (agentId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

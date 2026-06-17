@@ -74,6 +74,53 @@ export interface AgentAccess extends Agent {
   can_configure: boolean;
 }
 
+export type AgentPermissionLevel = "run" | "view_results" | "approve" | "configure";
+
+export interface AgentDepartmentGrant {
+  id: string;
+  department_id: string;
+  access_level: string;
+  can_run: boolean;
+  can_view_results: boolean;
+  can_approve: boolean;
+  can_configure: boolean;
+}
+
+export interface AgentUserGrant {
+  id: string;
+  user_id: string;
+  access_level: string;
+  can_run: boolean;
+  can_view_results: boolean;
+  can_approve: boolean;
+  can_configure: boolean;
+  expires_at?: string | null;
+}
+
+export interface AgentAccessManagement {
+  department_grants: AgentDepartmentGrant[];
+  user_grants: AgentUserGrant[];
+}
+
+export interface AgentDepartmentGrantInput {
+  department_id: string;
+  access_level: string;
+  can_run: boolean;
+  can_view_results: boolean;
+  can_approve: boolean;
+  can_configure: boolean;
+}
+
+export interface AgentUserGrantInput {
+  user_id: string;
+  access_level: string;
+  can_run: boolean;
+  can_view_results: boolean;
+  can_approve: boolean;
+  can_configure: boolean;
+  expires_at?: string | null;
+}
+
 export interface Role {
   id: string;
   name: string;

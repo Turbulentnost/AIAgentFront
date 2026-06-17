@@ -1,10 +1,11 @@
 import { useMemo, useRef, useState } from "react";
-import { Camera, FolderOpen, Users } from "lucide-react";
+import { Camera, Edit3, FolderOpen, Users } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { isNdControlAgent, navigateToAgentLaunch } from "@/utils/agentLaunch";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
+import { AgentAccessEditor } from "@/components/AgentAccessEditor";
 import { FormSelect } from "@/components/form-controls";
 import type { AgentAccess, AgentStatus, Task } from "@/types";
 import styles from "./Agents.module.css";
@@ -176,6 +177,85 @@ function AgentIconArt({
   );
 }
 
+function RecommendedAgentCard({
+  agent,
+  usageCount,
+  isAccessExpanded,
+  onToggleAccess,
+  onOpen
+}: {
+  agent: AgentAccess;
+  usageCount: number;
+  isAccessExpanded: boolean;
+  onToggleAccess: () => void;
+  onOpen?: () => void;
+}) {
+  const { user } = useAuth();
+  const isAdmin = Boolean(user?.is_superuser);
+  const capability = getCapabilityLabel(agent);
+
+  const stopPropagation = (event: React.MouseEvent) => {
+    event.stopPropagation();
+  };
+
+  return (
+    <article
+      className={`${styles.compactFlipCard} ${isAccessExpanded ? styles.compactFlipCardFlipped : ""}`}
+    >
+      <div className={`${styles.compactFlipInner} ${isAccessExpanded ? styles.compactFlipInnerFlipped : ""}`}>
+        <div
+          className={`${styles.compactFlipFace} ${styles.compactFlipFront} ${styles.compactCardFace}`}
+          onClick={onOpen}
+          onKeyDown={
+            onOpen
+              ? (event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onOpen();
+                  }
+                }
+              : undefined
+          }
+          role={onOpen ? "button" : undefined}
+          tabIndex={onOpen ? 0 : undefined}
+        >
+          <AgentStatusBadge status={agent.status} />
+          <AgentIconArt agent={agent} variant="compact" />
+          <h3 className={styles.compactTitle}>{agent.name}</h3>
+          <div className={styles.compactMeta}>
+            <span className={styles.compactMetaRow}>
+              <FolderOpen size={12} strokeWidth={2} aria-hidden="true" />
+              <span className={styles.compactMetaText}>{capability}</span>
+            </span>
+            <span className={styles.compactMetaRow}>
+              <Users size={12} strokeWidth={2} aria-hidden="true" />
+              <span className={styles.compactMetaText}>{formatUsageCount(usageCount)}</span>
+            </span>
+          </div>
+          {isAdmin ? (
+            <button
+              type="button"
+              className={styles.compactAccessButton}
+              onClick={(event) => {
+                stopPropagation(event);
+                onToggleAccess();
+              }}
+              title="Редактировать доступ к агенту"
+              aria-label="Редактировать доступ к агенту"
+            >
+              <Edit3 size={14} strokeWidth={2.1} aria-hidden="true" />
+            </button>
+          ) : null}
+        </div>
+
+        <div className={`${styles.compactFlipFace} ${styles.compactFlipBack} ${styles.compactCardFace}`}>
+          <AgentAccessEditor agent={agent} compact onClose={onToggleAccess} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function AgentCard({
   agent,
   usageCount,
@@ -272,6 +352,7 @@ export default function Agents() {
   const [kindTab, setKindTab] = useState<KindTab>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
+  const [expandedAccessAgentId, setExpandedAccessAgentId] = useState<string | null>(null);
 
   const agentsQuery = useQuery({
     queryKey: ["agents", "available"],
@@ -416,11 +497,14 @@ export default function Agents() {
           ) : (
             <div className={styles.compactGrid}>
               {recommendedAgents.map((agent) => (
-                <AgentCard
+                <RecommendedAgentCard
                   key={agent.id}
                   agent={agent}
                   usageCount={usageByAgent.get(agent.id) ?? 0}
-                  compact
+                  isAccessExpanded={expandedAccessAgentId === agent.id}
+                  onToggleAccess={() =>
+                    setExpandedAccessAgentId((current) => (current === agent.id ? null : agent.id))
+                  }
                   onOpen={isNdControlAgent(agent) ? () => openAgent(agent) : undefined}
                 />
               ))}

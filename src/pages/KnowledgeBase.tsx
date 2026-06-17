@@ -268,8 +268,9 @@ export default function KnowledgeBasePage() {
   });
 
   const applyCancelSuccess = (job: KnowledgeBaseIndexingJob | undefined, knowledgeBaseId: string) => {
-    queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
-      items?.map((item) =>
+    queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) => {
+      if (!Array.isArray(items)) return items;
+      return items.map((item) =>
         item.id === knowledgeBaseId
           ? {
               ...item,
@@ -277,8 +278,8 @@ export default function KnowledgeBasePage() {
               status: item.fragments_count > 0 ? "ready" : item.status
             }
           : item
-      )
-    );
+      );
+    });
     if (job?.id) {
       queryClient.setQueryData<KnowledgeBaseIndexingJob[]>(
         ["knowledge-base-jobs", knowledgeBaseId],
@@ -338,13 +339,14 @@ export default function KnowledgeBasePage() {
   const confirmReview = useMutation({
     mutationFn: (knowledgeBaseId: string) => knowledgeBasesApi.confirmReview(knowledgeBaseId),
     onSuccess: async (_kb, knowledgeBaseId) => {
-      queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
-        items?.map((item) =>
+      queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) => {
+        if (!Array.isArray(items)) return items;
+        return items.map((item) =>
           item.id === knowledgeBaseId
             ? { ...item, status: "ready", can_confirm_review: false }
             : item
-        )
-      );
+        );
+      });
       await queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
       await queryClient.invalidateQueries({ queryKey: ["knowledge-bases", "stats"] });
       await queryClient.invalidateQueries({ queryKey: ["knowledge-base-readiness", knowledgeBaseId] });

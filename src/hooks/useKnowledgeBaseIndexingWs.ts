@@ -114,8 +114,9 @@ function applyIndexingMessage(queryClient: QueryClient, message: KnowledgeBaseIn
     );
   }
 
-  queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) =>
-    items?.map((item) =>
+  queryClient.setQueriesData<KnowledgeBaseListItem[]>({ queryKey: ["knowledge-bases"] }, (items) => {
+    if (!Array.isArray(items)) return items;
+    return items.map((item) =>
       item.id === kbId
         ? {
             ...item,
@@ -125,8 +126,8 @@ function applyIndexingMessage(queryClient: QueryClient, message: KnowledgeBaseIn
             sources_count: message.sources_count
           }
         : item
-    )
-  );
+    );
+  });
 
   if (["completed", "failed", "cancelled", "partial"].includes(message.event) || jobCancelled) {
     void queryClient.invalidateQueries({ queryKey: ["knowledge-bases"] });
