@@ -40,6 +40,8 @@ export default function NdControlAgent() {
   const [deptPendingDelete, setDeptPendingDelete] = useState<NdControlDepartment | null>(null);
   const [showReanalyzeDialog, setShowReanalyzeDialog] = useState(false);
   const [selectedCard, setSelectedCard] = useState<DepartmentStructuralDocumentCard | null>(null);
+  const [relationsProcessId, setRelationsProcessId] = useState<string | undefined>();
+  const [relationsProcessName, setRelationsProcessName] = useState<string | undefined>();
 
   const permissions = useQuery({
     queryKey: ["nd-control", "permissions"],
@@ -139,11 +141,6 @@ export default function NdControlAgent() {
       }
       await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
     }
-  });
-
-  const confirmOwner = useMutation({
-    mutationFn: (processId: string) => ndControlApi.confirmProcessOwner(processId, {}),
-    onSuccess: async () => queryClient.invalidateQueries({ queryKey: ["nd-control"] })
   });
 
   const searchVisible = activeTab !== "overview" && activeTab !== "history";
@@ -267,11 +264,29 @@ export default function NdControlAgent() {
                 <DepartmentProcessesTab
                   departmentId={selectedDeptId}
                   search={search}
-                  onConfirmOwner={(processId) => confirmOwner.mutate(processId)}
+                  isAnalysisRunning={showAnalysisScreen}
+                  analysisProcessed={analysisStatus.data?.processed_documents}
+                  analysisTotal={analysisStatus.data?.total_documents}
+                  onStartAnalysis={() => setShowReanalyzeDialog(true)}
+                  onOpenDocuments={() => setActiveTab("documents")}
+                  onOpenRelations={(processId, processName) => {
+                    setRelationsProcessId(processId);
+                    setRelationsProcessName(processName);
+                    setActiveTab("relations");
+                  }}
                 />
               ) : null}
               {activeTab === "relations" ? (
-                <DepartmentRelationsTab departmentId={selectedDeptId} search={search} />
+                <DepartmentRelationsTab
+                  departmentId={selectedDeptId}
+                  search={search}
+                  processId={relationsProcessId}
+                  processName={relationsProcessName}
+                  onClearProcessFilter={() => {
+                    setRelationsProcessId(undefined);
+                    setRelationsProcessName(undefined);
+                  }}
+                />
               ) : null}
               {activeTab === "review" ? (
                 <DepartmentReviewTab departmentId={selectedDeptId} search={search} />

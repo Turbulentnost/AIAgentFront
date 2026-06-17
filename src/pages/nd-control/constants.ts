@@ -41,6 +41,40 @@ export const KB_STATUS_LABELS: Record<string, string> = {
   error: "Ошибки"
 };
 
+export const CONFIDENCE_LABELS: Record<string, string> = {
+  high: "Высокая",
+  medium: "Средняя",
+  low: "Низкая"
+};
+
+export const EXTRACTION_TYPE_LABELS: Record<string, string> = {
+  explicit: "Явно из документа",
+  inferred: "Вывод агента",
+  uncertain: "Требует проверки"
+};
+
+export const CONFIRMATION_LABELS: Record<string, string> = {
+  confirmed: "Подтверждено",
+  pending: "Не подтверждено",
+  rejected: "Отклонено"
+};
+
+export const REVIEW_STATUS_LABELS: Record<string, string> = {
+  pending: "На проверке",
+  approved: "Подтверждено",
+  rejected: "Отклонено"
+};
+
+export const ENTITY_TYPE_LABELS: Record<string, string> = {
+  Document: "Документ",
+  Process: "Процесс",
+  Department: "Отдел",
+  Role: "Роль",
+  Form: "Форма",
+  System: "Система",
+  Resource: "Ресурс"
+};
+
 export const RELATION_TYPE_LABELS: Record<string, string> = {
   DEPARTMENT_OWNS_PROCESS: "Отдел владеет процессом",
   DEPARTMENT_PARTICIPATES_IN_PROCESS: "Отдел участвует в процессе",
