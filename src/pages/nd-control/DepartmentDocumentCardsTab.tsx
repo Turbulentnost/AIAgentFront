@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ndControlApi } from "@/api/endpoints";
 import type { DepartmentStructuralDocumentCard } from "@/types";
 import { EXTRACTION_STATUS_LABELS } from "./constants";
+import NdControlDataTable from "./NdControlDataTable";
 import { formatDateTime } from "./utils";
 import styles from "../NdControlAgent.module.css";
 
@@ -41,9 +42,8 @@ export default function DepartmentDocumentCardsTab({
   }
 
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
+    <NdControlDataTable>
+      <thead className={styles.tableHead}>
           <tr>
             <th>Код</th>
             <th>Наименование</th>
@@ -62,7 +62,7 @@ export default function DepartmentDocumentCardsTab({
           {cards.data.items.map((card) => (
             <tr key={card.document_card_id}>
               <td>{card.document_code ?? "—"}</td>
-              <td>{card.title ?? card.file_name ?? "—"}</td>
+              <td className={styles.cellEllipsis}>{card.title ?? card.file_name ?? "—"}</td>
               <td>{card.document_type ?? "—"}</td>
               <td>{card.version ?? "—"}</td>
               <td>{card.status ?? "—"}</td>
@@ -95,8 +95,7 @@ export default function DepartmentDocumentCardsTab({
               </td>
             </tr>
           ))}
-        </tbody>
-      </table>
-    </div>
+      </tbody>
+    </NdControlDataTable>
   );
 }

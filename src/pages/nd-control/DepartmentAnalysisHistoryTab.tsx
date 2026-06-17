@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { ndControlApi } from "@/api/endpoints";
 import { formatDateTime, formatDuration } from "./utils";
+import NdControlDataTable from "./NdControlDataTable";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
@@ -25,16 +26,16 @@ export default function DepartmentAnalysisHistoryTab({ departmentId, onReanalyze
   }
 
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
+    <>
+      <NdControlDataTable>
+        <thead className={styles.tableHead}>
           <tr>
             <th>Запуск</th>
             <th>Завершение</th>
             <th>Статус</th>
             <th>Документы</th>
             <th>Ошибки</th>
-            <th>Needs review</th>
+            <th>На проверке</th>
             <th>Процессы</th>
             <th>Связи</th>
             <th>Длительность</th>
@@ -44,8 +45,8 @@ export default function DepartmentAnalysisHistoryTab({ departmentId, onReanalyze
         <tbody>
           {runs.data.items.map((run) => (
             <tr key={run.run_id}>
-              <td>{formatDateTime(run.started_at)}</td>
-              <td>{formatDateTime(run.finished_at)}</td>
+              <td className={styles.cellNowrap}>{formatDateTime(run.started_at)}</td>
+              <td className={styles.cellNowrap}>{formatDateTime(run.finished_at)}</td>
               <td>{run.status}</td>
               <td>
                 {run.processed_documents}/{run.total_documents}
@@ -63,13 +64,13 @@ export default function DepartmentAnalysisHistoryTab({ departmentId, onReanalyze
             </tr>
           ))}
         </tbody>
-      </table>
+      </NdControlDataTable>
       {runs.data.items.some((run) => run.error_message) ? (
         <div className={styles.sectionCard}>
           <h3>Последняя ошибка</h3>
           <p>{runs.data.items.find((run) => run.error_message)?.error_message}</p>
         </div>
       ) : null}
-    </div>
+    </>
   );
 }

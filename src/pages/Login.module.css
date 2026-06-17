@@ -722,11 +722,24 @@
 }
 
 .rememberCheckbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
   flex: 0 0 auto;
   color: var(--color-login-label);
   font-size: 0.8125rem;
   font-weight: 700;
   white-space: nowrap;
+  cursor: pointer;
+}
+
+.rememberCheckbox input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  accent-color: var(--nav-button-primary-bg, #2563eb);
 }
 
 .rememberCheckbox span:last-child {

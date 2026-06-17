@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ndControlApi } from "@/api/endpoints";
 import type { DepartmentRelationItem } from "@/types";
+import NdControlDataTable from "./NdControlDataTable";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
@@ -18,9 +19,8 @@ function RelationReviewTable({
   onReject: (id: string) => void;
 }) {
   return (
-    <div className={styles.tableWrap}>
-      <table className={styles.table}>
-        <thead>
+    <NdControlDataTable>
+      <thead className={styles.tableHead}>
           <tr>
             <th>Источник</th>
             <th>Связь</th>
@@ -58,9 +58,8 @@ function RelationReviewTable({
               </td>
             </tr>
           ))}
-        </tbody>
-      </table>
-    </div>
+      </tbody>
+    </NdControlDataTable>
   );
 }
 
@@ -106,9 +105,8 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
         <section className={styles.sectionCard}>
           <h3>Владельцы процессов</h3>
           <p className={styles.sectionHint}>Подтвердите или скорректируйте кандидата владельца для каждого процесса.</p>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
+          <NdControlDataTable>
+            <thead className={styles.tableHead}>
                 <tr>
                   <th>Процесс</th>
                   <th>Кандидат</th>
@@ -134,8 +132,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </NdControlDataTable>
         </section>
       ) : null}
 
@@ -185,9 +182,8 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
         <section className={styles.sectionCard}>
           <h3>Ошибки извлечения</h3>
           <p className={styles.sectionHint}>Документы, при обработке которых произошла ошибка. Запустите повторный анализ.</p>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
+          <NdControlDataTable>
+            <thead className={styles.tableHead}>
                 <tr>
                   <th>Код</th>
                   <th>Документ</th>
@@ -203,8 +199,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </NdControlDataTable>
         </section>
       ) : null}
 
@@ -212,9 +207,8 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
         <section className={styles.sectionCard}>
           <h3>Документы на проверке</h3>
           <p className={styles.sectionHint}>Карточки документов, которые агент пометил как требующие ручной проверки.</p>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
+          <NdControlDataTable>
+            <thead className={styles.tableHead}>
                 <tr>
                   <th>Код</th>
                   <th>Документ</th>
@@ -230,8 +224,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
                   </tr>
                 ))}
               </tbody>
-            </table>
-          </div>
+          </NdControlDataTable>
         </section>
       ) : null}
     </div>

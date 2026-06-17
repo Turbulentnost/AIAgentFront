@@ -480,7 +480,7 @@ export default function Login() {
 
             {!isCorporateMode && (
               <div className={styles.formMeta}>
-                <label className={styles.checkbox}>
+                <label className={styles.rememberCheckbox}>
                   <input
                     checked={rememberMe}
                     type="checkbox"

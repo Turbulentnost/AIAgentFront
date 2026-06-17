@@ -1,6 +1,7 @@
 import { AlertTriangle, CheckCircle2 } from "lucide-react";
 import type { DepartmentSummary } from "@/types";
 import { KB_STATUS_LABELS } from "./constants";
+import NdControlDataTable from "./NdControlDataTable";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
@@ -82,9 +83,8 @@ export default function DepartmentOverviewTab({
         {topProcesses.length === 0 ? (
           <p className={styles.emptyHint}>Процессы пока не найдены.</p>
         ) : (
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
+          <NdControlDataTable>
+            <thead className={styles.tableHead}>
                 <tr>
                   <th>Процесс</th>
                   <th>Владелец</th>
@@ -109,9 +109,8 @@ export default function DepartmentOverviewTab({
                     </td>
                   </tr>
                 ))}
-              </tbody>
-            </table>
-          </div>
+            </tbody>
+          </NdControlDataTable>
         )}
       </section>
 

@@ -1,198 +1,197 @@
-import { X } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  AlignLeft,
+  CircleDot,
+  FileText,
+  GitBranch,
+  Layers,
+  ListOrdered,
+  LogIn,
+  LogOut,
+  Network,
+  Target,
+  User,
+  X
+} from "lucide-react";
 import type { DepartmentProcessItem } from "@/types";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
   process: DepartmentProcessItem | null;
-  onClose: () => void;
   onConfirmOwner: (process: DepartmentProcessItem) => void;
   onOpenRelations: (processId: string, processName: string) => void;
+  onDismiss?: () => void;
   onOpenDocument?: (documentId: string) => void;
 };
 
-function ListBlock({ title, items, emptyLabel }: { title: string; items: string[]; emptyLabel: string }) {
+function ownerBadgeClass(status: string) {
+  if (status === "Подтверждён") return styles.drawerStatusOk;
+  if (status === "Требует проверки") return styles.drawerStatusReview;
+  return styles.drawerStatusNeutral;
+}
+
+function confidenceDotClass(level: string | null | undefined) {
+  if (level === "high") return styles.confidenceDotHigh;
+  if (level === "low") return styles.confidenceDotLow;
+  return styles.confidenceDotMedium;
+}
+
+function DetailRow({
+  icon: Icon,
+  label,
+  children
+}: {
+  icon: typeof Target;
+  label: string;
+  children: ReactNode;
+}) {
   return (
-    <section className={styles.drawerSection}>
-      <h4>{title}</h4>
-      {items.length ? (
-        <ul className={styles.drawerList}>
-          {items.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      ) : (
-        <p className={styles.drawerEmpty}>{emptyLabel}</p>
-      )}
-    </section>
+    <div className={styles.detailRow}>
+      <span className={styles.detailRowIcon} aria-hidden>
+        <Icon size={16} strokeWidth={1.75} />
+      </span>
+      <div className={styles.detailRowContent}>
+        <span className={styles.detailRowLabel}>{label}</span>
+        <div className={styles.detailRowValue}>{children}</div>
+      </div>
+    </div>
   );
 }
 
-function ownerBadgeClass(status: string) {
-  if (status === "Подтверждён") return styles.badgeOk;
-  if (status === "Требует проверки") return styles.badgeReview;
-  return styles.badgeNeutral;
+function ListValue({ items, emptyLabel }: { items: string[]; emptyLabel: string }) {
+  if (!items.length) return <span className={styles.detailEmpty}>{emptyLabel}</span>;
+  return (
+    <ul className={styles.detailList}>
+      {items.map((item) => (
+        <li key={item}>{item}</li>
+      ))}
+    </ul>
+  );
 }
 
 export default function ProcessDetailsDrawer({
   process,
-  onClose,
   onConfirmOwner,
   onOpenRelations,
+  onDismiss,
   onOpenDocument
 }: Props) {
-  if (!process) return null;
+  if (!process) {
+    return (
+      <div className={styles.processDetailsEmpty}>
+        <p>Выберите процесс в таблице.</p>
+      </div>
+    );
+  }
 
   const ownerActionLabel = process.owner.candidate ? "Подтвердить владельца" : "Назначить владельца";
+  const primaryDoc = process.source_documents[0];
 
   return (
-    <div className={styles.drawerOverlay} onClick={onClose}>
-      <aside className={styles.processDrawer} onClick={(event) => event.stopPropagation()}>
-        <header className={styles.drawerHeader}>
-          <div>
-            <h2>{process.name}</h2>
-            <div className={styles.drawerBadges}>
-              <span className={ownerBadgeClass(process.owner.status_label)}>{process.owner.status_label}</span>
-              {process.owner.confidence_label ? (
-                <span className={styles.badgeNeutral}>Уверенность: {process.owner.confidence_label}</span>
-              ) : null}
-            </div>
-          </div>
-          <button type="button" className={styles.iconBtn} onClick={onClose} aria-label="Закрыть">
-            <X size={18} />
-          </button>
-        </header>
-
-        <div className={styles.drawerBody}>
-          <section className={styles.drawerSection}>
-            <h4>Кратко</h4>
-            <dl className={styles.drawerMeta}>
-              <div>
-                <dt>Цель</dt>
-                <dd>{process.goal ?? "—"}</dd>
-              </div>
-              <div>
-                <dt>Описание</dt>
-                <dd>{process.description ?? "—"}</dd>
-              </div>
-              <div>
-                <dt>Кандидат владельца</dt>
-                <dd>{process.owner.candidate ?? "—"}</dd>
-              </div>
-              {process.owner.reason ? (
-                <div>
-                  <dt>Причина выбора владельца</dt>
-                  <dd>{process.owner.reason}</dd>
-                </div>
-              ) : null}
-              <div>
-                <dt>Статус владельца</dt>
-                <dd>{process.owner.status_label}</dd>
-              </div>
-              <div>
-                <dt>Уверенность владельца</dt>
-                <dd>{process.owner.confidence_label ?? "—"}</dd>
-              </div>
-            </dl>
-          </section>
-
-          <section className={styles.drawerSection}>
-            <h4>Документы-источники</h4>
-            {process.source_documents.length ? (
-              <ul className={styles.drawerDocList}>
-                {process.source_documents.map((doc) => (
-                  <li key={doc.document_id}>
-                    <div className={styles.drawerDocTitle}>
-                      <strong>{doc.document_code ?? "—"}</strong>
-                      <span>{doc.title ?? doc.display_name}</span>
-                    </div>
-                    <div className={styles.drawerDocMeta}>
-                      {doc.document_type ? <span>{doc.document_type}</span> : null}
-                      {doc.extraction_status_label ? (
-                        <span>{doc.extraction_status_label}</span>
-                      ) : null}
-                      {onOpenDocument ? (
-                        <button type="button" className={styles.linkBtn} onClick={() => onOpenDocument(doc.document_id)}>
-                          Открыть документ
-                        </button>
-                      ) : null}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className={styles.drawerEmpty}>Не найдено в документах.</p>
-            )}
-          </section>
-
-          <div className={styles.drawerTwoCol}>
-            <ListBlock title="Входы" items={process.inputs} emptyLabel="Не найдено в документах." />
-            <ListBlock title="Выходы" items={process.outputs} emptyLabel="Не найдено в документах." />
-          </div>
-
-          <section className={styles.drawerSection}>
-            <h4>Действия процесса</h4>
-            {process.actions.length ? (
-              <ol className={styles.drawerActionList}>
-                {process.actions.map((action, index) => (
-                  <li key={`${action.name}-${index}`}>
-                    <strong>{action.name}</strong>
-                    {action.performer ? <div>Исполнитель: {action.performer}</div> : null}
-                    {action.controller ? <div>Контролёр: {action.controller}</div> : null}
-                    {action.system_or_resource ? <div>Система: {action.system_or_resource}</div> : null}
-                    {action.evidence_label ? <div>Основание: {action.evidence_label}</div> : null}
-                  </li>
-                ))}
-              </ol>
-            ) : (
-              <p className={styles.drawerEmpty}>Не найдено в документах.</p>
-            )}
-          </section>
-
-          <ListBlock title="Формы" items={process.forms} emptyLabel="Не найдено в документах." />
-          <ListBlock
-            title="Системы и ресурсы"
-            items={[...process.systems, ...process.resources]}
-            emptyLabel="Не найдено в документах."
-          />
-
-          <section className={styles.drawerSection}>
-            <h4>Связи</h4>
-            <dl className={styles.drawerMeta}>
-              <div>
-                <dt>Всего связей</dt>
-                <dd>{process.relations_summary.total}</dd>
-              </div>
-              <div>
-                <dt>Подтверждённых</dt>
-                <dd>{process.relations_summary.confirmed}</dd>
-              </div>
-              <div>
-                <dt>Неподтверждённых</dt>
-                <dd>{process.relations_summary.unconfirmed}</dd>
-              </div>
-              <div>
-                <dt>Без основания</dt>
-                <dd>{process.relations_summary.without_evidence}</dd>
-              </div>
-            </dl>
-          </section>
+    <div className={styles.processDrawer}>
+      <header className={styles.drawerHeader}>
+        <div className={styles.drawerHeaderMain}>
+          <h2>{process.name}</h2>
+          <span className={`${styles.drawerStatusBadge} ${ownerBadgeClass(process.owner.status_label)}`}>
+            {process.owner.status_label}
+          </span>
         </div>
-
-        <footer className={styles.drawerFooter}>
-          {!process.owner.confirmed ? (
-            <button type="button" className={styles.primaryBtn} onClick={() => onConfirmOwner(process)}>
-              {ownerActionLabel}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            className={styles.secondaryBtn}
-            onClick={() => onOpenRelations(process.process_id, process.name)}
-          >
-            Открыть все связи процесса
+        {onDismiss ? (
+          <button type="button" className={styles.drawerCloseBtn} onClick={onDismiss} aria-label="Закрыть панель">
+            <X size={18} strokeWidth={2} />
           </button>
-        </footer>
-      </aside>
+        ) : null}
+      </header>
+
+      <div className={styles.drawerBody}>
+        <DetailRow icon={Target} label="Цель">
+          {process.goal ?? <span className={styles.detailEmpty}>—</span>}
+        </DetailRow>
+
+        <DetailRow icon={AlignLeft} label="Описание">
+          {process.description ?? <span className={styles.detailEmpty}>—</span>}
+        </DetailRow>
+
+        <DetailRow icon={User} label="Кандидат владельца">
+          {process.owner.candidate ?? <span className={styles.detailEmpty}>—</span>}
+        </DetailRow>
+
+        <DetailRow icon={CircleDot} label="Статус владельца">
+          {process.owner.status_label}
+        </DetailRow>
+
+        <DetailRow icon={CircleDot} label="Уверенность владельца">
+          <span className={styles.confidenceValue}>
+            <span className={`${styles.confidenceDot} ${confidenceDotClass(process.owner.confidence)}`} />
+            {process.owner.confidence_label ?? "—"}
+          </span>
+        </DetailRow>
+
+        <DetailRow icon={FileText} label="Документы-источники">
+          {primaryDoc ? (
+            <button
+              type="button"
+              className={styles.detailLinkBtn}
+              onClick={() => onOpenDocument?.(primaryDoc.document_id)}
+            >
+              {primaryDoc.document_code ?? primaryDoc.display_name}
+            </button>
+          ) : (
+            <span className={styles.detailEmpty}>Не найдено в документах</span>
+          )}
+        </DetailRow>
+
+        <DetailRow icon={LogIn} label="Входы">
+          <ListValue items={process.inputs} emptyLabel="Не найдено в документах" />
+        </DetailRow>
+
+        <DetailRow icon={LogOut} label="Выходы">
+          <ListValue items={process.outputs} emptyLabel="Не найдено в документах" />
+        </DetailRow>
+
+        <DetailRow icon={ListOrdered} label="Действия процесса">
+          {process.actions.length ? (
+            <ol className={styles.detailOrderedList}>
+              {process.actions.map((action, index) => (
+                <li key={`${action.name}-${index}`}>{action.name}</li>
+              ))}
+            </ol>
+          ) : (
+            <span className={styles.detailEmpty}>Не найдено в документах</span>
+          )}
+        </DetailRow>
+
+        <DetailRow icon={Layers} label="Формы">
+          <ListValue items={process.forms} emptyLabel="Не найдено в документах" />
+        </DetailRow>
+
+        <DetailRow icon={Network} label="Системы и ресурсы">
+          <ListValue items={[...process.systems, ...process.resources]} emptyLabel="Не найдено в документах" />
+        </DetailRow>
+
+        <DetailRow icon={GitBranch} label="Связи">
+          <span>
+            Всего: {process.relations_summary.total} · подтверждённых: {process.relations_summary.confirmed} ·
+            неподтверждённых: {process.relations_summary.unconfirmed}
+          </span>
+        </DetailRow>
+      </div>
+
+      <footer className={styles.drawerFooter}>
+        {!process.owner.confirmed ? (
+          <button type="button" className={styles.drawerPrimaryBtn} onClick={() => onConfirmOwner(process)}>
+            {ownerActionLabel}
+          </button>
+        ) : null}
+        <button
+          type="button"
+          className={styles.drawerSecondaryBtn}
+          onClick={() => onOpenRelations(process.process_id, process.name)}
+        >
+          <Network size={16} strokeWidth={2} aria-hidden />
+          Открыть связи процесса
+        </button>
+      </footer>
     </div>
   );
 }
