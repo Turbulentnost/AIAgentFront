@@ -68,6 +68,14 @@ import type {
   User,
   UserCreate,
   UserUpdate,
+  MeetingLoginContext,
+  MeetingMemoDetail,
+  MeetingPermissions,
+  MeetingRun,
+  MeetingRunCreate,
+  MeetingRunResult,
+  MeetingSlot,
+  MeetingSlotsRequest,
   AgentBlueprint,
   AgentBuilderSession,
   AgentBuilderSessionDetail,
@@ -76,6 +84,24 @@ import type {
   AgentBuilderToolCatalogItem,
   SandboxRun
 } from "@/types";
+
+export const meetingsApi = {
+  permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
+  getDashboard: () =>
+    apiClient
+      .get<MeetingLoginContext>("/meetings/dashboard", {
+        params: { _: Date.now() },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  getMemoDetail: (memoRefKey: string) =>
+    apiClient.get<MeetingMemoDetail>(`/meetings/memos/${memoRefKey}/detail`).then((r) => r.data),
+  findSlots: (payload: MeetingSlotsRequest) =>
+    apiClient.post<MeetingSlot[]>("/meetings/slots", payload).then((r) => r.data),
+  createRun: (payload: MeetingRunCreate) =>
+    apiClient.post<MeetingRun>("/meetings/runs", payload).then((r) => r.data),
+  getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data)
+};
 
 export const healthApi = {
   get: () => apiClient.get<HealthResponse>("/health").then((r) => r.data),

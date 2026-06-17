@@ -8,7 +8,7 @@
 
 .statsRow {
   display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -68,6 +68,13 @@
   display: grid;
   gap: 18px;
   padding: 18px 20px 20px;
+}
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .panelHead h2,
@@ -184,7 +191,7 @@
 .tagblue { color: #1d4ed8; background: #dbeafe; }
 .tagamber { color: #92400e; background: #fef3c7; }
 .tagred { color: #991b1b; background: #fee2e2; }
-.tagslate { color: #475569; background: #f1f5f9; }
+.taggreen { color: #166534; background: #dcfce7; }
 
 .queueMore {
   justify-self: start;
@@ -303,6 +310,10 @@
   color: #d97706;
 }
 
+.checkerror svg {
+  color: #dc2626;
+}
+
 .recommendationBox {
   display: grid;
   gap: 6px;
@@ -344,6 +355,9 @@
 }
 
 .primaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: #ffffff;
   background: #2563eb;
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
@@ -481,6 +495,121 @@
   color: #64748b;
   font-size: 11px;
   font-weight: 700;
+}
+
+.checkwarning {
+  color: #92400e;
+}
+
+.checkerror {
+  color: #991b1b;
+}
+
+.inlineMuted {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.participantList {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.runStatus {
+  margin: 8px 0 0;
+  color: #1d4ed8;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.runError {
+  margin: 8px 0 0;
+  color: #991b1b;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.spinner {
+  animation: meetingSpin 0.8s linear infinite;
+}
+
+@keyframes meetingSpin {
+  to { transform: rotate(360deg); }
+}
+
+.stateMessage,
+.queueEmpty,
+.detailsEmpty {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding: 24px;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.refreshButton,
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.refreshButton {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.refreshButton:disabled {
+  opacity: 0.6;
+}
+
+.refreshButtonSpinning svg {
+  animation: meetingSpin 0.8s linear infinite;
+}
+
+.queueMetaNote {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.queueHint {
+  margin: 0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 @media (max-width: 1280px) {

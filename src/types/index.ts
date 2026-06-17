@@ -1368,3 +1368,18 @@ export type NdDocumentCardUpdate = Partial<
     "id" | "department_id" | "knowledge_base_id" | "knowledge_base_source_id" | "document_id" | "document_version_id"
   >
 >;
+
+export type {
+  MeetingApplication,
+  MeetingDashboardItem,
+  MeetingHistoryEvent,
+  MeetingLoginContext,
+  MeetingMemoDetail,
+  MeetingPermissions,
+  MeetingRun,
+  MeetingRunCreate,
+  MeetingRunResult,
+  MeetingSlot,
+  MeetingSlotsRequest,
+  MeetingValidationCheck
+} from "./meetings";

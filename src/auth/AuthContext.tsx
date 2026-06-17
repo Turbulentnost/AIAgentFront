@@ -84,6 +84,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setOnecCredentials(null);
       setAuthMode("platform");
       await queryClient.invalidateQueries({ queryKey: ["auth"] });
+      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
     }
   });
 
@@ -99,6 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAuthMode("platform");
       await queryClient.invalidateQueries({ queryKey: ["auth"] });
       await queryClient.invalidateQueries({ queryKey: ["onec", "tasks"] });
+      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
     }
   });
 

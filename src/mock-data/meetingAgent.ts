@@ -1,4 +1,4 @@
-export type MeetingQueueTab = "all" | "ud" | "conflicts" | "errors";
+export type MeetingQueueTab = "all" | "ud" | "today" | "conflicts" | "errors";
 
 export interface MeetingStat {
   id: string;
@@ -66,6 +66,7 @@ export const meetingStats: MeetingStat[] = [
 export const meetingQueueTabs: { id: MeetingQueueTab; label: string }[] = [
   { id: "all", label: "Все заявки" },
   { id: "ud", label: "Требуют решения УД" },
+  { id: "today", label: "СЗ за сегодня" },
   { id: "conflicts", label: "Конфликты" },
   { id: "errors", label: "Ошибки" }
 ];
