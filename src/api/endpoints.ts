@@ -356,7 +356,7 @@ export const ndControlApi = {
       .then((r) => r.data),
   listDepartmentProcesses: (
     departmentId: string,
-    params: { query?: string; filter?: string; page?: number; size?: number } = {}
+    params: { query?: string; filter?: string; sort?: string; page?: number; size?: number } = {}
   ) =>
     apiClient
       .get<Page<DepartmentProcessItem>>(`/nd-control/departments/${departmentId}/processes`, { params })
@@ -369,6 +369,7 @@ export const ndControlApi = {
       relation_type?: string;
       confidence?: string;
       extraction_type?: string;
+      process_id?: string;
       page?: number;
       size?: number;
     } = {}
@@ -388,6 +389,12 @@ export const ndControlApi = {
       .then((r) => r.data),
   approveRelation: (relationId: string) =>
     apiClient.post(`/nd-control/review/relations/${relationId}/approve`).then((r) => r.data),
+  bulkApproveRelations: (relationIds: string[]) =>
+    apiClient
+      .post<{ approved: string[]; skipped: string[] }>("/nd-control/review/relations/bulk-approve", {
+        relation_ids: relationIds
+      })
+      .then((r) => r.data),
   rejectRelation: (relationId: string) =>
     apiClient.post(`/nd-control/review/relations/${relationId}/reject`).then((r) => r.data),
   confirmProcessOwner: (processId: string, payload: { owner_name?: string }) =>

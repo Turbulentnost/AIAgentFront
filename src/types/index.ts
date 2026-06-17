@@ -1152,35 +1152,119 @@ export interface DepartmentStructuralDocumentCard {
   purpose?: string | null;
 }
 
+export interface ProcessSourceDocumentItem {
+  document_id: string;
+  document_code: string | null;
+  title: string | null;
+  display_name: string;
+  document_type: string | null;
+  extraction_status: string | null;
+  extraction_status_label: string | null;
+}
+
+export interface ProcessOwnerDisplay {
+  candidate: string | null;
+  confirmed: boolean;
+  confidence: string | null;
+  confidence_label: string | null;
+  status_label: string;
+  reason: string | null;
+}
+
+export interface ProcessActionDisplay {
+  name: string;
+  performer: string | null;
+  controller: string | null;
+  system_or_resource: string | null;
+  evidence_label: string | null;
+}
+
+export interface ProcessRelationsSummary {
+  total: number;
+  confirmed: number;
+  unconfirmed: number;
+  without_evidence: number;
+}
+
 export interface DepartmentProcessItem {
   process_id: string;
+  name: string;
   canonical_name: string;
   description: string | null;
   goal: string | null;
+  owner: ProcessOwnerDisplay;
   owner_candidate: string | null;
   owner_confirmed: boolean;
   owner_confidence: string | null;
+  owner_confidence_label: string | null;
+  owner_status_label: string | null;
+  source_documents: ProcessSourceDocumentItem[];
+  source_document_names: string[];
   source_documents_count: number;
+  inputs: string[];
+  outputs: string[];
+  actions: ProcessActionDisplay[];
+  action_names: string[];
+  forms: string[];
+  systems: string[];
+  resources: string[];
+  systems_preview: string;
   relations_count: number;
+  relations_summary: ProcessRelationsSummary;
   forms_count: number;
   systems_count: number;
   needs_review: boolean;
   pending_relations_count: number;
 }
 
+export interface RelationEntityDisplay {
+  type: string;
+  type_label: string;
+  id: string | null;
+  name: string;
+}
+
+export interface RelationEvidenceDisplay {
+  label: string;
+  document_code?: string | null;
+  section?: string | null;
+  quote?: string | null;
+}
+
 export interface DepartmentRelationItem {
   relation_id: string;
   source_type: string;
-  source_name: string;
+  source_type_label: string;
+  source_id: string | null;
+  source_display_name: string;
+  source: RelationEntityDisplay;
   relation_type: string;
   relation_type_label: string;
+  relation: { type: string; label: string };
   target_type: string;
-  target_name: string;
+  target_type_label: string;
+  target_id: string | null;
+  target_display_name: string;
+  target: RelationEntityDisplay;
   confidence: string;
+  confidence_label: string;
   extraction_type: string;
+  extraction_type_label: string;
+  confirmation_status: string;
+  confirmation_status_label: string;
   is_confirmed: boolean;
   review_status: string;
-  evidence: Record<string, unknown>;
+  review_status_label: string;
+  evidence_summary: string | null;
+  evidence_json: Array<Record<string, unknown>>;
+  evidence: RelationEvidenceDisplay;
+  relation_description: string;
+  is_weak_relation: boolean;
+  is_service_relation: boolean;
+  is_primary_relation: boolean;
+  has_evidence: boolean;
+  requires_review: boolean;
+  can_bulk_approve: boolean;
   created_at?: string | null;
 }
 
@@ -1190,9 +1274,21 @@ export interface DepartmentReviewPending {
     process_name: string;
     owner_candidate: string | null;
     confidence: string | null;
+    confidence_label: string | null;
     evidence: Record<string, unknown> | null;
   }>;
   relations: DepartmentRelationItem[];
+  important_relations: DepartmentRelationItem[];
+  relations_without_evidence: DepartmentRelationItem[];
+  weak_relations: DepartmentRelationItem[];
+  extraction_errors: Array<{
+    document_card_id: string;
+    document_id: string;
+    document_code: string | null;
+    title: string | null;
+    reason: string | null;
+    extraction_status: string;
+  }>;
   documents: Array<{
     document_card_id: string;
     document_id: string;
