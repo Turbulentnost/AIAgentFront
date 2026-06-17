@@ -59,6 +59,7 @@ import type {
   DepartmentReviewPending,
   DepartmentStructuralDocumentCard,
   DepartmentSummary,
+  ProcessUmlResponse,
   NdDocumentCard,
   NdDocumentCardUpdate,
   Role,
@@ -411,5 +412,7 @@ export const ndControlApi = {
   rejectRelation: (relationId: string) =>
     apiClient.post(`/nd-control/review/relations/${relationId}/reject`).then((r) => r.data),
   confirmProcessOwner: (processId: string, payload: { owner_name?: string }) =>
-    apiClient.post(`/nd-control/review/processes/${processId}/confirm-owner`, payload).then((r) => r.data)
+    apiClient.post(`/nd-control/review/processes/${processId}/confirm-owner`, payload).then((r) => r.data),
+  getProcessUml: (processId: string) =>
+    apiClient.get<ProcessUmlResponse>(`/nd-control/processes/${processId}/uml`).then((r) => r.data),
 };

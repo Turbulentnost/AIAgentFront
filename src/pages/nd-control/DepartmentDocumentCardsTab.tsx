@@ -8,6 +8,7 @@ import {
   SMK_DOCUMENT_LEVEL_FILTER_OPTIONS,
   SMK_DOCUMENT_TYPE_FILTER_OPTIONS
 } from "./constants";
+import NdControlDataTable from "./NdControlDataTable";
 import { formatDateTime } from "./utils";
 import styles from "../NdControlAgent.module.css";
 
@@ -47,27 +48,31 @@ export default function DepartmentDocumentCardsTab({
     enabled: Boolean(departmentId)
   });
 
+  const filterControls = (
+    <div className={styles.toolbarFilters}>
+      <FormSelect
+        compact
+        value={documentTypeFilter}
+        onChange={setDocumentTypeFilter}
+        options={SMK_DOCUMENT_TYPE_FILTER_OPTIONS}
+        ariaLabel="Фильтр по типу документа"
+      />
+      <FormSelect
+        compact
+        value={documentLevelFilter}
+        onChange={setDocumentLevelFilter}
+        options={SMK_DOCUMENT_LEVEL_FILTER_OPTIONS}
+        ariaLabel="Фильтр по уровню СМК"
+      />
+    </div>
+  );
+
   if (cards.isLoading) return <p className={styles.emptyHint}>Загрузка карточек…</p>;
   if (cards.isError) return <p className={styles.emptyHint}>Не удалось загрузить карточки документов.</p>;
   if (!cards.data?.items.length) {
     return (
       <div className={styles.emptyStateBlock}>
-        <div className={styles.toolbarFilters}>
-          <FormSelect
-            compact
-            value={documentTypeFilter}
-            onChange={setDocumentTypeFilter}
-            options={SMK_DOCUMENT_TYPE_FILTER_OPTIONS}
-            ariaLabel="Фильтр по типу документа"
-          />
-          <FormSelect
-            compact
-            value={documentLevelFilter}
-            onChange={setDocumentLevelFilter}
-            options={SMK_DOCUMENT_LEVEL_FILTER_OPTIONS}
-            ariaLabel="Фильтр по уровню СМК"
-          />
-        </div>
+        {filterControls}
         <p>Карточки документов пока не созданы для этого отдела.</p>
         <p className={styles.emptyHint}>Запустите анализ, чтобы создать карточки из прикреплённых баз знаний.</p>
       </div>
@@ -75,25 +80,10 @@ export default function DepartmentDocumentCardsTab({
   }
 
   return (
-    <div className={styles.tableWrap}>
-      <div className={styles.toolbarFilters}>
-        <FormSelect
-          compact
-          value={documentTypeFilter}
-          onChange={setDocumentTypeFilter}
-          options={SMK_DOCUMENT_TYPE_FILTER_OPTIONS}
-          ariaLabel="Фильтр по типу документа"
-        />
-        <FormSelect
-          compact
-          value={documentLevelFilter}
-          onChange={setDocumentLevelFilter}
-          options={SMK_DOCUMENT_LEVEL_FILTER_OPTIONS}
-          ariaLabel="Фильтр по уровню СМК"
-        />
-      </div>
-      <table className={styles.table}>
-        <thead>
+    <>
+      {filterControls}
+      <NdControlDataTable>
+        <thead className={styles.tableHead}>
           <tr>
             <th>Код</th>
             <th>Наименование</th>
@@ -113,7 +103,7 @@ export default function DepartmentDocumentCardsTab({
           {cards.data.items.map((card) => (
             <tr key={card.document_card_id}>
               <td>{card.document_code ?? "—"}</td>
-              <td>{card.title ?? card.file_name ?? "—"}</td>
+              <td className={styles.cellEllipsis}>{card.title ?? card.file_name ?? "—"}</td>
               <td>{card.document_type_label ?? "—"}</td>
               <td>{card.document_level_label ?? "—"}</td>
               <td>{card.version ?? "—"}</td>
@@ -148,7 +138,7 @@ export default function DepartmentDocumentCardsTab({
             </tr>
           ))}
         </tbody>
-      </table>
-    </div>
+      </NdControlDataTable>
+    </>
   );
 }

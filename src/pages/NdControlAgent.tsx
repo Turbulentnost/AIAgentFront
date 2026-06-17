@@ -5,7 +5,7 @@ import { Plus, LayoutPanelLeft, AlertTriangle, Building2 } from "lucide-react";
 import { knowledgeBasesApi, ndControlApi } from "@/api/endpoints";
 import { FormSearchInput } from "@/components/form-controls";
 import CreateDepartmentModal from "@/pages/CreateDepartmentModal";
-import type { DepartmentStructuralDocumentCard, NdControlDepartment } from "@/types";
+import type { DepartmentStructuralDocumentCard, DepartmentProcessItem, NdControlDepartment } from "@/types";
 import DepartmentAnalysisProgress from "./nd-control/DepartmentAnalysisProgress";
 import DepartmentAnalysisHistoryTab from "./nd-control/DepartmentAnalysisHistoryTab";
 import DepartmentDocumentCardsTab from "./nd-control/DepartmentDocumentCardsTab";
@@ -15,6 +15,8 @@ import DepartmentRelationsTab from "./nd-control/DepartmentRelationsTab";
 import DepartmentReviewTab from "./nd-control/DepartmentReviewTab";
 import DepartmentSummaryHeader from "./nd-control/DepartmentSummaryHeader";
 import DeptSidebarItem from "./nd-control/DeptSidebarItem";
+import ConfirmProcessOwnerDialog from "./nd-control/ConfirmProcessOwnerDialog";
+import ProcessDetailsDrawer from "./nd-control/ProcessDetailsDrawer";
 import ReanalyzeConfirmDialog from "./nd-control/ReanalyzeConfirmDialog";
 import { DEPARTMENT_TABS, isAnalysisRunning, type DepartmentTab } from "./nd-control/constants";
 import styles from "./NdControlAgent.module.css";
@@ -42,6 +44,8 @@ export default function NdControlAgent() {
   const [selectedCard, setSelectedCard] = useState<DepartmentStructuralDocumentCard | null>(null);
   const [relationsProcessId, setRelationsProcessId] = useState<string | undefined>();
   const [relationsProcessName, setRelationsProcessName] = useState<string | undefined>();
+  const [selectedProcess, setSelectedProcess] = useState<DepartmentProcessItem | null>(null);
+  const [confirmProcess, setConfirmProcess] = useState<DepartmentProcessItem | null>(null);
 
   const permissions = useQuery({
     queryKey: ["nd-control", "permissions"],
@@ -143,6 +147,26 @@ export default function NdControlAgent() {
     }
   });
 
+  const confirmProcessOwner = useMutation({
+    mutationFn: (processId: string) => ndControlApi.confirmProcessOwner(processId, {}),
+    onSuccess: async () => {
+      setConfirmProcess(null);
+      await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
+    }
+  });
+
+  const showProcessPanel = activeTab === "processes" && Boolean(selectedDeptId) && !showAnalysisScreen;
+
+  useEffect(() => {
+    setSelectedProcess(null);
+  }, [selectedDeptId]);
+
+  useEffect(() => {
+    if (activeTab !== "processes") {
+      setSelectedProcess(null);
+    }
+  }, [activeTab]);
+
   const searchVisible = activeTab !== "overview" && activeTab !== "history";
 
   if (permissions.isLoading) return <div className={styles.page}>Загрузка…</div>;
@@ -163,13 +187,13 @@ export default function NdControlAgent() {
         </div>
       </header>
 
-      <div className={styles.layout}>
+      <div className={`${styles.layout} ${showProcessPanel ? styles.layoutWithProcessPanel : ""}`}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
             <h2>Отделы агента</h2>
             {permissions.data.can_manage_departments ? (
-              <button type="button" className={styles.iconBtn} onClick={() => setShowCreateDept(true)} aria-label="Создать отдел">
-                <Plus size={18} />
+              <button type="button" className={styles.addBtn} onClick={() => setShowCreateDept(true)} aria-label="Создать отдел">
+                <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
               </button>
             ) : null}
           </div>
@@ -240,7 +264,7 @@ export default function NdControlAgent() {
 
               {searchVisible ? (
                 <div className={styles.toolbar}>
-                  <FormSearchInput value={search} onChange={setSearch} placeholder="Поиск по текущей вкладке…" />
+                  <FormSearchInput compact value={search} onChange={setSearch} placeholder="Поиск по текущей вкладке…" />
                 </div>
               ) : null}
 
@@ -267,6 +291,8 @@ export default function NdControlAgent() {
                   isAnalysisRunning={showAnalysisScreen}
                   analysisProcessed={analysisStatus.data?.processed_documents}
                   analysisTotal={analysisStatus.data?.total_documents}
+                  selectedProcessId={selectedProcess?.process_id ?? null}
+                  onSelectProcess={setSelectedProcess}
                   onStartAnalysis={() => setShowReanalyzeDialog(true)}
                   onOpenDocuments={() => setActiveTab("documents")}
                   onOpenRelations={(processId, processName) => {
@@ -274,6 +300,7 @@ export default function NdControlAgent() {
                     setRelationsProcessName(processName);
                     setActiveTab("relations");
                   }}
+                  onConfirmProcessOwner={setConfirmProcess}
                 />
               ) : null}
               {activeTab === "relations" ? (
@@ -300,6 +327,21 @@ export default function NdControlAgent() {
             </>
           )}
         </main>
+
+        {showProcessPanel ? (
+          <aside className={`${styles.sidebar} ${styles.processSidebar}`}>
+            <ProcessDetailsDrawer
+              process={selectedProcess}
+              onDismiss={() => setSelectedProcess(null)}
+              onConfirmOwner={setConfirmProcess}
+              onOpenRelations={(processId, processName) => {
+                setRelationsProcessId(processId);
+                setRelationsProcessName(processName);
+                setActiveTab("relations");
+              }}
+            />
+          </aside>
+        ) : null}
       </div>
 
       {showCreateDept ? (
@@ -324,6 +366,15 @@ export default function NdControlAgent() {
           if (!selectedDeptId) return;
           reanalyzeDepartment.mutate({ departmentId: selectedDeptId, forceReextract });
         }}
+      />
+
+      <ConfirmProcessOwnerDialog
+        process={confirmProcess}
+        onClose={() => setConfirmProcess(null)}
+        onConfirm={() => {
+          if (confirmProcess) confirmProcessOwner.mutate(confirmProcess.process_id);
+        }}
+        isPending={confirmProcessOwner.isPending}
       />
 
       {selectedCard ? (

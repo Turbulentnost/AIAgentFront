@@ -1,10 +1,11 @@
 import { Loader2 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { ndControlApi } from "@/api/endpoints";
+import { FormSelect } from "@/components/form-controls";
+import formStyles from "@/components/form-controls/form-controls.module.css";
 import type { DepartmentProcessItem } from "@/types";
-import ConfirmProcessOwnerDialog from "./ConfirmProcessOwnerDialog";
-import ProcessDetailsDrawer from "./ProcessDetailsDrawer";
+import NdControlDataTable from "./NdControlDataTable";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
@@ -13,6 +14,9 @@ type Props = {
   isAnalysisRunning?: boolean;
   analysisProcessed?: number;
   analysisTotal?: number;
+  selectedProcessId: string | null;
+  onSelectProcess: (process: DepartmentProcessItem | null) => void;
+  onConfirmProcessOwner: (process: DepartmentProcessItem) => void;
   onOpenRelations: (processId: string, processName: string) => void;
   onOpenDocuments?: () => void;
   onStartAnalysis?: () => void;
@@ -44,10 +48,10 @@ function ownerBadgeClass(status: string) {
   return styles.badgeNeutral;
 }
 
-function confidenceBadgeClass(level: string | null | undefined) {
-  if (level === "high") return styles.badgeOk;
-  if (level === "low") return styles.badgeReview;
-  return styles.badgeNeutral;
+function confidenceDotClass(level: string | null | undefined) {
+  if (level === "high") return styles.confidenceDotHigh;
+  if (level === "low") return styles.confidenceDotLow;
+  return styles.confidenceDotMedium;
 }
 
 function shortText(value: string | null | undefined, max = 120) {
@@ -61,15 +65,15 @@ export default function DepartmentProcessesTab({
   isAnalysisRunning,
   analysisProcessed,
   analysisTotal,
+  selectedProcessId,
+  onSelectProcess,
+  onConfirmProcessOwner,
   onOpenRelations,
   onOpenDocuments,
   onStartAnalysis
 }: Props) {
-  const queryClient = useQueryClient();
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState("name");
-  const [selectedProcess, setSelectedProcess] = useState<DepartmentProcessItem | null>(null);
-  const [confirmProcess, setConfirmProcess] = useState<DepartmentProcessItem | null>(null);
 
   const processes = useQuery({
     queryKey: ["nd-control", "department-processes", departmentId, search, filter, sort],
@@ -84,21 +88,22 @@ export default function DepartmentProcessesTab({
     enabled: Boolean(departmentId)
   });
 
-  const confirmOwner = useMutation({
-    mutationFn: (processId: string) => ndControlApi.confirmProcessOwner(processId, {}),
-    onSuccess: async () => {
-      setConfirmProcess(null);
-      setSelectedProcess(null);
-      await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
-    }
-  });
-
   const items = processes.data?.items ?? [];
 
-  const selectedInList = useMemo(
-    () => (selectedProcess ? items.find((item) => item.process_id === selectedProcess.process_id) ?? selectedProcess : null),
-    [items, selectedProcess]
-  );
+  useEffect(() => {
+    if (!items.length) {
+      onSelectProcess(null);
+      return;
+    }
+    const currentInList = selectedProcessId
+      ? items.find((item) => item.process_id === selectedProcessId)
+      : null;
+    if (currentInList) {
+      onSelectProcess(currentInList);
+      return;
+    }
+    onSelectProcess(items[0]);
+  }, [items, selectedProcessId, onSelectProcess]);
 
   if (isAnalysisRunning) {
     return (
@@ -121,7 +126,7 @@ export default function DepartmentProcessesTab({
       <div className={styles.tabHint}>
         <p>
           Процессы — это виды деятельности, найденные агентом в документах отдела. Подробные действия, входы, выходы,
-          формы и системы доступны в карточке процесса.
+          формы и системы доступны в карточке процесса справа.
         </p>
       </div>
 
@@ -138,16 +143,16 @@ export default function DepartmentProcessesTab({
             </button>
           ))}
         </div>
-        <label className={styles.sortSelectWrap}>
-          <span>Сортировка</span>
-          <select className={styles.sortSelect} value={sort} onChange={(event) => setSort(event.target.value)}>
-            {SORTS.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+        <div className={`${formStyles.field} ${styles.sortSelectWrap}`}>
+          <span className={formStyles.fieldLabel}>Сортировка</span>
+          <FormSelect
+            compact
+            value={sort}
+            onChange={setSort}
+            options={SORTS.map((item) => ({ value: item.id, label: item.label }))}
+            ariaLabel="Сортировка процессов"
+          />
+        </div>
       </div>
 
       {processes.isLoading ? (
@@ -173,10 +178,10 @@ export default function DepartmentProcessesTab({
           </div>
         </div>
       ) : (
-        <div className={styles.tableWrap}>
-          <table className={`${styles.table} ${styles.processTable}`}>
-            <thead>
+        <NdControlDataTable className={styles.processTable}>
+          <thead className={styles.tableHead}>
               <tr>
+                <th>#</th>
                 <th>Процесс</th>
                 <th>Владелец</th>
                 <th>Уверенность</th>
@@ -187,21 +192,22 @@ export default function DepartmentProcessesTab({
               </tr>
             </thead>
             <tbody>
-              {items.map((process) => {
+              {items.map((process, index) => {
                 const subtitle = shortText(process.goal || process.description);
                 const docTooltip = process.source_documents.map((doc) => doc.display_name).join("\n");
                 return (
                   <tr
                     key={process.process_id}
-                    className={selectedProcess?.process_id === process.process_id ? styles.processRowSelected : undefined}
-                    onClick={() => setSelectedProcess(process)}
+                    className={selectedProcessId === process.process_id ? styles.processRowSelected : undefined}
+                    onClick={() => onSelectProcess(process)}
                   >
-                    <td>
-                      <div className={styles.processCellMain}>
-                        <span className={styles.processName}>{process.name}</span>
-                        {subtitle ? <span className={styles.processSubtitle}>{subtitle}</span> : null}
-                      </div>
-                    </td>
+                    <td className={styles.tableIndexCell}>{index + 1}</td>
+                        <td>
+                          <div className={styles.processCellMain}>
+                            <strong>{process.name}</strong>
+                            {subtitle ? <small>{subtitle}</small> : null}
+                          </div>
+                        </td>
                     <td>
                       <div className={styles.processOwnerCell}>
                         <span>{process.owner.candidate ?? "—"}</span>
@@ -209,17 +215,35 @@ export default function DepartmentProcessesTab({
                       </div>
                     </td>
                     <td>
-                      <span className={confidenceBadgeClass(process.owner.confidence)}>
+                      <span className={styles.confidenceValue}>
+                        <span className={`${styles.confidenceDot} ${confidenceDotClass(process.owner.confidence)}`} />
                         {process.owner.confidence_label ?? "—"}
                       </span>
                     </td>
-                    <td title={docTooltip || undefined}>{process.source_documents_count}</td>
-                    <td>{process.relations_count}</td>
+                    <td title={docTooltip || undefined}>
+                      {process.source_documents[0]?.document_code ? (
+                        <span className={styles.processDocLink}>{process.source_documents[0].document_code}</span>
+                      ) : (
+                        process.source_documents_count
+                      )}
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className={styles.linkBtn}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenRelations(process.process_id, process.name);
+                        }}
+                      >
+                        {process.relations_count}
+                      </button>
+                    </td>
                     <td>
                       <span className={styles.processSystemsPreview}>{process.systems_preview}</span>
                     </td>
                     <td className={styles.actionsCell} onClick={(event) => event.stopPropagation()}>
-                      <button type="button" className={styles.linkBtn} onClick={() => setSelectedProcess(process)}>
+                      <button type="button" className={styles.linkBtn} onClick={() => onSelectProcess(process)}>
                         Открыть
                       </button>
                       <button
@@ -233,7 +257,7 @@ export default function DepartmentProcessesTab({
                         <button
                           type="button"
                           className={styles.linkBtn}
-                          onClick={() => setConfirmProcess(process)}
+                          onClick={() => onConfirmProcessOwner(process)}
                         >
                           {process.owner.candidate ? "Подтвердить владельца" : "Назначить владельца"}
                         </button>
@@ -243,25 +267,8 @@ export default function DepartmentProcessesTab({
                 );
               })}
             </tbody>
-          </table>
-        </div>
+        </NdControlDataTable>
       )}
-
-      <ProcessDetailsDrawer
-        process={selectedInList}
-        onClose={() => setSelectedProcess(null)}
-        onConfirmOwner={setConfirmProcess}
-        onOpenRelations={onOpenRelations}
-      />
-
-      <ConfirmProcessOwnerDialog
-        process={confirmProcess}
-        onClose={() => setConfirmProcess(null)}
-        onConfirm={() => {
-          if (confirmProcess) confirmOwner.mutate(confirmProcess.process_id);
-        }}
-        isPending={confirmOwner.isPending}
-      />
     </div>
   );
 }

@@ -137,7 +137,6 @@ function AgentIconArt({
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    stopCardOpen(event);
     const file = event.target.files?.[0];
     if (file) {
       uploadMutation.mutate(file);

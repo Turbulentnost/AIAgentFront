@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ndControlApi } from "@/api/endpoints";
 import type { DepartmentRelationItem } from "@/types";
+import NdControlDataTable from "./NdControlDataTable";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
@@ -233,9 +234,8 @@ export default function DepartmentRelationsTab({
         <p className={styles.emptyHint}>Связи для этого отдела не найдены.</p>
       ) : (
         <>
-          <div className={styles.tableWrap}>
-            <table className={styles.table}>
-              <thead>
+          <NdControlDataTable>
+            <thead className={styles.tableHead}>
                 <tr>
                   <th>Источник</th>
                   <th>Тип связи</th>
@@ -258,9 +258,8 @@ export default function DepartmentRelationsTab({
                     rejectPending={reject.isPending}
                   />
                 ))}
-              </tbody>
-            </table>
-          </div>
+            </tbody>
+          </NdControlDataTable>
           <div className={styles.paginationRow}>
             <button
               type="button"

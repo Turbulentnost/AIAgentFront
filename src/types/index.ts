@@ -1268,6 +1268,13 @@ export interface DepartmentProcessItem {
   pending_relations_count: number;
 }
 
+export interface ProcessUmlResponse {
+  process_id: string;
+  uml_type: string;
+  uml_code: string;
+  cached?: boolean;
+}
+
 export interface RelationEntityDisplay {
   type: string;
   type_label: string;
