@@ -19,6 +19,7 @@ import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
   AGENT_LAUNCH_MORPH_MS,
+  isMeetingAgent,
   isNdControlAgent,
   navigateToAgentLaunch
 } from "@/utils/agentLaunch";
@@ -156,6 +157,11 @@ export default function Dashboard() {
 
   function handleAgentLaunch(agent: AgentAccess, event: MouseEvent<HTMLButtonElement>) {
     if (!agent.can_run || launchMorphAgentId) return;
+
+    if (isMeetingAgent(agent)) {
+      navigateToAgentLaunch(navigate, agent);
+      return;
+    }
 
     if (isNdControlAgent(agent)) {
       if (agent.icon_url) {
