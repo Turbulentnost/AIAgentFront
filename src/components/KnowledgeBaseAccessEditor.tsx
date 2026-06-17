@@ -23,6 +23,11 @@ type EditableGrant = {
   include_child_departments: boolean;
 };
 
+const addSubjectTypeOptions = [
+  { value: "department", label: "Подразделение" },
+  { value: "account", label: "Учётная запись" }
+];
+
 const accessLevelOptions: { value: KnowledgeBaseAccessType; label: string }[] = [
   { value: "read", label: "Просмотр карточки" },
   { value: "search", label: "Поиск" },
@@ -86,9 +91,10 @@ export function KnowledgeBaseAccessEditor(props: {
   const [departmentGrants, setDepartmentGrants] = useState<EditableGrant[]>([]);
   const [userGrants, setUserGrants] = useState<EditableGrant[]>([]);
   const [addQuery, setAddQuery] = useState("");
-  const [selectedAddId, setSelectedAddId] = useState<string | null>(null);
+  const [addSubjectType, setAddSubjectType] = useState<"department" | "account">("department");
   const [newAccessLevel, setNewAccessLevel] = useState<KnowledgeBaseAccessType>("search");
   const [includeChildren, setIncludeChildren] = useState(false);
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const departmentsQuery = useQuery({
@@ -184,6 +190,8 @@ export function KnowledgeBaseAccessEditor(props: {
       .slice(0, 8);
   }, [usersQuery.data, directUserGrantIds, addQuery]);
 
+  const candidates = addSubjectType === "department" ? departmentCandidates : accountCandidates;
+
   const saveMutation = useMutation({
     mutationFn: () => {
       const preserved = props.grants.filter(
@@ -240,16 +248,27 @@ export function KnowledgeBaseAccessEditor(props: {
 
   function resetAddForm() {
     setAddQuery("");
-    setSelectedAddId(null);
     setNewAccessLevel("search");
     setIncludeChildren(false);
   }
 
-  function addGrant() {
-    if (!selectedAddId) return;
+  function closeAddPanel() {
+    setIsAddOpen(false);
+    resetAddForm();
+  }
 
-    if (view === "department") {
-      const department = departmentsQuery.data?.find((item) => item.id === selectedAddId);
+  function openAddPanel() {
+    setAddSubjectType(view === "department" ? "department" : "account");
+    resetAddForm();
+    setIsAddOpen(true);
+  }
+
+  function addGrant(subjectId?: string) {
+    const targetId = subjectId;
+    if (!targetId) return;
+
+    if (addSubjectType === "department") {
+      const department = departmentsQuery.data?.find((item) => item.id === targetId);
       if (!department) return;
       setDepartmentGrants((items) => [
         ...items,
@@ -262,8 +281,9 @@ export function KnowledgeBaseAccessEditor(props: {
           include_child_departments: includeChildren
         }
       ]);
+      if (view !== "department") setView("department");
     } else {
-      const user = usersQuery.data?.find((item) => item.id === selectedAddId);
+      const user = usersQuery.data?.find((item) => item.id === targetId);
       if (!user) return;
       setUserGrants((items) => [
         ...items,
@@ -276,9 +296,10 @@ export function KnowledgeBaseAccessEditor(props: {
           include_child_departments: false
         }
       ]);
+      if (view !== "account") setView("account");
     }
 
-    resetAddForm();
+    closeAddPanel();
   }
 
   const activeGrants = view === "department" ? departmentGrants : userGrants;
@@ -304,7 +325,7 @@ export function KnowledgeBaseAccessEditor(props: {
           className={view === "department" ? styles.accessEditorTabActive : styles.accessEditorTab}
           onClick={() => {
             setView("department");
-            resetAddForm();
+            closeAddPanel();
           }}
         >
           <Building2 size={15} strokeWidth={2} aria-hidden="true" />
@@ -317,7 +338,7 @@ export function KnowledgeBaseAccessEditor(props: {
           className={view === "account" ? styles.accessEditorTabActive : styles.accessEditorTab}
           onClick={() => {
             setView("account");
-            resetAddForm();
+            closeAddPanel();
           }}
         >
           <UserRound size={15} strokeWidth={2} aria-hidden="true" />
@@ -330,14 +351,105 @@ export function KnowledgeBaseAccessEditor(props: {
       ) : (
         <>
           <section className={styles.accessEditorSection}>
-            <h4>{view === "department" ? "Подразделения с доступом" : "Учётные записи с прямым доступом"}</h4>
-            {!activeGrants.length ? (
+            <div className={styles.accessEditorSectionHead}>
+              <h4>{view === "department" ? "Подразделения с доступом" : "Учётные записи с прямым доступом"}</h4>
+              <button
+                type="button"
+                className={`${styles.iconButton} ${isAddOpen ? styles.iconButtonActive : ""}`}
+                onClick={() => (isAddOpen ? closeAddPanel() : openAddPanel())}
+                title={view === "department" ? "Добавить подразделение" : "Добавить учётную запись"}
+                aria-expanded={isAddOpen}
+              >
+                <Plus size={16} strokeWidth={2.2} />
+              </button>
+            </div>
+
+            {isAddOpen ? (
+              <div className={styles.accessEditorAddInline}>
+                <div className={styles.accessEditorSearchCombo}>
+                  <FormSelect
+                    compact
+                    className={styles.accessEditorSubjectSelect}
+                    value={addSubjectType}
+                    onChange={(value) => {
+                      setAddSubjectType(value as "department" | "account");
+                      setAddQuery("");
+                    }}
+                    options={addSubjectTypeOptions}
+                    ariaLabel="Тип субъекта"
+                  />
+                  <FormSearchInput
+                    compact
+                    className={styles.accessEditorSearchInput}
+                    value={addQuery}
+                    onChange={(value) => setAddQuery(value)}
+                    placeholder={
+                      addSubjectType === "department"
+                        ? "Начните вводить название подразделения"
+                        : "Начните вводить ФИО, должность или отдел"
+                    }
+                  />
+                </div>
+                <div className={styles.accessEditorAddOptions}>
+                  <FormSelect
+                    compact
+                    value={newAccessLevel}
+                    onChange={(value) => setNewAccessLevel(value as KnowledgeBaseAccessType)}
+                    options={accessLevelOptions}
+                    ariaLabel="Уровень доступа для новой записи"
+                  />
+                  {addSubjectType === "department" ? (
+                    <label className={styles.accessEditorCheckboxInline}>
+                      <input
+                        type="checkbox"
+                        checked={includeChildren}
+                        onChange={(event) => setIncludeChildren(event.target.checked)}
+                      />
+                      Включая дочерние подразделения
+                    </label>
+                  ) : null}
+                </div>
+                {candidates.length > 0 ? (
+                  <div className={styles.accessEditorCandidates}>
+                    {candidates.map((item) => {
+                      const id = item.id;
+                      const label =
+                        addSubjectType === "department"
+                          ? "name" in item
+                            ? item.name
+                            : id
+                          : formatShortPersonName("full_name" in item ? item.full_name : null);
+                      const meta =
+                        addSubjectType === "account" && "position" in item
+                          ? [item.position, item.department_name].filter(Boolean).join(" · ")
+                          : null;
+
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          className={styles.accessEditorCandidate}
+                          onClick={() => addGrant(id)}
+                        >
+                          <strong>{label}</strong>
+                          {meta ? <span>{meta}</span> : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : addQuery.trim() ? (
+                  <p className={styles.accessEditorEmpty}>Ничего не найдено.</p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {!activeGrants.length && !isAddOpen ? (
               <p className={styles.accessEditorEmpty}>
                 {view === "department"
                   ? "Подразделения ещё не назначены."
                   : "Прямой доступ для учётных записей ещё не настроен."}
               </p>
-            ) : (
+            ) : activeGrants.length ? (
               <div className={styles.accessEditorTable} role="table">
                 <div
                   className={`${styles.accessEditorHead} ${view === "account" ? styles.accessEditorHeadAccount : ""}`}
@@ -391,7 +503,7 @@ export function KnowledgeBaseAccessEditor(props: {
                   </div>
                 ))}
               </div>
-            )}
+            ) : null}
           </section>
 
           {view === "account" && inheritedAccounts.length > 0 ? (
@@ -417,75 +529,6 @@ export function KnowledgeBaseAccessEditor(props: {
               </div>
             </section>
           ) : null}
-
-          <section className={styles.accessEditorAddPanel}>
-            <h4>{view === "department" ? "Добавить подразделение" : "Добавить учётную запись"}</h4>
-            <div className={styles.accessEditorAddForm}>
-              <FormSearchInput
-                compact
-                value={addQuery}
-                onChange={setAddQuery}
-                placeholder={
-                  view === "department"
-                    ? "Начните вводить название подразделения"
-                    : "Начните вводить ФИО, должность или отдел"
-                }
-              />
-              <FormSelect
-                compact
-                value={newAccessLevel}
-                onChange={(value) => setNewAccessLevel(value as KnowledgeBaseAccessType)}
-                options={accessLevelOptions}
-                ariaLabel="Уровень доступа для новой записи"
-              />
-              {view === "department" ? (
-                <label className={styles.accessEditorCheckboxInline}>
-                  <input
-                    type="checkbox"
-                    checked={includeChildren}
-                    onChange={(event) => setIncludeChildren(event.target.checked)}
-                  />
-                  Включая дочерние подразделения
-                </label>
-              ) : null}
-            </div>
-            <div className={styles.accessEditorCandidates}>
-              {(view === "department" ? departmentCandidates : accountCandidates).map((item) => {
-                const id = item.id;
-                const label =
-                  view === "department"
-                    ? "name" in item
-                      ? item.name
-                      : id
-                    : formatShortPersonName("full_name" in item ? item.full_name : null);
-                const meta =
-                  view === "account" && "position" in item
-                    ? [item.position, item.department_name].filter(Boolean).join(" · ")
-                    : null;
-
-                return (
-                  <button
-                    key={id}
-                    type="button"
-                    className={`${styles.accessEditorCandidate} ${selectedAddId === id ? styles.accessEditorCandidateSelected : ""}`}
-                    onClick={() => setSelectedAddId(id)}
-                  >
-                    <strong>{label}</strong>
-                    {meta ? <span>{meta}</span> : null}
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              onClick={addGrant}
-              disabled={!selectedAddId}
-            >
-              <Plus size={15} strokeWidth={2.2} aria-hidden="true" />
-              Добавить
-            </button>
-          </section>
         </>
       )}
 

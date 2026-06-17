@@ -3136,6 +3136,8 @@
 .overviewTab {
   display: grid;
   gap: var(--summary-sections-gap);
+  container-type: inline-size;
+  container-name: overview-tab;
 }
 
 .overviewLoading {
@@ -3169,6 +3171,7 @@
   min-width: 0;
   height: 100%;
   padding: 12px;
+  overflow: hidden;
 }
 
 .overviewSectionTile .overviewSectionBody {
@@ -3355,6 +3358,8 @@
 .overviewGridSingle {
   display: grid;
   gap: var(--summary-rows-gap);
+  width: 100%;
+  min-width: 0;
 }
 
 .overviewGridCol {
@@ -3379,8 +3384,12 @@
 }
 
 .overviewSectionTile .overviewRow {
-  align-items: flex-start;
-  gap: 8px;
+  display: grid;
+  grid-template-columns: minmax(0, 9.25rem) minmax(0, 1fr);
+  gap: 6px 10px;
+  align-items: start;
+  width: 100%;
+  min-width: 0;
 }
 
 .overviewLabel {
@@ -3393,8 +3402,9 @@
 }
 
 .overviewSectionTile .overviewLabel {
-  flex: 0 1 46%;
+  min-width: 0;
   white-space: normal;
+  line-height: 1.35;
 }
 
 .overviewValue {
@@ -3408,17 +3418,19 @@
 }
 
 .overviewSectionTile .overviewValue {
-  flex: 1 1 auto;
   min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.overviewValueWrap {
-  flex: 1 1 auto;
-  min-width: 0;
+.overviewSectionTile .overviewValueWrap {
+  overflow: visible;
+  text-overflow: unset;
   white-space: normal;
   overflow-wrap: anywhere;
+  word-break: break-word;
+  hyphens: auto;
 }
 
 .overviewValueSuccess {
@@ -3529,12 +3541,46 @@
   border-radius: var(--summary-block-radius);
 }
 
-.accessEditorSection h4,
-.accessEditorAddPanel h4 {
+.accessEditorSection h4 {
   margin: 0;
   color: var(--color-text-strong);
   font-size: 13px;
   font-weight: 800;
+}
+
+.accessEditorSectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.accessEditorAddInline {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.accessEditorSearchCombo {
+  display: grid;
+  grid-template-columns: minmax(150px, 190px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.accessEditorSubjectSelect,
+.accessEditorSearchInput {
+  min-width: 0;
+}
+
+.accessEditorAddOptions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
 }
 
 .accessEditorHint,
@@ -3693,7 +3739,13 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .accessEditorAddForm {
+  .accessEditorSearchCombo {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@container overview-tab (max-width: 520px) {
+  .overviewTileRow {
     grid-template-columns: minmax(0, 1fr);
   }
 }

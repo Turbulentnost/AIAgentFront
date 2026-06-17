@@ -126,7 +126,7 @@ function AgentIconArt({
     }
   });
 
-  const stopCardOpen = (event: React.MouseEvent | React.KeyboardEvent) => {
+  const stopCardOpen = (event: { stopPropagation: () => void }) => {
     event.stopPropagation();
   };
 

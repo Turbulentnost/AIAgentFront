@@ -46,7 +46,16 @@ import type {
   NdChangeTargetLocation,
   NdControlDepartment,
   NdControlDepartmentCreate,
+  NdControlDepartmentCreateResponse,
   NdControlPermissions,
+  DepartmentAnalysisRun,
+  DepartmentAnalysisRunListItem,
+  DepartmentAnalysisStatus,
+  DepartmentProcessItem,
+  DepartmentRelationItem,
+  DepartmentReviewPending,
+  DepartmentStructuralDocumentCard,
+  DepartmentSummary,
   NdDocumentCard,
   NdDocumentCardUpdate,
   Role,
@@ -300,7 +309,10 @@ export const ndControlApi = {
   permissions: () => apiClient.get<NdControlPermissions>("/nd-control/me/permissions").then((r) => r.data),
   listDepartments: () => apiClient.get<NdControlDepartment[]>("/nd-control/departments").then((r) => r.data),
   createDepartment: (payload: NdControlDepartmentCreate) =>
-    apiClient.post<NdControlDepartment>("/nd-control/departments", payload).then((r) => r.data),
+    apiClient.post<NdControlDepartmentCreateResponse>("/nd-control/departments", {
+      auto_start_analysis: true,
+      ...payload
+    }).then((r) => r.data),
   updateDepartment: (departmentId: string, payload: { name?: string; description?: string | null; sort_order?: number }) =>
     apiClient.patch<NdControlDepartment>(`/nd-control/departments/${departmentId}`, payload).then((r) => r.data),
   deleteDepartment: (departmentId: string) =>
@@ -322,5 +334,62 @@ export const ndControlApi = {
   getDocumentCard: (cardId: string) =>
     apiClient.get<NdDocumentCard>(`/nd-control/document-cards/${cardId}`).then((r) => r.data),
   updateDocumentCard: (cardId: string, payload: NdDocumentCardUpdate) =>
-    apiClient.patch<NdDocumentCard>(`/nd-control/document-cards/${cardId}`, payload).then((r) => r.data)
+    apiClient.patch<NdDocumentCard>(`/nd-control/document-cards/${cardId}`, payload).then((r) => r.data),
+  startDepartmentAnalysis: (departmentId: string, payload: { force_reextract?: boolean } = {}) =>
+    apiClient
+      .post<DepartmentAnalysisRun>(`/nd-control/departments/${departmentId}/analyze`, payload)
+      .then((r) => r.data),
+  getDepartmentAnalysisStatus: (departmentId: string) =>
+    apiClient
+      .get<DepartmentAnalysisStatus>(`/nd-control/departments/${departmentId}/analysis-status`)
+      .then((r) => r.data),
+  getDepartmentSummary: (departmentId: string) =>
+    apiClient.get<DepartmentSummary>(`/nd-control/departments/${departmentId}/summary`).then((r) => r.data),
+  listDepartmentDocumentCards: (
+    departmentId: string,
+    params: { query?: string; page?: number; size?: number } = {}
+  ) =>
+    apiClient
+      .get<Page<DepartmentStructuralDocumentCard>>(`/nd-control/departments/${departmentId}/document-cards`, {
+        params
+      })
+      .then((r) => r.data),
+  listDepartmentProcesses: (
+    departmentId: string,
+    params: { query?: string; filter?: string; page?: number; size?: number } = {}
+  ) =>
+    apiClient
+      .get<Page<DepartmentProcessItem>>(`/nd-control/departments/${departmentId}/processes`, { params })
+      .then((r) => r.data),
+  listDepartmentRelations: (
+    departmentId: string,
+    params: {
+      query?: string;
+      filter?: string;
+      relation_type?: string;
+      confidence?: string;
+      extraction_type?: string;
+      page?: number;
+      size?: number;
+    } = {}
+  ) =>
+    apiClient
+      .get<Page<DepartmentRelationItem>>(`/nd-control/departments/${departmentId}/relations`, { params })
+      .then((r) => r.data),
+  listDepartmentAnalysisRuns: (departmentId: string, params: { page?: number; size?: number } = {}) =>
+    apiClient
+      .get<Page<DepartmentAnalysisRunListItem>>(`/nd-control/departments/${departmentId}/analysis-runs`, { params })
+      .then((r) => r.data),
+  listReviewPending: (departmentId: string, params: { query?: string; filter?: string } = {}) =>
+    apiClient
+      .get<DepartmentReviewPending>("/nd-control/review/pending", {
+        params: { department_id: departmentId, ...params }
+      })
+      .then((r) => r.data),
+  approveRelation: (relationId: string) =>
+    apiClient.post(`/nd-control/review/relations/${relationId}/approve`).then((r) => r.data),
+  rejectRelation: (relationId: string) =>
+    apiClient.post(`/nd-control/review/relations/${relationId}/reject`).then((r) => r.data),
+  confirmProcessOwner: (processId: string, payload: { owner_name?: string }) =>
+    apiClient.post(`/nd-control/review/processes/${processId}/confirm-owner`, payload).then((r) => r.data)
 };

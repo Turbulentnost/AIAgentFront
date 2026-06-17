@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { BookOpen, Database, FileText, Info, Search, X } from "lucide-react";
-import { FormCheckbox } from "@/components/form-controls";
+import { BookOpen, Check, Database, FileText, Info, X } from "lucide-react";
+import { FormSearchInput } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import type { KnowledgeBaseListItem, KnowledgeBaseStatus } from "@/types";
 import styles from "./CreateDepartmentModal.module.css";
@@ -72,18 +72,12 @@ export default function CreateDepartmentModal({
 
   const filteredKbs = useMemo(() => {
     const query = kbSearch.trim().toLowerCase();
-    const list = knowledgeBases.filter((kb) => {
-      if (!query) return true;
+    if (!query) return knowledgeBases;
+    return knowledgeBases.filter((kb) => {
       const haystack = `${kb.name} ${kb.description ?? ""} ${kb.topic ?? ""}`.toLowerCase();
       return haystack.includes(query);
     });
-    return [...list].sort((a, b) => {
-      const aSelected = selectedKbIds.includes(a.id);
-      const bSelected = selectedKbIds.includes(b.id);
-      if (aSelected !== bSelected) return aSelected ? -1 : 1;
-      return a.name.localeCompare(b.name, "ru", { sensitivity: "base" });
-    });
-  }, [kbSearch, knowledgeBases, selectedKbIds]);
+  }, [kbSearch, knowledgeBases]);
 
   const toggleKb = (kbId: string) => {
     if (selectedKbIds.includes(kbId)) {
@@ -112,150 +106,109 @@ export default function CreateDepartmentModal({
             <p>Быстро добавьте отдел агента и привяжите базы знаний с нормативными документами.</p>
           </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
-            <X size={18} strokeWidth={2.2} aria-hidden="true" />
+            <X size={18} strokeWidth={2} />
           </button>
         </header>
 
         <div className={styles.body}>
-          <section className={styles.summaryBlock} aria-label="Данные отдела">
-            <label className={styles.field} htmlFor="create-dept-name">
-              <span className={styles.fieldLabel}>
-                <span className={styles.fieldLabelText}>Название отдела</span>
-                <span className={styles.required} aria-hidden="true">
-                  *
-                </span>
-              </span>
-              <div className={styles.fieldControl}>
-                <input
-                  id="create-dept-name"
-                  className={formStyles.control}
-                  value={name}
-                  onChange={(event) => onNameChange(event.target.value)}
-                  placeholder="Например: Отдел качества"
-                  autoFocus
-                  required
-                />
-              </div>
-            </label>
+          <section className={styles.leftColumn}>
+            <div className={styles.field}>
+              <label htmlFor="create-dept-name">
+                Название отдела <span className={styles.required}>*</span>
+              </label>
+              <input
+                id="create-dept-name"
+                className={formStyles.control}
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="тестовый отдел 1"
+                autoFocus
+                required
+              />
+            </div>
 
             <div className={styles.infoCallout}>
-              <Info size={18} strokeWidth={2.1} aria-hidden="true" />
+              <Info size={18} strokeWidth={2} aria-hidden="true" />
               <p>
                 Введите название и выберите базы знаний справа. Можно отметить несколько карточек — документы
                 подтянутся из всех выбранных баз.
               </p>
             </div>
 
-            <div className={styles.summaryRow}>
-              <span className={styles.summaryLabel}>Выбрано баз</span>
-              <span className={styles.summaryValue}>{selectedKbIds.length}</span>
+            <div className={styles.selectedCounter}>
+              <span>Выбрано баз</span>
+              <strong>{selectedKbIds.length}</strong>
             </div>
           </section>
 
-          <section className={`${styles.summaryBlock} ${styles.widgetPanel}`} aria-label="Выбор баз знаний">
-            <div className={styles.widgetHead}>
-              <div className={styles.widgetHeadText}>
-                <h3 className={styles.summaryBlockTitle}>Базы знаний</h3>
+          <section className={styles.rightColumn}>
+            <div className={styles.kbPanelHead}>
+              <div>
+                <h3>Базы знаний</h3>
                 <p>Нажмите на карточку, чтобы прикрепить или открепить базу</p>
               </div>
-              <span className={styles.statusBadge}>
-                {selectedKbIds.length} / {knowledgeBases.length}
+              <span className={styles.kbCounter}>
+                {selectedKbIds.length}/{knowledgeBases.length}
               </span>
             </div>
 
-            <label className={styles.field} htmlFor="create-dept-kb-search">
-              <span className={styles.fieldLabel}>
-                <span className={styles.fieldLabelText}>Поиск баз знаний</span>
-              </span>
-              <div className={`${formStyles.selectField} ${styles.fieldControl}`}>
-                <Search className={formStyles.selectSearch} size={16} strokeWidth={2} aria-hidden="true" />
-                <input
-                  id="create-dept-kb-search"
-                  className={formStyles.control}
-                  type="search"
-                  value={kbSearch}
-                  placeholder="Поиск по названию или тематике"
-                  onChange={(event) => setKbSearch(event.target.value)}
-                />
-              </div>
-            </label>
+            <FormSearchInput
+              className={styles.kbSearch}
+              value={kbSearch}
+              onChange={setKbSearch}
+              placeholder="Поиск по названию или тематике"
+            />
 
-            {filteredKbs.length ? (
-              <ul className={styles.widgetGrid}>
+            {!knowledgeBases.length ? (
+              <p className={styles.kbEmpty}>Нет доступных баз знаний.</p>
+            ) : !filteredKbs.length ? (
+              <p className={styles.kbEmpty}>По запросу ничего не найдено.</p>
+            ) : (
+              <ul className={styles.kbCardGrid}>
                 {filteredKbs.map((kb, index) => {
                   const selected = selectedKbIds.includes(kb.id);
                   const { Icon, tone } = kbIconOptions[index % kbIconOptions.length];
                   const status = getKbStatusPresentation(kb);
                   return (
                     <li key={kb.id}>
-                      <div
-                        className={`${styles.kbWidget} ${selected ? styles.kbWidgetSelected : ""}`}
-                        tabIndex={0}
+                      <button
+                        type="button"
+                        className={`${styles.kbCard} ${selected ? styles.kbCardSelected : ""}`}
+                        aria-pressed={selected}
                         onClick={() => toggleKb(kb.id)}
-                        onKeyDown={(event) => {
-                          if (event.key === "Enter" || event.key === " ") {
-                            event.preventDefault();
-                            toggleKb(kb.id);
-                          }
-                        }}
                       >
-                        <span className={styles.kbWidgetAside}>
-                          <span className={`${styles.kbWidgetIcon} ${styles[`kbWidgetIcon_${tone}`]}`}>
-                            <Icon size={18} strokeWidth={2} aria-hidden="true" />
-                          </span>
-                          <span
-                            className={styles.kbWidgetCheckboxWrap}
-                            onClick={(event) => event.stopPropagation()}
-                            onKeyDown={(event) => event.stopPropagation()}
-                          >
-                            <FormCheckbox
-                              checked={selected}
-                              onChange={(checked) => {
-                                if (checked !== selected) toggleKb(kb.id);
-                              }}
-                              aria-label={`Выбрать базу знаний ${kb.name}`}
-                              className={styles.kbWidgetCheckbox}
-                            />
-                          </span>
+                        <span className={`${styles.kbCardCheck} ${selected ? styles.kbCardCheckSelected : ""}`}>
+                          {selected ? <Check size={14} strokeWidth={2.8} /> : null}
                         </span>
-                        <span className={styles.kbWidgetBody}>
-                          <span className={styles.kbWidgetTop}>
+                        <span className={`${styles.kbIcon} ${styles[`kbIcon_${tone}`]}`}>
+                          <Icon size={18} strokeWidth={2} aria-hidden="true" />
+                        </span>
+                        <span className={styles.kbCardBody}>
+                          <span className={styles.kbCardTop}>
                             <strong>{kb.name}</strong>
                             <span className={`${styles.kbStatus} ${styles[`kbStatus_${status.tone}`]}`}>
                               {status.label}
                             </span>
                           </span>
-                          <span className={styles.kbWidgetMeta}>{formatDocCount(kb.sources_count)}</span>
-                          <span className={styles.kbWidgetDesc}>
+                          <span className={styles.kbDocCount}>{formatDocCount(kb.sources_count)}</span>
+                          <span className={styles.kbCardDesc}>
                             {kb.description || kb.topic || "Описание не задано"}
                           </span>
                         </span>
-                      </div>
+                      </button>
                     </li>
                   );
                 })}
               </ul>
-            ) : (
-              <div className={styles.widgetEmpty}>
-                {knowledgeBases.length
-                  ? "Ничего не найдено по вашему запросу."
-                  : "Нет доступных баз знаний для прикрепления."}
-              </div>
             )}
-
-            {!selectedKbIds.length ? (
-              <p className={styles.widgetHint} role="status">
-                Выберите хотя бы одну базу знаний.
-              </p>
-            ) : null}
           </section>
         </div>
 
         <footer className={styles.footer}>
-          <button type="button" className={styles.navBackButton} onClick={onClose}>
+          <button type="button" className={styles.secondaryBtn} onClick={onClose} disabled={isSubmitting}>
             Отмена
           </button>
-          <button type="submit" className={styles.navNextButton} disabled={!canSubmit}>
+          <button type="submit" className={styles.primaryBtn} disabled={!canSubmit}>
             {isSubmitting ? "Создаём…" : "Создать отдел"}
           </button>
         </footer>
