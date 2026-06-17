@@ -1056,13 +1056,175 @@ export interface NdControlDepartment {
   created_by_user_id: string | null;
   knowledge_bases_count: number;
   cards_count: number;
+  documents_count?: number;
+  processes_count?: number;
+  pending_review_count?: number;
   knowledge_base_ids: string[];
+  analysis_status?: string | null;
+  analysis_progress_percent?: number | null;
+}
+
+export type DepartmentAnalysisRunStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "completed_with_warnings"
+  | "failed"
+  | "cancelled";
+
+export interface DepartmentAnalysisRun {
+  id: string;
+  department_id: string;
+  status: DepartmentAnalysisRunStatus;
+  current_step: string;
+  progress_percent: number;
+  total_knowledge_bases: number;
+  total_documents: number;
+  processed_documents: number;
+  skipped_documents: number;
+  failed_documents: number;
+  needs_review_documents: number;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+  summary_json: Record<string, unknown> | null;
+}
+
+export interface NdControlDepartmentCreateResponse {
+  department: NdControlDepartment;
+  analysis_run: DepartmentAnalysisRun | null;
+}
+
+export interface DepartmentAnalysisStatus {
+  department_id: string;
+  run_id: string | null;
+  status: DepartmentAnalysisRunStatus | null;
+  current_step: string | null;
+  progress_percent: number;
+  total_documents: number;
+  processed_documents: number;
+  skipped_documents: number;
+  failed_documents: number;
+  needs_review_documents: number;
+  message: string | null;
+  summary: Record<string, unknown>;
+}
+
+export interface DepartmentSummary {
+  department_id: string;
+  department_name: string;
+  analysis_status: string | null;
+  knowledge_bases: Array<{
+    id: string;
+    name: string;
+    description?: string | null;
+    documents_count?: number;
+    processed_count?: number;
+    failed_count?: number;
+    status?: string;
+  }>;
+  knowledge_bases_count?: number;
+  documents_count: number;
+  document_cards_count: number;
+  processes_count: number;
+  relations_count: number;
+  pending_review_count: number;
+  last_analysis_at?: string | null;
+  last_analysis_run: DepartmentAnalysisRun | null;
+}
+
+export interface DepartmentStructuralDocumentCard {
+  document_card_id: string;
+  document_id: string;
+  knowledge_base_id: string;
+  file_name: string | null;
+  document_code: string | null;
+  title: string | null;
+  document_type: string | null;
+  version: string | null;
+  status: string | null;
+  extraction_status: string;
+  extraction_confidence: string | null;
+  processes_count: number;
+  relations_count: number;
+  needs_review_count: number;
+  updated_at: string | null;
+  purpose?: string | null;
+}
+
+export interface DepartmentProcessItem {
+  process_id: string;
+  canonical_name: string;
+  description: string | null;
+  goal: string | null;
+  owner_candidate: string | null;
+  owner_confirmed: boolean;
+  owner_confidence: string | null;
+  source_documents_count: number;
+  relations_count: number;
+  forms_count: number;
+  systems_count: number;
+  needs_review: boolean;
+  pending_relations_count: number;
+}
+
+export interface DepartmentRelationItem {
+  relation_id: string;
+  source_type: string;
+  source_name: string;
+  relation_type: string;
+  relation_type_label: string;
+  target_type: string;
+  target_name: string;
+  confidence: string;
+  extraction_type: string;
+  is_confirmed: boolean;
+  review_status: string;
+  evidence: Record<string, unknown>;
+  created_at?: string | null;
+}
+
+export interface DepartmentReviewPending {
+  process_owners: Array<{
+    process_id: string;
+    process_name: string;
+    owner_candidate: string | null;
+    confidence: string | null;
+    evidence: Record<string, unknown> | null;
+  }>;
+  relations: DepartmentRelationItem[];
+  documents: Array<{
+    document_card_id: string;
+    document_id: string;
+    document_code: string | null;
+    title: string | null;
+    reason: string | null;
+    extraction_status: string;
+  }>;
+  conflicts: Array<Record<string, unknown>>;
+}
+
+export interface DepartmentAnalysisRunListItem {
+  run_id: string;
+  started_at: string | null;
+  finished_at: string | null;
+  status: DepartmentAnalysisRunStatus;
+  total_documents: number;
+  processed_documents: number;
+  skipped_documents: number;
+  failed_documents: number;
+  needs_review_documents: number;
+  processes_created: number;
+  relations_created: number;
+  duration_seconds: number | null;
+  error_message: string | null;
 }
 
 export interface NdControlDepartmentCreate {
   name: string;
   description?: string | null;
   knowledge_base_ids: string[];
+  auto_start_analysis?: boolean;
 }
 
 export interface NdDocumentCard {
