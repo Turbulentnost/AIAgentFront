@@ -267,6 +267,18 @@
   align-items: center;
 }
 
+.toolbarFilters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+  align-items: center;
+}
+
+.toolbarFilters > * {
+  min-width: 160px;
+}
+
 .searchField {
   flex: 1;
   min-width: 220px;

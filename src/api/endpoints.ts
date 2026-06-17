@@ -354,7 +354,13 @@ export const ndControlApi = {
     apiClient.get<DepartmentSummary>(`/nd-control/departments/${departmentId}/summary`).then((r) => r.data),
   listDepartmentDocumentCards: (
     departmentId: string,
-    params: { query?: string; page?: number; size?: number } = {}
+    params: {
+      query?: string;
+      document_type?: string;
+      document_level?: string;
+      page?: number;
+      size?: number;
+    } = {}
   ) =>
     apiClient
       .get<Page<DepartmentStructuralDocumentCard>>(`/nd-control/departments/${departmentId}/document-cards`, {

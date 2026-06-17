@@ -1188,6 +1188,10 @@ export interface DepartmentStructuralDocumentCard {
   document_code: string | null;
   title: string | null;
   document_type: string | null;
+  document_type_label?: string | null;
+  document_type_confidence?: string | null;
+  document_level?: string | null;
+  document_level_label?: string | null;
   version: string | null;
   status: string | null;
   extraction_status: string;

@@ -337,7 +337,8 @@ export default function NdControlAgent() {
             </div>
             <div className={styles.cardDetailGrid}>
               <div><span>Код</span><strong>{selectedCard.document_code ?? "—"}</strong></div>
-              <div><span>Тип</span><strong>{selectedCard.document_type ?? "—"}</strong></div>
+              <div><span>Тип документа</span><strong>{selectedCard.document_type_label ?? "—"}</strong></div>
+              <div><span>Уровень СМК</span><strong>{selectedCard.document_level_label ?? "—"}</strong></div>
               <div><span>Версия</span><strong>{selectedCard.version ?? "—"}</strong></div>
               <div><span>Статус извлечения</span><strong>{selectedCard.extraction_status}</strong></div>
               <div className={styles.cardDetailFull}>

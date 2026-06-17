@@ -47,6 +47,45 @@ export const CONFIDENCE_LABELS: Record<string, string> = {
   low: "Низкая"
 };
 
+export const SMK_DOCUMENT_TYPE_LABELS: Record<string, string> = {
+  POLICY: "Политика",
+  REGULATION: "Положение",
+  PROCESS_REGULATION: "Регламент",
+  STO: "СТО",
+  INSTRUCTION: "Инструкция",
+  policy: "Политика",
+  regulation: "Положение",
+  process_regulation: "Регламент",
+  sto: "СТО",
+  instruction: "Инструкция"
+};
+
+export const SMK_DOCUMENT_LEVEL_LABELS: Record<string, string> = {
+  strategic: "Стратегический",
+  organizational: "Организационный",
+  process: "Процессный",
+  technical: "Технический",
+  operational: "Операционный"
+};
+
+export const SMK_DOCUMENT_TYPE_FILTER_OPTIONS = [
+  { value: "", label: "Все типы" },
+  { value: "POLICY", label: "Политика" },
+  { value: "REGULATION", label: "Положение" },
+  { value: "PROCESS_REGULATION", label: "Регламент" },
+  { value: "STO", label: "СТО" },
+  { value: "INSTRUCTION", label: "Инструкция" }
+];
+
+export const SMK_DOCUMENT_LEVEL_FILTER_OPTIONS = [
+  { value: "", label: "Все уровни" },
+  { value: "strategic", label: "Стратегический" },
+  { value: "organizational", label: "Организационный" },
+  { value: "process", label: "Процессный" },
+  { value: "technical", label: "Технический" },
+  { value: "operational", label: "Операционный" }
+];
+
 export const EXTRACTION_TYPE_LABELS: Record<string, string> = {
   explicit: "Явно из документа",
   inferred: "Вывод агента",

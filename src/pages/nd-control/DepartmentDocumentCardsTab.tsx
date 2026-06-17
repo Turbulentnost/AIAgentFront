@@ -1,7 +1,13 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ndControlApi } from "@/api/endpoints";
+import { FormSelect } from "@/components/form-controls";
 import type { DepartmentStructuralDocumentCard } from "@/types";
-import { EXTRACTION_STATUS_LABELS } from "./constants";
+import {
+  EXTRACTION_STATUS_LABELS,
+  SMK_DOCUMENT_LEVEL_FILTER_OPTIONS,
+  SMK_DOCUMENT_TYPE_FILTER_OPTIONS
+} from "./constants";
 import { formatDateTime } from "./utils";
 import styles from "../NdControlAgent.module.css";
 
@@ -18,11 +24,23 @@ export default function DepartmentDocumentCardsTab({
   onOpenCard,
   onReextract
 }: Props) {
+  const [documentTypeFilter, setDocumentTypeFilter] = useState("");
+  const [documentLevelFilter, setDocumentLevelFilter] = useState("");
+
   const cards = useQuery({
-    queryKey: ["nd-control", "structural-document-cards", departmentId, search],
+    queryKey: [
+      "nd-control",
+      "structural-document-cards",
+      departmentId,
+      search,
+      documentTypeFilter,
+      documentLevelFilter
+    ],
     queryFn: () =>
       ndControlApi.listDepartmentDocumentCards(departmentId, {
         query: search || undefined,
+        document_type: documentTypeFilter || undefined,
+        document_level: documentLevelFilter || undefined,
         page: 1,
         size: 100
       }),
@@ -34,6 +52,22 @@ export default function DepartmentDocumentCardsTab({
   if (!cards.data?.items.length) {
     return (
       <div className={styles.emptyStateBlock}>
+        <div className={styles.toolbarFilters}>
+          <FormSelect
+            compact
+            value={documentTypeFilter}
+            onChange={setDocumentTypeFilter}
+            options={SMK_DOCUMENT_TYPE_FILTER_OPTIONS}
+            ariaLabel="Фильтр по типу документа"
+          />
+          <FormSelect
+            compact
+            value={documentLevelFilter}
+            onChange={setDocumentLevelFilter}
+            options={SMK_DOCUMENT_LEVEL_FILTER_OPTIONS}
+            ariaLabel="Фильтр по уровню СМК"
+          />
+        </div>
         <p>Карточки документов пока не созданы для этого отдела.</p>
         <p className={styles.emptyHint}>Запустите анализ, чтобы создать карточки из прикреплённых баз знаний.</p>
       </div>
@@ -42,12 +76,29 @@ export default function DepartmentDocumentCardsTab({
 
   return (
     <div className={styles.tableWrap}>
+      <div className={styles.toolbarFilters}>
+        <FormSelect
+          compact
+          value={documentTypeFilter}
+          onChange={setDocumentTypeFilter}
+          options={SMK_DOCUMENT_TYPE_FILTER_OPTIONS}
+          ariaLabel="Фильтр по типу документа"
+        />
+        <FormSelect
+          compact
+          value={documentLevelFilter}
+          onChange={setDocumentLevelFilter}
+          options={SMK_DOCUMENT_LEVEL_FILTER_OPTIONS}
+          ariaLabel="Фильтр по уровню СМК"
+        />
+      </div>
       <table className={styles.table}>
         <thead>
           <tr>
             <th>Код</th>
             <th>Наименование</th>
-            <th>Тип</th>
+            <th>Тип документа</th>
+            <th>Уровень СМК</th>
             <th>Версия</th>
             <th>Статус НД</th>
             <th>Извлечение</th>
@@ -63,7 +114,8 @@ export default function DepartmentDocumentCardsTab({
             <tr key={card.document_card_id}>
               <td>{card.document_code ?? "—"}</td>
               <td>{card.title ?? card.file_name ?? "—"}</td>
-              <td>{card.document_type ?? "—"}</td>
+              <td>{card.document_type_label ?? "—"}</td>
+              <td>{card.document_level_label ?? "—"}</td>
               <td>{card.version ?? "—"}</td>
               <td>{card.status ?? "—"}</td>
               <td>
