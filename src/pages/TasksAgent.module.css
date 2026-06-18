@@ -1,0 +1,201 @@
+.page {
+  display: grid;
+  gap: 24px;
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+.section {
+  display: grid;
+  gap: 12px;
+  padding: 18px 20px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.tableWrap {
+  overflow: auto;
+  border: 1px solid #dbeafe;
+  border-radius: 10px;
+}
+
+.table {
+  width: 100%;
+  min-width: 720px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.registerTable {
+  min-width: 1720px;
+}
+
+.taskColumn {
+  min-width: 360px;
+  width: 360px;
+  white-space: normal;
+  word-break: break-word;
+  line-height: 1.45;
+}
+
+.table thead th.taskColumn {
+  white-space: normal;
+}
+
+.table thead th {
+  padding: 10px 12px;
+  color: #0f172a;
+  text-align: left;
+  background: #dbeafe;
+  border: 1px solid #bfdbfe;
+  font-size: 12px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.table tbody td {
+  padding: 10px 12px;
+  color: #334155;
+  vertical-align: top;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.table tbody tr:nth-child(even) td {
+  background: #f8fafc;
+}
+
+.emptyCell {
+  color: #94a3b8;
+  text-align: center;
+  font-style: italic;
+}
+
+.exportButton {
+  justify-self: start;
+  min-height: 38px;
+  padding: 0 16px;
+  color: #ffffff;
+  background: #2563eb;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.18);
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.exportButton:hover {
+  background: #1d4ed8;
+}
+
+.exportButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pageHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 20px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
+}
+
+.pageMeta {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.pageMeta p {
+  margin: 0;
+  color: #475569;
+  font-size: 13px;
+}
+
+.pageMeta strong {
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.pageMetaMuted {
+  color: #94a3b8 !important;
+  font-size: 12px !important;
+}
+
+.pageMetaCounts {
+  color: #64748b !important;
+  font-size: 12px !important;
+}
+
+.stateMessage {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 24px;
+  color: #475569;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.errorBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 14px;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.refreshButton,
+.retryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  padding: 0 12px;
+  color: #1d4ed8;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.refreshButton {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
+}
+
+.refreshButton:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.refreshButtonSpinning svg,
+.spinner {
+  animation: tasksSpin 0.8s linear infinite;
+}
+
+@keyframes tasksSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}

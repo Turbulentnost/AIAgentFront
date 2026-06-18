@@ -76,6 +76,10 @@ import type {
   MeetingRunResult,
   MeetingSlot,
   MeetingSlotsRequest,
+  PorucheniyaDashboardParams,
+  PorucheniyaDashboardRefreshPayload,
+  PorucheniyaPermissions,
+  TasksDashboardRead,
   AgentBlueprint,
   AgentBuilderSession,
   AgentBuilderSessionDetail,
@@ -88,7 +92,7 @@ import type {
 export const meetingsApi = {
   permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
   getDashboard: () =>
-    apiClient
+    longRunningApiClient
       .get<MeetingLoginContext>("/meetings/dashboard", {
         params: { _: Date.now() },
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
@@ -101,6 +105,22 @@ export const meetingsApi = {
   createRun: (payload: MeetingRunCreate) =>
     apiClient.post<MeetingRun>("/meetings/runs", payload).then((r) => r.data),
   getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data)
+};
+
+export const porucheniyaApi = {
+  permissions: () =>
+    apiClient.get<PorucheniyaPermissions>("/porucheniya/me/permissions").then((r) => r.data),
+  getDashboard: (params?: PorucheniyaDashboardParams) =>
+    longRunningApiClient
+      .get<TasksDashboardRead>("/porucheniya/dashboard", {
+        params,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  refreshDashboard: (payload?: PorucheniyaDashboardRefreshPayload) =>
+    longRunningApiClient
+      .post<TasksDashboardRead>("/porucheniya/dashboard/refresh", payload ?? {})
+      .then((r) => r.data)
 };
 
 export const healthApi = {

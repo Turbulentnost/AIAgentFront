@@ -1383,3 +1383,15 @@ export type {
   MeetingSlotsRequest,
   MeetingValidationCheck
 } from "./meetings";
+
+export type {
+  PorucheniyaDashboardCounts,
+  PorucheniyaDashboardParams,
+  PorucheniyaDashboardRefreshPayload,
+  PorucheniyaPermissions,
+  PorucheniyaTableColumn,
+  PorucheniyaTasksTable,
+  TasksDashboardRead,
+  TasksMetrics,
+  TasksMetricsRow
+} from "./porucheniya";

@@ -5,6 +5,8 @@ export const ND_CONTROL_AGENT_SLUG = "nd_control_agent";
 export const ND_CONTROL_AGENT_PATH = "/agents/nd-control";
 export const MEETING_AGENT_SLUG = "meeting_agent";
 export const MEETING_AGENT_PATH = "/agents/meeting";
+export const TASKS_AGENT_SLUG = "tasks_agent";
+export const TASKS_AGENT_PATH = "/agents/tasks";
 export const AGENT_LAUNCH_MORPH_MS = 520;
 
 export function isNdControlAgent(agent: Pick<AgentAccess, "slug">): boolean {
@@ -15,8 +17,12 @@ export function isMeetingAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === MEETING_AGENT_SLUG;
 }
 
+export function isTasksAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === TASKS_AGENT_SLUG;
+}
+
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
-  return isNdControlAgent(agent) || isMeetingAgent(agent);
+  return isNdControlAgent(agent) || isMeetingAgent(agent) || isTasksAgent(agent);
 }
 
 export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "name">) {
@@ -29,6 +35,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isMeetingAgent(agent)) {
     return {
       path: MEETING_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isTasksAgent(agent)) {
+    return {
+      path: TASKS_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }

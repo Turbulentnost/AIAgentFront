@@ -55,6 +55,10 @@ function isOneCIntegrationErrorMessage(message: string): boolean {
     lower.includes("http 401") ||
     lower.includes("http 403") ||
     lower.includes("http 500") ||
+    lower.includes("request failed with status code") ||
+    lower.includes("network error") ||
+    lower.includes("timeout") ||
+    lower.includes("econnrefused") ||
     lower.includes("доступ запрещен") ||
     lower.includes("onec") ||
     lower.includes("1с") ||
@@ -83,6 +87,10 @@ export function getMeetingRequestError(error: unknown): string {
       return formatMeetingIntegrationError(
         detail.map((item) => item?.msg ?? String(item)).join("; ")
       );
+    }
+    const status = error.response?.status;
+    if (status === 500 || status === 502 || status === 503 || status === 504) {
+      return ONEC_INTEGRATION_ERROR_MESSAGE;
     }
     if (error.message) return formatMeetingIntegrationError(error.message);
   }
