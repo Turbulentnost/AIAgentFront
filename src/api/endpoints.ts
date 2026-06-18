@@ -417,7 +417,10 @@ export const ndControlApi = {
     apiClient.post(`/nd-control/review/relations/${relationId}/reject`).then((r) => r.data),
   confirmProcessOwner: (processId: string, payload: { owner_name?: string }) =>
     apiClient.post(`/nd-control/review/processes/${processId}/confirm-owner`, payload).then((r) => r.data),
-  getProcessUml: (processId: string, params: { force?: boolean } = {}) =>
+  getProcessUml: (
+    processId: string,
+    params: { force?: boolean; detail_level?: "compact" | "standard" | "detailed" } = {}
+  ) =>
     longRunningApiClient
       .get<ProcessUmlResponse>(`/nd-control/processes/${processId}/uml`, { params })
       .then((r) => r.data),

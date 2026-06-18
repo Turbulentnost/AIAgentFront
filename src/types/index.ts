@@ -1268,12 +1268,42 @@ export interface DepartmentProcessItem {
   pending_relations_count: number;
 }
 
+export interface ProcessUmlSchemaComposition {
+  start_end: number;
+  operations: number;
+  decisions: number;
+  documents: number;
+  roles: number;
+  forms: number;
+  systems: number;
+  related_processes: number;
+  effectiveness_criteria?: number;
+  resources?: number;
+  risks?: number;
+  archive_items?: number;
+}
+
+export type ProcessUmlDetailLevel = "compact" | "standard" | "detailed";
+
 export interface ProcessUmlResponse {
   process_id: string;
   process_name: string;
   uml_type: string;
   uml_code: string;
   cached?: boolean;
+  standard_profile?: string;
+  generator_version?: string;
+  detail_level?: ProcessUmlDetailLevel;
+  source_document_type?: string | null;
+  source_document_type_label?: string | null;
+  qms_level?: string | null;
+  qms_level_label?: string | null;
+  diagram_profile_label?: string | null;
+  primary_document_type?: string | null;
+  validation_status?: "valid" | "warning" | "invalid";
+  validation_errors?: string[];
+  warnings?: string[];
+  schema_composition?: ProcessUmlSchemaComposition;
 }
 
 export interface RelationEntityDisplay {

@@ -12,8 +12,8 @@ import {
   TriangleAlert,
   UserRound
 } from "lucide-react";
-import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState, type MouseEvent } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo, useRef, useState, useEffect, type MouseEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
@@ -120,15 +120,24 @@ function pickLaunchAgents(agents: AgentAccess[]) {
 
 export default function Dashboard() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user } = useAuth();
   const greetingName = getGreetingName(user);
   const [sweepingActionId, setSweepingActionId] = useState<string | null>(null);
   const [launchMorphAgentId, setLaunchMorphAgentId] = useState<string | null>(null);
+  const [brokenIconIds, setBrokenIconIds] = useState<Set<string>>(() => new Set());
+  const iconReloadAttempted = useRef<Set<string>>(new Set());
 
   const agentsQuery = useQuery({
     queryKey: ["agents", "available"],
-    queryFn: agentsApi.available
+    queryFn: agentsApi.available,
+    staleTime: 0
   });
+
+  useEffect(() => {
+    setBrokenIconIds(new Set());
+    iconReloadAttempted.current.clear();
+  }, [agentsQuery.dataUpdatedAt]);
 
   const launchAgents = useMemo(
     () => pickLaunchAgents(agentsQuery.data ?? []),
@@ -142,6 +151,15 @@ export default function Dashboard() {
       ),
     [agentsQuery.data]
   );
+
+  function handleAgentIconError(agentId: string) {
+    if (iconReloadAttempted.current.has(agentId)) {
+      setBrokenIconIds((prev) => new Set(prev).add(agentId));
+      return;
+    }
+    iconReloadAttempted.current.add(agentId);
+    void queryClient.invalidateQueries({ queryKey: ["agents", "available"] });
+  }
 
   function handleRecommendedClick(action: RecommendedAction, event: MouseEvent<HTMLAnchorElement>) {
     event.preventDefault();
@@ -229,16 +247,23 @@ export default function Dashboard() {
 
               if (isHiddenByMorph) return null;
 
+              const showAgentIcon = Boolean(agent.icon_url) && !brokenIconIds.has(agent.id);
+
               return (
                 <article
                   className={`${styles.launchCard} ${isMorphing ? styles.launchCardMorphing : ""}`}
                   key={agent.id}
                 >
                   <div
-                    className={`${styles.launchArt} ${agent.icon_url ? styles.launchArtHasIcon : styles[icon]}`}
+                    className={`${styles.launchArt} ${showAgentIcon ? styles.launchArtHasIcon : styles[icon]}`}
                   >
-                    {agent.icon_url ? (
-                      <img src={agent.icon_url} alt="" loading="lazy" />
+                    {showAgentIcon ? (
+                      <img
+                        src={agent.icon_url!}
+                        alt=""
+                        loading="lazy"
+                        onError={() => handleAgentIconError(agent.id)}
+                      />
                     ) : (
                       <Icon size={52} strokeWidth={1.7} aria-hidden="true" />
                     )}

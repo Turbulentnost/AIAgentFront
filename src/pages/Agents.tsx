@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, useEffect } from "react";
 import { Camera, Edit3, FolderOpen, Users } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
@@ -117,8 +117,15 @@ function AgentIconArt({
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = Boolean(user?.is_superuser);
-  const iconSrc = agent.icon_url ?? AGENT_ILLUSTRATION;
+  const [useFallbackIcon, setUseFallbackIcon] = useState(false);
+  const iconReloadAttempted = useRef(false);
+  const iconSrc = useFallbackIcon || !agent.icon_url ? AGENT_ILLUSTRATION : agent.icon_url;
   const artClass = variant === "compact" ? styles.compactArt : styles.agentArt;
+
+  useEffect(() => {
+    setUseFallbackIcon(false);
+    iconReloadAttempted.current = false;
+  }, [agent.icon_url]);
 
   const uploadMutation = useMutation({
     mutationFn: (file: File) => agentsApi.uploadIcon(agent.id, file),
@@ -149,7 +156,19 @@ function AgentIconArt({
       className={`${artClass} ${isAdmin ? styles.agentArtEditable : ""}`}
       onClick={isAdmin ? stopCardOpen : undefined}
     >
-      <img src={iconSrc} alt="" loading="lazy" />
+      <img
+        src={iconSrc}
+        alt=""
+        loading="lazy"
+        onError={() => {
+          if (agent.icon_url && !iconReloadAttempted.current) {
+            iconReloadAttempted.current = true;
+            void queryClient.invalidateQueries({ queryKey: ["agents", "available"] });
+            return;
+          }
+          setUseFallbackIcon(true);
+        }}
+      />
       {isAdmin ? (
         <>
           <span className={styles.agentArtOverlay} aria-hidden="true" />
@@ -355,7 +374,8 @@ export default function Agents() {
 
   const agentsQuery = useQuery({
     queryKey: ["agents", "available"],
-    queryFn: agentsApi.available
+    queryFn: agentsApi.available,
+    staleTime: 0
   });
   const departmentsQuery = useQuery({
     queryKey: ["departments"],

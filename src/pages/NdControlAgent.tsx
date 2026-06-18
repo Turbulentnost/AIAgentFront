@@ -19,6 +19,7 @@ import ConfirmProcessOwnerDialog from "./nd-control/ConfirmProcessOwnerDialog";
 import ProcessDetailsDrawer from "./nd-control/ProcessDetailsDrawer";
 import ReanalyzeConfirmDialog from "./nd-control/ReanalyzeConfirmDialog";
 import { DEPARTMENT_TABS, isAnalysisRunning, type DepartmentTab } from "./nd-control/constants";
+import { cleanupMermaidDomArtifacts } from "@/utils/renderMermaid";
 import styles from "./NdControlAgent.module.css";
 
 function EmptyState({ icon: Icon, text }: { icon: typeof LayoutPanelLeft; text: string }) {
@@ -79,6 +80,10 @@ export default function NdControlAgent() {
       await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
     }
   });
+
+  useEffect(() => {
+    cleanupMermaidDomArtifacts();
+  }, []);
 
   useEffect(() => {
     if (!selectedDeptId && departments.data?.length) {
