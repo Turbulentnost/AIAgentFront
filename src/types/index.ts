@@ -1270,6 +1270,7 @@ export interface DepartmentProcessItem {
 
 export interface ProcessUmlResponse {
   process_id: string;
+  process_name: string;
   uml_type: string;
   uml_code: string;
   cached?: boolean;

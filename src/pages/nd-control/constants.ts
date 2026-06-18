@@ -1,3 +1,5 @@
+import type { DepartmentProcessItem } from "@/types";
+
 export type DepartmentTab =
   | "overview"
   | "documents"
@@ -124,9 +126,14 @@ export const RELATION_TYPE_LABELS: Record<string, string> = {
   ROLE_RESPONSIBLE_FOR_ACTION: "Роль отвечает за действие"
 };
 
+export function processHasUmlGraph(process: DepartmentProcessItem): boolean {
+  return process.relations_count > 0;
+}
+
 export function analysisStatusLabel(status: string | null | undefined): string | null {
   if (!status) return "Не запускался";
   if (status === "pending" || status === "running") return "Анализируется";
+  if (status === "cancelled") return "Остановлен";
   if (status === "completed") return "Готово";
   if (status === "completed_with_warnings" || status === "needs_review") return "Требует проверки";
   if (status === "failed") return "Ошибка";

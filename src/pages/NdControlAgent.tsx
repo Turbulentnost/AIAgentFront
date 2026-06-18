@@ -135,6 +135,13 @@ export default function NdControlAgent() {
     }
   });
 
+  const cancelAnalysis = useMutation({
+    mutationFn: (departmentId: string) => ndControlApi.cancelDepartmentAnalysis(departmentId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["nd-control"] });
+    }
+  });
+
   const deleteDepartment = useMutation({
     mutationFn: (departmentId: string) => ndControlApi.deleteDepartment(departmentId),
     onSuccess: async (_data, departmentId) => {
@@ -221,7 +228,14 @@ export default function NdControlAgent() {
           {!selectedDeptId ? (
             <EmptyState icon={LayoutPanelLeft} text="Выберите отдел слева." />
           ) : showAnalysisScreen ? (
-            <DepartmentAnalysisProgress status={analysisStatus.data} isLoading={analysisStatus.isLoading} />
+            <DepartmentAnalysisProgress
+              status={analysisStatus.data}
+              isLoading={analysisStatus.isLoading}
+              onCancel={
+                selectedDeptId ? () => cancelAnalysis.mutate(selectedDeptId) : undefined
+              }
+              isCancelling={cancelAnalysis.isPending}
+            />
           ) : (
             <>
               {departmentSummary.data ? (

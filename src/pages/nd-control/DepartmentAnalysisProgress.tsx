@@ -1,4 +1,4 @@
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2, Square } from "lucide-react";
 import type { DepartmentAnalysisStatus } from "@/types";
 import { ANALYSIS_STEP_LABELS } from "./constants";
 import styles from "../NdControlAgent.module.css";
@@ -6,9 +6,16 @@ import styles from "../NdControlAgent.module.css";
 type Props = {
   status: DepartmentAnalysisStatus | undefined;
   isLoading: boolean;
+  onCancel?: () => void;
+  isCancelling?: boolean;
 };
 
-export default function DepartmentAnalysisProgress({ status, isLoading }: Props) {
+export default function DepartmentAnalysisProgress({
+  status,
+  isLoading,
+  onCancel,
+  isCancelling = false
+}: Props) {
   const progress = status?.progress_percent ?? 0;
   const processed =
     (status?.processed_documents ?? 0) +
@@ -18,6 +25,7 @@ export default function DepartmentAnalysisProgress({ status, isLoading }: Props)
   const total = status?.total_documents ?? 0;
   const stepKey = status?.current_step ?? "initializing";
   const stepLabel = ANALYSIS_STEP_LABELS[stepKey] ?? status?.message ?? "Анализ выполняется…";
+  const canCancel = Boolean(onCancel) && (status?.status === "pending" || status?.status === "running");
 
   return (
     <div className={styles.analysisPanel}>
@@ -40,9 +48,7 @@ export default function DepartmentAnalysisProgress({ status, isLoading }: Props)
         </div>
         <div>
           <span>Обработано</span>
-          <strong>
-            {total ? `${processed} из ${total}` : "подготовка…"}
-          </strong>
+          <strong>{total ? `${processed} из ${total}` : "подготовка…"}</strong>
         </div>
         <div>
           <span>Ошибок</span>
@@ -53,6 +59,17 @@ export default function DepartmentAnalysisProgress({ status, isLoading }: Props)
           <strong>{status?.needs_review_documents ?? 0}</strong>
         </div>
       </div>
+      {canCancel ? (
+        <button
+          type="button"
+          className={styles.analysisCancelBtn}
+          onClick={onCancel}
+          disabled={isCancelling}
+        >
+          <Square size={16} />
+          {isCancelling ? "Останавливаем…" : "Остановить извлечение"}
+        </button>
+      ) : null}
       {status?.status === "failed" ? (
         <div className={styles.analysisErrorInline}>
           <AlertTriangle size={16} />

@@ -347,6 +347,10 @@ export const ndControlApi = {
     apiClient
       .post<DepartmentAnalysisRun>(`/nd-control/departments/${departmentId}/analyze`, payload)
       .then((r) => r.data),
+  cancelDepartmentAnalysis: (departmentId: string) =>
+    apiClient
+      .post<DepartmentAnalysisRun>(`/nd-control/departments/${departmentId}/analyze/cancel`)
+      .then((r) => r.data),
   getDepartmentAnalysisStatus: (departmentId: string) =>
     apiClient
       .get<DepartmentAnalysisStatus>(`/nd-control/departments/${departmentId}/analysis-status`)
@@ -413,6 +417,8 @@ export const ndControlApi = {
     apiClient.post(`/nd-control/review/relations/${relationId}/reject`).then((r) => r.data),
   confirmProcessOwner: (processId: string, payload: { owner_name?: string }) =>
     apiClient.post(`/nd-control/review/processes/${processId}/confirm-owner`, payload).then((r) => r.data),
-  getProcessUml: (processId: string) =>
-    apiClient.get<ProcessUmlResponse>(`/nd-control/processes/${processId}/uml`).then((r) => r.data),
+  getProcessUml: (processId: string, params: { force?: boolean } = {}) =>
+    longRunningApiClient
+      .get<ProcessUmlResponse>(`/nd-control/processes/${processId}/uml`, { params })
+      .then((r) => r.data),
 };

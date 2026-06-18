@@ -6,6 +6,8 @@ import { FormSelect } from "@/components/form-controls";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import type { DepartmentProcessItem } from "@/types";
 import NdControlDataTable from "./NdControlDataTable";
+import ProcessUmlModal from "./ProcessUmlModal";
+import { processHasUmlGraph } from "./constants";
 import styles from "../NdControlAgent.module.css";
 
 type Props = {
@@ -74,6 +76,7 @@ export default function DepartmentProcessesTab({
 }: Props) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState("name");
+  const [umlProcess, setUmlProcess] = useState<DepartmentProcessItem | null>(null);
 
   const processes = useQuery({
     queryKey: ["nd-control", "department-processes", departmentId, search, filter, sort],
@@ -188,6 +191,7 @@ export default function DepartmentProcessesTab({
                 <th>Документы</th>
                 <th>Связи</th>
                 <th>Системы / формы</th>
+                <th>Диаграмма</th>
                 <th>Действия</th>
               </tr>
             </thead>
@@ -243,6 +247,21 @@ export default function DepartmentProcessesTab({
                       <span className={styles.processSystemsPreview}>{process.systems_preview}</span>
                     </td>
                     <td className={styles.actionsCell} onClick={(event) => event.stopPropagation()}>
+                      <button
+                        type="button"
+                        className={styles.linkBtn}
+                        disabled={!processHasUmlGraph(process)}
+                        title={
+                          processHasUmlGraph(process)
+                            ? "Построить UML-диаграмму процесса"
+                            : "Недостаточно связей для диаграммы"
+                        }
+                        onClick={() => setUmlProcess(process)}
+                      >
+                        Изобразить UML
+                      </button>
+                    </td>
+                    <td className={styles.actionsCell} onClick={(event) => event.stopPropagation()}>
                       <button type="button" className={styles.linkBtn} onClick={() => onSelectProcess(process)}>
                         Открыть
                       </button>
@@ -269,6 +288,7 @@ export default function DepartmentProcessesTab({
             </tbody>
         </NdControlDataTable>
       )}
+      {umlProcess ? <ProcessUmlModal process={umlProcess} onClose={() => setUmlProcess(null)} /> : null}
     </div>
   );
 }
