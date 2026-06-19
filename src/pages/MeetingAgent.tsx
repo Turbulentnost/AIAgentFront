@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -62,6 +62,8 @@ export default function MeetingAgent() {
   const [forceMemoRefresh, setForceMemoRefresh] = useState(false);
   const [slotPreviewOpen, setSlotPreviewOpen] = useState(false);
   const [approveSuccessMessage, setApproveSuccessMessage] = useState<string | null>(null);
+  const detailsPanelRef = useRef<HTMLElement>(null);
+  const [queuePanelMaxHeight, setQueuePanelMaxHeight] = useState<number | undefined>();
 
   const dashboard = dashboardQuery.data;
   const queueItems = useMemo(
@@ -108,6 +110,20 @@ export default function MeetingAgent() {
     setActiveRunId(null);
     setForceMemoRefresh(false);
   }, [selectedRefKey]);
+
+  useEffect(() => {
+    const detailsPanel = detailsPanelRef.current;
+    if (!detailsPanel) return;
+
+    const syncQueuePanelHeight = () => {
+      setQueuePanelMaxHeight(detailsPanel.offsetHeight);
+    };
+
+    syncQueuePanelHeight();
+    const observer = new ResizeObserver(syncQueuePanelHeight);
+    observer.observe(detailsPanel);
+    return () => observer.disconnect();
+  }, [dashboard, selectedItem, detail, detailQuery.isLoading, detailQuery.isFetching]);
 
   useEffect(() => {
     if (!detail || !selectedItem || forceMemoRefresh || detailQuery.isFetching) return;
@@ -314,7 +330,11 @@ export default function MeetingAgent() {
       </div>
 
       <div className={styles.workspace}>
-        <aside className={styles.queuePanel} aria-labelledby="meeting-queue-title">
+        <aside
+          className={styles.queuePanel}
+          aria-labelledby="meeting-queue-title"
+          style={queuePanelMaxHeight ? { maxHeight: queuePanelMaxHeight } : undefined}
+        >
           <div className={styles.panelHead}>
             <h2 id="meeting-queue-title">Рабочая очередь</h2>
             <button
@@ -347,21 +367,23 @@ export default function MeetingAgent() {
             <p className={styles.queueHint}>Служебные записки с датой документа за сегодня</p>
           ) : null}
 
-          <div className={styles.queueList}>
-            {queueItems.length ? (
-              queueItems.map((item) => (
-                <QueueCard
-                  key={getMeetingItemId(item)}
-                  item={item}
-                  dashboard={dashboard}
-                  queueTab={queueTab}
-                  active={selectedId === getMeetingItemId(item)}
-                  onSelect={() => setSelectedId(getMeetingItemId(item))}
-                />
-              ))
-            ) : (
-              <div className={styles.queueEmpty}>Заявок в этой вкладке нет</div>
-            )}
+          <div className={styles.queueScrollArea}>
+            <div className={styles.queueList}>
+              {queueItems.length ? (
+                queueItems.map((item) => (
+                  <QueueCard
+                    key={getMeetingItemId(item)}
+                    item={item}
+                    dashboard={dashboard}
+                    queueTab={queueTab}
+                    active={selectedId === getMeetingItemId(item)}
+                    onSelect={() => setSelectedId(getMeetingItemId(item))}
+                  />
+                ))
+              ) : (
+                <div className={styles.queueEmpty}>Заявок в этой вкладке нет</div>
+              )}
+            </div>
           </div>
 
           <p className={styles.queueMetaNote}>
@@ -369,7 +391,7 @@ export default function MeetingAgent() {
           </p>
         </aside>
 
-        <section className={styles.detailsPanel} aria-labelledby="meeting-details-title">
+        <section ref={detailsPanelRef} className={styles.detailsPanel} aria-labelledby="meeting-details-title">
           {!selectedItem ? (
             <div className={styles.detailsEmpty}>Выберите заявку из рабочей очереди</div>
           ) : !selectedRefKey ? (
@@ -524,51 +546,55 @@ function MeetingDetails({
       </div>
 
       <div className={styles.section}>
-        <h3>Проверки агента</h3>
-        <ul className={styles.checkList}>
-          {detail.validation_checks.length ? (
-            detail.validation_checks.map((check) => (
-              <li
-                className={`${styles.checkItem} ${styles[checkToneClass(check.passed, check.severity)]}`}
-                key={`${check.field}-${check.label}`}
-              >
-                {check.passed ? (
+        <div className={styles.agentInsightsGrid}>
+          <div className={styles.agentInsightBlock}>
+            <h3>Проверки агента</h3>
+            <ul className={styles.checkList}>
+              {detail.validation_checks.length ? (
+                detail.validation_checks.map((check) => (
+                  <li
+                    className={`${styles.checkItem} ${styles[checkToneClass(check.passed, check.severity)]}`}
+                    key={`${check.field}-${check.label}`}
+                  >
+                    {check.passed ? (
+                      <CheckCircle2 size={16} aria-hidden="true" />
+                    ) : (
+                      <AlertTriangle size={16} aria-hidden="true" />
+                    )}
+                    <span>{check.label}</span>
+                  </li>
+                ))
+              ) : (
+                <li className={`${styles.checkItem} ${styles.checksuccess}`}>
                   <CheckCircle2 size={16} aria-hidden="true" />
-                ) : (
-                  <AlertTriangle size={16} aria-hidden="true" />
-                )}
-                <span>{check.label}</span>
-              </li>
-            ))
-          ) : (
-            <li className={`${styles.checkItem} ${styles.checksuccess}`}>
-              <CheckCircle2 size={16} aria-hidden="true" />
-              <span>Данные загружены из 1С ERP</span>
-            </li>
-          )}
-        </ul>
-      </div>
+                  <span>Данные загружены из 1С ERP</span>
+                </li>
+              )}
+            </ul>
+          </div>
 
-      <div className={styles.section}>
-        <h3>
-          <History size={16} aria-hidden="true" />
-          История
-        </h3>
-        {detail.history.length ? (
-          <ol className={styles.historyList}>
-            {detail.history.map((item, index) => (
-              <li className={styles.historyItem} key={`${item.timestamp}-${index}`}>
-                <span className={styles.historyTime}>
-                  <Clock3 size={14} aria-hidden="true" />
-                  {formatMeetingDateTime(item.timestamp)}
-                </span>
-                <span>{item.message}</span>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className={styles.inlineMuted}>История пока пуста</p>
-        )}
+          <div className={styles.agentInsightBlock}>
+            <h3 className={styles.sectionTitleWithIcon}>
+              <History size={16} aria-hidden="true" />
+              История
+            </h3>
+            {detail.history.length ? (
+              <ol className={styles.historyList}>
+                {detail.history.map((item, index) => (
+                  <li className={styles.historyItem} key={`${item.timestamp}-${index}`}>
+                    <span className={styles.historyTime}>
+                      <Clock3 size={14} aria-hidden="true" />
+                      {formatMeetingDateTime(item.timestamp)}
+                    </span>
+                    <span>{item.message}</span>
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p className={styles.inlineMuted}>История пока пуста</p>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className={styles.section}>
@@ -580,7 +606,7 @@ function MeetingDetails({
           {runError ? <p className={styles.runError}>{runError}</p> : null}
         </div>
         <div className={styles.actionRow}>
-          <button type="button" className={styles.primaryButton} disabled={isRunning} onClick={onLaunchAgent}>
+          <button type="button" className={styles.actionButton} disabled={isRunning} onClick={onLaunchAgent}>
             {isRunning ? (
               <>
                 <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
@@ -590,11 +616,12 @@ function MeetingDetails({
               "Запустить агента"
             )}
           </button>
-          <button type="button" className={styles.secondaryButton}>Выбрать слот</button>
-        </div>
-        <div className={styles.tertiaryRow}>
-          <button type="button" className={styles.ghostButton}>Вернуть инициатору</button>
-          <button type="button" className={styles.ghostButton}>Отклонить по СТО</button>
+          <button type="button" className={styles.actionButton}>
+            Выбрать слот
+          </button>
+          <button type="button" className={styles.actionButton}>
+            Отклонить по СТО
+          </button>
         </div>
         <p className={styles.footerNote}>
           После подтверждения агент создаст событие в Outlook и обновит 1С ERP.
