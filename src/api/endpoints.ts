@@ -72,6 +72,22 @@ import type {
   User,
   UserCreate,
   UserUpdate,
+  MeetingLoginContext,
+  MeetingMemoDetail,
+  MeetingPermissions,
+  MeetingRun,
+  MeetingRunCreate,
+  MeetingRunResult,
+  MeetingAgentSlotPreview,
+  MeetingAgentSlotPreviewRequest,
+  MeetingAgentSlotApprove,
+  MeetingAgentSlotApproveRequest,
+  MeetingSlot,
+  MeetingSlotsRequest,
+  PorucheniyaDashboardParams,
+  PorucheniyaDashboardRefreshPayload,
+  PorucheniyaPermissions,
+  TasksDashboardRead,
   AgentBlueprint,
   AgentBuilderSession,
   AgentBuilderSessionDetail,
@@ -80,6 +96,54 @@ import type {
   AgentBuilderToolCatalogItem,
   SandboxRun
 } from "@/types";
+
+export const meetingsApi = {
+  permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
+  getDashboard: () =>
+    longRunningApiClient
+      .get<MeetingLoginContext>("/meetings/dashboard", {
+        params: { _: Date.now() },
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  refreshDashboard: () =>
+    longRunningApiClient.post<MeetingLoginContext>("/meetings/dashboard/refresh").then((r) => r.data),
+  getMemoDetail: (memoRefKey: string, options?: { forceRefresh?: boolean }) =>
+    apiClient
+      .get<MeetingMemoDetail>(`/meetings/memos/${memoRefKey}/detail`, {
+        params: options?.forceRefresh ? { force_refresh: true } : undefined
+      })
+      .then((r) => r.data),
+  findSlots: (payload: MeetingSlotsRequest) =>
+    apiClient.post<MeetingSlot[]>("/meetings/slots", payload).then((r) => r.data),
+  slotPreview: (memoRefKey: string, payload?: MeetingAgentSlotPreviewRequest) =>
+    longRunningApiClient
+      .post<MeetingAgentSlotPreview>(`/meetings/memos/${memoRefKey}/agent/slot-preview`, payload ?? {})
+      .then((r) => r.data),
+  approveSlot: (memoRefKey: string, payload: MeetingAgentSlotApproveRequest) =>
+    longRunningApiClient
+      .post<MeetingAgentSlotApprove>(`/meetings/memos/${memoRefKey}/agent/approve`, payload)
+      .then((r) => r.data),
+  createRun: (payload: MeetingRunCreate) =>
+    apiClient.post<MeetingRun>("/meetings/runs", payload).then((r) => r.data),
+  getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data)
+};
+
+export const porucheniyaApi = {
+  permissions: () =>
+    apiClient.get<PorucheniyaPermissions>("/porucheniya/me/permissions").then((r) => r.data),
+  getDashboard: (params?: PorucheniyaDashboardParams) =>
+    longRunningApiClient
+      .get<TasksDashboardRead>("/porucheniya/dashboard", {
+        params,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  refreshDashboard: (payload?: PorucheniyaDashboardRefreshPayload) =>
+    longRunningApiClient
+      .post<TasksDashboardRead>("/porucheniya/dashboard/refresh", payload ?? {})
+      .then((r) => r.data)
+};
 
 export const healthApi = {
   get: () => apiClient.get<HealthResponse>("/health").then((r) => r.data),

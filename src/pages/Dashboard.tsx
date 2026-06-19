@@ -19,9 +19,12 @@ import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
   AGENT_LAUNCH_MORPH_MS,
+  isMeetingAgent,
   isNdControlAgent,
+  isTasksAgent,
   navigateToAgentLaunch
 } from "@/utils/agentLaunch";
+import { usePorucheniyaPermissions } from "@/hooks/usePorucheniyaDashboard";
 import {
   dashboardActivities,
   dashboardStats,
@@ -139,10 +142,15 @@ export default function Dashboard() {
     iconReloadAttempted.current.clear();
   }, [agentsQuery.dataUpdatedAt]);
 
-  const launchAgents = useMemo(
-    () => pickLaunchAgents(agentsQuery.data ?? []),
-    [agentsQuery.data]
-  );
+  const porucheniyaPermissionsQuery = usePorucheniyaPermissions();
+
+  const launchAgents = useMemo(() => {
+    const agents = pickLaunchAgents(agentsQuery.data ?? []);
+    if (porucheniyaPermissionsQuery.data?.can_access_agent === false) {
+      return agents.filter((agent) => !isTasksAgent(agent));
+    }
+    return agents;
+  }, [agentsQuery.data, porucheniyaPermissionsQuery.data?.can_access_agent]);
 
   const stats = useMemo(
     () =>
@@ -174,6 +182,16 @@ export default function Dashboard() {
 
   function handleAgentLaunch(agent: AgentAccess, event: MouseEvent<HTMLButtonElement>) {
     if (!agent.can_run || launchMorphAgentId) return;
+
+    if (isMeetingAgent(agent)) {
+      navigateToAgentLaunch(navigate, agent);
+      return;
+    }
+
+    if (isTasksAgent(agent)) {
+      navigateToAgentLaunch(navigate, agent);
+      return;
+    }
 
     if (isNdControlAgent(agent)) {
       if (agent.icon_url) {

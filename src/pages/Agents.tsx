@@ -3,7 +3,7 @@ import { Camera, Edit3, FolderOpen, Users } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
-import { isNdControlAgent, navigateToAgentLaunch } from "@/utils/agentLaunch";
+import { hasDedicatedLaunchPage, navigateToAgentLaunch } from "@/utils/agentLaunch";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { AgentAccessEditor } from "@/components/AgentAccessEditor";
 import { FormSelect } from "@/components/form-controls";
@@ -426,7 +426,7 @@ export default function Agents() {
   );
 
   const openAgent = (agent: AgentAccess) => {
-    if (!isNdControlAgent(agent)) return;
+    if (!hasDedicatedLaunchPage(agent)) return;
     navigateToAgentLaunch(navigate, agent);
   };
 
@@ -500,7 +500,7 @@ export default function Agents() {
                   key={agent.id}
                   agent={agent}
                   usageCount={usageByAgent.get(agent.id) ?? 0}
-                  onOpen={isNdControlAgent(agent) ? () => openAgent(agent) : undefined}
+                  onOpen={hasDedicatedLaunchPage(agent) ? () => openAgent(agent) : undefined}
                 />
               ))}
             </div>
@@ -524,7 +524,7 @@ export default function Agents() {
                   onToggleAccess={() =>
                     setExpandedAccessAgentId((current) => (current === agent.id ? null : agent.id))
                   }
-                  onOpen={isNdControlAgent(agent) ? () => openAgent(agent) : undefined}
+                  onOpen={hasDedicatedLaunchPage(agent) ? () => openAgent(agent) : undefined}
                 />
               ))}
             </div>

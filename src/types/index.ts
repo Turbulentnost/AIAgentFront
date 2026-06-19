@@ -1457,3 +1457,35 @@ export type NdDocumentCardUpdate = Partial<
     "id" | "department_id" | "knowledge_base_id" | "knowledge_base_source_id" | "document_id" | "document_version_id"
   >
 >;
+
+export type {
+  MeetingApplication,
+  MeetingDashboardItem,
+  MeetingHistoryEvent,
+  MeetingLoginContext,
+  MeetingMemoDetail,
+  MeetingPermissions,
+  MeetingRun,
+  MeetingRunCreate,
+  MeetingRunResult,
+  MeetingAgentSlotPreview,
+  MeetingAgentSlotPreviewRequest,
+  MeetingAgentSlotApprove,
+  MeetingAgentSlotApproveRequest,
+  MeetingAttendee,
+  MeetingSlot,
+  MeetingSlotsRequest,
+  MeetingValidationCheck
+} from "./meetings";
+
+export type {
+  PorucheniyaDashboardCounts,
+  PorucheniyaDashboardParams,
+  PorucheniyaDashboardRefreshPayload,
+  PorucheniyaPermissions,
+  PorucheniyaTableColumn,
+  PorucheniyaTasksTable,
+  TasksDashboardRead,
+  TasksMetrics,
+  TasksMetricsRow
+} from "./porucheniya";
