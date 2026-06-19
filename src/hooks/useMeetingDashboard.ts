@@ -46,6 +46,31 @@ export function useRefreshMeetingDashboard() {
 const ONEC_INTEGRATION_ERROR_MESSAGE =
   "Не удалось получить данные из 1С ERP. Проверьте подключение и права доступа OData или обратитесь к администратору.";
 
+const OUTLOOK_INTEGRATION_ERROR_MESSAGE =
+  "Не удалось подключиться к Outlook/Exchange для проверки календарей. Проверьте OUTLOOK_* в .env и доступ к mail-серверу из Docker.";
+
+const MEETING_SERVER_ERROR_MESSAGE =
+  "Не удалось выполнить проверку календарей. Повторите попытку или обратитесь к администратору.";
+
+function isOutlookIntegrationErrorMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("outlook") ||
+    lower.includes("exchange") ||
+    lower.includes("ews") ||
+    lower.includes("exchangelib") ||
+    lower.includes("transporterror") ||
+    lower.includes("invalid credentials") ||
+    lower.includes("календар") ||
+    lower.includes("free/busy") ||
+    lower.includes("freebusy") ||
+    lower.includes("mail.turbo-don") ||
+    lower.includes("nameresolution") ||
+    lower.includes("failed to resolve") ||
+    lower.includes("no address associated with hostname")
+  );
+}
+
 function isOneCIntegrationErrorMessage(message: string): boolean {
   const lower = message.toLowerCase();
   return (
@@ -66,7 +91,8 @@ function isOneCIntegrationErrorMessage(message: string): boolean {
 }
 
 export function formatMeetingIntegrationError(message: string | null | undefined): string {
-  if (!message?.trim()) return ONEC_INTEGRATION_ERROR_MESSAGE;
+  if (!message?.trim()) return MEETING_SERVER_ERROR_MESSAGE;
+  if (isOutlookIntegrationErrorMessage(message)) return OUTLOOK_INTEGRATION_ERROR_MESSAGE;
   if (isOneCIntegrationErrorMessage(message)) return ONEC_INTEGRATION_ERROR_MESSAGE;
   return message.trim();
 }
@@ -88,12 +114,13 @@ export function getMeetingRequestError(error: unknown): string {
     }
     const status = error.response?.status;
     if (status === 500 || status === 502 || status === 503 || status === 504) {
-      return ONEC_INTEGRATION_ERROR_MESSAGE;
+      if (error.message) return formatMeetingIntegrationError(error.message);
+      return MEETING_SERVER_ERROR_MESSAGE;
     }
     if (error.message) return formatMeetingIntegrationError(error.message);
   }
   if (error instanceof Error && error.message) {
     return formatMeetingIntegrationError(error.message);
   }
-  return ONEC_INTEGRATION_ERROR_MESSAGE;
+  return MEETING_SERVER_ERROR_MESSAGE;
 }

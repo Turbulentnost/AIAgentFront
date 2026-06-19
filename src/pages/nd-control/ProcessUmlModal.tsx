@@ -14,7 +14,7 @@ type Props = {
 
 function extractErrorMessage(error: unknown): string {
   const detail = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail;
-  if (typeof detail === "string" && detail.trim()) return detail;
+  if (typeof detail === "string" && detail.trim()) return detail.trim();
   if (error instanceof Error && error.message) return error.message;
   return "Не удалось построить диаграмму процесса";
 }

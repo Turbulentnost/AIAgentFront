@@ -3,11 +3,7 @@ import axios from "axios";
 import { useCallback } from "react";
 import { porucheniyaApi } from "@/api/endpoints";
 import type { PorucheniyaDashboardRefreshPayload } from "@/types/porucheniya";
-import {
-  formatMeetingIntegrationError,
-  getMeetingRequestError,
-  isMeetingDashboardForbidden
-} from "@/hooks/useMeetingDashboard";
+import { isMeetingDashboardForbidden } from "@/hooks/useMeetingDashboard";
 
 export function usePorucheniyaPermissions() {
   return useQuery({
@@ -43,6 +39,67 @@ export function useRefreshPorucheniyaDashboard() {
   }, [queryClient]);
 }
 
-export const formatPorucheniyaIntegrationError = formatMeetingIntegrationError;
-export const getPorucheniyaRequestError = getMeetingRequestError;
+const PORUCHENIYA_ONEC_ERROR_MESSAGE =
+  "Не удалось получить данные из 1С ERP. Проверьте подключение и права доступа OData или обратитесь к администратору.";
+
+const PORUCHENIYA_SERVER_ERROR_MESSAGE =
+  "Не удалось загрузить поручения. Повторите попытку или обратитесь к администратору.";
+
+function isPorucheniyaProfileErrorMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes("пользователь не найден") ||
+    lower.includes("не найден пользователь") ||
+    lower.includes("не удалось определить фио руководителя") ||
+    lower.includes("не удалось определить ключ руководителя") ||
+    lower.includes("проверьте фио в профиле")
+  );
+}
+
+function isPorucheniyaOneCIntegrationErrorMessage(message: string): boolean {
+  const lower = message.toLowerCase();
+  if (isPorucheniyaProfileErrorMessage(message)) return false;
+  return (
+    lower.includes("odata.error") ||
+    lower.includes("http 401") ||
+    lower.includes("http 403") ||
+    lower.includes("http 500") ||
+    lower.includes("econnrefused") ||
+    lower.includes("доступ запрещен") ||
+    lower.includes("onec_odata") ||
+    (lower.includes("odata") && !lower.includes("пользователь"))
+  );
+}
+
+export function formatPorucheniyaIntegrationError(message: string | null | undefined): string {
+  if (!message?.trim()) return PORUCHENIYA_SERVER_ERROR_MESSAGE;
+  if (isPorucheniyaProfileErrorMessage(message)) return message.trim();
+  if (isPorucheniyaOneCIntegrationErrorMessage(message)) return PORUCHENIYA_ONEC_ERROR_MESSAGE;
+  return message.trim();
+}
+
+export function getPorucheniyaRequestError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) {
+      return formatPorucheniyaIntegrationError(detail);
+    }
+    if (Array.isArray(detail)) {
+      return formatPorucheniyaIntegrationError(
+        detail.map((item) => item?.msg ?? String(item)).join("; ")
+      );
+    }
+    const status = error.response?.status;
+    if (status === 500 || status === 502 || status === 503 || status === 504) {
+      if (error.message) return formatPorucheniyaIntegrationError(error.message);
+      return PORUCHENIYA_SERVER_ERROR_MESSAGE;
+    }
+    if (error.message) return formatPorucheniyaIntegrationError(error.message);
+  }
+  if (error instanceof Error && error.message) {
+    return formatPorucheniyaIntegrationError(error.message);
+  }
+  return PORUCHENIYA_SERVER_ERROR_MESSAGE;
+}
+
 export const isPorucheniyaDashboardForbidden = isMeetingDashboardForbidden;
