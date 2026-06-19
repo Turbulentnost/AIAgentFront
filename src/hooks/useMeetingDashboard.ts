@@ -78,7 +78,6 @@ function isOneCIntegrationErrorMessage(message: string): boolean {
     lower.includes("http 401") ||
     lower.includes("http 403") ||
     lower.includes("http 500") ||
-    lower.includes("request failed with status code") ||
     lower.includes("network error") ||
     lower.includes("timeout") ||
     lower.includes("econnrefused") ||
