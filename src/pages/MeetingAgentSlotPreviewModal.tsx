@@ -115,13 +115,13 @@ export default function MeetingAgentSlotPreviewModal({
         ) : null}
 
         <div className={styles.modalActions}>
-          <button type="button" className={styles.secondaryButton} onClick={onClose} disabled={isApproving}>
+          <button type="button" className={styles.modalSecondaryButton} onClick={onClose} disabled={isApproving}>
             Закрыть
           </button>
           {canApprove && onConfirmApprove ? (
             <button
               type="button"
-              className={styles.primaryButton}
+              className={styles.modalPrimaryButton}
               disabled={isApproving}
               onClick={onConfirmApprove}
             >

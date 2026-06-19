@@ -42,7 +42,7 @@
 
 .header p {
   margin: 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   max-width: 720px;
 }
 
@@ -50,9 +50,9 @@
   display: inline-flex;
   gap: 6px;
   padding: 4px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--color-surface-elevated);
 }
 
 .modeBtn {
@@ -60,14 +60,14 @@
   border-radius: 9px;
   padding: 9px 13px;
   background: transparent;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-weight: 700;
   cursor: pointer;
 }
 
 .modeBtnActive {
-  background: rgba(37, 99, 235, 0.35);
-  color: #eff6ff;
+  background: var(--color-blue-soft);
+  color: var(--color-primary-text);
 }
 
 .fullMain {
@@ -108,8 +108,8 @@
 
 .sidebar,
 .main {
-  background: var(--surface-elevated, rgba(255, 255, 255, 0.03));
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
   padding: 16px;
   display: flex;
@@ -134,7 +134,7 @@
   gap: 8px;
   margin-bottom: 16px;
   padding-bottom: 12px;
-  border-bottom: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-bottom: 1px solid var(--color-border);
 }
 
 .sidebarTitle {
@@ -142,14 +142,14 @@
   align-items: center;
   gap: 8px;
   margin: 0;
-  color: var(--color-text, #f8fafc);
+  color: var(--color-text-strong);
   font-size: 1rem;
   font-weight: 700;
 }
 
 .sidebarTitle svg {
   flex-shrink: 0;
-  color: #93c5fd;
+  color: var(--color-primary);
 }
 
 .sidebarHeader {
@@ -164,7 +164,7 @@
   margin: 0;
   font-size: 0.95rem;
   font-weight: 700;
-  color: var(--color-text, #f8fafc);
+  color: var(--color-text-strong);
 }
 
 .sidebarHeaderActions {
@@ -180,18 +180,18 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  border: 1px solid rgba(96, 165, 250, 0.55);
-  border-radius: 10px;
-  background: rgba(37, 99, 235, 0.28);
-  color: #dbeafe;
+  border: var(--form-control-border-width, 1px) solid var(--color-border-accent);
+  border-radius: var(--form-control-border-radius, 8px);
+  background: var(--nav-button-secondary-bg);
+  color: var(--nav-button-secondary-color);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: var(--form-control-transition, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease);
 }
 
 .iconBtn:hover {
-  background: rgba(37, 99, 235, 0.42);
-  border-color: rgba(147, 197, 253, 0.75);
-  color: #fff;
+  background: var(--color-blue-soft);
+  border-color: var(--form-control-focus-border-color);
+  color: var(--color-primary);
 }
 
 .deptList {
@@ -202,19 +202,19 @@
 
 .deptCard {
   position: relative;
-  border: 1px solid rgba(148, 163, 184, 0.14);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: #0b121d;
+  background: var(--color-surface-elevated);
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
 .deptCard:hover {
-  border-color: rgba(148, 163, 184, 0.24);
+  border-color: var(--color-border-strong);
 }
 
 .deptCardActive {
-  border-color: #2563eb;
-  background: rgba(15, 23, 42, 0.72);
+  border-color: var(--color-primary);
+  background: var(--color-blue-soft);
 }
 
 .deptCardBtn {
@@ -247,8 +247,8 @@
   width: 36px;
   height: 36px;
   border-radius: 8px;
-  color: #fff;
-  background: #1d4ed8;
+  color: var(--color-on-primary);
+  background: var(--color-primary-hover);
 }
 
 .deptCardTitleBlock {
@@ -263,7 +263,7 @@
   font-size: 0.95rem;
   font-weight: 600;
   line-height: 1.25;
-  color: #f8fafc;
+  color: var(--color-text-strong);
 }
 
 .deptDeleteBtn {
@@ -280,7 +280,7 @@
   border: none;
   border-radius: 6px;
   background: transparent;
-  color: #94a3b8;
+  color: var(--color-muted);
   opacity: 0;
   cursor: pointer;
   transition: opacity 0.2s ease, background 0.15s ease, color 0.15s ease;
@@ -291,8 +291,8 @@
 }
 
 .deptDeleteBtn:hover:not(:disabled) {
-  background: rgba(239, 68, 68, 0.14);
-  color: #f87171;
+  background: var(--color-danger-surface);
+  color: var(--color-danger);
 }
 
 .deptDeleteBtn:disabled {
@@ -319,7 +319,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #e2e8f0;
+  color: var(--color-text-strong);
   font-size: 0.9rem;
   font-weight: 600;
   line-height: 1;
@@ -327,11 +327,11 @@
 
 .deptStatValue svg {
   flex-shrink: 0;
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
 }
 
 .deptStatLabel {
-  color: #94a3b8;
+  color: var(--color-muted);
   font-size: 0.72rem;
   line-height: 1.2;
 }
@@ -345,33 +345,33 @@
 }
 
 .deptCardTitleBlock .deptBadgeRunning {
-  color: #93c5fd;
-  background: transparent;
-  border-color: rgba(59, 130, 246, 0.55);
+  color: var(--color-primary-text);
+  background: var(--color-blue-soft);
+  border-color: var(--color-border-accent);
 }
 
 .deptCardTitleBlock .deptBadgeOk {
-  color: #86efac;
-  background: transparent;
-  border-color: rgba(34, 197, 94, 0.55);
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+  border-color: var(--color-success-alpha-24);
 }
 
 .deptCardTitleBlock .deptBadgeReview {
-  color: #fbbf24;
-  background: transparent;
-  border-color: #d97706;
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+  border-color: var(--color-warning-dark);
 }
 
 .deptCardTitleBlock .deptBadgeError {
-  color: #fca5a5;
-  background: transparent;
-  border-color: rgba(239, 68, 68, 0.55);
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
+  border-color: var(--color-danger-border);
 }
 
 .deptCardTitleBlock .deptBadgeNeutral {
-  color: #cbd5e1;
-  background: transparent;
-  border-color: rgba(148, 163, 184, 0.45);
+  color: var(--color-text-secondary);
+  background: var(--color-gray-soft);
+  border-color: var(--color-border);
 }
 
 .addBtn {
@@ -382,12 +382,11 @@
   width: var(--nav-button-min-height, 46px);
   height: var(--nav-button-min-height, 46px);
   border-radius: var(--nav-button-radius, 10px);
-  border: 1px solid rgba(96, 165, 250, 0.65);
-  background: rgba(37, 99, 235, 0.32);
-  color: #dbeafe;
+  border: var(--form-control-border-width, 1px) solid var(--color-border-accent);
+  background: var(--nav-button-secondary-bg);
+  color: var(--nav-button-secondary-color);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: var(--form-control-transition, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease);
 }
 
 .addBtn svg {
@@ -396,11 +395,11 @@
 }
 
 .addBtn:hover {
-  background: rgba(37, 99, 235, 0.48);
-  border-color: rgba(147, 197, 253, 0.85);
-  color: #ffffff;
+  background: var(--color-blue-soft);
+  border-color: var(--form-control-focus-border-color);
+  color: var(--color-primary);
   transform: translateY(-1px);
-  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
+  box-shadow: var(--shadow-sm);
 }
 
 .addBtn:disabled {
@@ -436,7 +435,7 @@
 
 .templatesHeader p {
   margin: 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .templateForm {
@@ -444,9 +443,9 @@
   flex-direction: column;
   gap: 12px;
   padding: 14px;
-  border: 1px solid rgba(96, 165, 250, 0.2);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.45);
+  background: var(--color-surface-elevated);
 }
 
 .templateFormTitle {
@@ -465,9 +464,9 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: var(--text-secondary, #9ca3af);
-  font-size: 0.82rem;
-  font-weight: 600;
+  color: var(--form-label-color);
+  font-size: var(--form-label-size, 14px);
+  font-weight: var(--form-label-weight, 600);
 }
 
 .templateFormGrid input,
@@ -475,11 +474,13 @@
 .templateFormGrid textarea,
 .templateToolbar select {
   width: 100%;
-  border: 1px solid var(--form-control-border-color, rgba(148, 163, 184, 0.2));
-  border-radius: var(--form-control-border-radius, 10px);
-  background: var(--form-control-bg, rgba(15, 23, 42, 0.72));
-  color: var(--color-text, #f8fafc);
-  padding: 10px 12px;
+  min-height: var(--form-control-min-height, 46px);
+  border: var(--form-control-border-width, 1px) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius, 8px);
+  background: var(--form-control-bg);
+  color: var(--form-control-text-color);
+  padding: var(--form-control-padding-y, 12px) var(--form-control-padding-x, 16px);
+  font-size: var(--form-control-font-size, 14px);
 }
 
 .templateFormWide {
@@ -525,8 +526,8 @@
   height: min(760px, 88vh);
   padding: 16px;
   border-radius: 12px;
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -535,7 +536,7 @@
 .documentPreviewFrame {
   flex: 1;
   width: 100%;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
   background: #fff;
 }
@@ -545,8 +546,8 @@
   max-height: 90vh;
   padding: 16px;
   border-radius: 14px;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  background: #0f172a;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -563,19 +564,20 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  color: var(--text-secondary, #9ca3af);
-  font-size: 0.78rem;
-  font-weight: 600;
+  color: var(--form-label-color);
+  font-size: var(--form-label-size, 14px);
+  font-weight: var(--form-label-weight, 600);
 }
 
 .journalFilters input,
 .journalFilters select {
-  min-height: 38px;
-  border: 1px solid var(--form-control-border-color, rgba(148, 163, 184, 0.2));
-  border-radius: var(--form-control-border-radius, 10px);
-  background: var(--form-control-bg, rgba(15, 23, 42, 0.72));
-  color: var(--color-text, #f8fafc);
-  padding: 8px 10px;
+  min-height: var(--form-control-min-height, 46px);
+  border: var(--form-control-border-width, 1px) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius, 8px);
+  background: var(--form-control-bg);
+  color: var(--form-control-text-color);
+  padding: var(--form-control-padding-y, 12px) var(--form-control-padding-x, 16px);
+  font-size: var(--form-control-font-size, 14px);
 }
 
 .journalGrid {
@@ -592,9 +594,9 @@
 .journalDetail {
   min-height: 0;
   padding: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
+  border: 1px solid var(--color-border);
   border-radius: 12px;
-  background: rgba(2, 6, 23, 0.28);
+  background: var(--color-surface-elevated);
   overflow: auto;
 }
 
@@ -603,15 +605,16 @@
 }
 
 .journalDetail p {
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .journalDetail pre {
   margin: 0;
   padding: 12px;
   border-radius: 10px;
-  background: rgba(2, 6, 23, 0.55);
-  color: #dbeafe;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
   font-size: 0.78rem;
   line-height: 1.45;
   white-space: pre-wrap;
@@ -619,7 +622,7 @@
 
 .templateError {
   margin: 0;
-  color: #fca5a5;
+  color: var(--color-danger);
   font-size: 0.85rem;
 }
 
@@ -641,7 +644,7 @@
 }
 
 .searchField svg {
-  color: #94a3b8;
+  color: var(--color-muted);
 }
 
 .tableWrap {
@@ -671,12 +674,12 @@
   top: 0;
   z-index: 1;
   padding: 9px 12px;
-  color: var(--summary-label-color);
+  color: var(--form-label-color);
   background: var(--kb-table-head-bg);
   border-bottom: 1px solid var(--kb-table-border);
-  font-size: 12px;
-  font-weight: var(--summary-label-weight);
-  line-height: 1.3;
+  font-size: var(--form-label-size, 14px);
+  font-weight: var(--form-label-weight, 600);
+  line-height: var(--form-label-line-height, 1.3);
   text-align: left;
   vertical-align: middle;
   white-space: nowrap;
@@ -741,13 +744,13 @@
 }
 
 .rowBtn:hover {
-  color: #60a5fa;
+  color: var(--color-primary);
 }
 
 .empty {
   padding: 24px;
   text-align: center;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .emptyState {
@@ -776,7 +779,7 @@
   width: 72px;
   height: 72px;
   border-radius: 18px;
-  color: #93c5fd;
+  color: var(--color-primary);
   background: rgba(37, 99, 235, 0.14);
   border: 1px solid rgba(96, 165, 250, 0.28);
 }
@@ -790,7 +793,7 @@
   max-width: 220px;
   font-size: 0.875rem;
   line-height: 1.55;
-  color: var(--color-muted, #94a3b8);
+  color: var(--color-muted);
 }
 
 .emptyActionBtn {
@@ -804,8 +807,8 @@
   padding: 11px 16px;
   border: none;
   border-radius: 10px;
-  background: var(--nav-button-primary-bg, #2563eb);
-  color: var(--nav-button-primary-color, #ffffff);
+  background: var(--nav-button-primary-bg);
+  color: var(--nav-button-primary-color);
   box-shadow: 0 8px 18px rgba(37, 99, 235, 0.22);
   font-size: 0.875rem;
   font-weight: 700;
@@ -822,7 +825,7 @@
 .modalBackdrop {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: var(--color-overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -834,8 +837,8 @@
   width: min(720px, 100%);
   max-height: 90vh;
   overflow: auto;
-  background: var(--surface, #111827);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
 }
@@ -851,8 +854,8 @@
 
 .confirmModal {
   width: min(440px, 100%);
-  background: var(--surface, #111827);
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.12));
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   border-radius: 14px;
   padding: 20px;
 }
@@ -864,7 +867,7 @@
 
 .confirmModal p {
   margin: 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   line-height: 1.5;
 }
@@ -874,14 +877,13 @@
 }
 
 .dangerBtn {
-  border: none;
+  border: 1px solid var(--color-danger-border);
   border-radius: 10px;
   padding: 10px 14px;
   font-weight: 700;
   cursor: pointer;
-  background: rgba(239, 68, 68, 0.18);
-  color: #fca5a5;
-  border: 1px solid rgba(248, 113, 113, 0.35);
+  background: var(--color-danger-surface);
+  color: var(--color-danger-text);
 }
 
 .dangerBtn:disabled {
@@ -903,7 +905,7 @@
   display: block;
   margin-bottom: 6px;
   font-size: 0.8rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .kbList {
@@ -913,7 +915,7 @@
   max-height: 220px;
   overflow: auto;
   padding: 8px;
-  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--color-border);
   border-radius: 8px;
 }
 
@@ -962,7 +964,7 @@
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 960px) {
@@ -995,26 +997,26 @@
 }
 
 .deptBadgeRunning {
-  color: #93c5fd;
-  background: rgba(59, 130, 246, 0.12);
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
   border-color: rgba(59, 130, 246, 0.25);
 }
 
 .deptBadgeDone {
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.12);
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
   border-color: rgba(34, 197, 94, 0.25);
 }
 
 .deptBadgeReview {
-  color: #fcd34d;
-  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
   border-color: rgba(245, 158, 11, 0.25);
 }
 
 .deptBadgeError {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.12);
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
   border-color: rgba(239, 68, 68, 0.25);
 }
 
@@ -1034,7 +1036,7 @@
 }
 
 .analysisSpinnerWrap {
-  color: var(--color-primary, #60a5fa);
+  color: var(--color-primary);
 }
 
 .analysisSpinner,
@@ -1056,27 +1058,27 @@
 .analysisHint {
   margin: 0;
   max-width: 520px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .progressTrack {
   width: min(420px, 100%);
   height: 8px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--color-hover);
   overflow: hidden;
 }
 
 .progressFill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #3b82f6, #22c55e);
+  background: linear-gradient(90deg, var(--color-primary), var(--color-success));
   transition: width 0.35s ease;
 }
 
 .analysisMeta {
   margin: 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.92rem;
 }
 
@@ -1088,12 +1090,12 @@
   margin-bottom: 12px;
   border-radius: 10px;
   border: 1px solid rgba(239, 68, 68, 0.35);
-  background: rgba(239, 68, 68, 0.08);
+  background: var(--color-danger-surface);
 }
 
 .analysisError p {
   margin: 4px 0 8px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .summaryBar {
@@ -1105,17 +1107,17 @@
   padding: 12px 14px;
   border-radius: 10px;
   border: 1px solid rgba(34, 197, 94, 0.25);
-  background: rgba(34, 197, 94, 0.08);
+  background: var(--color-success-soft);
 }
 
 .summaryBarReview {
   border-color: rgba(245, 158, 11, 0.35);
-  background: rgba(245, 158, 11, 0.08);
+  background: var(--color-amber-soft);
 }
 
 .summaryBar p {
   margin: 4px 0 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -1123,8 +1125,8 @@
   font-size: 0.82rem;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
+  background: var(--color-amber-soft);
+  color: var(--color-warning-dark);
 }
 
 .deptHeader {
@@ -1135,8 +1137,8 @@
   margin-bottom: 16px;
   padding: 14px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
 }
 
 .deptHeaderMain h2 {
@@ -1154,7 +1156,7 @@
 .deptHeaderMeta,
 .deptHeaderSub {
   margin: 6px 0 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.92rem;
 }
 
@@ -1170,32 +1172,32 @@
 
 .statusRunning,
 .deptBadgeRunning {
-  background: rgba(59, 130, 246, 0.18);
-  color: #93c5fd;
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
 }
 
 .statusOk,
 .deptBadgeOk {
-  background: rgba(34, 197, 94, 0.15);
-  color: #86efac;
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
 }
 
 .statusReview,
 .deptBadgeReview {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
+  background: var(--color-amber-soft);
+  color: var(--color-warning-dark);
 }
 
 .statusError,
 .deptBadgeError {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
 }
 
 .statusNeutral,
 .deptBadgeNeutral {
-  background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
+  background: var(--color-gray-soft);
+  color: var(--color-text-secondary);
 }
 
 .tabBar {
@@ -1226,11 +1228,11 @@
 }
 
 .tabBtn:hover {
-  color: var(--color-text-strong, #f8fafc);
+  color: var(--color-text-strong);
 }
 
 .tabBtnActive {
-  color: var(--color-text-strong, #f8fafc);
+  color: var(--color-text-strong);
   background: transparent;
   box-shadow: none;
 }
@@ -1243,7 +1245,7 @@
   left: 12px;
   height: 2px;
   border-radius: 2px 2px 0 0;
-  background: var(--nav-button-primary-bg, #2563eb);
+  background: var(--nav-button-primary-bg);
 }
 
 .tabBadge {
@@ -1251,8 +1253,8 @@
   height: 20px;
   padding: 0 7px;
   border-radius: 6px;
-  background: #fbbf24;
-  color: #1f2937;
+  background: var(--color-warning);
+  color: var(--color-text-strong);
   font-size: 11px;
   font-weight: 700;
   line-height: 1;
@@ -1270,8 +1272,8 @@
 .sectionCard {
   padding: 14px 16px;
   border-radius: 12px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
 }
 
 .sectionCard h3,
@@ -1296,13 +1298,13 @@
 .metricCard {
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
 }
 
 .metricCard span {
   display: block;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 
@@ -1319,13 +1321,13 @@
 .kbCard {
   padding: 12px;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
 }
 
 .kbCard p {
   margin: 6px 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.88rem;
 }
 
@@ -1340,18 +1342,18 @@
 }
 
 .badgeOk {
-  background: rgba(34, 197, 94, 0.15);
-  color: #86efac;
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
 }
 
 .badgeReview {
-  background: rgba(245, 158, 11, 0.15);
-  color: #fcd34d;
+  background: var(--color-amber-soft);
+  color: var(--color-warning-dark);
 }
 
 .badgeError {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
 }
 
 .reviewAlert,
@@ -1389,7 +1391,7 @@
 
 .filterChip:hover {
   border-color: var(--form-control-focus-border-color);
-  color: var(--color-text-strong, #f8fafc);
+  color: var(--color-text-strong);
 }
 
 .filterChipActive {
@@ -1409,7 +1411,7 @@
 .inlineLinkBtn {
   border: none;
   background: none;
-  color: #93c5fd;
+  color: var(--color-primary);
   cursor: pointer;
   padding: 0;
 }
@@ -1431,7 +1433,7 @@
 
 .analysisStatsGrid span {
   display: block;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
 }
 
@@ -1440,7 +1442,7 @@
   gap: 8px;
   align-items: center;
   margin-top: 12px;
-  color: #fca5a5;
+  color: var(--color-danger-text);
 }
 
 .analysisCancelBtn {
@@ -1452,7 +1454,7 @@
   border-radius: 10px;
   border: 1px solid rgba(248, 113, 113, 0.45);
   background: rgba(127, 29, 29, 0.25);
-  color: #fecaca;
+  color: var(--color-danger-text);
   cursor: pointer;
   font-size: 0.92rem;
 }
@@ -1470,13 +1472,13 @@
   margin-top: 12px;
   height: 4px;
   border-radius: 999px;
-  background: rgba(148, 163, 184, 0.2);
+  background: var(--color-border-soft);
   overflow: hidden;
 }
 
 .deptMiniProgress div {
   height: 100%;
-  background: #3b82f6;
+  background: var(--color-primary);
 }
 
 .spinIcon {
@@ -1491,15 +1493,15 @@
 
 .emptyStateBlock,
 .emptyHint {
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .modalCardWide {
   width: min(760px, 92vw);
   padding: 16px;
   border-radius: 12px;
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
 .cardDetailGrid {
@@ -1510,7 +1512,7 @@
 
 .cardDetailGrid span {
   display: block;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
 }
 
@@ -1520,7 +1522,7 @@
 
 .tabHint {
   margin-bottom: 14px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
 }
 
@@ -1535,7 +1537,7 @@
 
 .sectionHint {
   margin: 0 0 10px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.85rem;
 }
 
@@ -1547,7 +1549,7 @@
 
 .entityType {
   font-size: 0.75rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .entityName {
@@ -1559,8 +1561,8 @@
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 0.75rem;
-  background: rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
+  background: var(--color-gray-soft);
+  color: var(--color-text-secondary);
 }
 
 .relationWeakRow td {
@@ -1570,18 +1572,18 @@
 .relationDescriptionRow td {
   padding-top: 0;
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+  border-bottom: 1px solid var(--color-border-soft);
 }
 
 .relationDescription {
   display: block;
   font-size: 0.82rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-style: italic;
 }
 
 .missingEvidence {
-  color: #fcd34d;
+  color: var(--color-warning-dark);
 }
 
 .activeFilterBanner {
@@ -1607,7 +1609,7 @@
 
 .bulkHint,
 .infoHint {
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
 }
 
@@ -1620,8 +1622,8 @@
 .processCard {
   padding: 14px;
   border-radius: 10px;
-  border: 1px solid rgba(148, 163, 184, 0.16);
-  background: rgba(2, 6, 23, 0.35);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
 }
 
 .processCardHeader {
@@ -1656,7 +1658,7 @@
 }
 
 .processMetaList dt {
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .processMetaList dd {
@@ -1708,15 +1710,15 @@
 }
 
 .confidenceDotHigh {
-  background: #22c55e;
+  background: var(--color-success);
 }
 
 .confidenceDotMedium {
-  background: #fbbf24;
+  background: var(--color-warning);
 }
 
 .confidenceDotLow {
-  background: #f87171;
+  background: var(--color-danger);
 }
 
 .confidenceValue {
@@ -1736,7 +1738,7 @@
   border: none;
   background: none;
   padding: 0;
-  color: #60a5fa;
+  color: var(--color-primary);
   font: inherit;
   cursor: pointer;
 }
@@ -1762,7 +1764,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   font-size: 0.82rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   line-height: 1.35;
 }
 
@@ -1784,7 +1786,7 @@
 
 .processEmptyState {
   padding: 28px 16px;
-  border: 1px dashed rgba(148, 163, 184, 0.25);
+  border: 1px dashed var(--color-border-strong);
   border-radius: 12px;
   text-align: center;
 }
@@ -1795,7 +1797,7 @@
 
 .processEmptyState p {
   margin: 0 0 16px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .processEmptyActions {
@@ -1811,7 +1813,7 @@
   align-items: center;
   gap: 10px;
   padding: 40px 16px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .processLoadingMeta {
@@ -1823,7 +1825,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px 16px;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.9rem;
   text-align: center;
 }
@@ -1855,7 +1857,7 @@
 
 .drawerHeader h2 {
   margin: 0;
-  color: var(--color-text-strong, #f8fafc);
+  color: var(--color-text-strong);
   font-size: 1.05rem;
   font-weight: 700;
   line-height: 1.35;
@@ -1878,8 +1880,8 @@
 }
 
 .drawerCloseBtn:hover {
-  background: rgba(148, 163, 184, 0.12);
-  color: var(--color-text-strong, #f8fafc);
+  background: var(--color-gray-soft);
+  color: var(--color-text-strong);
 }
 
 .drawerStatusBadge {
@@ -1894,20 +1896,20 @@
 }
 
 .drawerStatusReview {
-  border-color: #d97706;
-  color: #fbbf24;
+  border-color: var(--color-warning-dark);
+  color: var(--color-warning-dark);
   background: transparent;
 }
 
 .drawerStatusOk {
   border-color: rgba(34, 197, 94, 0.55);
-  color: #86efac;
+  color: var(--color-success-text);
   background: transparent;
 }
 
 .drawerStatusNeutral {
   border-color: rgba(148, 163, 184, 0.45);
-  color: #cbd5e1;
+  color: var(--color-text-secondary);
   background: transparent;
 }
 
@@ -1948,7 +1950,7 @@
 }
 
 .detailRowValue {
-  color: var(--color-text-strong, #f8fafc);
+  color: var(--color-text-strong);
   font-size: 13px;
   font-weight: 400;
   line-height: 1.45;
@@ -1962,7 +1964,7 @@
   border: none;
   background: none;
   padding: 0;
-  color: #60a5fa;
+  color: var(--color-primary);
   font: inherit;
   font-size: 13px;
   text-align: left;
@@ -2025,15 +2027,15 @@
 }
 
 .drawerSecondaryBtn {
-  border: 1px solid rgba(59, 130, 246, 0.55);
-  background: transparent;
-  color: #93c5fd;
+  border: var(--form-control-border-width, 1px) solid var(--color-border-accent);
+  background: var(--nav-button-secondary-bg);
+  color: var(--nav-button-secondary-color);
 }
 
 .drawerSecondaryBtn:hover {
-  border-color: rgba(96, 165, 250, 0.85);
-  background: rgba(37, 99, 235, 0.08);
-  color: #dbeafe;
+  border-color: var(--form-control-focus-border-color);
+  background: var(--color-blue-soft);
+  color: var(--color-primary);
 }
 
 .confirmDialogList {
@@ -2049,7 +2051,7 @@
 
 .confirmDialogList dt {
   font-size: 0.78rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .confirmDialogList dd {
@@ -2064,7 +2066,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(2, 6, 23, 0.72);
+  background: var(--color-overlay);
   backdrop-filter: blur(4px);
 }
 
@@ -2077,8 +2079,8 @@
   flex-direction: column;
   padding: 16px;
   border-radius: 12px;
-  background: #0f172a;
-  border: 1px solid rgba(148, 163, 184, 0.2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
 }
 
 .umlModalCard {
@@ -2100,7 +2102,7 @@
 
 .umlModalMeta {
   margin: 4px 0 0;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.82rem;
 }
 
@@ -2113,11 +2115,11 @@
   gap: 10px;
   min-height: 320px;
   text-align: center;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .umlErrorState {
-  color: #fca5a5;
+  color: var(--color-danger-text);
 }
 
 .umlToolbar {
@@ -2131,7 +2133,7 @@
   min-width: 48px;
   text-align: center;
   font-size: 0.85rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .umlViewport {
@@ -2139,9 +2141,9 @@
   min-height: 420px;
   max-height: 58vh;
   overflow: auto;
-  border: 1px solid rgba(148, 163, 184, 0.18);
+  border: 1px solid var(--color-border);
   border-radius: 10px;
-  background: rgba(15, 23, 42, 0.65);
+  background: var(--color-overlay);
   cursor: grab;
   touch-action: none;
 }
@@ -2165,9 +2167,9 @@
   margin: 0 0 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(59, 130, 246, 0.12);
+  background: var(--color-blue-soft);
   border: 1px solid rgba(59, 130, 246, 0.25);
-  color: #bfdbfe;
+  color: var(--color-primary-text);
   font-size: 0.86rem;
   line-height: 1.45;
 }
@@ -2187,18 +2189,18 @@
   margin: 0 0 12px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid var(--color-border);
+  background: var(--color-hover);
   font-size: 0.86rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .umlDocumentProfile strong {
-  color: var(--text-primary, #e5e7eb);
+  color: var(--color-text-strong);
 }
 
 .umlDetailLevelLabel {
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
   font-size: 0.88rem;
 }
 
@@ -2212,7 +2214,7 @@
   border: 1px solid rgba(148, 163, 184, 0.35);
   border-radius: 999px;
   background: transparent;
-  color: var(--text-primary, #e5e7eb);
+  color: var(--color-text-strong);
   padding: 6px 14px;
   font-size: 0.84rem;
   cursor: pointer;
@@ -2229,16 +2231,16 @@
 
 .umlDetailLevelBtnActive {
   border-color: rgba(96, 165, 250, 0.85);
-  background: rgba(59, 130, 246, 0.18);
+  background: var(--color-blue-soft);
 }
 
 .umlWarningBanner {
   margin: 0 0 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  background: rgba(245, 158, 11, 0.12);
+  background: var(--color-amber-soft);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fde68a;
+  color: var(--color-warning-dark);
   font-size: 0.86rem;
 }
 
@@ -2246,8 +2248,8 @@
   margin: 0 0 10px;
   padding: 10px 12px;
   border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
 }
 
 .umlSchemaComposition h3 {
@@ -2260,11 +2262,11 @@
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 6px 10px;
   font-size: 0.82rem;
-  color: var(--text-secondary, #9ca3af);
+  color: var(--color-text-secondary);
 }
 
 .umlSchemaGrid strong {
-  color: #e2e8f0;
+  color: var(--color-text-strong);
   font-weight: 600;
 }
 

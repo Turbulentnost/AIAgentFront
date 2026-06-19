@@ -18,6 +18,7 @@ import {
   getRegisterColumns
 } from "@/utils/porucheniyaDashboard";
 import type { TasksMetricsRow } from "@/types/porucheniya";
+import TasksRegisterTable from "@/pages/TasksRegisterTable";
 import styles from "./TasksAgent.module.css";
 
 const summaryColumns = [
@@ -33,6 +34,7 @@ export default function TasksAgent() {
   const refreshDashboard = useRefreshPorucheniyaDashboard();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [extraColumnsExpanded, setExtraColumnsExpanded] = useState(false);
 
   const dashboard = dashboardQuery.data;
   const registerColumns = useMemo(
@@ -160,45 +162,13 @@ export default function TasksAgent() {
       </header>
 
       <section className={styles.section} aria-label="Реестр ежедневного контроля">
-        <div className={styles.tableWrap}>
-          <table className={`${styles.table} ${styles.registerTable}`}>
-            <thead>
-              <tr>
-                {registerColumns.map((column) => (
-                  <th
-                    key={column.key}
-                    scope="col"
-                    className={column.key === "task_text" ? styles.taskColumn : undefined}
-                  >
-                    {column.title}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {registerRows.length ? (
-                registerRows.map((row, index) => (
-                  <tr key={`${row.document_number ?? "row"}-${index}`}>
-                    {registerColumns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={column.key === "task_text" ? styles.taskColumn : undefined}
-                      >
-                        {getRegisterCellValue(row, column.key)}
-                      </td>
-                    ))}
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td className={styles.emptyCell} colSpan={registerColumns.length || 1}>
-                    {buildRegisterEmptyMessage(dashboard)}
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <TasksRegisterTable
+          columns={dashboard.tasks_table.columns}
+          rows={registerRows}
+          emptyMessage={buildRegisterEmptyMessage(dashboard)}
+          extraColumnsExpanded={extraColumnsExpanded}
+          onToggleExtraColumns={() => setExtraColumnsExpanded((value) => !value)}
+        />
 
         <button
           type="button"
