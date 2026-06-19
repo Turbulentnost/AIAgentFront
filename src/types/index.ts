@@ -1379,6 +1379,11 @@ export type {
   MeetingRun,
   MeetingRunCreate,
   MeetingRunResult,
+  MeetingAgentSlotPreview,
+  MeetingAgentSlotPreviewRequest,
+  MeetingAgentSlotApprove,
+  MeetingAgentSlotApproveRequest,
+  MeetingAttendee,
   MeetingSlot,
   MeetingSlotsRequest,
   MeetingValidationCheck

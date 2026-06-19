@@ -13,6 +13,7 @@ export interface MeetingDashboardItem {
   meeting_start: string | null;
   meeting_end: string | null;
   participants_count?: number;
+  participant_names?: string[];
   warnings?: string[];
   subject: string | null;
   comment: string | null;
@@ -135,4 +136,47 @@ export interface MeetingSlotsRequest {
   participant_fio?: string[];
   planned_start?: string | null;
   duration_minutes?: number | null;
+}
+
+export interface MeetingAgentSlotPreviewRequest {
+  duration_minutes?: number | null;
+}
+
+export interface MeetingAttendee {
+  fio: string;
+  email: string | null;
+  role: string;
+  role_label: string;
+  found: boolean;
+}
+
+export interface MeetingAgentSlotPreview {
+  memo_ref_key: string;
+  slot: MeetingSlot | null;
+  slot_label: string | null;
+  duration_minutes: number | null;
+  attendees: MeetingAttendee[];
+  missing_emails: string[];
+  error: string | null;
+}
+
+export interface MeetingAgentSlotApproveRequest {
+  slot_start: string;
+  slot_end: string;
+  subject?: string | null;
+  location?: string | null;
+  attendees?: MeetingAttendee[];
+  attendee_emails?: string[];
+}
+
+export interface MeetingAgentSlotApprove {
+  memo_ref_key: string;
+  subject: string;
+  start: string;
+  end: string;
+  slot_label: string;
+  location: string | null;
+  attendees: string[];
+  attendee_details: MeetingAttendee[];
+  sent: boolean;
 }

@@ -32,6 +32,7 @@ export function usePorucheniyaDashboard(enabled = true) {
   });
 }
 
+/** F5 / mount → GET (кэш). Кнопка «Обновить» → POST refresh (всегда 1С). */
 export function useRefreshPorucheniyaDashboard() {
   const queryClient = useQueryClient();
 

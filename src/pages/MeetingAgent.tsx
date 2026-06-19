@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CalendarDays,
@@ -19,10 +20,13 @@ import {
 } from "@/hooks/useMeetingDashboard";
 import {
   useCreateMeetingRun,
+  useMeetingAgentSlotApprove,
+  useMeetingAgentSlotPreview,
   useMeetingMemoDetail,
   useMeetingRunResult,
   useMeetingSlots
 } from "@/hooks/useMeetingMemoDetail";
+import MeetingAgentSlotPreviewModal from "@/pages/MeetingAgentSlotPreviewModal";
 import type { MeetingDashboardItem, MeetingLoginContext, MeetingMemoDetail } from "@/types/meetings";
 import {
   buildMeetingStats,
@@ -36,6 +40,7 @@ import {
   getMeetingItemId,
   getMeetingItemTags,
   getMeetingItemTitle,
+  getMeetingParticipantNames,
   getMeetingStatusLabel,
   getMemoRefKey,
   isMeetingRunActive,
@@ -44,6 +49,7 @@ import {
 import styles from "./MeetingAgent.module.css";
 
 export default function MeetingAgent() {
+  const queryClient = useQueryClient();
   const permissionsQuery = useMeetingPermissions();
   const canAccessAgent = permissionsQuery.data?.can_access_agent ?? false;
   const dashboardQuery = useMeetingDashboard(canAccessAgent);
@@ -53,6 +59,9 @@ export default function MeetingAgent() {
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+  const [forceMemoRefresh, setForceMemoRefresh] = useState(false);
+  const [slotPreviewOpen, setSlotPreviewOpen] = useState(false);
+  const [approveSuccessMessage, setApproveSuccessMessage] = useState<string | null>(null);
 
   const dashboard = dashboardQuery.data;
   const queueItems = useMemo(
@@ -65,23 +74,24 @@ export default function MeetingAgent() {
     queueItems.find((item) => getMeetingItemId(item) === selectedId) ?? queueItems[0] ?? null;
   const selectedRefKey = getMemoRefKey(selectedItem);
 
-  const detailQuery = useMeetingMemoDetail(selectedRefKey, canAccessAgent);
+  const detailQuery = useMeetingMemoDetail(selectedRefKey, canAccessAgent, forceMemoRefresh);
   const detail = detailQuery.data;
 
   const slotsPayload = useMemo(() => {
     if (!selectedRefKey || !detail) return null;
+    const participantNames = getMeetingParticipantNames(detail.application, selectedItem);
     return {
       memo_ref_key: selectedRefKey,
       memo_number: detail.number,
       duration_minutes: detail.application.duration_minutes ?? 30,
-      participant_fio: detail.application.participants
-        .map((participant) => participant.full_name)
-        .filter((name): name is string => Boolean(name))
+      participant_fio: participantNames
     };
-  }, [detail, selectedRefKey]);
+  }, [detail, selectedItem, selectedRefKey]);
 
   const slotsQuery = useMeetingSlots(slotsPayload, Boolean(detail));
   const createRun = useCreateMeetingRun();
+  const slotPreviewMutation = useMeetingAgentSlotPreview();
+  const approveSlotMutation = useMeetingAgentSlotApprove();
   const runQuery = useMeetingRunResult(activeRunId);
 
   useEffect(() => {
@@ -96,7 +106,22 @@ export default function MeetingAgent() {
 
   useEffect(() => {
     setActiveRunId(null);
+    setForceMemoRefresh(false);
   }, [selectedRefKey]);
+
+  useEffect(() => {
+    if (!detail || !selectedItem || forceMemoRefresh || detailQuery.isFetching) return;
+
+    const participantNames = getMeetingParticipantNames(detail.application, selectedItem);
+    const participantsCount = Math.max(
+      detail.application.participants_count ?? 0,
+      selectedItem.participants_count ?? 0
+    );
+
+    if (participantsCount > 0 && participantNames.length === 0) {
+      setForceMemoRefresh(true);
+    }
+  }, [detail, detailQuery.isFetching, forceMemoRefresh, selectedItem]);
 
   async function handleRefreshDashboard() {
     if (isRefreshing) return;
@@ -152,7 +177,7 @@ export default function MeetingAgent() {
       <section className={styles.page}>
         <div className={styles.stateMessage}>
           Не удалось загрузить данные по совещаниям.
-          <button type="button" className={styles.retryButton} onClick={() => void handleRefreshDashboard()}>
+          <button type="button" className={styles.retryButton} onClick={() => void dashboardQuery.refetch()}>
             Повторить
           </button>
         </div>
@@ -178,6 +203,70 @@ export default function MeetingAgent() {
     setActiveRunId(run.task_id);
   }
 
+  async function handleLaunchAgent() {
+    if (!detail?.ref_key || slotPreviewMutation.isPending) return;
+    setApproveSuccessMessage(null);
+    approveSlotMutation.reset();
+    setSlotPreviewOpen(true);
+    slotPreviewMutation.reset();
+    try {
+      await slotPreviewMutation.mutateAsync({
+        memoRefKey: detail.ref_key,
+        durationMinutes: detail.application.duration_minutes
+      });
+    } catch {
+      // mutation error surfaced in modal
+    }
+  }
+
+  function handleCloseSlotPreview() {
+    if (approveSlotMutation.isPending) return;
+    setSlotPreviewOpen(false);
+    slotPreviewMutation.reset();
+    approveSlotMutation.reset();
+  }
+
+  async function handleConfirmApprove() {
+    const preview = slotPreviewMutation.data;
+    if (!detail?.ref_key || !preview?.slot || approveSlotMutation.isPending) return;
+
+    approveSlotMutation.reset();
+    try {
+      const result = await approveSlotMutation.mutateAsync({
+        memoRefKey: detail.ref_key,
+        payload: {
+          slot_start: preview.slot.start,
+          slot_end: preview.slot.end,
+          subject: detail.title || detail.application.agenda || undefined,
+          location: detail.application.location || undefined,
+          attendees: preview.attendees
+        }
+      });
+      setSlotPreviewOpen(false);
+      slotPreviewMutation.reset();
+      approveSlotMutation.reset();
+      setApproveSuccessMessage(
+        result.sent
+          ? `Приглашение отправлено: ${result.slot_label}${result.subject ? ` · ${result.subject}` : ""}`
+          : `Слот утверждён: ${result.slot_label}`
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", detail.ref_key] })
+      ]);
+    } catch {
+      // approve error surfaced in modal
+    }
+  }
+
+  const slotPreviewRequestError = slotPreviewMutation.isError
+    ? getMeetingRequestError(slotPreviewMutation.error)
+    : null;
+
+  const approveRequestError = approveSlotMutation.isError
+    ? getMeetingRequestError(approveSlotMutation.error)
+    : null;
+
   const recommendation =
     runQuery.data?.summary ||
     detail?.agent_recommendation ||
@@ -185,6 +274,22 @@ export default function MeetingAgent() {
 
   return (
     <section className={styles.page} aria-labelledby="meeting-agent-title">
+      <MeetingAgentSlotPreviewModal
+        open={slotPreviewOpen}
+        loading={slotPreviewMutation.isPending}
+        preview={slotPreviewMutation.data ?? null}
+        requestError={slotPreviewRequestError}
+        approveError={approveRequestError}
+        onClose={handleCloseSlotPreview}
+        onConfirmApprove={() => void handleConfirmApprove()}
+        isApproving={approveSlotMutation.isPending}
+      />
+      {approveSuccessMessage ? (
+        <div className={styles.successBanner} role="status">
+          <CheckCircle2 size={16} aria-hidden="true" />
+          <span>{approveSuccessMessage}</span>
+        </div>
+      ) : null}
       {refreshError ? (
         <div className={styles.errorBanner} role="alert">
           <AlertTriangle size={16} aria-hidden="true" />
@@ -281,11 +386,16 @@ export default function MeetingAgent() {
           ) : detail ? (
             <MeetingDetails
               detail={detail}
+              queueItem={selectedItem}
               recommendation={recommendation}
               runStatus={runQuery.data?.status ?? createRun.data?.status}
               runError={runQuery.data?.error_message}
-              isRunning={createRun.isPending || isMeetingRunActive(runQuery.data?.status)}
-              onRunAgent={() => void handleRunAgent()}
+              isRunning={
+                createRun.isPending ||
+                isMeetingRunActive(runQuery.data?.status) ||
+                slotPreviewMutation.isPending
+              }
+              onLaunchAgent={() => void handleLaunchAgent()}
             />
           ) : null}
         </section>
@@ -356,20 +466,23 @@ function QueueCard({
 
 function MeetingDetails({
   detail,
+  queueItem,
   recommendation,
   runStatus,
   runError,
   isRunning,
-  onRunAgent
+  onLaunchAgent
 }: {
   detail: MeetingMemoDetail;
+  queueItem: MeetingDashboardItem | null;
   recommendation: string;
   runStatus?: string;
   runError?: string | null;
   isRunning: boolean;
-  onRunAgent: () => void;
+  onLaunchAgent: () => void;
 }) {
   const application = detail.application;
+  const participantNames = getMeetingParticipantNames(application, queueItem);
 
   return (
     <>
@@ -389,15 +502,10 @@ function MeetingDetails({
         <dl className={styles.dataGrid}>
           <div><dt>Инициатор</dt><dd>{application.initiator?.full_name ?? "—"}</dd></div>
           <div><dt>Руководитель</dt><dd>{application.manager?.full_name ?? "—"}</dd></div>
-          <div>
+          <div className={styles.participantsField}>
             <dt>Участники</dt>
-            <dd>
-              {application.participants_count}{" "}
-              {application.participants.length ? (
-                <span className={styles.participantList}>
-                  ({application.participants.map((p) => p.full_name).filter(Boolean).join(", ")})
-                </span>
-              ) : null}
+            <dd className={styles.participantNames}>
+              {participantNames.length ? participantNames.join(", ") : "—"}
             </dd>
           </div>
           <div><dt>Повестка</dt><dd>{application.agenda ?? "—"}</dd></div>
@@ -472,7 +580,7 @@ function MeetingDetails({
           {runError ? <p className={styles.runError}>{runError}</p> : null}
         </div>
         <div className={styles.actionRow}>
-          <button type="button" className={styles.primaryButton} disabled={isRunning} onClick={onRunAgent}>
+          <button type="button" className={styles.primaryButton} disabled={isRunning} onClick={onLaunchAgent}>
             {isRunning ? (
               <>
                 <Loader2 size={16} className={styles.spinner} aria-hidden="true" />

@@ -1,4 +1,4 @@
-import type { MeetingDashboardItem, MeetingLoginContext } from "@/types/meetings";
+import type { MeetingApplication, MeetingDashboardItem, MeetingLoginContext } from "@/types/meetings";
 import type { MeetingQueueTab } from "@/mock-data/meetingAgent";
 
 export function getMeetingItemId(item: MeetingDashboardItem): string {
@@ -173,6 +173,27 @@ export function getMemoRefKey(item: MeetingDashboardItem | null | undefined): st
 
 export function isMeetingRunActive(status: string | null | undefined): boolean {
   return Boolean(status && ["pending", "planning", "running", "waiting_human"].includes(status));
+}
+
+export function getMeetingParticipantNames(
+  application: MeetingApplication,
+  queueItem?: MeetingDashboardItem | null
+): string[] {
+  const names = application.participants
+    .map((participant) => participant.full_name?.trim())
+    .filter((name): name is string => Boolean(name));
+
+  if (names.length) {
+    return [...new Set(names)];
+  }
+
+  return [
+    ...new Set(
+      (queueItem?.participant_names ?? [])
+        .map((name) => name.trim())
+        .filter(Boolean)
+    )
+  ];
 }
 
 export function buildMeetingStats(context: MeetingLoginContext) {

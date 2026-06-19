@@ -1,14 +1,22 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { meetingsApi } from "@/api/endpoints";
-import type { MeetingRunCreate, MeetingSlotsRequest } from "@/types/meetings";
+import type {
+  MeetingRunCreate,
+  MeetingSlotsRequest,
+  MeetingAgentSlotApproveRequest
+} from "@/types/meetings";
 
 const RUNNING_STATUSES = new Set(["pending", "planning", "running", "waiting_human"]);
 
-export function useMeetingMemoDetail(memoRefKey: string | null, enabled = true) {
+export function useMeetingMemoDetail(
+  memoRefKey: string | null,
+  enabled = true,
+  forceRefresh = false
+) {
   return useQuery({
-    queryKey: ["meetings", "memo-detail", memoRefKey],
-    queryFn: () => meetingsApi.getMemoDetail(memoRefKey!),
+    queryKey: ["meetings", "memo-detail", memoRefKey, forceRefresh ? "refresh" : "cache"],
+    queryFn: () => meetingsApi.getMemoDetail(memoRefKey!, { forceRefresh }),
     enabled: enabled && Boolean(memoRefKey),
     retry: (failureCount, error) => {
       if (axios.isAxiosError(error) && error.response?.status === 400) return false;
@@ -41,5 +49,33 @@ export function useMeetingRunResult(taskId: string | null) {
 export function useCreateMeetingRun() {
   return useMutation({
     mutationFn: (payload: MeetingRunCreate) => meetingsApi.createRun(payload)
+  });
+}
+
+export function useMeetingAgentSlotPreview() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      durationMinutes
+    }: {
+      memoRefKey: string;
+      durationMinutes?: number | null;
+    }) =>
+      meetingsApi.slotPreview(
+        memoRefKey,
+        durationMinutes ? { duration_minutes: durationMinutes } : undefined
+      )
+  });
+}
+
+export function useMeetingAgentSlotApprove() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload
+    }: {
+      memoRefKey: string;
+      payload: MeetingAgentSlotApproveRequest;
+    }) => meetingsApi.approveSlot(memoRefKey, payload)
   });
 }

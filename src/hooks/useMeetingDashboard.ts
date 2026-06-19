@@ -26,15 +26,13 @@ export function useMeetingDashboard(enabled = true) {
   });
 }
 
+/** F5 / mount → GET (Redis-кэш). Кнопка «Обновить» → POST refresh (всегда 1С). */
 export function useRefreshMeetingDashboard() {
   const queryClient = useQueryClient();
 
   return useCallback(async () => {
-    const dashboard = await queryClient.fetchQuery({
-      queryKey: ["meetings", "dashboard"],
-      queryFn: meetingsApi.getDashboard,
-      staleTime: 0
-    });
+    const dashboard = await meetingsApi.refreshDashboard();
+    queryClient.setQueryData(["meetings", "dashboard"], dashboard);
 
     await Promise.all([
       queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail"] }),

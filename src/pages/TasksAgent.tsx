@@ -97,7 +97,7 @@ export default function TasksAgent() {
       <section className={styles.page}>
         <div className={styles.stateMessage}>
           {getPorucheniyaRequestError(dashboardQuery.error)}
-          <button type="button" className={styles.retryButton} onClick={() => void handleRefreshDashboard()}>
+          <button type="button" className={styles.retryButton} onClick={() => void dashboardQuery.refetch()}>
             Повторить
           </button>
         </div>
