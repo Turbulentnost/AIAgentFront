@@ -11,6 +11,7 @@ type Props = {
   processId?: string;
   processName?: string;
   onClearProcessFilter?: () => void;
+  canManageDepartments: boolean;
 };
 
 const FILTERS = [
@@ -42,13 +43,15 @@ function RelationRow({
   onApprove,
   onReject,
   approvePending,
-  rejectPending
+  rejectPending,
+  canManageDepartments
 }: {
   relation: DepartmentRelationItem;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   approvePending: boolean;
   rejectPending: boolean;
+  canManageDepartments: boolean;
 }) {
   const weak = !relation.has_evidence || relation.is_weak_relation || relation.is_service_relation;
   return (
@@ -77,8 +80,9 @@ function RelationRow({
             <span className={styles.missingEvidence}>Нет основания</span>
           )}
         </td>
-        <td className={styles.actionsCell}>
-          {!relation.is_confirmed ? (
+        {canManageDepartments ? (
+          <td className={styles.actionsCell}>
+            {!relation.is_confirmed ? (
             <>
               <button
                 type="button"
@@ -97,11 +101,12 @@ function RelationRow({
                 Отклонить
               </button>
             </>
-          ) : null}
-        </td>
+            ) : null}
+          </td>
+        ) : null}
       </tr>
       <tr className={styles.relationDescriptionRow}>
-        <td colSpan={8}>
+        <td colSpan={canManageDepartments ? 8 : 7}>
           <span className={styles.relationDescription}>{relation.relation_description}</span>
         </td>
       </tr>
@@ -114,7 +119,8 @@ export default function DepartmentRelationsTab({
   search,
   processId,
   processName,
-  onClearProcessFilter
+  onClearProcessFilter,
+  canManageDepartments
 }: Props) {
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState("primary");
@@ -210,7 +216,7 @@ export default function DepartmentRelationsTab({
         ))}
       </div>
 
-      {bulkCandidates.length ? (
+      {canManageDepartments && bulkCandidates.length ? (
         <div className={styles.bulkActionsRow}>
           <button
             type="button"
@@ -244,7 +250,7 @@ export default function DepartmentRelationsTab({
                   <th>Извлечение</th>
                   <th>Подтверждение</th>
                   <th>Основание</th>
-                  <th>Действия</th>
+                  {canManageDepartments ? <th>Действия</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -256,6 +262,7 @@ export default function DepartmentRelationsTab({
                     onReject={(id) => reject.mutate(id)}
                     approvePending={approve.isPending}
                     rejectPending={reject.isPending}
+                    canManageDepartments={canManageDepartments}
                   />
                 ))}
             </tbody>

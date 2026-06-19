@@ -6,6 +6,7 @@ import styles from "../NdControlAgent.module.css";
 
 type Props = {
   summary: DepartmentSummary;
+  canReanalyze: boolean;
   isReanalyzing: boolean;
   onReanalyze: () => void;
   onOpenReview?: () => void;
@@ -22,6 +23,7 @@ function statusClass(status: string | null | undefined) {
 
 export default function DepartmentSummaryHeader({
   summary,
+  canReanalyze,
   isReanalyzing,
   onReanalyze,
   onOpenReview
@@ -54,10 +56,12 @@ export default function DepartmentSummaryHeader({
         </p>
         <p className={styles.deptHeaderSub}>Последний анализ: {formatDateTime(lastRunAt)}</p>
       </div>
-      <button type="button" className={styles.primaryBtn} onClick={onReanalyze} disabled={isReanalyzing}>
-        <RefreshCw size={16} className={isReanalyzing ? styles.spinIcon : undefined} />
-        {isReanalyzing ? "Запуск…" : "Переанализировать"}
-      </button>
+      {canReanalyze ? (
+        <button type="button" className={styles.primaryBtn} onClick={onReanalyze} disabled={isReanalyzing}>
+          <RefreshCw size={16} className={isReanalyzing ? styles.spinIcon : undefined} />
+          {isReanalyzing ? "Запуск…" : "Переанализировать"}
+        </button>
+      ) : null}
     </div>
   );
 }

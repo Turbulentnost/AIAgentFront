@@ -18,10 +18,11 @@ import styles from "../NdControlAgent.module.css";
 
 type Props = {
   process: DepartmentProcessItem | null;
-  onConfirmOwner: (process: DepartmentProcessItem) => void;
+  onConfirmOwner?: (process: DepartmentProcessItem) => void;
   onOpenRelations: (processId: string, processName: string) => void;
   onDismiss?: () => void;
   onOpenDocument?: (documentId: string) => void;
+  canManageDepartments: boolean;
 };
 
 function ownerBadgeClass(status: string) {
@@ -74,7 +75,8 @@ export default function ProcessDetailsDrawer({
   onConfirmOwner,
   onOpenRelations,
   onDismiss,
-  onOpenDocument
+  onOpenDocument,
+  canManageDepartments
 }: Props) {
   if (!process) {
     return (
@@ -178,7 +180,7 @@ export default function ProcessDetailsDrawer({
       </div>
 
       <footer className={styles.drawerFooter}>
-        {!process.owner.confirmed ? (
+        {canManageDepartments && !process.owner.confirmed && onConfirmOwner ? (
           <button type="button" className={styles.drawerPrimaryBtn} onClick={() => onConfirmOwner(process)}>
             {ownerActionLabel}
           </button>

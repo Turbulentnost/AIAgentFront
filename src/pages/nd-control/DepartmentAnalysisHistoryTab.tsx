@@ -6,7 +6,7 @@ import styles from "../NdControlAgent.module.css";
 
 type Props = {
   departmentId: string;
-  onReanalyze: () => void;
+  onReanalyze?: () => void;
 };
 
 export default function DepartmentAnalysisHistoryTab({ departmentId, onReanalyze }: Props) {
@@ -39,7 +39,7 @@ export default function DepartmentAnalysisHistoryTab({ departmentId, onReanalyze
             <th>Процессы</th>
             <th>Связи</th>
             <th>Длительность</th>
-            <th>Действия</th>
+            {onReanalyze ? <th>Действия</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -56,11 +56,13 @@ export default function DepartmentAnalysisHistoryTab({ departmentId, onReanalyze
               <td>{run.processes_created}</td>
               <td>{run.relations_created}</td>
               <td>{formatDuration(run.duration_seconds)}</td>
-              <td className={styles.actionsCell}>
-                <button type="button" className={styles.linkBtn} onClick={onReanalyze}>
-                  Повторить
-                </button>
-              </td>
+              {onReanalyze ? (
+                <td className={styles.actionsCell}>
+                  <button type="button" className={styles.linkBtn} onClick={onReanalyze}>
+                    Повторить
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
         </tbody>
