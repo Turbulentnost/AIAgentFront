@@ -1,4 +1,4 @@
-import type { DepartmentProcessItem } from "@/types";
+import type { DepartmentProcessItem, NdTemplateType } from "@/types";
 
 export type DepartmentTab =
   | "overview"
@@ -16,6 +16,48 @@ export const DEPARTMENT_TABS: { id: DepartmentTab; label: string }[] = [
   { id: "review", label: "Требует проверки" },
   { id: "history", label: "История анализа" }
 ];
+
+export const ND_TEMPLATE_TYPE_LABELS: Record<NdTemplateType, string> = {
+  policy: "Политика",
+  regulation: "Положение",
+  department_regulation: "Положение о подразделении",
+  process_regulation: "Регламент",
+  sto: "СТО",
+  instruction: "Инструкция",
+  work_instruction: "Рабочая инструкция",
+  job_description: "Должностная инструкция",
+  change_notice: "Извещение об изменении",
+  document_introduction_order: "Приказ о вводе документа",
+  implementation_plan: "План внедрения",
+  change_registration_sheet: "Лист регистрации изменений",
+  issuance_acknowledgement_sheet: "Лист выдачи и ознакомления",
+  training_protocol: "Протокол обучения",
+  process_passport: "Паспорт процесса"
+};
+
+export const TEMPLATE_CLASSIFICATION_STATUS_LABELS: Record<string, string> = {
+  pending: "Ожидает",
+  processing: "Классификация",
+  completed: "Готово",
+  failed: "Ошибка",
+  needs_review: "Проверка"
+};
+
+export const ND_CHANGE_JOURNAL_EVENT_LABELS: Record<string, string> = {
+  document_created: "Документ создан",
+  document_updated: "Документ обновлён",
+  document_deleted: "Документ удалён",
+  template_document_added: "Документ добавлен в шаблон",
+  template_document_classified: "Документ шаблона классифицирован",
+  department_analysis_started: "Запущен анализ отдела",
+  nd_change_request_created: "Создана заявка на изменение",
+  nd_change_request_updated: "Заявка на изменение обновлена",
+  nd_change_request_completed: "Заявка на изменение завершена",
+  nd_change_draft_applied: "Изменение применено к проекту",
+  nd_change_notice_generated: "Сформировано извещение",
+  nd_control_department_created: "Отдел создан",
+  nd_control_department_deleted: "Отдел удалён"
+};
 
 export const ANALYSIS_STEP_LABELS: Record<string, string> = {
   initializing: "Инициализация анализа",

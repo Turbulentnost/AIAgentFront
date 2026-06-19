@@ -46,6 +46,34 @@
   max-width: 720px;
 }
 
+.modeSwitch {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+}
+
+.modeBtn {
+  border: none;
+  border-radius: 9px;
+  padding: 9px 13px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.modeBtnActive {
+  background: var(--color-blue-soft);
+  color: var(--color-primary-text);
+}
+
+.fullMain {
+  width: 100%;
+}
+
 .layout {
   display: grid;
   grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
@@ -137,6 +165,12 @@
   font-size: 0.95rem;
   font-weight: 700;
   color: var(--color-text-strong);
+}
+
+.sidebarHeaderActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .iconBtn {
@@ -379,6 +413,217 @@
   gap: 12px;
   margin-bottom: 12px;
   align-items: center;
+}
+
+.templatesMode {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.templatesHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.templatesHeader h2 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.templatesHeader p {
+  margin: 0;
+  color: var(--color-text-secondary);
+}
+
+.templateForm {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+}
+
+.templateFormTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.templateFormGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.templateFormGrid label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--form-label-color);
+  font-size: var(--form-label-size, 14px);
+  font-weight: var(--form-label-weight, 600);
+}
+
+.templateFormGrid input,
+.templateFormGrid select,
+.templateFormGrid textarea,
+.templateToolbar select {
+  width: 100%;
+  min-height: var(--form-control-min-height, 46px);
+  border: var(--form-control-border-width, 1px) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius, 8px);
+  background: var(--form-control-bg);
+  color: var(--form-control-text-color);
+  padding: var(--form-control-padding-y, 12px) var(--form-control-padding-x, 16px);
+  font-size: var(--form-control-font-size, 14px);
+}
+
+.templateFormWide {
+  grid-column: 1 / -1;
+}
+
+.templateToolbar {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(180px, 260px);
+  gap: 12px;
+}
+
+.templateToolbarSingle {
+  display: flex;
+  margin-bottom: 4px;
+}
+
+.templatePanelTitle {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.templateDocumentsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.templateDocumentsBlock h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.templateDetail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.documentPreviewPanel {
+  width: min(1080px, 94vw);
+  height: min(760px, 88vh);
+  padding: 16px;
+  border-radius: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.documentPreviewFrame {
+  flex: 1;
+  width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.journalPanel {
+  width: min(1280px, 96vw);
+  max-height: 90vh;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  overflow: hidden;
+}
+
+.journalFilters {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.journalFilters label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--form-label-color);
+  font-size: var(--form-label-size, 14px);
+  font-weight: var(--form-label-weight, 600);
+}
+
+.journalFilters input,
+.journalFilters select {
+  min-height: var(--form-control-min-height, 46px);
+  border: var(--form-control-border-width, 1px) solid var(--form-control-border-color);
+  border-radius: var(--form-control-border-radius, 8px);
+  background: var(--form-control-bg);
+  color: var(--form-control-text-color);
+  padding: var(--form-control-padding-y, 12px) var(--form-control-padding-x, 16px);
+  font-size: var(--form-control-font-size, 14px);
+}
+
+.journalGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: 14px;
+  min-height: 0;
+}
+
+.journalTableBlock {
+  min-width: 0;
+}
+
+.journalDetail {
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  overflow: auto;
+}
+
+.journalDetail h3 {
+  margin: 0 0 10px;
+}
+
+.journalDetail p {
+  color: var(--color-text-secondary);
+}
+
+.journalDetail pre {
+  margin: 0;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.templateError {
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.85rem;
 }
 
 .toolbarFilters {
@@ -727,7 +972,9 @@
     grid-template-columns: 1fr;
   }
 
-  .formGrid {
+  .formGrid,
+  .templateFormGrid,
+  .templateToolbar {
     grid-template-columns: 1fr;
   }
 }
@@ -1993,7 +2240,7 @@
   border-radius: 8px;
   background: var(--color-amber-soft);
   border: 1px solid rgba(245, 158, 11, 0.35);
-  color: #fde68a;
+  color: var(--color-warning-dark);
   font-size: 0.86rem;
 }
 
@@ -2002,7 +2249,7 @@
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid var(--color-border);
-  background: rgba(15, 23, 42, 0.55);
+  background: var(--color-surface-elevated);
 }
 
 .umlSchemaComposition h3 {

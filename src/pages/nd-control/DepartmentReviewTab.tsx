@@ -7,16 +7,19 @@ import styles from "../NdControlAgent.module.css";
 type Props = {
   departmentId: string;
   search: string;
+  canManageDepartments: boolean;
 };
 
 function RelationReviewTable({
   relations,
   onApprove,
-  onReject
+  onReject,
+  canManageDepartments
 }: {
   relations: DepartmentRelationItem[];
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
+  canManageDepartments: boolean;
 }) {
   return (
     <NdControlDataTable>
@@ -27,7 +30,7 @@ function RelationReviewTable({
             <th>Цель</th>
             <th>Основание</th>
             <th>Уверенность</th>
-            <th>Действия</th>
+            {canManageDepartments ? <th>Действия</th> : null}
           </tr>
         </thead>
         <tbody>
@@ -48,14 +51,16 @@ function RelationReviewTable({
               </td>
               <td>{relation.has_evidence ? relation.evidence.label : "Нет основания"}</td>
               <td>{relation.confidence_label}</td>
-              <td className={styles.actionsCell}>
-                <button type="button" className={styles.linkBtn} onClick={() => onApprove(relation.relation_id)}>
-                  Подтвердить
-                </button>
-                <button type="button" className={styles.linkBtn} onClick={() => onReject(relation.relation_id)}>
-                  Отклонить
-                </button>
-              </td>
+              {canManageDepartments ? (
+                <td className={styles.actionsCell}>
+                  <button type="button" className={styles.linkBtn} onClick={() => onApprove(relation.relation_id)}>
+                    Подтвердить
+                  </button>
+                  <button type="button" className={styles.linkBtn} onClick={() => onReject(relation.relation_id)}>
+                    Отклонить
+                  </button>
+                </td>
+              ) : null}
             </tr>
           ))}
       </tbody>
@@ -63,7 +68,7 @@ function RelationReviewTable({
   );
 }
 
-export default function DepartmentReviewTab({ departmentId, search }: Props) {
+export default function DepartmentReviewTab({ departmentId, search, canManageDepartments }: Props) {
   const queryClient = useQueryClient();
   const review = useQuery({
     queryKey: ["nd-control", "review-pending", departmentId, search],
@@ -111,7 +116,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
                   <th>Процесс</th>
                   <th>Кандидат</th>
                   <th>Уверенность</th>
-                  <th>Действия</th>
+                  {canManageDepartments ? <th>Действия</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -120,15 +125,17 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
                     <td>{item.process_name}</td>
                     <td>{item.owner_candidate ?? "—"}</td>
                     <td>{item.confidence_label ?? "—"}</td>
-                    <td className={styles.actionsCell}>
-                      <button
-                        type="button"
-                        className={styles.linkBtn}
-                        onClick={() => confirmOwner.mutate(item.process_id)}
-                      >
-                        Подтвердить
-                      </button>
-                    </td>
+                    {canManageDepartments ? (
+                      <td className={styles.actionsCell}>
+                        <button
+                          type="button"
+                          className={styles.linkBtn}
+                          onClick={() => confirmOwner.mutate(item.process_id)}
+                        >
+                          Подтвердить
+                        </button>
+                      </td>
+                    ) : null}
                   </tr>
                 ))}
               </tbody>
@@ -146,6 +153,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
             relations={data.important_relations}
             onApprove={(id) => approveRelation.mutate(id)}
             onReject={(id) => rejectRelation.mutate(id)}
+            canManageDepartments={canManageDepartments}
           />
         </section>
       ) : null}
@@ -160,6 +168,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
             relations={data.relations_without_evidence}
             onApprove={(id) => approveRelation.mutate(id)}
             onReject={(id) => rejectRelation.mutate(id)}
+            canManageDepartments={canManageDepartments}
           />
         </section>
       ) : null}
@@ -174,6 +183,7 @@ export default function DepartmentReviewTab({ departmentId, search }: Props) {
             relations={data.weak_relations}
             onApprove={(id) => approveRelation.mutate(id)}
             onReject={(id) => rejectRelation.mutate(id)}
+            canManageDepartments={canManageDepartments}
           />
         </section>
       ) : null}

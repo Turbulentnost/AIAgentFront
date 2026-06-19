@@ -1088,10 +1088,167 @@ export type NdDocumentType = "policy" | "regulation" | "procedure" | "sto" | "in
 export type NdQmsLevel = "strategic" | "organizational" | "process" | "technical" | "operational";
 export type NdDocumentCardStatus = "active" | "draft" | "superseded" | "archived";
 export type NdConfidentialityLevel = "public" | "restricted" | "confidential";
+export type NdTemplateType =
+  | "policy"
+  | "regulation"
+  | "department_regulation"
+  | "process_regulation"
+  | "sto"
+  | "instruction"
+  | "work_instruction"
+  | "job_description"
+  | "change_notice"
+  | "document_introduction_order"
+  | "implementation_plan"
+  | "change_registration_sheet"
+  | "issuance_acknowledgement_sheet"
+  | "training_protocol"
+  | "process_passport";
 
 export interface NdControlPermissions {
   can_manage_departments: boolean;
   can_access_agent: boolean;
+  can_manage_templates: boolean;
+  can_upload_template_documents: boolean;
+  can_reanalyze_departments: boolean;
+  can_view_change_journal: boolean;
+  is_process_management_specialist: boolean;
+}
+
+export interface NdTemplateTypeOption {
+  value: NdTemplateType;
+  label: string;
+}
+
+export interface NdControlTemplateSource {
+  id: string;
+  knowledge_base_id: string;
+  knowledge_base_name: string | null;
+  document_id: string;
+  document_version_id: string;
+  document_title: string | null;
+  original_filename: string | null;
+  processing_status: string | null;
+  already_registered: boolean;
+}
+
+export interface NdControlTemplate {
+  id: string;
+  template_type: NdTemplateType;
+  template_type_label: string;
+  name: string;
+  title?: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_by_user_id: string | null;
+  knowledge_bases_count: number;
+  documents_count: number;
+  classification_stats: {
+    pending: number;
+    processing: number;
+    completed: number;
+    failed: number;
+    needs_review: number;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NdControlTemplateDetail extends NdControlTemplate {
+  knowledge_base_ids: string[];
+}
+
+export interface NdControlTemplateDocument {
+  id: string;
+  template_id: string;
+  knowledge_base_id: string;
+  knowledge_base_source_id: string;
+  document_id: string;
+  document_version_id: string;
+  detected_template_type: NdTemplateType | null;
+  detected_template_type_label: string | null;
+  classification_confidence: number | null;
+  classification_status: "pending" | "processing" | "completed" | "failed" | "needs_review";
+  classified_at: string | null;
+  classified_by: string | null;
+  metadata: Record<string, unknown> | null;
+  knowledge_base_name: string | null;
+  document_title: string | null;
+  original_filename: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NdControlTemplateCreate {
+  template_type: NdTemplateType;
+  name?: string | null;
+  description?: string | null;
+  sort_order?: number | null;
+}
+
+export type NdControlTemplateUpdate = Partial<
+  Pick<NdControlTemplate, "name" | "description" | "sort_order" | "is_active">
+>;
+
+export interface NdControlTemplateKnowledgeBasesUpdate {
+  knowledge_base_ids: string[];
+}
+
+export interface NdControlTemplateDocumentCreate {
+  knowledge_base_source_id?: string | null;
+  document_id?: string | null;
+}
+
+export interface NdControlTemplateDocumentUpdate {
+  confirm_detected_type?: boolean;
+}
+
+export type NdChangeJournalEventType =
+  | "document_created"
+  | "document_updated"
+  | "document_deleted"
+  | "template_document_added"
+  | "template_document_classified"
+  | "department_analysis_started"
+  | "nd_change_request_created"
+  | "nd_change_request_updated"
+  | "nd_change_request_completed"
+  | "nd_change_draft_applied"
+  | "nd_change_notice_generated"
+  | "nd_control_department_created"
+  | "nd_control_department_deleted";
+
+export type NdChangeJournalSource = "manual" | "system" | "nd_change_workflow";
+
+export interface NdChangeJournalEntry {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  event_type: NdChangeJournalEventType;
+  actor_user_id: string | null;
+  resource_type: string;
+  resource_id: string;
+  department_id: string | null;
+  template_id: string | null;
+  document_id: string | null;
+  document_code: string | null;
+  document_name: string | null;
+  summary: string;
+  payload: Record<string, unknown> | null;
+  source: NdChangeJournalSource;
+}
+
+export interface NdChangeJournalParams {
+  date_from?: string;
+  date_to?: string;
+  event_type?: NdChangeJournalEventType | "";
+  department_id?: string;
+  template_id?: string;
+  actor_id?: string;
+  search?: string;
+  page?: number;
+  size?: number;
 }
 
 export interface NdControlDepartment {

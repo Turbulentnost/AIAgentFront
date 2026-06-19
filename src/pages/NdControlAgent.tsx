@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Plus, LayoutPanelLeft, AlertTriangle, Building2 } from "lucide-react";
+import { Plus, LayoutPanelLeft, AlertTriangle, Building2, FileStack, History } from "lucide-react";
 import { knowledgeBasesApi, ndControlApi } from "@/api/endpoints";
 import { FormSearchInput } from "@/components/form-controls";
 import CreateDepartmentModal from "@/pages/CreateDepartmentModal";
@@ -15,6 +15,9 @@ import DepartmentRelationsTab from "./nd-control/DepartmentRelationsTab";
 import DepartmentReviewTab from "./nd-control/DepartmentReviewTab";
 import DepartmentSummaryHeader from "./nd-control/DepartmentSummaryHeader";
 import DeptSidebarItem from "./nd-control/DeptSidebarItem";
+import NdChangeJournalPanel from "./nd-control/NdChangeJournalPanel";
+import TemplateSidebarItem from "./nd-control/TemplateSidebarItem";
+import TemplatesPanel from "./nd-control/TemplatesPanel";
 import ConfirmProcessOwnerDialog from "./nd-control/ConfirmProcessOwnerDialog";
 import ProcessDetailsDrawer from "./nd-control/ProcessDetailsDrawer";
 import ReanalyzeConfirmDialog from "./nd-control/ReanalyzeConfirmDialog";
@@ -31,8 +34,11 @@ function EmptyState({ icon: Icon, text }: { icon: typeof LayoutPanelLeft; text: 
   );
 }
 
+type AgentMode = "departments" | "templates";
+
 export default function NdControlAgent() {
   const location = useLocation();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<DepartmentTab>("overview");
@@ -47,6 +53,9 @@ export default function NdControlAgent() {
   const [relationsProcessName, setRelationsProcessName] = useState<string | undefined>();
   const [selectedProcess, setSelectedProcess] = useState<DepartmentProcessItem | null>(null);
   const [confirmProcess, setConfirmProcess] = useState<DepartmentProcessItem | null>(null);
+  const [activeMode, setActiveMode] = useState<AgentMode>("departments");
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [showChangeJournal, setShowChangeJournal] = useState(false);
 
   const permissions = useQuery({
     queryKey: ["nd-control", "permissions"],
@@ -57,6 +66,18 @@ export default function NdControlAgent() {
     queryKey: ["nd-control", "departments"],
     queryFn: () => ndControlApi.listDepartments(),
     enabled: permissions.data?.can_access_agent ?? false
+  });
+
+  const canViewTemplates = Boolean(
+    permissions.data?.can_access_agent ||
+      permissions.data?.can_manage_templates ||
+      permissions.data?.can_upload_template_documents
+  );
+
+  const templates = useQuery({
+    queryKey: ["nd-control", "templates", "sidebar"],
+    queryFn: () => ndControlApi.templates.list({ page: 1, size: 100 }),
+    enabled: (activeMode === "templates" || showChangeJournal) && canViewTemplates
   });
 
   const knowledgeBases = useQuery({
@@ -92,10 +113,36 @@ export default function NdControlAgent() {
   }, [departments.data, selectedDeptId]);
 
   useEffect(() => {
+    if (!permissions.data) return;
+    const params = new URLSearchParams(location.search);
+    const modeFromUrl = params.get("mode");
+    if ((modeFromUrl === "templates" || modeFromUrl === "departments") && modeFromUrl !== activeMode) {
+      setActiveMode(modeFromUrl);
+      return;
+    }
+    if (!modeFromUrl && !permissions.data.can_manage_departments && permissions.data.can_manage_templates) {
+      switchMode("templates", true);
+    }
+  }, [activeMode, location.search, permissions.data]);
+
+  useEffect(() => {
     const params = new URLSearchParams(location.search);
     const deptFromUrl = params.get("department");
     if (deptFromUrl) setSelectedDeptId(deptFromUrl);
   }, [location.search]);
+
+  useEffect(() => {
+    if (!selectedTemplateId && templates.data?.items.length) {
+      setSelectedTemplateId(templates.data.items[0].id);
+    }
+  }, [selectedTemplateId, templates.data?.items]);
+
+  function switchMode(mode: AgentMode, replace = false) {
+    setActiveMode(mode);
+    const params = new URLSearchParams(location.search);
+    params.set("mode", mode);
+    navigate(`${location.pathname}?${params.toString()}`, { replace });
+  }
 
   const selectedDepartment = useMemo(
     () => departments.data?.find((dept) => dept.id === selectedDeptId) ?? null,
@@ -167,7 +214,7 @@ export default function NdControlAgent() {
     }
   });
 
-  const showProcessPanel = activeTab === "processes" && Boolean(selectedDeptId) && !showAnalysisScreen;
+  const showProcessPanel = activeMode === "departments" && activeTab === "processes" && Boolean(selectedDeptId) && !showAnalysisScreen;
 
   useEffect(() => {
     setSelectedProcess(null);
@@ -182,7 +229,8 @@ export default function NdControlAgent() {
   const searchVisible = activeTab !== "overview" && activeTab !== "history";
 
   if (permissions.isLoading) return <div className={styles.page}>Загрузка…</div>;
-  if (!permissions.data?.can_access_agent) {
+  const permissionData = permissions.data;
+  if (!permissionData || (!permissionData.can_access_agent && !canViewTemplates)) {
     return (
       <div className={styles.page}>
         <EmptyState icon={LayoutPanelLeft} text="Нет доступа к агенту контроля НД." />
@@ -195,21 +243,59 @@ export default function NdControlAgent() {
       <header className={styles.header}>
         <div>
           <h1>Агент контроля НД и внесения изменений</h1>
-          <p>Анализ нормативных документов отделов, процессов и связей между ними.</p>
+          <p>
+            {activeMode === "departments"
+              ? "Анализ нормативных документов отделов, процессов и связей между ними."
+              : "Реестр шаблонов нормативных документов для процессного управления."}
+          </p>
         </div>
+        {permissionData.can_view_change_journal ? (
+          <button type="button" className={styles.secondaryBtn} onClick={() => setShowChangeJournal(true)}>
+            <History size={16} />
+            Журнал изменений
+          </button>
+        ) : null}
       </header>
 
       <div className={`${styles.layout} ${showProcessPanel ? styles.layoutWithProcessPanel : ""}`}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeader}>
-            <h2>Отделы агента</h2>
-            {permissions.data.can_manage_departments ? (
+            <h2>{activeMode === "departments" ? "Отделы агента" : "Шаблоны"}</h2>
+            <div className={styles.sidebarHeaderActions}>
+              <button
+                type="button"
+                className={styles.iconBtn}
+                title={activeMode === "departments" ? "Шаблоны" : "Отделы"}
+                aria-label={activeMode === "departments" ? "Шаблоны" : "Отделы"}
+                onClick={() => switchMode(activeMode === "departments" ? "templates" : "departments")}
+              >
+                {activeMode === "departments" ? <FileStack size={20} /> : <Building2 size={20} />}
+              </button>
+              {activeMode === "departments" && permissionData.can_manage_departments ? (
               <button type="button" className={styles.addBtn} onClick={() => setShowCreateDept(true)} aria-label="Создать отдел">
                 <Plus size={22} strokeWidth={2.5} aria-hidden="true" />
               </button>
-            ) : null}
+              ) : null}
+            </div>
           </div>
-          {departments.isLoading ? (
+          {activeMode === "templates" ? (
+            templates.isLoading ? (
+              <p className={styles.emptyHint}>Загрузка шаблонов…</p>
+            ) : !templates.data?.items.length ? (
+              <EmptyState icon={FileStack} text="Шаблоны не найдены." />
+            ) : (
+              <div className={styles.deptList}>
+                {templates.data.items.map((template) => (
+                  <TemplateSidebarItem
+                    key={template.id}
+                    template={template}
+                    selected={template.id === selectedTemplateId}
+                    onSelect={() => setSelectedTemplateId(template.id)}
+                  />
+                ))}
+              </div>
+            )
+          ) : departments.isLoading ? (
             <p className={styles.emptyHint}>Загрузка отделов…</p>
           ) : !departments.data?.length ? (
             <EmptyState icon={Building2} text="Создайте первый отдел и прикрепите к нему базу знаний." />
@@ -220,7 +306,7 @@ export default function NdControlAgent() {
                   key={dept.id}
                   dept={dept}
                   selected={dept.id === selectedDeptId}
-                  canManage={permissions.data.can_manage_departments}
+                  canManage={permissionData.can_manage_departments}
                   onSelect={() => setSelectedDeptId(dept.id)}
                   onDelete={() => setDeptPendingDelete(dept)}
                 />
@@ -230,14 +316,22 @@ export default function NdControlAgent() {
         </aside>
 
         <main className={styles.main}>
-          {!selectedDeptId ? (
+          {activeMode === "templates" ? (
+            <TemplatesPanel
+              permissions={permissionData}
+              selectedTemplateId={selectedTemplateId}
+              onSelectTemplate={setSelectedTemplateId}
+            />
+          ) : !selectedDeptId ? (
             <EmptyState icon={LayoutPanelLeft} text="Выберите отдел слева." />
           ) : showAnalysisScreen ? (
             <DepartmentAnalysisProgress
               status={analysisStatus.data}
               isLoading={analysisStatus.isLoading}
               onCancel={
-                selectedDeptId ? () => cancelAnalysis.mutate(selectedDeptId) : undefined
+                selectedDeptId && permissionData.can_reanalyze_departments
+                  ? () => cancelAnalysis.mutate(selectedDeptId)
+                  : undefined
               }
               isCancelling={cancelAnalysis.isPending}
             />
@@ -246,6 +340,7 @@ export default function NdControlAgent() {
               {departmentSummary.data ? (
                 <DepartmentSummaryHeader
                   summary={departmentSummary.data}
+                  canReanalyze={permissionData.can_reanalyze_departments}
                   isReanalyzing={reanalyzeDepartment.isPending}
                   onReanalyze={() => setShowReanalyzeDialog(true)}
                   onOpenReview={() => setActiveTab("review")}
@@ -258,9 +353,11 @@ export default function NdControlAgent() {
                   <div>
                     <strong>Ошибка анализа</strong>
                     <p>{analysisStatus.data.message ?? "Не удалось завершить анализ отдела."}</p>
-                    <button type="button" className={styles.secondaryBtn} onClick={() => setShowReanalyzeDialog(true)}>
-                      Повторить анализ
-                    </button>
+                    {permissionData.can_reanalyze_departments ? (
+                      <button type="button" className={styles.secondaryBtn} onClick={() => setShowReanalyzeDialog(true)}>
+                        Повторить анализ
+                      </button>
+                    ) : null}
                   </div>
                 </div>
               ) : null}
@@ -300,7 +397,7 @@ export default function NdControlAgent() {
                   departmentId={selectedDeptId}
                   search={search}
                   onOpenCard={setSelectedCard}
-                  onReextract={() => setShowReanalyzeDialog(true)}
+                  onReextract={permissionData.can_reanalyze_departments ? () => setShowReanalyzeDialog(true) : undefined}
                 />
               ) : null}
               {activeTab === "processes" ? (
@@ -312,14 +409,17 @@ export default function NdControlAgent() {
                   analysisTotal={analysisStatus.data?.total_documents}
                   selectedProcessId={selectedProcess?.process_id ?? null}
                   onSelectProcess={setSelectedProcess}
-                  onStartAnalysis={() => setShowReanalyzeDialog(true)}
+                  canManageDepartments={permissionData.can_manage_departments}
+                  onStartAnalysis={
+                    permissionData.can_reanalyze_departments ? () => setShowReanalyzeDialog(true) : undefined
+                  }
                   onOpenDocuments={() => setActiveTab("documents")}
                   onOpenRelations={(processId, processName) => {
                     setRelationsProcessId(processId);
                     setRelationsProcessName(processName);
                     setActiveTab("relations");
                   }}
-                  onConfirmProcessOwner={setConfirmProcess}
+                  onConfirmProcessOwner={permissionData.can_manage_departments ? setConfirmProcess : undefined}
                 />
               ) : null}
               {activeTab === "relations" ? (
@@ -328,6 +428,7 @@ export default function NdControlAgent() {
                   search={search}
                   processId={relationsProcessId}
                   processName={relationsProcessName}
+                  canManageDepartments={permissionData.can_manage_departments}
                   onClearProcessFilter={() => {
                     setRelationsProcessId(undefined);
                     setRelationsProcessName(undefined);
@@ -335,12 +436,16 @@ export default function NdControlAgent() {
                 />
               ) : null}
               {activeTab === "review" ? (
-                <DepartmentReviewTab departmentId={selectedDeptId} search={search} />
+                <DepartmentReviewTab
+                  departmentId={selectedDeptId}
+                  search={search}
+                  canManageDepartments={permissionData.can_manage_departments}
+                />
               ) : null}
               {activeTab === "history" ? (
                 <DepartmentAnalysisHistoryTab
                   departmentId={selectedDeptId}
-                  onReanalyze={() => setShowReanalyzeDialog(true)}
+                  onReanalyze={permissionData.can_reanalyze_departments ? () => setShowReanalyzeDialog(true) : undefined}
                 />
               ) : null}
             </>
@@ -352,7 +457,8 @@ export default function NdControlAgent() {
             <ProcessDetailsDrawer
               process={selectedProcess}
               onDismiss={() => setSelectedProcess(null)}
-              onConfirmOwner={setConfirmProcess}
+              canManageDepartments={permissionData.can_manage_departments}
+              onConfirmOwner={permissionData.can_manage_departments ? setConfirmProcess : undefined}
               onOpenRelations={(processId, processName) => {
                 setRelationsProcessId(processId);
                 setRelationsProcessName(processName);
@@ -382,7 +488,7 @@ export default function NdControlAgent() {
         onClose={() => setShowReanalyzeDialog(false)}
         isPending={reanalyzeDepartment.isPending}
         onConfirm={({ forceReextract }) => {
-          if (!selectedDeptId) return;
+          if (!selectedDeptId || !permissions.data?.can_reanalyze_departments) return;
           reanalyzeDepartment.mutate({ departmentId: selectedDeptId, forceReextract });
         }}
       />
@@ -440,6 +546,13 @@ export default function NdControlAgent() {
           </div>
         </div>
       ) : null}
+
+      <NdChangeJournalPanel
+        open={showChangeJournal}
+        departments={departments.data ?? []}
+        templates={templates.data?.items ?? []}
+        onClose={() => setShowChangeJournal(false)}
+      />
     </div>
   );
 }

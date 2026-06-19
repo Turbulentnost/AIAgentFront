@@ -50,7 +50,20 @@ import type {
   NdControlDepartment,
   NdControlDepartmentCreate,
   NdControlDepartmentCreateResponse,
+  NdChangeJournalEntry,
+  NdChangeJournalParams,
   NdControlPermissions,
+  NdControlTemplate,
+  NdControlTemplateCreate,
+  NdControlTemplateDetail,
+  NdControlTemplateDocument,
+  NdControlTemplateDocumentCreate,
+  NdControlTemplateDocumentUpdate,
+  NdControlTemplateKnowledgeBasesUpdate,
+  NdControlTemplateSource,
+  NdControlTemplateUpdate,
+  NdTemplateType,
+  NdTemplateTypeOption,
   DepartmentAnalysisRun,
   DepartmentAnalysisRunListItem,
   DepartmentAnalysisStatus,
@@ -379,6 +392,66 @@ export const ndChangeRequestsApi = {
 
 export const ndControlApi = {
   permissions: () => apiClient.get<NdControlPermissions>("/nd-control/me/permissions").then((r) => r.data),
+  listChangeJournal: (params: NdChangeJournalParams = {}) =>
+    apiClient.get<Page<NdChangeJournalEntry>>("/nd-control/change-journal", { params }).then((r) => r.data),
+  getChangeJournalEntry: (entryId: string) =>
+    apiClient.get<NdChangeJournalEntry>(`/nd-control/change-journal/${entryId}`).then((r) => r.data),
+  templates: {
+    types: () => apiClient.get<NdTemplateTypeOption[]>("/nd-control/templates/types").then((r) => r.data),
+    list: (params: {
+      template_type?: NdTemplateType;
+      knowledge_base_id?: string;
+      query?: string;
+      active_only?: boolean;
+      page?: number;
+      size?: number;
+    } = {}) =>
+      apiClient.get<Page<NdControlTemplate>>("/nd-control/templates", { params }).then((r) => r.data),
+    get: (templateId: string) =>
+      apiClient.get<NdControlTemplateDetail>(`/nd-control/templates/${templateId}`).then((r) => r.data),
+    update: (templateId: string, payload: NdControlTemplateUpdate) =>
+      apiClient.patch<NdControlTemplateDetail>(`/nd-control/templates/${templateId}`, payload).then((r) => r.data),
+    setKnowledgeBases: (templateId: string, payload: NdControlTemplateKnowledgeBasesUpdate) =>
+      apiClient
+        .put<NdControlTemplateDetail>(`/nd-control/templates/${templateId}/knowledge-bases`, payload)
+        .then((r) => r.data),
+    documents: (templateId: string, params: { page?: number; size?: number; classification_status?: string } = {}) =>
+      apiClient
+        .get<Page<NdControlTemplateDocument>>(`/nd-control/templates/${templateId}/documents`, { params })
+        .then((r) => r.data),
+    addDocument: (templateId: string, payload: NdControlTemplateDocumentCreate) =>
+      apiClient
+        .post<NdControlTemplateDocument>(`/nd-control/templates/${templateId}/documents`, payload)
+        .then((r) => r.data),
+    updateDocument: (templateId: string, documentLinkId: string, payload: NdControlTemplateDocumentUpdate) =>
+      apiClient
+        .patch<NdControlTemplateDocument>(`/nd-control/templates/${templateId}/documents/${documentLinkId}`, payload)
+        .then((r) => r.data),
+    deleteDocument: (templateId: string, documentLinkId: string) =>
+      apiClient.delete(`/nd-control/templates/${templateId}/documents/${documentLinkId}`).then((r) => r.data)
+  },
+  listTemplateTypes: () => apiClient.get<NdTemplateTypeOption[]>("/nd-control/templates/types").then((r) => r.data),
+  listTemplates: (params: {
+    template_type?: NdTemplateType;
+    knowledge_base_id?: string;
+    query?: string;
+    active_only?: boolean;
+    page?: number;
+    size?: number;
+  } = {}) =>
+    apiClient.get<Page<NdControlTemplate>>("/nd-control/templates", { params }).then((r) => r.data),
+  listTemplateSources: (params: {
+    knowledge_base_id?: string;
+    query?: string;
+    include_registered?: boolean;
+  } = {}) =>
+    apiClient.get<NdControlTemplateSource[]>("/nd-control/templates/sources", { params }).then((r) => r.data),
+  createTemplate: (payload: NdControlTemplateCreate) =>
+    apiClient.post<NdControlTemplate>("/nd-control/templates", payload).then((r) => r.data),
+  updateTemplate: (templateId: string, payload: NdControlTemplateUpdate) =>
+    apiClient.patch<NdControlTemplate>(`/nd-control/templates/${templateId}`, payload).then((r) => r.data),
+  archiveTemplate: (templateId: string) =>
+    apiClient.delete(`/nd-control/templates/${templateId}`).then((r) => r.data),
   listDepartments: () => apiClient.get<NdControlDepartment[]>("/nd-control/departments").then((r) => r.data),
   createDepartment: (payload: NdControlDepartmentCreate) =>
     apiClient.post<NdControlDepartmentCreateResponse>("/nd-control/departments", {

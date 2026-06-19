@@ -18,10 +18,11 @@ type Props = {
   analysisTotal?: number;
   selectedProcessId: string | null;
   onSelectProcess: (process: DepartmentProcessItem | null) => void;
-  onConfirmProcessOwner: (process: DepartmentProcessItem) => void;
+  onConfirmProcessOwner?: (process: DepartmentProcessItem) => void;
   onOpenRelations: (processId: string, processName: string) => void;
   onOpenDocuments?: () => void;
   onStartAnalysis?: () => void;
+  canManageDepartments: boolean;
 };
 
 const FILTERS = [
@@ -72,7 +73,8 @@ export default function DepartmentProcessesTab({
   onConfirmProcessOwner,
   onOpenRelations,
   onOpenDocuments,
-  onStartAnalysis
+  onStartAnalysis,
+  canManageDepartments
 }: Props) {
   const [filter, setFilter] = useState("");
   const [sort, setSort] = useState("name");
@@ -272,7 +274,7 @@ export default function DepartmentProcessesTab({
                       >
                         Связи
                       </button>
-                      {!process.owner.confirmed ? (
+                      {canManageDepartments && !process.owner.confirmed && onConfirmProcessOwner ? (
                         <button
                           type="button"
                           className={styles.linkBtn}
