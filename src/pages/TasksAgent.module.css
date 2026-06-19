@@ -64,23 +64,27 @@
   word-break: break-word;
 }
 
-.participantsColumn {
+.participantsColumn,
+.stackedColumn {
   min-width: 220px;
 }
 
-.participantsStack {
+.participantsStack,
+.stackedLines {
   display: grid;
   gap: 8px;
 }
 
-.participantLine {
+.participantLine,
+.stackedLine {
   display: grid;
   grid-template-columns: 24px minmax(0, 1fr);
   gap: 8px;
   align-items: start;
 }
 
-.participantIcon {
+.participantIcon,
+.stackedIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -92,7 +96,8 @@
   border-radius: 8px;
 }
 
-.participantText {
+.participantText,
+.stackedText {
   color: var(--kb-table-cell-color);
   font-size: var(--form-control-font-size, 14px);
   font-weight: var(--form-control-font-weight, 400);

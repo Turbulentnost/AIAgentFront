@@ -18,10 +18,14 @@ const COLUMN_TITLE_OVERRIDES: Record<string, string> = {
 const HIDDEN_COLUMN_KEYS = new Set(["source"]);
 
 export type ParticipantRole = "executor" | "reviewer" | "department";
+export type OverdueField = "days" | "reason";
+export type PostponeField = "request" | "basis";
 
 export type RegisterTableColumn =
   | { type: "data"; key: string; title: string }
   | { type: "participants"; key: "__participants__"; title: string }
+  | { type: "overdue"; key: "__overdue__"; title: string }
+  | { type: "postpone"; key: "__postpone__"; title: string }
   | { type: "status"; key: string; title: string }
   | { type: "collapsible"; key: string; title: string; minWidth: number }
   | { type: "toggle"; key: "__toggle__"; title: string };
@@ -32,9 +36,21 @@ export interface RegisterParticipantKeys {
   department?: string;
 }
 
+export interface RegisterOverdueKeys {
+  days?: string;
+  reason?: string;
+}
+
+export interface RegisterPostponeKeys {
+  request?: string;
+  basis?: string;
+}
+
 export interface RegisterTableLayout {
   columns: RegisterTableColumn[];
   participantKeys: RegisterParticipantKeys;
+  overdueKeys: RegisterOverdueKeys;
+  postponeKeys: RegisterPostponeKeys;
 }
 
 export interface TaskStatusVisual {
@@ -90,19 +106,45 @@ export function detectParticipantRole(column: ExportColumn): ParticipantRole | n
   return null;
 }
 
+export function detectOverdueField(column: ExportColumn): OverdueField | null {
+  const key = column.key.toLowerCase();
+  const title = normalizeColumnLabel(column.title);
+
+  if (title.includes("причина") && title.includes("просроч")) return "reason";
+  if (key.includes("overdue_reason") || key.includes("delay_reason")) return "reason";
+
+  if (title.includes("просроч") && (title.includes("дней") || title.includes("день"))) return "days";
+  if (key.includes("overdue_days") || key.includes("delay_days")) return "days";
+
+  if (title.includes("просроч") && !title.includes("причина")) return "days";
+
+  return null;
+}
+
+export function detectPostponeField(column: ExportColumn): PostponeField | null {
+  const key = column.key.toLowerCase();
+  const title = normalizeColumnLabel(column.title);
+
+  if (title.includes("основание") && title.includes("перенос")) return "basis";
+  if (key.includes("postpone_reason") || key.includes("transfer_basis") || key.includes("transfer_ground")) {
+    return "basis";
+  }
+
+  if (title.includes("запрос") && title.includes("перенос")) return "request";
+  if (key.includes("postpone_request") || key.includes("transfer_request")) return "request";
+
+  return null;
+}
+
 export function isCollapsibleRegisterColumn(column: ExportColumn): boolean {
+  if (detectOverdueField(column) || detectPostponeField(column)) return false;
+
   const key = column.key.toLowerCase();
   const title = normalizeColumnLabel(column.title);
 
   return (
-    title.includes("просроч") ||
-    title.includes("перенос") ||
     title.includes("контролер") ||
     title.includes("требуется рк") ||
-    key.includes("overdue") ||
-    key.includes("delay") ||
-    key.includes("postpone") ||
-    key.includes("transfer") ||
     key.includes("controller") ||
     key.includes("rk_required")
   );
@@ -116,19 +158,35 @@ function isStatusRegisterColumn(column: ExportColumn): boolean {
 
 function getCollapsibleMinWidth(column: ExportColumn): number {
   const title = normalizeColumnLabel(column.title);
-  if (title.includes("основание") || title.includes("причина") || title.includes("действие")) {
-    return 200;
-  }
-  if (title.includes("просроч")) return 108;
+  if (title.includes("действие")) return 200;
   if (title.includes("требуется")) return 112;
   return 152;
 }
 
+export function formatOverdueDaysValue(value: string): string {
+  if (value === "—") return value;
+  const trimmed = value.trim();
+  if (/^-?\d+$/.test(trimmed)) {
+    const days = Number(trimmed);
+    const mod10 = Math.abs(days) % 10;
+    const mod100 = Math.abs(days) % 100;
+    let suffix = "дней";
+    if (mod10 === 1 && mod100 !== 11) suffix = "день";
+    else if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) suffix = "дня";
+    return `${days} ${suffix}`;
+  }
+  return trimmed;
+}
+
 export function buildRegisterTableLayout(columns: ExportColumn[]): RegisterTableLayout {
   const participantKeys: RegisterParticipantKeys = {};
+  const overdueKeys: RegisterOverdueKeys = {};
+  const postponeKeys: RegisterPostponeKeys = {};
   const output: RegisterTableColumn[] = [];
   const collapsible: RegisterTableColumn[] = [];
   let participantColumnAdded = false;
+  let overdueColumnAdded = false;
+  let postponeColumnAdded = false;
 
   for (const column of columns) {
     const participantRole = detectParticipantRole(column);
@@ -137,6 +195,26 @@ export function buildRegisterTableLayout(columns: ExportColumn[]): RegisterTable
       if (!participantColumnAdded) {
         output.push({ type: "participants", key: "__participants__", title: "Участники" });
         participantColumnAdded = true;
+      }
+      continue;
+    }
+
+    const overdueField = detectOverdueField(column);
+    if (overdueField) {
+      overdueKeys[overdueField] = column.key;
+      if (!overdueColumnAdded) {
+        output.push({ type: "overdue", key: "__overdue__", title: "Просрочка" });
+        overdueColumnAdded = true;
+      }
+      continue;
+    }
+
+    const postponeField = detectPostponeField(column);
+    if (postponeField) {
+      postponeKeys[postponeField] = column.key;
+      if (!postponeColumnAdded) {
+        output.push({ type: "postpone", key: "__postpone__", title: "Перенос" });
+        postponeColumnAdded = true;
       }
       continue;
     }
@@ -164,7 +242,7 @@ export function buildRegisterTableLayout(columns: ExportColumn[]): RegisterTable
     output.push({ type: "toggle", key: "__toggle__", title: "" });
   }
 
-  return { columns: output, participantKeys };
+  return { columns: output, participantKeys, overdueKeys, postponeKeys };
 }
 
 export function formatPersonShortFio(value: string): string {

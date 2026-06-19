@@ -1,14 +1,28 @@
 import type { CSSProperties } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Building2, PanelLeft, PanelLeftClose, UserCheck, UserRound } from "lucide-react";
+import {
+  ArrowRightLeft,
+  Building2,
+  FileText,
+  MessageSquareText,
+  PanelLeft,
+  PanelLeftClose,
+  Timer,
+  UserCheck,
+  UserRound
+} from "lucide-react";
 import {
   buildRegisterTableLayout,
+  formatOverdueDaysValue,
   formatPersonShortFio,
   getRegisterCellValue,
   getRegisterColumns,
   getTaskStatusVisual,
+  type RegisterOverdueKeys,
   type RegisterParticipantKeys,
-  type RegisterTableColumn
+  type RegisterPostponeKeys,
+  type RegisterTableColumn,
+  type RegisterTableLayout
 } from "@/utils/porucheniyaDashboard";
 import type { PorucheniyaTableColumn } from "@/types/porucheniya";
 import styles from "./TasksAgent.module.css";
@@ -31,6 +45,29 @@ const PARTICIPANT_LINES: ParticipantLine[] = [
   { role: "executor", label: "Исполнитель", Icon: UserRound },
   { role: "reviewer", label: "Проверяющий", Icon: UserCheck },
   { role: "department", label: "Подразделение", Icon: Building2 }
+];
+
+type OverdueLine = {
+  field: keyof RegisterOverdueKeys;
+  label: string;
+  Icon: LucideIcon;
+  format?: (value: string) => string;
+};
+
+const OVERDUE_LINES: OverdueLine[] = [
+  { field: "days", label: "Дней просрочки", Icon: Timer, format: formatOverdueDaysValue },
+  { field: "reason", label: "Причина просрочки", Icon: MessageSquareText }
+];
+
+type PostponeLine = {
+  field: keyof RegisterPostponeKeys;
+  label: string;
+  Icon: LucideIcon;
+};
+
+const POSTPONE_LINES: PostponeLine[] = [
+  { field: "request", label: "Запрос переноса", Icon: ArrowRightLeft },
+  { field: "basis", label: "Основание переноса", Icon: FileText }
 ];
 
 export default function TasksRegisterTable({
@@ -64,7 +101,7 @@ export default function TasksRegisterTable({
             rows.map((row, index) => (
               <tr key={`${row.document_number ?? "row"}-${index}`}>
                 {layout.columns.map((column) =>
-                  renderBodyCell(column, row, layout.participantKeys, extraColumnsExpanded)
+                  renderBodyCell(column, row, layout, extraColumnsExpanded)
                 )}
               </tr>
             ))
@@ -126,7 +163,7 @@ function renderHeaderCell(
 function renderBodyCell(
   column: RegisterTableColumn,
   row: Record<string, string | number>,
-  participantKeys: RegisterParticipantKeys,
+  layout: RegisterTableLayout,
   extraColumnsExpanded: boolean
 ) {
   if (column.type === "collapsible" && !extraColumnsExpanded) {
@@ -139,19 +176,64 @@ function renderBodyCell(
 
   if (column.type === "participants") {
     return (
-      <td key={column.key} className={styles.participantsColumn}>
-        <div className={styles.participantsStack}>
+      <td key={column.key} className={styles.stackedColumn}>
+        <div className={styles.stackedLines}>
           {PARTICIPANT_LINES.map(({ role, label, Icon }) => {
-            const sourceKey = participantKeys[role];
+            const sourceKey = layout.participantKeys[role];
             if (!sourceKey) return null;
             const rawValue = getRegisterCellValue(row, sourceKey);
             const value = role === "department" ? rawValue : formatPersonShortFio(rawValue);
             return (
-              <div className={styles.participantLine} key={role} title={`${label}: ${rawValue}`}>
-                <span className={styles.participantIcon} aria-hidden="true">
+              <div className={styles.stackedLine} key={role} title={`${label}: ${rawValue}`}>
+                <span className={styles.stackedIcon} aria-hidden="true">
                   <Icon size={14} strokeWidth={2} />
                 </span>
-                <span className={styles.participantText}>{value}</span>
+                <span className={styles.stackedText}>{value}</span>
+              </div>
+            );
+          })}
+        </div>
+      </td>
+    );
+  }
+
+  if (column.type === "overdue") {
+    return (
+      <td key={column.key} className={styles.stackedColumn}>
+        <div className={styles.stackedLines}>
+          {OVERDUE_LINES.map(({ field, label, Icon, format }) => {
+            const sourceKey = layout.overdueKeys[field];
+            if (!sourceKey) return null;
+            const rawValue = getRegisterCellValue(row, sourceKey);
+            const value = format ? format(rawValue) : rawValue;
+            return (
+              <div className={styles.stackedLine} key={field} title={`${label}: ${rawValue}`}>
+                <span className={styles.stackedIcon} aria-hidden="true">
+                  <Icon size={14} strokeWidth={2} />
+                </span>
+                <span className={styles.stackedText}>{value}</span>
+              </div>
+            );
+          })}
+        </div>
+      </td>
+    );
+  }
+
+  if (column.type === "postpone") {
+    return (
+      <td key={column.key} className={styles.stackedColumn}>
+        <div className={styles.stackedLines}>
+          {POSTPONE_LINES.map(({ field, label, Icon }) => {
+            const sourceKey = layout.postponeKeys[field];
+            if (!sourceKey) return null;
+            const rawValue = getRegisterCellValue(row, sourceKey);
+            return (
+              <div className={styles.stackedLine} key={field} title={`${label}: ${rawValue}`}>
+                <span className={styles.stackedIcon} aria-hidden="true">
+                  <Icon size={14} strokeWidth={2} />
+                </span>
+                <span className={styles.stackedText}>{rawValue}</span>
               </div>
             );
           })}
