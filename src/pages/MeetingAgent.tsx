@@ -563,10 +563,10 @@ function MeetingDetails({
             {isRunning ? (
               <>
                 <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-                Агент работает…
+                Подбираем слот…
               </>
             ) : (
-              "Запустить агента"
+              "Выбрать слот"
             )}
           </button>
           {detail.status === "НеСогласована" ? (
@@ -578,17 +578,15 @@ function MeetingDetails({
               title={
                 canAutoApprove
                   ? undefined
-                  : "Автосогласование доступно, когда выполнены все пункты СТО"
+                  : "Согласование доступно, когда выполнены все пункты СТО"
               }
             >
-              Согласовать автоматически
+              Согласовать
             </button>
           ) : null}
-          <button type="button" className={styles.secondaryButton}>Выбрать слот</button>
-        </div>
-        <div className={styles.tertiaryRow}>
-          <button type="button" className={styles.ghostButton}>Вернуть инициатору</button>
-          <button type="button" className={styles.ghostButton}>Отклонить по СТО</button>
+          <button type="button" className={styles.rejectButton} disabled={isRunning}>
+            Отклонить
+          </button>
         </div>
         <p className={styles.footerNote}>
           После подтверждения агент создаст событие в Outlook и обновит 1С ERP.
