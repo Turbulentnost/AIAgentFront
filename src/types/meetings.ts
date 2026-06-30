@@ -18,6 +18,8 @@ export interface MeetingDashboardItem {
   subject: string | null;
   comment: string | null;
   location: string | null;
+  initiator?: MeetingPerson | null;
+  manager?: MeetingPerson | null;
 }
 
 export interface MeetingLoginContext {
@@ -59,6 +61,18 @@ export interface MeetingValidationCheck {
   passed: boolean;
 }
 
+export interface MeetingStoChecklistItem {
+  field: string;
+  label: string;
+  passed: boolean;
+  message: string;
+}
+
+export interface MeetingStoIssue {
+  field: string;
+  message: string;
+}
+
 export interface MeetingHistoryEvent {
   timestamp: string;
   message: string;
@@ -93,6 +107,10 @@ export interface MeetingMemoDetail {
   warnings: string[];
   history: MeetingHistoryEvent[];
   agent_recommendation: string | null;
+  sto_ready?: boolean;
+  auto_approve_allowed?: boolean;
+  sto_checklist?: MeetingStoChecklistItem[];
+  sto_issues?: MeetingStoIssue[];
 }
 
 export interface MeetingSlot {

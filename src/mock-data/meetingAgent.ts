@@ -118,7 +118,7 @@ export const meetingRequestDetails: MeetingRequestDetails = {
   id: "000154",
   code: "СЗ №000154",
   title: "Запрос на совещание УД",
-  statusLabel: "Ожидает подтверждения УД",
+  statusLabel: "Не согласована",
   initiator: "Иванов И.И.",
   manager: "Петров П.П.",
   participants: 8,

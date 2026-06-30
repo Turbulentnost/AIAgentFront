@@ -1632,6 +1632,8 @@ export type {
   MeetingAttendee,
   MeetingSlot,
   MeetingSlotsRequest,
+  MeetingStoChecklistItem,
+  MeetingStoIssue,
   MeetingValidationCheck
 } from "./meetings";
 

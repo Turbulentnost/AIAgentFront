@@ -2,14 +2,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  CalendarDays,
   CheckCircle2,
   Clock3,
   History,
   Loader2,
   RefreshCw
 } from "lucide-react";
-import { meetingCalendarRows, meetingQueueTabs, type MeetingQueueTab } from "@/mock-data/meetingAgent";
 import {
   formatMeetingIntegrationError,
   getMeetingRequestError,
@@ -23,28 +21,27 @@ import {
   useMeetingAgentSlotApprove,
   useMeetingAgentSlotPreview,
   useMeetingMemoDetail,
-  useMeetingRunResult,
-  useMeetingSlots
+  useMeetingRunResult
 } from "@/hooks/useMeetingMemoDetail";
 import MeetingAgentSlotPreviewModal from "@/pages/MeetingAgentSlotPreviewModal";
-import type { MeetingDashboardItem, MeetingLoginContext, MeetingMemoDetail } from "@/types/meetings";
+import type { MeetingDashboardItem, MeetingMemoDetail } from "@/types/meetings";
 import {
   buildMeetingStats,
-  filterMeetingItems,
+  canAutoApproveMeetingMemo,
+  countPassedStoChecklist,
+  mergeMeetingItems,
   formatMeetingDate,
   formatMeetingDateTime,
-  formatMeetingSlot,
-  formatMeetingTime,
   getMeetingItemCode,
-  getMeetingItemDate,
   getMeetingItemId,
-  getMeetingItemTags,
-  getMeetingItemTitle,
+  getMeetingPersonName,
+  getMeetingScheduledLabel,
+  getMeetingTheme,
   getMeetingParticipantNames,
   getMeetingStatusLabel,
+  getMeetingStatusTone,
   getMemoRefKey,
-  isMeetingRunActive,
-  isTodayQueueItem
+  isMeetingRunActive
 } from "@/utils/meetingDashboard";
 import styles from "./MeetingAgent.module.css";
 
@@ -54,7 +51,6 @@ export default function MeetingAgent() {
   const canAccessAgent = permissionsQuery.data?.can_access_agent ?? false;
   const dashboardQuery = useMeetingDashboard(canAccessAgent);
   const refreshDashboard = useRefreshMeetingDashboard();
-  const [queueTab, setQueueTab] = useState<MeetingQueueTab>("all");
   const [selectedId, setSelectedId] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -65,8 +61,8 @@ export default function MeetingAgent() {
 
   const dashboard = dashboardQuery.data;
   const queueItems = useMemo(
-    () => (dashboard ? filterMeetingItems(dashboard, queueTab) : []),
-    [dashboard, queueTab]
+    () => (dashboard ? mergeMeetingItems(dashboard.unapproved, dashboard.today) : []),
+    [dashboard]
   );
   const stats = useMemo(() => (dashboard ? buildMeetingStats(dashboard) : []), [dashboard]);
 
@@ -77,18 +73,6 @@ export default function MeetingAgent() {
   const detailQuery = useMeetingMemoDetail(selectedRefKey, canAccessAgent, forceMemoRefresh);
   const detail = detailQuery.data;
 
-  const slotsPayload = useMemo(() => {
-    if (!selectedRefKey || !detail) return null;
-    const participantNames = getMeetingParticipantNames(detail.application, selectedItem);
-    return {
-      memo_ref_key: selectedRefKey,
-      memo_number: detail.number,
-      duration_minutes: detail.application.duration_minutes ?? 30,
-      participant_fio: participantNames
-    };
-  }, [detail, selectedItem, selectedRefKey]);
-
-  const slotsQuery = useMeetingSlots(slotsPayload, Boolean(detail));
   const createRun = useCreateMeetingRun();
   const slotPreviewMutation = useMeetingAgentSlotPreview();
   const approveSlotMutation = useMeetingAgentSlotApprove();
@@ -268,9 +252,9 @@ export default function MeetingAgent() {
     : null;
 
   const recommendation =
-    runQuery.data?.summary ||
     detail?.agent_recommendation ||
-    "Запустите агента для полного анализа заявки.";
+    runQuery.data?.summary ||
+    "Откройте заявку для проверки условий СТО.";
 
   return (
     <section className={styles.page} aria-labelledby="meeting-agent-title">
@@ -328,39 +312,18 @@ export default function MeetingAgent() {
             </button>
           </div>
 
-          <div className={styles.queueTabs} role="tablist" aria-label="Фильтр заявок">
-            {meetingQueueTabs.map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                role="tab"
-                aria-selected={queueTab === tab.id}
-                className={`${styles.queueTab} ${queueTab === tab.id ? styles.queueTabActive : ""}`}
-                onClick={() => setQueueTab(tab.id)}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {queueTab === "today" ? (
-            <p className={styles.queueHint}>Служебные записки с датой документа за сегодня</p>
-          ) : null}
-
           <div className={styles.queueList}>
             {queueItems.length ? (
               queueItems.map((item) => (
                 <QueueCard
                   key={getMeetingItemId(item)}
                   item={item}
-                  dashboard={dashboard}
-                  queueTab={queueTab}
                   active={selectedId === getMeetingItemId(item)}
                   onSelect={() => setSelectedId(getMeetingItemId(item))}
                 />
               ))
             ) : (
-              <div className={styles.queueEmpty}>Заявок в этой вкладке нет</div>
+              <div className={styles.queueEmpty}>Заявок в очереди нет</div>
             )}
           </div>
 
@@ -399,15 +362,6 @@ export default function MeetingAgent() {
             />
           ) : null}
         </section>
-
-        <aside className={styles.contextPanel} aria-label="Контекст заявки">
-          <MeetingContextPanel
-            slots={slotsQuery.data ?? []}
-            slotsLoading={slotsQuery.isLoading || slotsQuery.isFetching}
-            slotsError={slotsQuery.isError}
-            onRefreshSlots={() => slotsQuery.refetch()}
-          />
-        </aside>
       </div>
     </section>
   );
@@ -415,19 +369,15 @@ export default function MeetingAgent() {
 
 function QueueCard({
   item,
-  dashboard,
-  queueTab,
   active,
   onSelect
 }: {
   item: MeetingDashboardItem;
-  dashboard: MeetingLoginContext;
-  queueTab: MeetingQueueTab;
   active: boolean;
   onSelect: () => void;
 }) {
-  const preferDocumentDate = isTodayQueueItem(item, dashboard, queueTab);
-  const tags = getMeetingItemTags(item, { preferDocumentDate });
+  const statusLabel = getMeetingStatusLabel(item.status, item.status_label);
+  const statusTone = getMeetingStatusTone(item.status);
 
   return (
     <button
@@ -435,31 +385,33 @@ function QueueCard({
       className={`${styles.queueCard} ${active ? styles.queueCardActive : ""}`}
       onClick={onSelect}
     >
-      <div className={styles.queueCardTop}>
-        <strong>{getMeetingItemCode(item)}</strong>
-      </div>
-      <div className={styles.queueMeta}>
-        <span>
-          <CalendarDays size={13} aria-hidden="true" />
-          {preferDocumentDate ? "Дата документа" : "Дата совещания"}:{" "}
-          {item.scheduled_label || getMeetingItemDate(item, { preferDocumentDate })}
-          {!preferDocumentDate && !item.scheduled_label
-            ? ` · ${formatMeetingTime(item.meeting_start, item.meeting_end)}`
-            : null}
+      <div className={styles.queueCardHeader}>
+        <strong className={styles.queueCardCode}>{getMeetingItemCode(item)}</strong>
+        <span className={`${styles.queueCardStatus} ${styles[`queueCardStatus${statusTone}`]}`}>
+          {statusLabel}
         </span>
-        {typeof item.participants_count === "number" ? (
-          <span>Участников: {item.participants_count}</span>
-        ) : null}
       </div>
-      {tags.length ? (
-        <div className={styles.tagRow}>
-          {tags.map((tag) => (
-            <span className={`${styles.tag} ${styles[`tag${tag.tone}`]}`} key={tag.label}>
-              {tag.label}
-            </span>
-          ))}
+
+      <p className={styles.queueCardTheme}>{getMeetingTheme(item)}</p>
+
+      <dl className={styles.queueCardFields}>
+        <div>
+          <dt>Дата СЗ</dt>
+          <dd>{formatMeetingDate(item.document_date)}</dd>
         </div>
-      ) : null}
+        <div>
+          <dt>Дата совещания</dt>
+          <dd>{getMeetingScheduledLabel(item)}</dd>
+        </div>
+        <div>
+          <dt>Инициатор</dt>
+          <dd>{getMeetingPersonName(item.initiator, { short: true })}</dd>
+        </div>
+        <div>
+          <dt>Руководитель</dt>
+          <dd>{getMeetingPersonName(item.manager, { short: true })}</dd>
+        </div>
+      </dl>
     </button>
   );
 }
@@ -471,7 +423,8 @@ function MeetingDetails({
   runStatus,
   runError,
   isRunning,
-  onLaunchAgent
+  onLaunchAgent,
+  onAutoApprove
 }: {
   detail: MeetingMemoDetail;
   queueItem: MeetingDashboardItem | null;
@@ -480,9 +433,13 @@ function MeetingDetails({
   runError?: string | null;
   isRunning: boolean;
   onLaunchAgent: () => void;
+  onAutoApprove?: () => void;
 }) {
   const application = detail.application;
   const participantNames = getMeetingParticipantNames(application, queueItem);
+  const stoChecklist = detail.sto_checklist ?? [];
+  const stoPassedCount = countPassedStoChecklist(detail);
+  const canAutoApprove = canAutoApproveMeetingMemo(detail);
 
   return (
     <>
@@ -524,29 +481,51 @@ function MeetingDetails({
       </div>
 
       <div className={styles.section}>
-        <h3>Проверки агента</h3>
-        <ul className={styles.checkList}>
-          {detail.validation_checks.length ? (
-            detail.validation_checks.map((check) => (
+        <div className={styles.sectionHead}>
+          <h3>Чек-лист СТО</h3>
+          <span
+            className={`${styles.checklistSummary} ${detail.sto_ready ? styles.checklistSummaryReady : ""}`}
+          >
+            {stoPassedCount} из {stoChecklist.length}
+            {detail.sto_ready ? " · СТО выполнен" : ""}
+          </span>
+        </div>
+        <p className={styles.checklistIntro}>
+          Обязательные условия служебной записки на совещание согласно СТО.
+        </p>
+        {stoChecklist.length ? (
+          <ul className={styles.checkList}>
+            {stoChecklist.map((item) => (
               <li
-                className={`${styles.checkItem} ${styles[checkToneClass(check.passed, check.severity)]}`}
-                key={`${check.field}-${check.label}`}
+                className={`${styles.checkItem} ${styles[item.passed ? "checksuccess" : "checkerror"]}`}
+                key={item.field}
               >
-                {check.passed ? (
+                {item.passed ? (
                   <CheckCircle2 size={16} aria-hidden="true" />
                 ) : (
                   <AlertTriangle size={16} aria-hidden="true" />
                 )}
-                <span>{check.label}</span>
+                <span className={styles.checkItemBody}>
+                  <span>{item.label}</span>
+                  {!item.passed && item.message ? (
+                    <span className={styles.checkItemHint}>{item.message}</span>
+                  ) : null}
+                </span>
               </li>
-            ))
-          ) : (
-            <li className={`${styles.checkItem} ${styles.checksuccess}`}>
-              <CheckCircle2 size={16} aria-hidden="true" />
-              <span>Данные загружены из 1С ERP</span>
-            </li>
-          )}
-        </ul>
+            ))}
+          </ul>
+        ) : (
+          <p className={styles.inlineMuted}>Чек-лист СТО не загружен. Обновите карточку заявки.</p>
+        )}
+        {detail.sto_issues?.length ? (
+          <ul className={styles.stoIssuesList} aria-label="Невыполненные пункты СТО">
+            {detail.sto_issues.map((issue) => (
+              <li className={styles.stoIssueItem} key={issue.field}>
+                {issue.message}
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </div>
 
       <div className={styles.section}>
@@ -590,6 +569,21 @@ function MeetingDetails({
               "Запустить агента"
             )}
           </button>
+          {detail.status === "НеСогласована" ? (
+            <button
+              type="button"
+              className={styles.secondaryButton}
+              disabled={!canAutoApprove || isRunning}
+              onClick={onAutoApprove}
+              title={
+                canAutoApprove
+                  ? undefined
+                  : "Автосогласование доступно, когда выполнены все пункты СТО"
+              }
+            >
+              Согласовать автоматически
+            </button>
+          ) : null}
           <button type="button" className={styles.secondaryButton}>Выбрать слот</button>
         </div>
         <div className={styles.tertiaryRow}>
@@ -602,82 +596,4 @@ function MeetingDetails({
       </div>
     </>
   );
-}
-
-function MeetingContextPanel({
-  slots,
-  slotsLoading,
-  slotsError,
-  onRefreshSlots
-}: {
-  slots: { start: string; end: string; confidence: number }[];
-  slotsLoading: boolean;
-  slotsError: boolean;
-  onRefreshSlots: () => void;
-}) {
-  return (
-    <>
-      <div className={styles.section}>
-        <h3>Календарная проверка</h3>
-        <p className={styles.inlineMuted}>
-          Превью календаря появится после подключения Outlook в ответе /detail.
-        </p>
-        <div className={styles.calendarHead}>
-          <span>10:00</span>
-          <span>10:30</span>
-        </div>
-        <div className={styles.calendarLegend}>
-          <span><i className={styles.legendFree} /> Свободно</span>
-          <span><i className={styles.legendBusy} /> Занято</span>
-          <span><i className={styles.legendUnknown} /> Нет данных</span>
-        </div>
-        <div className={styles.calendarGrid}>
-          {meetingCalendarRows.map((row) => (
-            <div className={styles.calendarRow} key={row.id}>
-              <span className={styles.calendarLabel}>{row.label}</span>
-              <div className={styles.calendarTrack}>
-                {row.segments.map((segment, index) => (
-                  <span
-                    className={`${styles.calendarSegment} ${styles[`segment${segment.tone}`]}`}
-                    key={`${row.id}-${index}`}
-                    style={{ left: `${segment.start}%`, width: `${segment.end - segment.start}%` }}
-                  />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className={styles.section}>
-        <div className={styles.panelHead}>
-          <h3>Альтернативные слоты</h3>
-          <button type="button" className={styles.refreshButton} onClick={onRefreshSlots} aria-label="Обновить слоты">
-            <RefreshCw size={15} aria-hidden="true" />
-          </button>
-        </div>
-        {slotsLoading ? (
-          <p className={styles.inlineMuted}>Подбираем слоты…</p>
-        ) : slotsError ? (
-          <p className={styles.inlineMuted}>Не удалось загрузить альтернативные слоты</p>
-        ) : slots.length ? (
-          <div className={styles.slotRow}>
-            {slots.map((slot) => (
-              <button type="button" className={styles.slotButton} key={`${slot.start}-${slot.end}`}>
-                {formatMeetingSlot(slot)}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className={styles.inlineMuted}>Свободные слоты не найдены</p>
-        )}
-      </div>
-    </>
-  );
-}
-
-function checkToneClass(passed: boolean, severity: string): "checksuccess" | "checkwarning" | "checkerror" {
-  if (passed) return "checksuccess";
-  if (severity === "error") return "checkerror";
-  return "checkwarning";
 }

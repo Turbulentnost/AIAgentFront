@@ -1,4 +1,4 @@
-import type { MeetingApplication, MeetingDashboardItem, MeetingLoginContext } from "@/types/meetings";
+import type { MeetingApplication, MeetingDashboardItem, MeetingLoginContext, MeetingMemoDetail } from "@/types/meetings";
 import type { MeetingQueueTab } from "@/mock-data/meetingAgent";
 
 export function getMeetingItemId(item: MeetingDashboardItem): string {
@@ -32,6 +32,42 @@ export function formatMeetingTime(
   if (!start && !end) return "—";
   if (start && end) return `${start}–${end}`;
   return start ?? end ?? "—";
+}
+
+export function formatShortPersonName(fullName?: string | null): string {
+  const trimmed = fullName?.trim();
+  if (!trimmed) return "—";
+  const parts = trimmed.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0];
+  const [lastName, ...rest] = parts;
+  const initials = rest.map((part) => `${part.charAt(0).toUpperCase()}.`).join("");
+  return `${lastName} ${initials}`.trim();
+}
+
+export function getMeetingPersonName(
+  person: { full_name?: string | null } | null | undefined,
+  options: { short?: boolean } = {}
+): string {
+  const fullName = person?.full_name?.trim();
+  if (!fullName) return "—";
+  return options.short ? formatShortPersonName(fullName) : fullName;
+}
+
+export function getMeetingScheduledLabel(item: MeetingDashboardItem): string {
+  if (item.scheduled_label?.trim()) return item.scheduled_label.trim();
+  if (item.meeting_start) {
+    if (item.meeting_end) {
+      return formatMeetingSlot({ start: item.meeting_start, end: item.meeting_end });
+    }
+    return formatMeetingDateTime(item.meeting_start);
+  }
+  const date = formatMeetingDate(item.meeting_date ?? item.desired_meeting_date);
+  return date !== "—" ? date : "—";
+}
+
+export function getMeetingTheme(item: MeetingDashboardItem): string {
+  const theme = item.title?.trim() || item.subject?.trim();
+  return theme || "—";
 }
 
 export function getMeetingItemTitle(item: MeetingDashboardItem): string {
@@ -82,10 +118,10 @@ export function getMeetingStatusLabel(
   status: string | null | undefined,
   statusLabel?: string | null
 ): string {
-  if (statusLabel?.trim()) return statusLabel.trim();
-  if (!status) return "Без статуса";
   if (status === "НеСогласована") return "Не согласована";
   if (status === "Согласована") return "Согласована";
+  if (statusLabel?.trim()) return statusLabel.trim();
+  if (!status) return "Без статуса";
   return status;
 }
 
@@ -207,4 +243,12 @@ export function buildMeetingStats(context: MeetingLoginContext) {
     { id: "total", label: "Всего в очереди", value: totalCount, tone: "blue" as const },
     { id: "errors", label: "Ошибки интеграции", value: context.error ? 1 : 0, tone: "red" as const }
   ];
+}
+
+export function canAutoApproveMeetingMemo(detail: MeetingMemoDetail): boolean {
+  return Boolean(detail.auto_approve_allowed && detail.status === "НеСогласована");
+}
+
+export function countPassedStoChecklist(detail: MeetingMemoDetail): number {
+  return (detail.sto_checklist ?? []).filter((item) => item.passed).length;
 }
