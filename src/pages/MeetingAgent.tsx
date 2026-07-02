@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import {
   formatMeetingIntegrationError,
+  getMeetingMemoActionError,
   getMeetingRequestError,
   isMeetingDashboardForbidden,
   useMeetingDashboard,
@@ -20,16 +21,23 @@ import {
   useCreateMeetingRun,
   useMeetingAgentSlotApprove,
   useMeetingAgentSlotPreview,
+  useMeetingMemoApprove,
   useMeetingMemoDetail,
+  useMeetingMemoReject,
   useMeetingRunResult
 } from "@/hooks/useMeetingMemoDetail";
+import MeetingAgentRegistry from "@/pages/MeetingAgentRegistry";
+import MeetingAgentRejectModal from "@/pages/MeetingAgentRejectModal";
 import MeetingAgentSlotPreviewModal from "@/pages/MeetingAgentSlotPreviewModal";
 import type { MeetingDashboardItem, MeetingMemoDetail } from "@/types/meetings";
 import {
   buildMeetingStats,
-  canAutoApproveMeetingMemo,
+  buildMeetingQueueFilterCounts,
+  canShowMeetingMemoDecisionActions,
   countPassedStoChecklist,
-  mergeMeetingItems,
+  filterMeetingQueueItems,
+  getMeetingQueueEmptyMessage,
+  meetingQueueFilters,
   formatMeetingDate,
   formatMeetingDateTime,
   getMeetingItemCode,
@@ -41,9 +49,14 @@ import {
   getMeetingStatusLabel,
   getMeetingStatusTone,
   getMemoRefKey,
-  isMeetingRunActive
+  isMeetingRunActive,
+  normalizeOutlookMeetingUrl,
+  resolveMeetingSlotPreview,
+  type MeetingQueueFilter
 } from "@/utils/meetingDashboard";
 import styles from "./MeetingAgent.module.css";
+
+type MeetingPageTab = "queue" | "registry";
 
 export default function MeetingAgent() {
   const queryClient = useQueryClient();
@@ -51,17 +64,25 @@ export default function MeetingAgent() {
   const canAccessAgent = permissionsQuery.data?.can_access_agent ?? false;
   const dashboardQuery = useMeetingDashboard(canAccessAgent);
   const refreshDashboard = useRefreshMeetingDashboard();
+  const [queueFilter, setQueueFilter] = useState<MeetingQueueFilter>("unapproved");
   const [selectedId, setSelectedId] = useState("");
   const [activeRunId, setActiveRunId] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [forceMemoRefresh, setForceMemoRefresh] = useState(false);
   const [slotPreviewOpen, setSlotPreviewOpen] = useState(false);
-  const [approveSuccessMessage, setApproveSuccessMessage] = useState<string | null>(null);
+  const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [outlookMeetingUrl, setOutlookMeetingUrl] = useState<string | null>(null);
+  const [pageTab, setPageTab] = useState<MeetingPageTab>("queue");
 
   const dashboard = dashboardQuery.data;
   const queueItems = useMemo(
-    () => (dashboard ? mergeMeetingItems(dashboard.unapproved, dashboard.today) : []),
+    () => (dashboard ? filterMeetingQueueItems(dashboard, queueFilter) : []),
+    [dashboard, queueFilter]
+  );
+  const queueFilterCounts = useMemo(
+    () => (dashboard ? buildMeetingQueueFilterCounts(dashboard) : null),
     [dashboard]
   );
   const stats = useMemo(() => (dashboard ? buildMeetingStats(dashboard) : []), [dashboard]);
@@ -76,6 +97,8 @@ export default function MeetingAgent() {
   const createRun = useCreateMeetingRun();
   const slotPreviewMutation = useMeetingAgentSlotPreview();
   const approveSlotMutation = useMeetingAgentSlotApprove();
+  const approveMemoMutation = useMeetingMemoApprove();
+  const rejectMemoMutation = useMeetingMemoReject();
   const runQuery = useMeetingRunResult(activeRunId);
 
   useEffect(() => {
@@ -189,8 +212,10 @@ export default function MeetingAgent() {
 
   async function handleLaunchAgent() {
     if (!detail?.ref_key || slotPreviewMutation.isPending) return;
-    setApproveSuccessMessage(null);
+    setSuccessMessage(null);
+    setOutlookMeetingUrl(null);
     approveSlotMutation.reset();
+    approveMemoMutation.reset();
     setSlotPreviewOpen(true);
     slotPreviewMutation.reset();
     try {
@@ -204,42 +229,142 @@ export default function MeetingAgent() {
   }
 
   function handleCloseSlotPreview() {
-    if (approveSlotMutation.isPending) return;
+    if (approveSlotMutation.isPending || approveMemoMutation.isPending) return;
     setSlotPreviewOpen(false);
     slotPreviewMutation.reset();
     approveSlotMutation.reset();
+    approveMemoMutation.reset();
   }
 
   async function handleConfirmApprove() {
     const preview = slotPreviewMutation.data;
-    if (!detail?.ref_key || !preview?.slot || approveSlotMutation.isPending) return;
+    const slot = preview ? resolveMeetingSlotPreview(preview) : null;
+    const shouldApproveMemoFirst = queueFilter === "unapproved";
+    if (
+      !detail?.ref_key ||
+      !preview ||
+      !slot ||
+      approveSlotMutation.isPending ||
+      approveMemoMutation.isPending
+    ) {
+      return;
+    }
 
     approveSlotMutation.reset();
+    approveMemoMutation.reset();
     try {
+      let memoMessage: string | null = null;
+      if (shouldApproveMemoFirst) {
+        const memoResult = await approveMemoMutation.mutateAsync({
+          memoRefKey: detail.ref_key
+        });
+        memoMessage = memoResult.message?.trim() || null;
+      }
+
       const result = await approveSlotMutation.mutateAsync({
         memoRefKey: detail.ref_key,
         payload: {
-          slot_start: preview.slot.start,
-          slot_end: preview.slot.end,
+          slot_start: slot.start,
+          slot_end: slot.end,
           subject: detail.title || detail.application.agenda || undefined,
-          location: detail.application.location || undefined,
+          location:
+            detail.application.invite_location ||
+            detail.application.location ||
+            undefined,
           attendees: preview.attendees
         }
       });
       setSlotPreviewOpen(false);
       slotPreviewMutation.reset();
       approveSlotMutation.reset();
-      setApproveSuccessMessage(
-        result.sent
-          ? `Приглашение отправлено: ${result.slot_label}${result.subject ? ` · ${result.subject}` : ""}`
-          : `Слот утверждён: ${result.slot_label}`
+      approveMemoMutation.reset();
+
+      const slotMessage = result.sent
+        ? `Приглашение отправлено: ${result.slot_label}${result.subject ? ` · ${result.subject}` : ""}`
+        : `Слот утверждён: ${result.slot_label}`;
+      setSuccessMessage(memoMessage ? `${memoMessage} · ${slotMessage}` : slotMessage);
+      setOutlookMeetingUrl(normalizeOutlookMeetingUrl(result.outlook_meeting_url));
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", detail.ref_key] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings", "registry"] })
+      ]);
+    } catch {
+      // error surfaced in modal
+    }
+  }
+
+  async function handleApproveMemo() {
+    if (!detail?.ref_key || approveMemoMutation.isPending) return;
+
+    setSuccessMessage(null);
+    setOutlookMeetingUrl(null);
+    approveMemoMutation.reset();
+    try {
+      const result = await approveMemoMutation.mutateAsync({
+        memoRefKey: detail.ref_key
+      });
+      setSuccessMessage(
+        result.message?.trim() || (
+          result.already_approved
+            ? `${result.number ? `СЗ №${result.number}` : "Служебная записка"} уже согласована`
+            : `${result.number ? `СЗ №${result.number}` : "Служебная записка"} согласована`
+        )
       );
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
         queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", detail.ref_key] })
       ]);
     } catch {
-      // approve error surfaced in modal
+      // error surfaced in MeetingDetails
+    }
+  }
+
+  function handleOpenRejectModal() {
+    if (!detail?.ref_key || rejectMemoMutation.isPending) return;
+    setSuccessMessage(null);
+    setOutlookMeetingUrl(null);
+    rejectMemoMutation.reset();
+    setRejectModalOpen(true);
+  }
+
+  function handleCloseRejectModal() {
+    if (rejectMemoMutation.isPending) return;
+    setRejectModalOpen(false);
+    rejectMemoMutation.reset();
+  }
+
+  async function handleConfirmReject(payload: { reason: string; notifyInitiator: boolean }) {
+    if (!detail?.ref_key || rejectMemoMutation.isPending) return;
+
+    rejectMemoMutation.reset();
+    try {
+      const result = await rejectMemoMutation.mutateAsync({
+        memoRefKey: detail.ref_key,
+        payload: {
+          reason: payload.reason,
+          notify_initiator: payload.notifyInitiator
+        }
+      });
+      setRejectModalOpen(false);
+      rejectMemoMutation.reset();
+
+      setOutlookMeetingUrl(null);
+      setSuccessMessage(result.message?.trim() || (
+        result.already_rejected
+          ? `${result.number ? `СЗ №${result.number}` : "Служебная записка"} уже была отклонена`
+          : `${result.number ? `СЗ №${result.number}` : "Служебная записка"} отклонена${
+              result.notification_sent ? " · инициатор уведомлён" : ""
+            }`
+      ));
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", detail.ref_key] })
+      ]);
+    } catch {
+      // mutation error surfaced in modal
     }
   }
 
@@ -247,9 +372,23 @@ export default function MeetingAgent() {
     ? getMeetingRequestError(slotPreviewMutation.error)
     : null;
 
-  const approveRequestError = approveSlotMutation.isError
-    ? getMeetingRequestError(approveSlotMutation.error)
+  const approveRequestError = approveMemoMutation.isError
+    ? getMeetingMemoActionError(approveMemoMutation.error)
+    : approveSlotMutation.isError
+      ? getMeetingRequestError(approveSlotMutation.error)
+      : null;
+
+  const rejectRequestError = rejectMemoMutation.isError
+    ? getMeetingMemoActionError(rejectMemoMutation.error)
     : null;
+
+  const approveMemoError = approveMemoMutation.isError
+    ? getMeetingMemoActionError(approveMemoMutation.error)
+    : null;
+
+  const rejectMemoLabel = detail?.number
+    ? `СЗ №${detail.number}${detail.title ? ` · ${detail.title}` : ""}`
+    : detail?.title || "Служебная записка";
 
   const recommendation =
     detail?.agent_recommendation ||
@@ -266,12 +405,31 @@ export default function MeetingAgent() {
         approveError={approveRequestError}
         onClose={handleCloseSlotPreview}
         onConfirmApprove={() => void handleConfirmApprove()}
-        isApproving={approveSlotMutation.isPending}
+        isApproving={approveSlotMutation.isPending || approveMemoMutation.isPending}
+        approveWithMemo={queueFilter === "unapproved"}
       />
-      {approveSuccessMessage ? (
+      <MeetingAgentRejectModal
+        open={rejectModalOpen}
+        memoLabel={rejectMemoLabel}
+        loading={rejectMemoMutation.isPending}
+        error={rejectRequestError}
+        onClose={handleCloseRejectModal}
+        onConfirm={(payload) => void handleConfirmReject(payload)}
+      />
+      {successMessage ? (
         <div className={styles.successBanner} role="status">
           <CheckCircle2 size={16} aria-hidden="true" />
-          <span>{approveSuccessMessage}</span>
+          <span className={styles.successBannerText}>{successMessage}</span>
+          {outlookMeetingUrl ? (
+            <a
+              className={styles.successBannerOutlookButton}
+              href={outlookMeetingUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Открыть в Outlook
+            </a>
+          ) : null}
         </div>
       ) : null}
       {refreshError ? (
@@ -288,6 +446,31 @@ export default function MeetingAgent() {
         </div>
       ) : null}
 
+      <div className={styles.pageTabs} role="tablist" aria-label="Разделы агента совещаний">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pageTab === "queue"}
+          className={`${styles.pageTab} ${pageTab === "queue" ? styles.pageTabActive : ""}`}
+          onClick={() => setPageTab("queue")}
+        >
+          Рабочая очередь
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pageTab === "registry"}
+          className={`${styles.pageTab} ${pageTab === "registry" ? styles.pageTabActive : ""}`}
+          onClick={() => setPageTab("registry")}
+        >
+          Реестр совещаний
+        </button>
+      </div>
+
+      {pageTab === "registry" ? (
+        <MeetingAgentRegistry canAccessAgent={canAccessAgent} />
+      ) : (
+        <>
       <div className={styles.statsRow} aria-label="Сводка по заявкам">
         {stats.map((stat) => (
           <article className={styles.statCard} key={stat.id}>
@@ -312,6 +495,21 @@ export default function MeetingAgent() {
             </button>
           </div>
 
+          <div className={styles.queueTabs} role="tablist" aria-label="Фильтр заявок">
+            {meetingQueueFilters.map((filter) => (
+              <button
+                key={filter.id}
+                type="button"
+                role="tab"
+                aria-selected={queueFilter === filter.id}
+                className={`${styles.queueTab} ${queueFilter === filter.id ? styles.queueTabActive : ""}`}
+                onClick={() => setQueueFilter(filter.id)}
+              >
+                {filter.label} — {queueFilterCounts?.[filter.id] ?? 0}
+              </button>
+            ))}
+          </div>
+
           <div className={styles.queueList}>
             {queueItems.length ? (
               queueItems.map((item) => (
@@ -323,7 +521,7 @@ export default function MeetingAgent() {
                 />
               ))
             ) : (
-              <div className={styles.queueEmpty}>Заявок в очереди нет</div>
+              <div className={styles.queueEmpty}>{getMeetingQueueEmptyMessage(queueFilter)}</div>
             )}
           </div>
 
@@ -356,13 +554,22 @@ export default function MeetingAgent() {
               isRunning={
                 createRun.isPending ||
                 isMeetingRunActive(runQuery.data?.status) ||
-                slotPreviewMutation.isPending
+                slotPreviewMutation.isPending ||
+                rejectMemoMutation.isPending ||
+                approveMemoMutation.isPending
               }
+              isRejecting={rejectMemoMutation.isPending}
+              isApproving={approveMemoMutation.isPending}
+              approveError={approveMemoError}
               onLaunchAgent={() => void handleLaunchAgent()}
+              onAutoApprove={() => void handleApproveMemo()}
+              onReject={() => handleOpenRejectModal()}
             />
           ) : null}
         </section>
       </div>
+        </>
+      )}
     </section>
   );
 }
@@ -397,7 +604,7 @@ function QueueCard({
       <dl className={styles.queueCardFields}>
         <div>
           <dt>Дата СЗ</dt>
-          <dd>{formatMeetingDate(item.document_date)}</dd>
+          <dd>{formatMeetingDateTime(item.document_date)}</dd>
         </div>
         <div>
           <dt>Дата совещания</dt>
@@ -405,11 +612,15 @@ function QueueCard({
         </div>
         <div>
           <dt>Инициатор</dt>
-          <dd>{getMeetingPersonName(item.initiator, { short: true })}</dd>
+          <dd className={styles.queueCardFieldPerson}>
+            {getMeetingPersonName(item.initiator, { short: true })}
+          </dd>
         </div>
         <div>
           <dt>Руководитель</dt>
-          <dd>{getMeetingPersonName(item.manager, { short: true })}</dd>
+          <dd className={styles.queueCardFieldPerson}>
+            {getMeetingPersonName(item.manager, { short: true })}
+          </dd>
         </div>
       </dl>
     </button>
@@ -423,8 +634,12 @@ function MeetingDetails({
   runStatus,
   runError,
   isRunning,
+  isRejecting = false,
+  isApproving = false,
+  approveError,
   onLaunchAgent,
-  onAutoApprove
+  onAutoApprove,
+  onReject
 }: {
   detail: MeetingMemoDetail;
   queueItem: MeetingDashboardItem | null;
@@ -432,14 +647,22 @@ function MeetingDetails({
   runStatus?: string;
   runError?: string | null;
   isRunning: boolean;
+  isRejecting?: boolean;
+  isApproving?: boolean;
+  approveError?: string | null;
   onLaunchAgent: () => void;
   onAutoApprove?: () => void;
+  onReject?: () => void;
 }) {
   const application = detail.application;
   const participantNames = getMeetingParticipantNames(application, queueItem);
   const stoChecklist = detail.sto_checklist ?? [];
   const stoPassedCount = countPassedStoChecklist(detail);
-  const canAutoApprove = canAutoApproveMeetingMemo(detail);
+  const visibleStatus = getMeetingStatusLabel(
+    queueItem?.status ?? detail.status,
+    queueItem?.status_label ?? detail.status_label
+  );
+  const canShowDecisionActions = canShowMeetingMemoDecisionActions(detail, queueItem);
 
   return (
     <>
@@ -449,9 +672,7 @@ function MeetingDetails({
             {detail.number ? `СЗ №${detail.number}` : "Служебная записка"} · {detail.title || "Заявка на совещание"}
           </h2>
         </div>
-        <span className={styles.statusBadge}>
-          {getMeetingStatusLabel(detail.status, detail.status_label)}
-        </span>
+        <span className={styles.statusBadge}>{visibleStatus}</span>
       </header>
 
       <div className={styles.section}>
@@ -471,7 +692,10 @@ function MeetingDetails({
             <dt>Длительность</dt>
             <dd>{application.duration_minutes ? `${application.duration_minutes} мин` : "—"}</dd>
           </div>
-          <div><dt>Место</dt><dd>{application.location ?? "—"}</dd></div>
+          <div>
+            <dt>Место</dt>
+            <dd>{application.invite_location ?? application.location ?? "—"}</dd>
+          </div>
           <div>
             <dt>Тип совещания</dt>
             <dd>{application.meeting_type_label ?? application.meeting_type ?? "—"}</dd>
@@ -569,25 +793,43 @@ function MeetingDetails({
               "Выбрать слот"
             )}
           </button>
-          {detail.status === "НеСогласована" ? (
-            <button
-              type="button"
-              className={styles.secondaryButton}
-              disabled={!canAutoApprove || isRunning}
-              onClick={onAutoApprove}
-              title={
-                canAutoApprove
+          <button
+            type="button"
+            className={styles.secondaryButton}
+            disabled={isRunning || !canShowDecisionActions}
+            onClick={onAutoApprove}
+            title={
+              canShowDecisionActions
+                ? detail.sto_ready
                   ? undefined
-                  : "Согласование доступно, когда выполнены все пункты СТО"
-              }
-            >
-              Согласовать
-            </button>
-          ) : null}
-          <button type="button" className={styles.rejectButton} disabled={isRunning}>
+                  : "Не все пункты СТО выполнены — бэкенд может отклонить согласование"
+                : `СЗ уже ${visibleStatus.toLowerCase()}`
+            }
+          >
+            {isApproving ? (
+              <>
+                <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                Согласуем…
+              </>
+            ) : (
+              "Согласовать"
+            )}
+          </button>
+          <button
+            type="button"
+            className={styles.rejectButton}
+            disabled={isRunning || isRejecting || !canShowDecisionActions}
+            onClick={onReject}
+            title={canShowDecisionActions ? undefined : `СЗ уже ${visibleStatus.toLowerCase()}`}
+          >
             Отклонить
           </button>
         </div>
+        {approveError ? (
+          <p className={styles.runError} role="alert">
+            {approveError}
+          </p>
+        ) : null}
         <p className={styles.footerNote}>
           После подтверждения агент создаст событие в Outlook и обновит 1С ERP.
         </p>

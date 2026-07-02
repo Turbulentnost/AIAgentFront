@@ -1,5 +1,11 @@
 import { AlertTriangle, CheckCircle2, Loader2, X } from "lucide-react";
 import type { MeetingAgentSlotPreview } from "@/types/meetings";
+import {
+  getMeetingAttendeeRoleLabel,
+  resolveMeetingSlotPreview,
+  resolveMeetingSlotPreviewDuration,
+  resolveMeetingSlotPreviewLabel
+} from "@/utils/meetingDashboard";
 import styles from "./MeetingAgent.module.css";
 
 type Props = {
@@ -11,6 +17,8 @@ type Props = {
   onClose: () => void;
   onConfirmApprove?: () => void;
   isApproving?: boolean;
+  /** На вкладке «Не согласованы»: сначала согласование в 1С, затем приглашения. */
+  approveWithMemo?: boolean;
 };
 
 export default function MeetingAgentSlotPreviewModal({
@@ -21,12 +29,16 @@ export default function MeetingAgentSlotPreviewModal({
   approveError,
   onClose,
   onConfirmApprove,
-  isApproving = false
+  isApproving = false,
+  approveWithMemo = false
 }: Props) {
   if (!open) return null;
 
   const previewError = preview?.error?.trim() || null;
-  const canApprove = Boolean(preview && !previewError && !requestError && preview.slot);
+  const commonSlot = preview ? resolveMeetingSlotPreview(preview) : null;
+  const commonSlotLabel = preview ? resolveMeetingSlotPreviewLabel(preview) : null;
+  const commonSlotDuration = preview ? resolveMeetingSlotPreviewDuration(preview) : null;
+  const canApprove = Boolean(preview && !previewError && !requestError && commonSlot);
 
   return (
     <div className={styles.modalOverlay} onClick={onClose} role="presentation">
@@ -61,12 +73,12 @@ export default function MeetingAgentSlotPreviewModal({
                 <AlertTriangle size={16} aria-hidden="true" />
                 <span>{previewError}</span>
               </div>
-            ) : preview.slot_label ? (
+            ) : commonSlotLabel ? (
               <div className={styles.modalSlotHighlight}>
                 <strong>Ближайший свободный слот</strong>
-                <p>{preview.slot_label}</p>
-                {preview.duration_minutes ? (
-                  <span className={styles.modalSlotMeta}>Длительность: {preview.duration_minutes} мин</span>
+                <p>{commonSlotLabel}</p>
+                {commonSlotDuration ? (
+                  <span className={styles.modalSlotMeta}>Длительность: {commonSlotDuration} мин</span>
                 ) : null}
               </div>
             ) : null}
@@ -77,10 +89,16 @@ export default function MeetingAgentSlotPreviewModal({
                 <ul className={styles.attendeeList}>
                   {preview.attendees.map((attendee) => (
                     <li className={styles.attendeeItem} key={`${attendee.role}-${attendee.fio}`}>
-                      <span className={styles.attendeeRole}>{attendee.role_label}</span>
+                      <span className={styles.attendeeRole}>{getMeetingAttendeeRoleLabel(attendee)}</span>
                       <span className={styles.attendeeName}>{attendee.fio}</span>
                       {attendee.email ? (
                         <span className={styles.attendeeEmail}>{attendee.email}</span>
+                      ) : null}
+                      {attendee.nearest_slot_label ? (
+                        <div className={styles.attendeeSlot}>
+                          <span className={styles.attendeeSlotLabel}>Ближайший свободный слот</span>
+                          <span className={styles.attendeeSlotTime}>{attendee.nearest_slot_label}</span>
+                        </div>
                       ) : null}
                       <span
                         className={`${styles.attendeeStatus} ${
@@ -128,8 +146,10 @@ export default function MeetingAgentSlotPreviewModal({
               {isApproving ? (
                 <>
                   <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-                  Отправляем приглашения…
+                  {approveWithMemo ? "Согласуем и отправляем…" : "Отправляем приглашения…"}
                 </>
+              ) : approveWithMemo ? (
+                "Согласовать и утвердить"
               ) : (
                 "Утвердить"
               )}

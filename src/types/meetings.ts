@@ -26,9 +26,11 @@ export interface MeetingLoginContext {
   date: string;
   unapproved: MeetingDashboardItem[];
   today: MeetingDashboardItem[];
+  items?: MeetingDashboardItem[];
   counts: {
     unapproved?: number;
     today?: number;
+    items?: number;
     [key: string]: number | undefined;
   };
   fetched_at: string;
@@ -90,6 +92,7 @@ export interface MeetingApplication {
   meeting_end: string | null;
   duration_minutes: number | null;
   location: string | null;
+  invite_location?: string | null;
   meeting_type: string | null;
   meeting_type_label: string | null;
   priority: string | null;
@@ -164,18 +167,21 @@ export interface MeetingAttendee {
   fio: string;
   email: string | null;
   role: string;
-  role_label: string;
+  role_label?: string;
   found: boolean;
+  nearest_slot_start?: string | null;
+  nearest_slot_end?: string | null;
+  nearest_slot_label?: string | null;
 }
 
 export interface MeetingAgentSlotPreview {
-  memo_ref_key: string;
-  slot: MeetingSlot | null;
-  slot_label: string | null;
-  duration_minutes: number | null;
+  memo_ref_key?: string;
+  slot?: MeetingSlot | null;
+  slot_label?: string | null;
+  duration_minutes?: number | null;
   attendees: MeetingAttendee[];
-  missing_emails: string[];
-  error: string | null;
+  missing_emails?: string[];
+  error?: string | null;
 }
 
 export interface MeetingAgentSlotApproveRequest {
@@ -197,4 +203,71 @@ export interface MeetingAgentSlotApprove {
   attendees: string[];
   attendee_details: MeetingAttendee[];
   sent: boolean;
+  outlook_item_id?: string | null;
+  outlook_changekey?: string | null;
+  outlook_meeting_url?: string | null;
+}
+
+export interface MeetingMemoRejectRequest {
+  reason: string;
+  notify_initiator?: boolean;
+}
+
+export interface MeetingMemoRejectRead {
+  ref_key: string;
+  number: string | null;
+  status: string;
+  status_label?: string | null;
+  reason: string | null;
+  changed: boolean;
+  already_rejected: boolean;
+  notification_sent: boolean;
+  message?: string | null;
+}
+
+export interface MeetingMemoApproveRequest {
+  comment?: string | null;
+}
+
+export interface MeetingMemoApproveRead {
+  ref_key: string;
+  number: string | null;
+  status: string;
+  changed: boolean;
+  already_approved: boolean;
+  sto_ready: boolean;
+  message: string;
+}
+
+export type MeetingRegistryStage =
+  | "invitations_sent"
+  | "protocol_created"
+  | "protocol_conducted"
+  | "meeting_completed";
+
+export type MeetingRegistryStageFilter = MeetingRegistryStage | "all" | "approved";
+
+export interface MeetingRegistryItem {
+  ref_key: string;
+  memo_number: string | null;
+  title: string | null;
+  subject: string | null;
+  location: string | null;
+  initiator_name: string | null;
+  manager_name: string | null;
+  participants_count: number;
+  slot_start: string | null;
+  slot_end: string | null;
+  stage: MeetingRegistryStage;
+  invitations_sent_at: string;
+  approved_at: string | null;
+  protocol_number: string | null;
+  updated_at: string;
+}
+
+export interface MeetingRegistryContext {
+  items: MeetingRegistryItem[];
+  stage_counts: Record<string, number>;
+  fetched_at: string;
+  error: string | null;
 }

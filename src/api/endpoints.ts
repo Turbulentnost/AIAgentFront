@@ -95,6 +95,11 @@ import type {
   MeetingAgentSlotPreviewRequest,
   MeetingAgentSlotApprove,
   MeetingAgentSlotApproveRequest,
+  MeetingMemoRejectRead,
+  MeetingMemoRejectRequest,
+  MeetingMemoApproveRead,
+  MeetingMemoApproveRequest,
+  MeetingRegistryContext,
   MeetingSlot,
   MeetingSlotsRequest,
   PorucheniyaDashboardParams,
@@ -121,6 +126,13 @@ export const meetingsApi = {
       .then((r) => r.data),
   refreshDashboard: () =>
     longRunningApiClient.post<MeetingLoginContext>("/meetings/dashboard/refresh").then((r) => r.data),
+  getRegistry: (stage?: string) =>
+    apiClient
+      .get<MeetingRegistryContext>("/meetings/registry", {
+        params: stage ? { stage } : undefined,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
   getMemoDetail: (memoRefKey: string, options?: { forceRefresh?: boolean }) =>
     apiClient
       .get<MeetingMemoDetail>(`/meetings/memos/${memoRefKey}/detail`, {
@@ -136,6 +148,14 @@ export const meetingsApi = {
   approveSlot: (memoRefKey: string, payload: MeetingAgentSlotApproveRequest) =>
     longRunningApiClient
       .post<MeetingAgentSlotApprove>(`/meetings/memos/${memoRefKey}/agent/approve`, payload)
+      .then((r) => r.data),
+  rejectMemo: (memoRefKey: string, payload: MeetingMemoRejectRequest) =>
+    longRunningApiClient
+      .post<MeetingMemoRejectRead>(`/meetings/memos/${memoRefKey}/reject`, payload)
+      .then((r) => r.data),
+  approveMemo: (memoRefKey: string, payload?: MeetingMemoApproveRequest) =>
+    longRunningApiClient
+      .post<MeetingMemoApproveRead>(`/meetings/memos/${memoRefKey}/approve`, payload ?? {})
       .then((r) => r.data),
   createRun: (payload: MeetingRunCreate) =>
     apiClient.post<MeetingRun>("/meetings/runs", payload).then((r) => r.data),

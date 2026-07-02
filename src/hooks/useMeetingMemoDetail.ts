@@ -4,7 +4,9 @@ import { meetingsApi } from "@/api/endpoints";
 import type {
   MeetingRunCreate,
   MeetingSlotsRequest,
-  MeetingAgentSlotApproveRequest
+  MeetingAgentSlotApproveRequest,
+  MeetingMemoRejectRequest,
+  MeetingMemoApproveRequest
 } from "@/types/meetings";
 
 const RUNNING_STATUSES = new Set(["pending", "planning", "running", "waiting_human"]);
@@ -77,5 +79,29 @@ export function useMeetingAgentSlotApprove() {
       memoRefKey: string;
       payload: MeetingAgentSlotApproveRequest;
     }) => meetingsApi.approveSlot(memoRefKey, payload)
+  });
+}
+
+export function useMeetingMemoReject() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload
+    }: {
+      memoRefKey: string;
+      payload: MeetingMemoRejectRequest;
+    }) => meetingsApi.rejectMemo(memoRefKey, payload)
+  });
+}
+
+export function useMeetingMemoApprove() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload
+    }: {
+      memoRefKey: string;
+      payload?: MeetingMemoApproveRequest;
+    }) => meetingsApi.approveMemo(memoRefKey, payload)
   });
 }

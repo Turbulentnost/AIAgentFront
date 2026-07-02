@@ -1,5 +1,20 @@
-import type { MeetingApplication, MeetingDashboardItem, MeetingLoginContext, MeetingMemoDetail } from "@/types/meetings";
-import type { MeetingQueueTab } from "@/mock-data/meetingAgent";
+import type {
+  MeetingApplication,
+  MeetingAgentSlotPreview,
+  MeetingAttendee,
+  MeetingDashboardItem,
+  MeetingLoginContext,
+  MeetingMemoDetail
+} from "@/types/meetings";
+
+export type MeetingQueueFilter = "today" | "approved" | "unapproved" | "rejected";
+
+export const meetingQueueFilters: { id: MeetingQueueFilter; label: string }[] = [
+  { id: "today", label: "СЗ за сегодня" },
+  { id: "approved", label: "Согласованы" },
+  { id: "unapproved", label: "Не согласованы" },
+  { id: "rejected", label: "Отклонены" }
+];
 
 export function getMeetingItemId(item: MeetingDashboardItem): string {
   return item.ref_key ?? item.number ?? "";
@@ -95,22 +110,13 @@ export function getMeetingItemDate(
   return formatMeetingDate(item.meeting_date ?? item.desired_meeting_date ?? item.document_date);
 }
 
-export function isTodayQueueItem(
-  item: MeetingDashboardItem,
-  context: MeetingLoginContext,
-  tab: MeetingQueueTab
-): boolean {
-  if (tab === "today") return true;
-  if (tab !== "all") return false;
-  return context.today.some((todayItem) => getMeetingItemId(todayItem) === getMeetingItemId(item));
-}
-
 export function getMeetingStatusTone(
   status: string | null | undefined
 ): "blue" | "amber" | "red" | "slate" | "green" {
   if (!status) return "slate";
   if (status === "НеСогласована") return "amber";
   if (status === "Согласована") return "green";
+  if (status === "Отклонена") return "red";
   return "slate";
 }
 
@@ -120,6 +126,7 @@ export function getMeetingStatusLabel(
 ): string {
   if (status === "НеСогласована") return "Не согласована";
   if (status === "Согласована") return "Согласована";
+  if (status === "Отклонена") return "Отклонена";
   if (statusLabel?.trim()) return statusLabel.trim();
   if (!status) return "Без статуса";
   return status;
@@ -185,22 +192,67 @@ export function mergeMeetingItems(
   return merged;
 }
 
-export function filterMeetingItems(
+export function getMeetingDashboardItems(context: MeetingLoginContext): MeetingDashboardItem[] {
+  if (context.items?.length) {
+    return context.items;
+  }
+  return mergeMeetingItems(context.unapproved, context.today);
+}
+
+export function filterMeetingQueueItems(
   context: MeetingLoginContext,
-  tab: MeetingQueueTab
+  filter: MeetingQueueFilter
 ): MeetingDashboardItem[] {
-  switch (tab) {
-    case "ud":
-      return context.unapproved;
+  const items = getMeetingDashboardItems(context);
+
+  switch (filter) {
     case "today":
       return context.today;
-    case "conflicts":
-      return [];
-    case "errors":
-      return [];
+    case "approved":
+      return items.filter((item) => item.status === "Согласована");
+    case "unapproved":
+      return items.filter(
+        (item) =>
+          !isMeetingMemoApproved(item.status, item.status_label) &&
+          !isMeetingMemoRejected(item.status, item.status_label)
+      );
+    case "rejected":
+      return items.filter((item) => item.status === "Отклонена");
     default:
-      return mergeMeetingItems(context.unapproved, context.today);
+      return items;
   }
+}
+
+export function getMeetingQueueEmptyMessage(filter: MeetingQueueFilter): string {
+  switch (filter) {
+    case "today":
+      return "СЗ с датой документа за сегодня нет";
+    case "approved":
+      return "Согласованных СЗ нет";
+    case "unapproved":
+      return "Не согласованных СЗ нет";
+    case "rejected":
+      return "Отклонённых СЗ нет";
+    default:
+      return "Заявок в очереди нет";
+  }
+}
+
+export function buildMeetingQueueFilterCounts(
+  context: MeetingLoginContext
+): Record<MeetingQueueFilter, number> {
+  return meetingQueueFilters.reduce(
+    (counts, filter) => {
+      counts[filter.id] = filterMeetingQueueItems(context, filter.id).length;
+      return counts;
+    },
+    {
+      today: 0,
+      approved: 0,
+      unapproved: 0,
+      rejected: 0
+    } as Record<MeetingQueueFilter, number>
+  );
 }
 
 export function getMemoRefKey(item: MeetingDashboardItem | null | undefined): string | null {
@@ -233,22 +285,192 @@ export function getMeetingParticipantNames(
 }
 
 export function buildMeetingStats(context: MeetingLoginContext) {
-  const unapprovedCount = context.counts.unapproved ?? context.unapproved.length;
-  const todayCount = context.counts.today ?? context.today.length;
-  const totalCount = mergeMeetingItems(context.unapproved, context.today).length;
+  const counts = buildMeetingQueueFilterCounts(context);
 
-  return [
-    { id: "unapproved", label: "Не согласовано", value: unapprovedCount, tone: "amber" as const },
-    { id: "today", label: "СЗ за сегодня", value: todayCount, tone: "green" as const },
-    { id: "total", label: "Всего в очереди", value: totalCount, tone: "blue" as const },
-    { id: "errors", label: "Ошибки интеграции", value: context.error ? 1 : 0, tone: "red" as const }
-  ];
+  const tones: Record<MeetingQueueFilter, "amber" | "green" | "blue" | "red"> = {
+    today: "green",
+    approved: "blue",
+    unapproved: "amber",
+    rejected: "red"
+  };
+
+  return meetingQueueFilters.map((filter) => ({
+    id: filter.id,
+    label: filter.label,
+    value: counts[filter.id],
+    tone: tones[filter.id]
+  }));
 }
 
-export function canAutoApproveMeetingMemo(detail: MeetingMemoDetail): boolean {
-  return Boolean(detail.auto_approve_allowed && detail.status === "НеСогласована");
+function normalizeMeetingStatusText(value: string | null | undefined): string {
+  if (!value) return "";
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "")
+    .replace(/a/g, "а")
+    .replace(/e/g, "е")
+    .replace(/o/g, "о")
+    .replace(/p/g, "р")
+    .replace(/c/g, "с")
+    .replace(/x/g, "х")
+    .replace(/k/g, "к")
+    .replace(/m/g, "м")
+    .replace(/t/g, "т");
+}
+
+export function isMeetingMemoApproved(
+  status: string | null | undefined,
+  statusLabel?: string | null
+): boolean {
+  for (const value of [status, statusLabel]) {
+    const normalized = normalizeMeetingStatusText(value);
+    if (!normalized) continue;
+    if (normalized === "согласована") return true;
+    if (normalized.includes("соглас") && !normalized.includes("несоглас")) return true;
+  }
+  return false;
+}
+
+export function isMeetingMemoRejected(
+  status: string | null | undefined,
+  statusLabel?: string | null
+): boolean {
+  for (const value of [status, statusLabel]) {
+    const normalized = normalizeMeetingStatusText(value);
+    if (!normalized) continue;
+    if (normalized === "отклонена" || normalized.includes("отклон")) return true;
+  }
+  return false;
+}
+
+export function isMeetingMemoPendingApproval(
+  status: string | null | undefined,
+  statusLabel?: string | null
+): boolean {
+  if (isMeetingMemoApproved(status, statusLabel) || isMeetingMemoRejected(status, statusLabel)) {
+    return false;
+  }
+
+  for (const value of [status, statusLabel]) {
+    const normalized = normalizeMeetingStatusText(value);
+    if (!normalized) continue;
+    if (normalized.includes("несоглас")) return true;
+  }
+
+  return false;
+}
+
+/** Кнопки «Согласовать» / «Отклонить» — по статусу карточки из очереди (не detail.queue). */
+export function canShowMeetingMemoDecisionActions(
+  detail: MeetingMemoDetail,
+  queueItem?: MeetingDashboardItem | null
+): boolean {
+  const status = queueItem?.status ?? detail.status;
+  const statusLabel = queueItem?.status_label ?? detail.status_label;
+  const visibleLabel = getMeetingStatusLabel(status, statusLabel);
+
+  return visibleLabel !== "Согласована" && visibleLabel !== "Отклонена";
+}
+
+export function canApproveMeetingMemo(
+  detail: MeetingMemoDetail,
+  queueItem?: MeetingDashboardItem | null
+): boolean {
+  return canShowMeetingMemoDecisionActions(detail, queueItem);
 }
 
 export function countPassedStoChecklist(detail: MeetingMemoDetail): number {
   return (detail.sto_checklist ?? []).filter((item) => item.passed).length;
+}
+
+const ATTENDEE_ROLE_LABELS: Record<string, string> = {
+  initiator: "Инициатор",
+  manager: "Руководитель",
+  participant: "Участник"
+};
+
+export function getMeetingAttendeeRoleLabel(attendee: MeetingAttendee): string {
+  const label = attendee.role_label?.trim();
+  if (label) return label;
+  return ATTENDEE_ROLE_LABELS[attendee.role] ?? attendee.role;
+}
+
+export type MeetingSlotPreviewResolved = {
+  start: string;
+  end: string;
+  label: string;
+};
+
+function calcSlotDurationMinutes(start: string, end: string): number | null {
+  const durationMs = new Date(end).getTime() - new Date(start).getTime();
+  if (!Number.isFinite(durationMs) || durationMs <= 0) return null;
+  return Math.round(durationMs / 60000);
+}
+
+function resolveAttendeeSlot(attendee: MeetingAttendee): MeetingSlotPreviewResolved | null {
+  if (!attendee.nearest_slot_start || !attendee.nearest_slot_end) return null;
+  return {
+    start: attendee.nearest_slot_start,
+    end: attendee.nearest_slot_end,
+    label: attendee.nearest_slot_label?.trim() || formatMeetingTime(attendee.nearest_slot_start, attendee.nearest_slot_end)
+  };
+}
+
+export function resolveMeetingSlotPreview(preview: MeetingAgentSlotPreview): MeetingSlotPreviewResolved | null {
+  if (preview.slot?.start && preview.slot?.end) {
+    return {
+      start: preview.slot.start,
+      end: preview.slot.end,
+      label: preview.slot_label?.trim() || formatMeetingTime(preview.slot.start, preview.slot.end)
+    };
+  }
+
+  const attendeeSlots = preview.attendees
+    .map(resolveAttendeeSlot)
+    .filter((slot): slot is MeetingSlotPreviewResolved => Boolean(slot));
+
+  if (!attendeeSlots.length) return null;
+
+  const [first] = attendeeSlots;
+  const allSame = attendeeSlots.every(
+    (slot) => slot.start === first.start && slot.end === first.end
+  );
+
+  return allSame ? first : null;
+}
+
+export function resolveMeetingSlotPreviewLabel(preview: MeetingAgentSlotPreview): string | null {
+  const resolved = resolveMeetingSlotPreview(preview);
+  if (resolved) return resolved.label;
+
+  const labels = [
+    ...new Set(
+      preview.attendees
+        .map((attendee) => attendee.nearest_slot_label?.trim())
+        .filter((label): label is string => Boolean(label))
+    )
+  ];
+
+  return labels.length === 1 ? labels[0] : null;
+}
+
+export function resolveMeetingSlotPreviewDuration(preview: MeetingAgentSlotPreview): number | null {
+  if (preview.duration_minutes) return preview.duration_minutes;
+
+  const resolved = resolveMeetingSlotPreview(preview);
+  if (!resolved) return null;
+
+  return calcSlotDurationMinutes(resolved.start, resolved.end);
+}
+
+/** Нормализует ссылку OWA; открытие — только по явному клику пользователя. */
+export function normalizeOutlookMeetingUrl(url: string | null | undefined): string | null {
+  const normalized = url?.trim();
+  return normalized || null;
+}
+
+/** @deprecated Используйте normalizeOutlookMeetingUrl — автоматический window.open убран. */
+export function openOutlookMeetingUrl(url: string | null | undefined): string | null {
+  return normalizeOutlookMeetingUrl(url);
 }

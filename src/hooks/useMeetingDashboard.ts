@@ -124,3 +124,31 @@ export function getMeetingRequestError(error: unknown): string {
   }
   return MEETING_SERVER_ERROR_MESSAGE;
 }
+
+/** Ошибки approve/reject — показываем detail/message с бэкенда, без ложной OData-ошибки. */
+export function getMeetingMemoActionError(error: unknown): string {
+  if (axios.isAxiosError(error)) {
+    const data = error.response?.data;
+    if (data && typeof data === "object") {
+      const message = "message" in data && typeof data.message === "string" ? data.message.trim() : "";
+      if (message) return message;
+
+      const detail = "detail" in data ? data.detail : undefined;
+      if (typeof detail === "string" && detail.trim()) return detail.trim();
+      if (detail && typeof detail === "object" && "message" in detail) {
+        const detailMessage = detail.message;
+        if (typeof detailMessage === "string" && detailMessage.trim()) return detailMessage.trim();
+      }
+    }
+
+    if (error.code === "ECONNABORTED") {
+      return "Операция в 1С заняла слишком много времени. Проверьте статус СЗ в 1С и обновите dashboard.";
+    }
+
+    const status = error.response?.status;
+    if (status === 404) {
+      return "Метод согласования/отклонения не найден на сервере. Перезапустите бэкенд с актуальной версией.";
+    }
+  }
+  return getMeetingRequestError(error);
+}
