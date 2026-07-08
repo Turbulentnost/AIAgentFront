@@ -4,7 +4,11 @@ import type {
   MeetingAttendee,
   MeetingDashboardItem,
   MeetingLoginContext,
-  MeetingMemoDetail
+  MeetingMemoDetail,
+  MeetingSlotCandidate,
+  MeetingSlotCoverage,
+  MeetingSlotBlockingEvent,
+  MeetingSlotPreviewParticipant
 } from "@/types/meetings";
 
 export type MeetingQueueFilter = "today" | "approved" | "unapproved" | "rejected";
@@ -418,6 +422,8 @@ function resolveAttendeeSlot(attendee: MeetingAttendee): MeetingSlotPreviewResol
 }
 
 export function resolveMeetingSlotPreview(preview: MeetingAgentSlotPreview): MeetingSlotPreviewResolved | null {
+  if (preview.search_mode === "partial") return null;
+
   if (preview.slot?.start && preview.slot?.end) {
     return {
       start: preview.slot.start,
@@ -438,6 +444,95 @@ export function resolveMeetingSlotPreview(preview: MeetingAgentSlotPreview): Mee
   );
 
   return allSame ? first : null;
+}
+
+export function isMeetingSlotPreviewAssignable(preview: MeetingAgentSlotPreview): boolean {
+  if (preview.search_mode === "partial") return false;
+  return Boolean(preview.slot?.start && preview.slot?.end);
+}
+
+export function isMeetingSlotPreviewPartial(preview: MeetingAgentSlotPreview): boolean {
+  return preview.search_mode === "partial";
+}
+
+export function formatMeetingSlotCoverage(coverage?: MeetingSlotCoverage | null): string {
+  if (!coverage) return "—";
+  const percent = Math.round(coverage.ratio * 100);
+  return `${coverage.free} из ${coverage.total} (${percent}%)`;
+}
+
+export function formatMeetingSlotCandidateCoverage(coverage: MeetingSlotCoverage): string {
+  const percent = Math.round(coverage.ratio * 100);
+  const weighted =
+    coverage.weighted_ratio != null
+      ? ` · важные: ${Math.round(coverage.weighted_ratio * 100)}%`
+      : "";
+  return `${coverage.free}/${coverage.total} (${percent}%)${weighted}`;
+}
+
+export function formatMeetingSlotPreviewErrorStage(stage?: string | null): string | null {
+  if (!stage) return null;
+  const labels: Record<string, string> = {
+    onec: "1С ERP",
+    participants: "участники",
+    email: "e-mail",
+    calendar: "календарь",
+    no_slot: "нет слота"
+  };
+  return labels[stage] ?? stage;
+}
+
+export function buildMeetingAttendeesByEmail(
+  attendees: MeetingAttendee[]
+): Record<string, MeetingAttendee> {
+  return Object.fromEntries(
+    attendees
+      .filter((attendee) => attendee.email?.trim())
+      .map((attendee) => [attendee.email!.trim().toLowerCase(), attendee])
+  );
+}
+
+export function resolveMeetingAttendeeFioByEmail(
+  byEmail: Record<string, MeetingAttendee>,
+  email: string
+): string {
+  return byEmail[email.trim().toLowerCase()]?.fio ?? email;
+}
+
+export function resolveMeetingSlotCandidateTimes(
+  candidate: MeetingSlotCandidate
+): { start: string; end: string } | null {
+  if (candidate.slot?.start && candidate.slot?.end) {
+    return { start: candidate.slot.start, end: candidate.slot.end };
+  }
+  if (candidate.slot_start && candidate.slot_end) {
+    return { start: candidate.slot_start, end: candidate.slot_end };
+  }
+  return null;
+}
+
+export function formatMeetingBlockingEventRange(event: MeetingSlotBlockingEvent): string {
+  if (event.event_start && event.event_end) {
+    return formatMeetingTime(event.event_start, event.event_end);
+  }
+  return "—";
+}
+
+export function formatMeetingSlotParticipantStatus(
+  participant: MeetingSlotPreviewParticipant
+): string {
+  if (participant.status === "free") return "Свободен";
+  if (participant.status === "busy") return "Занят";
+  return "Неизвестно";
+}
+
+export function formatMeetingConflictMovability(movability?: string | null): string {
+  if (!movability) return "—";
+  const normalized = movability.trim().toLowerCase();
+  if (normalized === "high") return "Высокая";
+  if (normalized === "medium") return "Средняя";
+  if (normalized === "low") return "Низкая";
+  return movability;
 }
 
 export function resolveMeetingSlotPreviewLabel(preview: MeetingAgentSlotPreview): string | null {

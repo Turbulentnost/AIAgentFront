@@ -93,6 +93,8 @@ import type {
   MeetingRunResult,
   MeetingAgentSlotPreview,
   MeetingAgentSlotPreviewRequest,
+  MeetingAgentSlotPreviewDetails,
+  MeetingAgentSlotPreviewDetailsRequest,
   MeetingAgentSlotApprove,
   MeetingAgentSlotApproveRequest,
   MeetingMemoRejectRead,
@@ -144,6 +146,13 @@ export const meetingsApi = {
   slotPreview: (memoRefKey: string, payload?: MeetingAgentSlotPreviewRequest) =>
     longRunningApiClient
       .post<MeetingAgentSlotPreview>(`/meetings/memos/${memoRefKey}/agent/slot-preview`, payload ?? {})
+      .then((r) => r.data),
+  slotPreviewDetails: (memoRefKey: string, payload: MeetingAgentSlotPreviewDetailsRequest) =>
+    longRunningApiClient
+      .post<MeetingAgentSlotPreviewDetails>(
+        `/meetings/memos/${memoRefKey}/agent/slot-preview/details`,
+        payload
+      )
       .then((r) => r.data),
   approveSlot: (memoRefKey: string, payload: MeetingAgentSlotApproveRequest) =>
     longRunningApiClient

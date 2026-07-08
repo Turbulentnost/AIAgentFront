@@ -21,6 +21,7 @@ import {
   useCreateMeetingRun,
   useMeetingAgentSlotApprove,
   useMeetingAgentSlotPreview,
+  useMeetingAgentSlotPreviewDetails,
   useMeetingMemoApprove,
   useMeetingMemoDetail,
   useMeetingMemoReject,
@@ -50,6 +51,7 @@ import {
   getMeetingStatusTone,
   getMemoRefKey,
   isMeetingRunActive,
+  isMeetingSlotPreviewAssignable,
   normalizeOutlookMeetingUrl,
   resolveMeetingSlotPreview,
   type MeetingQueueFilter
@@ -96,6 +98,7 @@ export default function MeetingAgent() {
 
   const createRun = useCreateMeetingRun();
   const slotPreviewMutation = useMeetingAgentSlotPreview();
+  const slotPreviewDetailsMutation = useMeetingAgentSlotPreviewDetails();
   const approveSlotMutation = useMeetingAgentSlotApprove();
   const approveMemoMutation = useMeetingMemoApprove();
   const rejectMemoMutation = useMeetingMemoReject();
@@ -238,7 +241,8 @@ export default function MeetingAgent() {
 
   async function handleConfirmApprove() {
     const preview = slotPreviewMutation.data;
-    const slot = preview ? resolveMeetingSlotPreview(preview) : null;
+    if (!preview || !isMeetingSlotPreviewAssignable(preview)) return;
+    const slot = resolveMeetingSlotPreview(preview);
     const shouldApproveMemoFirst = queueFilter === "unapproved";
     if (
       !detail?.ref_key ||
@@ -407,6 +411,15 @@ export default function MeetingAgent() {
         onConfirmApprove={() => void handleConfirmApprove()}
         isApproving={approveSlotMutation.isPending || approveMemoMutation.isPending}
         approveWithMemo={queueFilter === "unapproved"}
+        onFetchSlotDetails={async (slotStart, slotEnd) => {
+          if (!detail?.ref_key) {
+            throw new Error("У заявки нет ref_key для загрузки деталей слота.");
+          }
+          return slotPreviewDetailsMutation.mutateAsync({
+            memoRefKey: detail.ref_key,
+            payload: { slot_start: slotStart, slot_end: slotEnd }
+          });
+        }}
       />
       <MeetingAgentRejectModal
         open={rejectModalOpen}

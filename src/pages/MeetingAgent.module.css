@@ -794,6 +794,294 @@
   font-weight: 600;
 }
 
+.modalSlotWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+  border: 1px solid var(--color-warning-border, var(--color-border-accent));
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.previewTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.previewTable th,
+.previewTable td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.previewTable th {
+  color: var(--color-muted);
+  background: var(--color-hover);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.previewTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.previewTableRowActive {
+  background: var(--color-info-surface);
+  cursor: pointer;
+}
+
+.previewTable tbody tr {
+  cursor: pointer;
+}
+
+.previewTable tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.modalErrorContent {
+  display: grid;
+  gap: 4px;
+}
+
+.modalErrorStage {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.slotCandidateList {
+  display: grid;
+  gap: 10px;
+}
+
+.slotCandidateCard {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface, #fff);
+}
+
+.slotCandidateCardExpanded {
+  border-color: var(--color-border-accent);
+  box-shadow: 0 0 0 1px var(--color-border-accent);
+}
+
+.slotCandidateHeader {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  position: relative;
+  padding-right: 36px;
+}
+
+.slotCandidateHeader:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.slotCandidateTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.slotCandidateLabel {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-primary-text);
+}
+
+.slotCandidateBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border-accent);
+  color: var(--color-primary-text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.slotCandidateCoverage,
+.slotCandidateMeta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+.slotCandidateAttendees {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.slotCandidateAttendeeGroup {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.slotCandidateAttendeeLabel {
+  font-weight: 800;
+}
+
+.slotCandidateAttendeeGroupFree {
+  color: var(--color-success-dark, #166534);
+}
+
+.slotCandidateAttendeeGroupBusy {
+  color: var(--color-warning-dark);
+}
+
+.slotCandidateChevron {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  color: var(--color-muted);
+  transition: transform 0.15s ease;
+}
+
+.slotCandidateChevronOpen {
+  transform: rotate(180deg);
+}
+
+.slotCandidateDetails {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.slotCandidateDetailsLoader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.slotParticipantList {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slotParticipantItem {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-hover);
+}
+
+.slotParticipantHeader {
+  display: grid;
+  gap: 2px;
+}
+
+.slotParticipantRole {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.slotParticipantName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.slotParticipantEmail {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.slotParticipantStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.slotParticipantStatusFree {
+  color: var(--color-success-dark, #166534);
+}
+
+.slotParticipantStatusBusy {
+  color: var(--color-danger-dark);
+}
+
+.slotParticipantStatusUnknown {
+  color: var(--color-muted);
+}
+
+.slotBlockingEvents {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slotBlockingEvent {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
+.slotBlockingEventLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.slotBlockingEventMeta {
+  font-size: 11px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+.slotParticipantAccessError {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-danger-dark);
+}
+
 .modalSlotHighlight {
   display: grid;
   gap: 6px;

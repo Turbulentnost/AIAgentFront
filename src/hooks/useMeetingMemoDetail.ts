@@ -5,6 +5,7 @@ import type {
   MeetingRunCreate,
   MeetingSlotsRequest,
   MeetingAgentSlotApproveRequest,
+  MeetingAgentSlotPreviewDetailsRequest,
   MeetingMemoRejectRequest,
   MeetingMemoApproveRequest
 } from "@/types/meetings";
@@ -79,6 +80,18 @@ export function useMeetingAgentSlotApprove() {
       memoRefKey: string;
       payload: MeetingAgentSlotApproveRequest;
     }) => meetingsApi.approveSlot(memoRefKey, payload)
+  });
+}
+
+export function useMeetingAgentSlotPreviewDetails() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload
+    }: {
+      memoRefKey: string;
+      payload: MeetingAgentSlotPreviewDetailsRequest;
+    }) => meetingsApi.slotPreviewDetails(memoRefKey, payload)
   });
 }
 

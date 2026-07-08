@@ -1627,6 +1627,8 @@ export type {
   MeetingRunResult,
   MeetingAgentSlotPreview,
   MeetingAgentSlotPreviewRequest,
+  MeetingAgentSlotPreviewDetails,
+  MeetingAgentSlotPreviewDetailsRequest,
   MeetingAgentSlotApprove,
   MeetingAgentSlotApproveRequest,
   MeetingMemoRejectRead,

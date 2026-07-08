@@ -163,6 +163,87 @@ export interface MeetingAgentSlotPreviewRequest {
   duration_minutes?: number | null;
 }
 
+export type MeetingSlotSearchMode = "all" | "partial";
+
+export type MeetingSlotPreviewErrorStage =
+  | "onec"
+  | "participants"
+  | "email"
+  | "calendar"
+  | "no_slot";
+
+export interface MeetingSlotCoverage {
+  free: number;
+  total: number;
+  ratio: number;
+  weighted_ratio?: number;
+  required_ok?: boolean;
+}
+
+export interface MeetingSlotConflict {
+  fio: string;
+  email?: string | null;
+  event_subject?: string | null;
+  movability?: string | null;
+  reschedule_hint_label?: string | null;
+  event_attendees?: string[];
+  event_attendee_names?: string[];
+}
+
+export interface MeetingSlotCandidate {
+  slot?: MeetingSlot | null;
+  slot_start?: string | null;
+  slot_end?: string | null;
+  slot_label: string;
+  coverage: MeetingSlotCoverage;
+  free_attendees: string[];
+  busy_attendees: string[];
+  conflicts?: MeetingSlotConflict[];
+  verified?: boolean;
+  impact_score?: number;
+  busy_weight_cost?: number;
+  reschedule_count?: number;
+  low_movability_count?: number;
+}
+
+export interface MeetingAgentSlotPreviewDetailsRequest {
+  slot_start: string;
+  slot_end: string;
+}
+
+export interface MeetingSlotBlockingEvent {
+  event_label: string;
+  event_subject?: string | null;
+  event_start?: string | null;
+  event_end?: string | null;
+  organizer?: string | null;
+  movability?: string | null;
+  movability_reason?: string | null;
+  reschedule_hint_label?: string | null;
+  event_attendees?: string[];
+  event_attendee_names?: string[];
+}
+
+export interface MeetingSlotPreviewParticipant {
+  fio: string;
+  email: string | null;
+  role: string;
+  role_label?: string | null;
+  status: "free" | "busy" | "unknown";
+  blocking_events: MeetingSlotBlockingEvent[];
+  calendar_access_error?: string | null;
+}
+
+export interface MeetingAgentSlotPreviewDetails {
+  memo_ref_key: string;
+  slot_start: string;
+  slot_end: string;
+  slot_label: string;
+  duration_minutes?: number | null;
+  participants: MeetingSlotPreviewParticipant[];
+  error?: string | null;
+}
+
 export interface MeetingAttendee {
   fio: string;
   email: string | null;
@@ -176,12 +257,18 @@ export interface MeetingAttendee {
 
 export interface MeetingAgentSlotPreview {
   memo_ref_key?: string;
+  search_mode?: MeetingSlotSearchMode;
   slot?: MeetingSlot | null;
   slot_label?: string | null;
   duration_minutes?: number | null;
+  preview_note?: string | null;
+  coverage?: MeetingSlotCoverage | null;
+  slot_candidates?: MeetingSlotCandidate[];
+  conflicts?: MeetingSlotConflict[];
   attendees: MeetingAttendee[];
   missing_emails?: string[];
   error?: string | null;
+  error_stage?: MeetingSlotPreviewErrorStage | null;
 }
 
 export interface MeetingAgentSlotApproveRequest {
