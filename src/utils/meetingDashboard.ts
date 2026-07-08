@@ -104,6 +104,10 @@ export function getMeetingItemCode(item: MeetingDashboardItem): string {
   return item.number ? `СЗ №${item.number}` : "Служебная записка";
 }
 
+export function isMeetingPsdLevel(item: MeetingDashboardItem): boolean {
+  return Boolean(item.psd_level);
+}
+
 export function getMeetingItemDate(
   item: MeetingDashboardItem,
   options: { preferDocumentDate?: boolean } = {}

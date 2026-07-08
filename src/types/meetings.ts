@@ -20,6 +20,7 @@ export interface MeetingDashboardItem {
   location: string | null;
   initiator?: MeetingPerson | null;
   manager?: MeetingPerson | null;
+  psd_level?: boolean;
 }
 
 export interface MeetingLoginContext {
@@ -96,6 +97,7 @@ export interface MeetingApplication {
   meeting_type: string | null;
   meeting_type_label: string | null;
   priority: string | null;
+  psd_level?: boolean;
 }
 
 export interface MeetingMemoDetail {

@@ -1,13 +1,22 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  CalendarDays,
   CheckCircle2,
   Clock3,
+  FileText,
+  Flag,
   History,
   Loader2,
-  RefreshCw
+  MapPin,
+  Presentation,
+  RefreshCw,
+  UserCog,
+  UserRound,
+  Users
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import {
   formatMeetingIntegrationError,
   getMeetingMemoActionError,
@@ -49,6 +58,7 @@ import {
   getMeetingParticipantNames,
   getMeetingStatusLabel,
   getMeetingStatusTone,
+  isMeetingPsdLevel,
   getMemoRefKey,
   isMeetingRunActive,
   isMeetingSlotPreviewAssignable,
@@ -607,9 +617,14 @@ function QueueCard({
     >
       <div className={styles.queueCardHeader}>
         <strong className={styles.queueCardCode}>{getMeetingItemCode(item)}</strong>
-        <span className={`${styles.queueCardStatus} ${styles[`queueCardStatus${statusTone}`]}`}>
-          {statusLabel}
-        </span>
+        <div className={styles.queueCardBadges}>
+          <span className={`${styles.queueCardStatus} ${styles[`queueCardStatus${statusTone}`]}`}>
+            {statusLabel}
+          </span>
+          {isMeetingPsdLevel(item) ? (
+            <span className={styles.queueCardPsdBadge}>ПСД</span>
+          ) : null}
+        </div>
       </div>
 
       <p className={styles.queueCardTheme}>{getMeetingTheme(item)}</p>
@@ -637,6 +652,28 @@ function QueueCard({
         </div>
       </dl>
     </button>
+  );
+}
+
+function DataField({
+  label,
+  icon: Icon,
+  value,
+  className
+}: {
+  label: string;
+  icon: LucideIcon;
+  value: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={className}>
+      <dt>{label}</dt>
+      <dd className={styles.dataFieldValue}>
+        <Icon size={14} className={styles.dataFieldIcon} aria-hidden="true" />
+        <span>{value}</span>
+      </dd>
+    </div>
   );
 }
 
@@ -691,29 +728,58 @@ function MeetingDetails({
       <div className={styles.section}>
         <h3>Данные заявки</h3>
         <dl className={styles.dataGrid}>
-          <div><dt>Инициатор</dt><dd>{application.initiator?.full_name ?? "—"}</dd></div>
-          <div><dt>Руководитель</dt><dd>{application.manager?.full_name ?? "—"}</dd></div>
+          <DataField
+            label="Инициатор"
+            icon={UserRound}
+            value={application.initiator?.full_name ?? "—"}
+          />
+          <DataField
+            label="Руководитель"
+            icon={UserCog}
+            value={application.manager?.full_name ?? "—"}
+          />
           <div className={styles.participantsField}>
             <dt>Участники</dt>
-            <dd className={styles.participantNames}>
-              {participantNames.length ? participantNames.join(", ") : "—"}
+            <dd>
+              {participantNames.length ? (
+                <ul className={styles.participantList}>
+                  {participantNames.map((name) => (
+                    <li className={styles.participantListItem} key={name}>
+                      <Users size={14} className={styles.participantListIcon} aria-hidden="true" />
+                      <span>{name}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <span className={styles.dataFieldValue}>
+                  <Users size={14} className={styles.dataFieldIcon} aria-hidden="true" />
+                  <span>—</span>
+                </span>
+              )}
             </dd>
           </div>
-          <div><dt>Повестка</dt><dd>{application.agenda ?? "—"}</dd></div>
-          <div><dt>Дата / время</dt><dd>{application.scheduled_label ?? "—"}</dd></div>
-          <div>
-            <dt>Длительность</dt>
-            <dd>{application.duration_minutes ? `${application.duration_minutes} мин` : "—"}</dd>
-          </div>
-          <div>
-            <dt>Место</dt>
-            <dd>{application.invite_location ?? application.location ?? "—"}</dd>
-          </div>
-          <div>
-            <dt>Тип совещания</dt>
-            <dd>{application.meeting_type_label ?? application.meeting_type ?? "—"}</dd>
-          </div>
-          <div><dt>Приоритет</dt><dd>{application.priority ?? "—"}</dd></div>
+          <DataField label="Повестка" icon={FileText} value={application.agenda ?? "—"} />
+          <DataField
+            label="Дата / время"
+            icon={CalendarDays}
+            value={application.scheduled_label ?? "—"}
+          />
+          <DataField
+            label="Длительность"
+            icon={Clock3}
+            value={application.duration_minutes ? `${application.duration_minutes} мин` : "—"}
+          />
+          <DataField
+            label="Место"
+            icon={MapPin}
+            value={application.invite_location ?? application.location ?? "—"}
+          />
+          <DataField
+            label="Тип совещания"
+            icon={Presentation}
+            value={application.meeting_type_label ?? application.meeting_type ?? "—"}
+          />
+          <DataField label="Приоритет" icon={Flag} value={application.priority ?? "—"} />
         </dl>
       </div>
 
@@ -754,15 +820,6 @@ function MeetingDetails({
         ) : (
           <p className={styles.inlineMuted}>Чек-лист СТО не загружен. Обновите карточку заявки.</p>
         )}
-        {detail.sto_issues?.length ? (
-          <ul className={styles.stoIssuesList} aria-label="Невыполненные пункты СТО">
-            {detail.sto_issues.map((issue) => (
-              <li className={styles.stoIssueItem} key={issue.field}>
-                {issue.message}
-              </li>
-            ))}
-          </ul>
-        ) : null}
       </div>
 
       <div className={styles.section}>
