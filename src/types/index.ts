@@ -991,3 +991,114 @@ export interface SandboxRun {
   error_message?: string | null;
   steps: SandboxStep[];
 }
+
+export type EmailMessageStatus =
+  | "processing"
+  | "done"
+  | "spam"
+  | "error"
+  | "awaiting_human";
+
+export interface DocumentXmlService {
+  name: string;
+  title?: string;
+  process: string;
+  reasoning: string;
+}
+
+export interface DocumentXml {
+  organization: string;
+  theme: string;
+  direction: string;
+  claim: boolean;
+  partner: string;
+  services: DocumentXmlService[];
+  email_sender: string;
+  email_recipient: string;
+  mail_datetime: string;
+  process: string;
+  /** Устаревшие поля — только в старых XML */
+  spam?: boolean;
+  confidence_level?: string;
+  matching_keywords?: string;
+  processing_notes?: string;
+}
+
+export interface EmailMessage {
+  id: string;
+  message_id: string;
+  received_at: string | null;
+  processed_at: string | null;
+  mailbox: string;
+  sender_email: string;
+  sender_name: string | null;
+  subject: string | null;
+  body_text?: string | null;
+  status: EmailMessageStatus;
+  is_spam: boolean;
+  spam_confidence: number | null;
+  spam_reason: string | null;
+  department_id: string | null;
+  department_name: string | null;
+  dept_confidence: number | null;
+  priority: string | null;
+  summary_ru: string | null;
+  erp_document_number: string | null;
+  erp_task_id: string | null;
+  human_review: Record<string, unknown> | null;
+  erp_retry_count: number | null;
+  attachments_count: number | null;
+  contractor_id?: string | null;
+  is_new_contractor?: boolean;
+  partner_name?: string | null;
+  to?: string[];
+  routing_recipient?: string | null;
+  xml_document?: string | null;
+  document_xml?: DocumentXml | null;
+}
+
+export interface PochtaDepartment {
+  id: string;
+  name: string;
+}
+
+export interface PochtaOrganization {
+  id: string;
+  name: string;
+}
+
+export interface PochtaContractor {
+  contractor_id: string;
+  name: string;
+  email: string;
+  emails: string[];
+  contractor_type?: string;
+}
+
+export interface EmailMessageFetchBodyResponse {
+  status: "ready";
+  id: string;
+  body_text: string;
+  cached?: boolean;
+  task_id?: string;
+}
+
+export interface EmailMessageActionResponse {
+  task_id?: string;
+  status: string;
+  id?: string;
+  message_id?: string;
+  restored_from_spam?: boolean;
+}
+
+export interface EmailMessagesPage {
+  items: EmailMessage[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface EmailMessagesStats {
+  total: number;
+  by_status: Partial<Record<EmailMessageStatus, number>>;
+}

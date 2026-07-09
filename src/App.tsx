@@ -4,6 +4,8 @@ import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
+import NdControlAgent from "./pages/NdControlAgent";
+import IncomingMail from "./pages/IncomingMail";
 import AgentBuilder from "./pages/AgentBuilder";
 import Tasks from "./pages/Tasks";
 import KnowledgeBase from "./pages/KnowledgeBase";
@@ -29,6 +31,8 @@ export default function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/" element={<ProtectedRoute><Layout title="Дашборд"><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/agents" element={<ProtectedRoute><Layout title="Агенты"><Agents /></Layout></ProtectedRoute>} />
+      <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/incoming-mail" element={<ProtectedRoute><Layout title="Входящая корреспонденция"><IncomingMail /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

@@ -21,7 +21,8 @@ export default function FormAutocomplete({
   emptyLabel,
   footerOptions = [],
   onFooterSelect,
-  noResultsText = "Ничего не найдено"
+  noResultsText = "Ничего не найдено",
+  onQueryChange
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -36,6 +37,7 @@ export default function FormAutocomplete({
   footerOptions?: FormAutocompleteOption[];
   onFooterSelect?: (value: string) => void;
   noResultsText?: string;
+  onQueryChange?: (query: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -56,7 +58,11 @@ export default function FormAutocomplete({
   const filteredOptions = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) return selectableOptions;
-    return selectableOptions.filter((option) => option.label.toLowerCase().includes(normalized));
+    return selectableOptions.filter(
+      (option) =>
+        option.label.toLowerCase().includes(normalized) ||
+        option.value.toLowerCase().includes(normalized)
+    );
   }, [query, selectableOptions]);
 
   useEffect(() => {
@@ -133,6 +139,7 @@ export default function FormAutocomplete({
         onClick={openList}
         onChange={(event) => {
           setQuery(event.target.value);
+          onQueryChange?.(event.target.value);
           setOpen(true);
         }}
       />

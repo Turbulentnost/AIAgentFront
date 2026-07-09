@@ -7,6 +7,7 @@ const DEFAULT_API_SERVER = "http://192.168.1.157:5454";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxy = env.VITE_API_PROXY || env.VITE_API_SERVER || DEFAULT_API_SERVER;
+  const pochtaProxy = env.VITE_POCHTA_API_PROXY || "http://localhost:8080";
   const onecProxy = env.VITE_ONEC_API_SERVER || "http://192.168.0.247:8000";
 
   return {
@@ -30,6 +31,13 @@ export default defineConfig(({ mode }) => {
           ws: true,
           timeout: 600000,
           proxyTimeout: 600000
+        },
+        "/pochta-api": {
+          target: pochtaProxy,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/pochta-api/, ""),
+          timeout: 120_000,
+          proxyTimeout: 120_000
         },
         "/onec-api": {
           target: onecProxy,

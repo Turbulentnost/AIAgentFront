@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { FolderOpen, Users } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { FormSelect } from "@/components/form-controls";
@@ -7,6 +8,62 @@ import type { AgentAccess, AgentStatus, Task } from "@/types";
 import styles from "./Agents.module.css";
 
 const AGENT_ILLUSTRATION = "/agent-catalog-illustration.png";
+const ND_CONTROL_AGENT_ROUTE = "/agents/nd-control";
+const INCOMING_MAIL_ROUTE = "/agents/incoming-mail";
+const INCOMING_MAIL_DISPLAY_NAME = "Агент по входящей корреспонденции";
+
+const INCOMING_MAIL_CATALOG_AGENT: AgentAccess = {
+  id: "catalog-agent_pochta",
+  name: INCOMING_MAIL_DISPLAY_NAME,
+  slug: "agent_pochta",
+  purpose:
+    "ИИ-агент обрабатывает входящую корреспонденцию: фильтрует спам, определяет отправителя и отдел, формирует обзор и создаёт задачу в 1С:ERP.",
+  status: "active",
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+  access_level: "run",
+  can_run: true,
+  can_view_results: true,
+  can_approve: false,
+  can_configure: false
+};
+
+function withIncomingMailDisplayName(agents: AgentAccess[]) {
+  return agents.map((agent) =>
+    isIncomingMailAgent(agent) ? { ...agent, name: INCOMING_MAIL_DISPLAY_NAME } : agent
+  );
+}
+
+function mergePinnedCatalogAgents(agents: AgentAccess[]) {
+  const normalized = withIncomingMailDisplayName(agents);
+  if (normalized.some(isIncomingMailAgent)) return normalized;
+  return [INCOMING_MAIL_CATALOG_AGENT, ...normalized];
+}
+
+function isNdControlAgent(agent: AgentAccess) {
+  const key = agentSearchKey(agent);
+  return (
+    agent.slug === "nd_control_agent" ||
+    agent.slug === "nd-control" ||
+    /nd[_-]?control/.test(key) ||
+    /контрол.*нд|нд.*изменен/.test(key)
+  );
+}
+
+function isIncomingMailAgent(agent: AgentAccess) {
+  const key = agentSearchKey(agent);
+  return (
+    agent.slug === "agent_pochta" ||
+    agent.slug === "incoming-mail" ||
+    /pochta|incoming.?mail|входящ.*корресп/.test(key)
+  );
+}
+
+function getAgentRoute(agent: AgentAccess) {
+  if (isNdControlAgent(agent)) return ND_CONTROL_AGENT_ROUTE;
+  if (isIncomingMailAgent(agent)) return INCOMING_MAIL_ROUTE;
+  return null;
+}
 
 type KindTab = "all" | "chat" | "abstract";
 type CategoryFilter = "all" | "generative" | "analytic";
@@ -58,6 +115,7 @@ function getCapabilityLabel(agent: AgentAccess) {
   if (/document|документ|\bkd\b|\btd\b|кд|тд/.test(key)) return "Анализирует документы";
   if (/tender|тендер|закуп|procurement/.test(key)) return "Анализирует закупки";
   if (/comment|коммент|исполн/.test(key)) return "Анализирует комментарии";
+  if (/mail|почт|корресп|email|письм|imap/.test(key)) return "Обрабатывает корреспонденцию";
   return "Автоматизирует задачи";
 }
 
@@ -117,7 +175,7 @@ function AgentCard({
     "Корпоративный ИИ-агент платформы для автоматизации типовых задач подразделения.";
 
   if (compact) {
-    return (
+    const card = (
       <article className={styles.compactCard}>
         <AgentStatusBadge status={agent.status} />
         <div className={styles.compactArt}>
@@ -136,9 +194,20 @@ function AgentCard({
         </div>
       </article>
     );
+
+    const route = getAgentRoute(agent);
+    if (route) {
+      return (
+        <Link to={route} className={styles.agentCardLink}>
+          {card}
+        </Link>
+      );
+    }
+
+    return card;
   }
 
-  return (
+  const card = (
     <article className={styles.agentCard}>
       <div className={styles.agentArt}>
         <img src={AGENT_ILLUSTRATION} alt="" loading="lazy" />
@@ -162,6 +231,17 @@ function AgentCard({
       </div>
     </article>
   );
+
+  const route = getAgentRoute(agent);
+  if (route) {
+    return (
+      <Link to={route} className={styles.agentCardLink}>
+        {card}
+      </Link>
+    );
+  }
+
+  return card;
 }
 
 export default function Agents() {
@@ -196,8 +276,13 @@ export default function Agents() {
     [departmentsQuery.data]
   );
 
+  const catalogAgents = useMemo(
+    () => mergePinnedCatalogAgents(agentsQuery.data ?? []),
+    [agentsQuery.data]
+  );
+
   const filteredAgents = useMemo(() => {
-    let items = agentsQuery.data ?? [];
+    let items = catalogAgents;
 
     if (kindTab === "chat") items = items.filter((agent) => getAgentKind(agent) === "chat");
     if (kindTab === "abstract") items = items.filter((agent) => getAgentKind(agent) === "abstract");
@@ -214,15 +299,15 @@ export default function Agents() {
     }
 
     return items;
-  }, [agentsQuery.data, categoryFilter, departmentFilter, kindTab]);
+  }, [catalogAgents, categoryFilter, departmentFilter, kindTab]);
 
   const recommendedAgents = useMemo(
-    () => pickRecommended(agentsQuery.data ?? []),
-    [agentsQuery.data]
+    () => pickRecommended(catalogAgents),
+    [catalogAgents]
   );
 
   const isLoading = agentsQuery.isLoading || departmentsQuery.isLoading;
-  const isError = agentsQuery.isError;
+  const isError = agentsQuery.isError && !catalogAgents.length;
 
   return (
     <div className={styles.page}>
@@ -280,7 +365,7 @@ export default function Agents() {
             <div className={styles.errorState}>Не удалось загрузить агентов</div>
           ) : !filteredAgents.length ? (
             <div className={styles.emptyState}>
-              {agentsQuery.data?.length
+              {catalogAgents.length
                 ? "По выбранным фильтрам агенты не найдены."
                 : "Нет агентов, доступных текущему пользователю."}
             </div>
