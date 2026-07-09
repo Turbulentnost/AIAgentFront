@@ -21,6 +21,7 @@ import {
   AGENT_LAUNCH_MORPH_MS,
   isMeetingAgent,
   isNdControlAgent,
+  isIncomingCorrespondenceAgent,
   isTasksAgent,
   navigateToAgentLaunch
 } from "@/utils/agentLaunch";
@@ -189,6 +190,11 @@ export default function Dashboard() {
     }
 
     if (isTasksAgent(agent)) {
+      navigateToAgentLaunch(navigate, agent);
+      return;
+    }
+
+    if (isIncomingCorrespondenceAgent(agent)) {
       navigateToAgentLaunch(navigate, agent);
       return;
     }
