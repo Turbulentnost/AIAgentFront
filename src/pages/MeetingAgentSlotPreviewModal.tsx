@@ -1,28 +1,38 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, Loader2, X } from "lucide-react";
 import type {
   MeetingAgentSlotPreview,
   MeetingAgentSlotPreviewDetails,
   MeetingAttendee,
   MeetingSlotCandidate,
-  MeetingSlotPreviewParticipant
+  MeetingSlotPreviewParticipant,
+  MeetingSlotRescheduleRecommendation,
+  MeetingSlotRoomStatus
 } from "@/types/meetings";
 import {
   buildMeetingAttendeesByEmail,
+  filterMeetingSlotPreviewPeople,
+  filterPreviewAttendeePeople,
   formatMeetingBlockingEventRange,
   formatMeetingConflictMovability,
   formatMeetingSlotCandidateCoverage,
   formatMeetingSlotCoverage,
   formatMeetingSlotParticipantStatus,
   formatMeetingSlotPreviewErrorStage,
+  formatMeetingTime,
   getMeetingAttendeeRoleLabel,
+  isMeetingSlotDetailAvailable,
   isMeetingSlotPreviewAssignable,
   isMeetingSlotPreviewPartial,
+  resolveManualSlotDefaultsFromIso,
   resolveMeetingAttendeeFioByEmail,
   resolveMeetingSlotCandidateTimes,
+  resolveMeetingSlotPreview,
   resolveMeetingSlotPreviewDuration,
-  resolveMeetingSlotPreviewLabel
+  resolveMeetingSlotPreviewLabel,
+  resolveMeetingSlotPreviewRoom
 } from "@/utils/meetingDashboard";
+import MeetingAgentManualSlotModal from "@/pages/MeetingAgentManualSlotModal";
 import styles from "./MeetingAgent.module.css";
 
 type Props = {
@@ -32,14 +42,71 @@ type Props = {
   requestError: string | null;
   approveError: string | null;
   onClose: () => void;
-  onConfirmApprove?: () => void;
+  onConfirmApprove?: (slotOverride?: { start: string; end: string }) => void;
   isApproving?: boolean;
   approveWithMemo?: boolean;
+  approveButtonLabel?: string;
+  approveLoadingLabel?: string;
+  mode?: "agent" | "reschedule";
+  previousSlotLabel?: string | null;
+  previousSlotStart?: string | null;
+  previousSlotEnd?: string | null;
+  searchAfter?: string | null;
   onFetchSlotDetails?: (
     slotStart: string,
     slotEnd: string
   ) => Promise<MeetingAgentSlotPreviewDetails>;
 };
+
+function RoomDetailsCard({
+  room,
+  variant = "attendee"
+}: {
+  room: MeetingSlotRoomStatus;
+  variant?: "attendee" | "slot";
+}) {
+  const isFree = room.status === "free";
+  const statusClass = isFree ? styles.attendeeStatusOk : styles.attendeeStatusMissing;
+  const statusIcon = isFree ? (
+    <CheckCircle2 size={14} aria-hidden="true" />
+  ) : (
+    <AlertTriangle size={14} aria-hidden="true" />
+  );
+
+  if (variant === "slot") {
+    return (
+      <li className={styles.slotParticipantItem}>
+        <div className={styles.slotParticipantHeader}>
+          <span className={styles.slotParticipantRole}>Переговорная</span>
+          <span className={styles.slotParticipantName}>{room.name}</span>
+          {room.email ? <span className={styles.slotParticipantEmail}>{room.email}</span> : null}
+          <span className={`${styles.slotParticipantStatus} ${statusClass}`}>
+            {statusIcon}
+            {room.status_label}
+          </span>
+        </div>
+        {room.calendar_access_error ? (
+          <p className={styles.slotParticipantAccessError}>{room.calendar_access_error}</p>
+        ) : null}
+      </li>
+    );
+  }
+
+  return (
+    <li className={styles.attendeeItem}>
+      <span className={styles.attendeeRole}>Переговорная</span>
+      <span className={styles.attendeeName}>{room.name}</span>
+      {room.email ? <span className={styles.attendeeEmail}>{room.email}</span> : null}
+      <span className={`${styles.attendeeStatus} ${statusClass}`}>
+        {statusIcon}
+        {room.status_label}
+      </span>
+      {room.calendar_access_error ? (
+        <p className={styles.slotParticipantAccessError}>{room.calendar_access_error}</p>
+      ) : null}
+    </li>
+  );
+}
 
 function ParticipantDetails({
   participant
@@ -69,9 +136,9 @@ function ParticipantDetails({
         </span>
       </div>
 
-      {participant.status === "busy" && participant.blocking_events.length ? (
+      {participant.status === "busy" && (participant.blocking_events ?? []).length ? (
         <ul className={styles.slotBlockingEvents}>
-          {participant.blocking_events.map((event, index) => (
+          {(participant.blocking_events ?? []).map((event, index) => (
             <li
               className={styles.slotBlockingEvent}
               key={`${event.event_label}-${event.event_start ?? index}`}
@@ -101,6 +168,80 @@ function ParticipantDetails({
   );
 }
 
+function ManualSlotCheckSummary({
+  loading,
+  available,
+  recommendations,
+  detailsError,
+  detailsErrorStage
+}: {
+  loading: boolean;
+  available: boolean | null;
+  recommendations: MeetingSlotRescheduleRecommendation[];
+  detailsError: string | null;
+  detailsErrorStage: string | null;
+}) {
+  if (loading) {
+    return (
+      <div className={styles.modalSlotChecking} role="status">
+        <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+        <span>Проверяем календари участников…</span>
+      </div>
+    );
+  }
+
+  if (detailsError) {
+    return (
+      <div className={styles.modalError} role="alert">
+        <AlertTriangle size={16} aria-hidden="true" />
+        <div className={styles.modalErrorContent}>
+          <span>{detailsError}</span>
+          {detailsErrorStage ? (
+            <span className={styles.modalErrorStage}>Этап: {detailsErrorStage}</span>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
+  if (available === null) return null;
+
+  if (available) {
+    return (
+      <div className={styles.modalSlotSuccess} role="status">
+        <CheckCircle2 size={16} aria-hidden="true" />
+        <span>Слот свободен</span>
+      </div>
+    );
+  }
+
+  return (
+    <div className={styles.modalSlotWarning} role="alert">
+      <AlertTriangle size={16} aria-hidden="true" />
+      <div>
+        <strong>Для освобождения слота нужно перенести:</strong>
+        {recommendations.length ? (
+          <ul className={styles.manualSlotRescheduleList}>
+            {recommendations.map((item, index) => (
+              <li key={`${item.participant_fio}-${item.event_label}-${index}`}>
+                <strong>{item.participant_fio}</strong>
+                {": "}
+                {item.event_label}
+                {item.event_time_label ? ` (${item.event_time_label})` : ""}
+                {item.reschedule_hint_label?.trim()
+                  ? ` → ${item.reschedule_hint_label.trim()}`
+                  : ""}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p>Есть конфликты в календарях — см. детали ниже.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function SlotCandidateCard({
   candidate,
   index,
@@ -121,10 +262,10 @@ function SlotCandidateCard({
   onToggle: () => void;
 }) {
   const slotTimes = resolveMeetingSlotCandidateTimes(candidate);
-  const freeNames = candidate.free_attendees.map((email) =>
+  const freeNames = (candidate.free_attendees ?? []).map((email) =>
     resolveMeetingAttendeeFioByEmail(attendeesByEmail, email)
   );
-  const busyNames = candidate.busy_attendees.map((email) =>
+  const busyNames = (candidate.busy_attendees ?? []).map((email) =>
     resolveMeetingAttendeeFioByEmail(attendeesByEmail, email)
   );
 
@@ -187,15 +328,27 @@ function SlotCandidateCard({
               <AlertTriangle size={16} aria-hidden="true" />
               <span>{details.error}</span>
             </div>
-          ) : details?.participants.length ? (
-            <ul className={styles.slotParticipantList}>
-              {details.participants.map((participant) => (
-                <ParticipantDetails
-                  key={`${participant.role}-${participant.fio}-${participant.email ?? "no-email"}`}
-                  participant={participant}
-                />
-              ))}
-            </ul>
+          ) : details ? (
+            (() => {
+              const people = filterMeetingSlotPreviewPeople(details.participants);
+              const room = resolveMeetingSlotPreviewRoom(details);
+
+              if (!people.length && !room) {
+                return <p className={styles.modalHint}>Нет данных по участникам для этого слота.</p>;
+              }
+
+              return (
+                <ul className={styles.slotParticipantList}>
+                  {people.map((participant) => (
+                    <ParticipantDetails
+                      key={`${participant.role}-${participant.fio}-${participant.email ?? "no-email"}`}
+                      participant={participant}
+                    />
+                  ))}
+                  {room ? <RoomDetailsCard room={room} variant="slot" /> : null}
+                </ul>
+              );
+            })()
           ) : (
             <p className={styles.modalHint}>Нет данных по участникам для этого слота.</p>
           )}
@@ -215,6 +368,13 @@ export default function MeetingAgentSlotPreviewModal({
   onConfirmApprove,
   isApproving = false,
   approveWithMemo = false,
+  approveButtonLabel: approveButtonLabelProp,
+  approveLoadingLabel: approveLoadingLabelProp,
+  mode = "agent",
+  previousSlotLabel = null,
+  previousSlotStart = null,
+  previousSlotEnd = null,
+  searchAfter = null,
   onFetchSlotDetails
 }: Props) {
   const [expandedCandidateIndex, setExpandedCandidateIndex] = useState<number | null>(null);
@@ -223,25 +383,101 @@ export default function MeetingAgentSlotPreviewModal({
   >({});
   const [detailsLoadingIndex, setDetailsLoadingIndex] = useState<number | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
+  const [allModeDetails, setAllModeDetails] = useState<MeetingAgentSlotPreviewDetails | null>(null);
+  const [allModeDetailsLoading, setAllModeDetailsLoading] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
+  const [manualSlot, setManualSlot] = useState<{ start: string; end: string; label: string } | null>(
+    null
+  );
 
   const isPartial = preview ? isMeetingSlotPreviewPartial(preview) : false;
+  const isAllMode = preview ? isMeetingSlotPreviewAssignable(preview) : false;
+  const autoModeSlot = preview && isAllMode ? resolveMeetingSlotPreview(preview) : null;
+  const activeSlot = manualSlot ?? autoModeSlot;
   const candidates = useMemo(() => preview?.slot_candidates?.slice(0, 3) ?? [], [preview?.slot_candidates]);
-  const attendeesByEmail = useMemo(
-    () => buildMeetingAttendeesByEmail(preview?.attendees ?? []),
-    [preview?.attendees]
+  const previewAttendees = preview?.attendees ?? [];
+  const previewPeople = useMemo(
+    () => filterPreviewAttendeePeople(previewAttendees),
+    [previewAttendees]
   );
+  const attendeesByEmail = useMemo(
+    () => buildMeetingAttendeesByEmail(previewAttendees),
+    [previewAttendees]
+  );
+  const onFetchSlotDetailsRef = useRef(onFetchSlotDetails);
+
+  useEffect(() => {
+    onFetchSlotDetailsRef.current = onFetchSlotDetails;
+  }, [onFetchSlotDetails]);
 
   const resetDetailsState = useCallback(() => {
     setExpandedCandidateIndex(null);
     setDetailsByIndex({});
     setDetailsLoadingIndex(null);
     setDetailsError(null);
+    setAllModeDetails(null);
+    setAllModeDetailsLoading(false);
+    setManualModalOpen(false);
+    setManualSlot(null);
   }, []);
 
   useEffect(() => {
     if (!open) return;
     resetDetailsState();
   }, [open, preview?.memo_ref_key, preview?.search_mode, resetDetailsState]);
+
+  useEffect(() => {
+    const previewRoomNow = preview ? resolveMeetingSlotPreviewRoom(preview) : null;
+    if (previewRoomNow && !manualSlot) {
+      setAllModeDetails(null);
+      setAllModeDetailsLoading(false);
+      return;
+    }
+
+    if (!open || !activeSlot) {
+      setAllModeDetails(null);
+      setAllModeDetailsLoading(false);
+      return;
+    }
+
+    const fetchDetails = onFetchSlotDetailsRef.current;
+    if (!fetchDetails) return;
+
+    let cancelled = false;
+    setAllModeDetailsLoading(true);
+    setAllModeDetails(null);
+
+    void fetchDetails(activeSlot.start, activeSlot.end)
+      .then((details) => {
+        if (!cancelled) setAllModeDetails(details);
+      })
+      .catch(() => {
+        if (!cancelled) setAllModeDetails(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAllModeDetailsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [open, activeSlot?.start, activeSlot?.end, preview, manualSlot]);
+
+  const manualDetailsPeople = useMemo(
+    () => (allModeDetails ? filterMeetingSlotPreviewPeople(allModeDetails.participants) : []),
+    [allModeDetails]
+  );
+  const manualSlotDefaults = useMemo(() => {
+    const autoSlot = preview && isAllMode ? resolveMeetingSlotPreview(preview) : null;
+    return resolveManualSlotDefaultsFromIso(autoSlot?.start ?? manualSlot?.start);
+  }, [preview, isAllMode, manualSlot?.start]);
+  const manualSlotAvailable = manualSlot ? isMeetingSlotDetailAvailable(allModeDetails) : null;
+  const manualSlotRecommendations = allModeDetails?.reschedule_recommendations ?? [];
+  const manualSlotDetailsError = allModeDetails?.error?.trim() || null;
+  const manualSlotDetailsErrorStage = formatMeetingSlotPreviewErrorStage(allModeDetails?.error_stage);
+  const manualSlotCheckComplete = Boolean(
+    manualSlot && !allModeDetailsLoading && allModeDetails && !manualSlotDetailsError
+  );
 
   const handleToggleCandidate = useCallback(
     async (index: number) => {
@@ -266,14 +502,14 @@ export default function MeetingAgentSlotPreviewModal({
 
       if (detailsByIndex[index]) return;
 
-      if (!onFetchSlotDetails) {
+      if (!onFetchSlotDetailsRef.current) {
         setDetailsError("Загрузка деталей недоступна.");
         return;
       }
 
       setDetailsLoadingIndex(index);
       try {
-        const details = await onFetchSlotDetails(slotTimes.start, slotTimes.end);
+        const details = await onFetchSlotDetailsRef.current(slotTimes.start, slotTimes.end);
         setDetailsByIndex((current) => ({ ...current, [index]: details }));
       } catch (error) {
         const message =
@@ -285,7 +521,7 @@ export default function MeetingAgentSlotPreviewModal({
         setDetailsLoadingIndex(null);
       }
     },
-    [candidates, detailsByIndex, expandedCandidateIndex, onFetchSlotDetails]
+    [candidates, detailsByIndex, expandedCandidateIndex]
   );
 
   if (!open) return null;
@@ -293,16 +529,70 @@ export default function MeetingAgentSlotPreviewModal({
   const previewError = preview?.error?.trim() || null;
   const previewErrorStage = formatMeetingSlotPreviewErrorStage(preview?.error_stage);
   const hasPreviewError = Boolean(previewError);
-  const isAllMode = preview ? isMeetingSlotPreviewAssignable(preview) : false;
   const slotLabel = preview ? resolveMeetingSlotPreviewLabel(preview) : null;
   const slotDuration = preview ? resolveMeetingSlotPreviewDuration(preview) : null;
-  const canApprove = Boolean(preview && !hasPreviewError && !requestError && isAllMode);
+  const previewRoom = manualSlot
+    ? allModeDetails
+      ? resolveMeetingSlotPreviewRoom(allModeDetails)
+      : null
+    : preview
+      ? resolveMeetingSlotPreviewRoom(preview) ??
+        (allModeDetails ? resolveMeetingSlotPreviewRoom(allModeDetails) : null)
+      : null;
+  const showManualDetails = Boolean(manualSlot);
+  const manualSlotReady =
+    !manualSlot || (manualSlotCheckComplete && manualSlotAvailable === true);
+  const hasActiveSlotContext = Boolean(
+    activeSlot && !requestError && (isAllMode || manualSlot) && (!hasPreviewError || manualSlot)
+  );
+  const canShowAgentApprove = mode === "agent" && Boolean(onConfirmApprove) && hasActiveSlotContext;
+  const canShowRescheduleApprove =
+    mode === "reschedule" && Boolean(onConfirmApprove) && hasActiveSlotContext;
+  const isApproveEnabled = !isApproving && manualSlotReady;
+  const approveDisabledTitle = manualSlot && allModeDetailsLoading
+    ? "Проверяем доступность слота…"
+    : manualSlot && manualSlotDetailsError
+      ? "Не удалось проверить слот"
+      : manualSlot && manualSlotCheckComplete && manualSlotAvailable === false
+        ? "Слот занят — выберите другое время"
+        : manualSlot && !manualSlotCheckComplete
+          ? "Дождитесь проверки слота"
+          : undefined;
+  const canScheduleManually = Boolean(preview && onFetchSlotDetails && !loading && !requestError);
 
-  const approveButtonLabel = approveWithMemo ? "Согласовать и утвердить" : "Утвердить";
-  const approveLoadingLabel = approveWithMemo ? "Согласуем и утверждаем…" : "Утверждаем…";
+  const modalTitle = mode === "reschedule" ? "Перенести совещание" : "Проверка календарей";
+  const slotHighlightTitle = manualSlot
+    ? "Выбранный слот"
+    : mode === "reschedule"
+      ? "Предлагаемый слот"
+      : "Общий свободный слот";
+  const displayedSlotLabel = manualSlot
+    ? allModeDetails?.slot_label ?? manualSlot.label
+    : slotLabel;
+  const approveButtonLabel =
+    approveButtonLabelProp ?? (approveWithMemo ? "Согласовать и утвердить" : "Утвердить");
+  const approveLoadingLabel =
+    approveLoadingLabelProp ?? (approveWithMemo ? "Согласуем и утверждаем…" : "Утверждаем…");
+  const currentSlotLabel =
+    previousSlotStart && previousSlotEnd
+      ? formatMeetingTime(previousSlotStart, previousSlotEnd)
+      : previousSlotLabel;
 
   return (
-    <div className={styles.modalOverlay} onClick={onClose} role="presentation">
+    <>
+      <MeetingAgentManualSlotModal
+        open={manualModalOpen}
+        durationMinutes={slotDuration ?? 60}
+        initialDate={manualSlotDefaults.initialDate}
+        initialStartTime={manualSlotDefaults.initialStartTime}
+        onClose={() => setManualModalOpen(false)}
+        onApply={(slot) => {
+          setManualSlot(slot);
+          setManualModalOpen(false);
+        }}
+      />
+
+      <div className={styles.modalOverlay} onClick={onClose} role="presentation">
       <div
         className={styles.modalCard}
         onClick={(event) => event.stopPropagation()}
@@ -311,7 +601,7 @@ export default function MeetingAgentSlotPreviewModal({
         aria-labelledby="meeting-slot-preview-title"
       >
         <div className={styles.modalHeader}>
-          <h2 id="meeting-slot-preview-title">Проверка календарей</h2>
+          <h2 id="meeting-slot-preview-title">{modalTitle}</h2>
           <button type="button" className={styles.modalCloseButton} onClick={onClose} aria-label="Закрыть">
             <X size={18} aria-hidden="true" />
           </button>
@@ -329,6 +619,17 @@ export default function MeetingAgentSlotPreviewModal({
           </div>
         ) : preview ? (
           <>
+            {mode === "reschedule" && (currentSlotLabel || searchAfter) ? (
+              <div className={styles.modalRescheduleContext}>
+                {currentSlotLabel ? (
+                  <p>
+                    <strong>Текущий слот:</strong> {currentSlotLabel}
+                  </p>
+                ) : null}
+                {searchAfter ? <p className={styles.modalHint}>Ищем после: {searchAfter}</p> : null}
+              </div>
+            ) : null}
+
             {hasPreviewError ? (
               <div className={styles.modalError} role="alert">
                 <AlertTriangle size={16} aria-hidden="true" />
@@ -341,19 +642,37 @@ export default function MeetingAgentSlotPreviewModal({
               </div>
             ) : (
               <>
-                {isAllMode && slotLabel ? (
+                {(isAllMode || manualSlot) && displayedSlotLabel ? (
                   <div className={styles.modalSlotHighlight}>
-                    <strong>Общий свободный слот</strong>
-                    <p>{slotLabel}</p>
+                    <strong>{slotHighlightTitle}</strong>
+                    <p>{displayedSlotLabel}</p>
                     {slotDuration ? (
                       <span className={styles.modalSlotMeta}>Длительность: {slotDuration} мин</span>
                     ) : null}
-                    {preview.coverage ? (
+                    {manualSlot ? (
+                      manualSlotCheckComplete ? (
+                        <span className={styles.modalSlotMeta}>
+                          {manualSlotAvailable ? "Слот свободен" : "Слот занят"}
+                        </span>
+                      ) : allModeDetailsLoading ? (
+                        <span className={styles.modalSlotMeta}>Проверяем доступность…</span>
+                      ) : null
+                    ) : preview.coverage ? (
                       <span className={styles.modalSlotMeta}>
                         Покрытие: {formatMeetingSlotCoverage(preview.coverage)}
                       </span>
                     ) : null}
                   </div>
+                ) : null}
+
+                {manualSlot ? (
+                  <ManualSlotCheckSummary
+                    loading={allModeDetailsLoading}
+                    available={manualSlotCheckComplete ? manualSlotAvailable : null}
+                    recommendations={manualSlotRecommendations}
+                    detailsError={manualSlotDetailsError}
+                    detailsErrorStage={manualSlotDetailsErrorStage}
+                  />
                 ) : null}
 
                 {isPartial ? (
@@ -395,11 +714,46 @@ export default function MeetingAgentSlotPreviewModal({
                   </>
                 ) : null}
 
-                {isAllMode && preview.attendees.length ? (
+                {showManualDetails ? (
+                  <section className={styles.modalSection} aria-label="Проверенные календари">
+                    <h3>Кого проверяли</h3>
+                    {allModeDetailsLoading && !manualDetailsPeople.length ? (
+                      <div className={styles.modalSlotChecking} role="status">
+                        <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                        <span>Загружаем статусы участников…</span>
+                      </div>
+                    ) : allModeDetails?.error ? (
+                      <div className={styles.modalError} role="alert">
+                        <AlertTriangle size={16} aria-hidden="true" />
+                        <span>{allModeDetails.error}</span>
+                      </div>
+                    ) : (
+                      <ul className={styles.slotParticipantList}>
+                        {manualDetailsPeople.map((participant) => (
+                          <ParticipantDetails
+                            key={`${participant.role}-${participant.fio}-${participant.email ?? "no-email"}`}
+                            participant={participant}
+                          />
+                        ))}
+                        {allModeDetailsLoading && !previewRoom ? (
+                          <li className={styles.attendeeItem}>
+                            <span className={styles.attendeeRole}>Переговорная</span>
+                            <span className={styles.attendeeStatus}>
+                              <Loader2 size={14} className={styles.spinner} aria-hidden="true" />
+                              Проверяем календарь…
+                            </span>
+                          </li>
+                        ) : previewRoom ? (
+                          <RoomDetailsCard room={previewRoom} variant="slot" />
+                        ) : null}
+                      </ul>
+                    )}
+                  </section>
+                ) : isAllMode && (previewPeople.length || allModeDetailsLoading || previewRoom) ? (
                   <section className={styles.modalSection} aria-label="Проверенные календари">
                     <h3>Кого проверяли</h3>
                     <ul className={styles.attendeeList}>
-                      {preview.attendees.map((attendee) => (
+                      {previewPeople.map((attendee) => (
                         <li className={styles.attendeeItem} key={`${attendee.role}-${attendee.fio}`}>
                           <span className={styles.attendeeRole}>{getMeetingAttendeeRoleLabel(attendee)}</span>
                           <span className={styles.attendeeName}>{attendee.fio}</span>
@@ -431,6 +785,17 @@ export default function MeetingAgentSlotPreviewModal({
                           </span>
                         </li>
                       ))}
+                      {allModeDetailsLoading && !previewRoom ? (
+                        <li className={styles.attendeeItem}>
+                          <span className={styles.attendeeRole}>Переговорная</span>
+                          <span className={styles.attendeeStatus}>
+                            <Loader2 size={14} className={styles.spinner} aria-hidden="true" />
+                            Проверяем календарь…
+                          </span>
+                        </li>
+                      ) : previewRoom ? (
+                        <RoomDetailsCard room={previewRoom} />
+                      ) : null}
                     </ul>
                   </section>
                 ) : null}
@@ -446,38 +811,59 @@ export default function MeetingAgentSlotPreviewModal({
           </>
         ) : null}
 
-        <div className={styles.modalActions}>
-          <button type="button" className={styles.secondaryButton} onClick={onClose} disabled={isApproving}>
-            Закрыть
-          </button>
-          {canApprove && onConfirmApprove ? (
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled={isApproving}
-              onClick={onConfirmApprove}
-            >
-              {isApproving ? (
-                <>
-                  <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-                  {approveLoadingLabel}
-                </>
-              ) : (
-                approveButtonLabel
-              )}
-            </button>
-          ) : isPartial && !hasPreviewError ? (
-            <button
-              type="button"
-              className={styles.primaryButton}
-              disabled
-              title="Утверждение недоступно без общего слота"
-            >
-              Утвердить
-            </button>
-          ) : null}
+        <div className={`${styles.modalActions} ${styles.modalActionsSplit}`}>
+          <div className={styles.modalActionsStart}>
+            {canScheduleManually ? (
+              <button
+                type="button"
+                className={styles.ghostButton}
+                onClick={() => setManualModalOpen(true)}
+                disabled={isApproving}
+              >
+                Запланировать вручную
+              </button>
+            ) : null}
+          </div>
+          <div className={styles.modalActionsEnd}>
+            {canShowAgentApprove || canShowRescheduleApprove ? (
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={!isApproveEnabled}
+                title={approveDisabledTitle}
+                onClick={() =>
+                  onConfirmApprove?.(
+                    manualSlot
+                      ? { start: manualSlot.start, end: manualSlot.end }
+                      : activeSlot
+                        ? { start: activeSlot.start, end: activeSlot.end }
+                        : undefined
+                  )
+                }
+              >
+                {isApproving ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                    {approveLoadingLabel}
+                  </>
+                ) : (
+                  approveButtonLabel
+                )}
+              </button>
+            ) : isPartial && !hasPreviewError && mode === "agent" ? (
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled
+                title="Утверждение недоступно без общего слота"
+              >
+                Утвердить
+              </button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>
+    </>
   );
 }

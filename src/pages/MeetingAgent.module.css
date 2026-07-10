@@ -277,6 +277,8 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .queueCardFieldPerson {
@@ -834,6 +836,43 @@
   line-height: 1.45;
 }
 
+.modalSlotSuccess {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+  border: 1px solid var(--color-success-border, #86efac);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.modalSlotChecking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted, #f8fafc);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.manualSlotRescheduleList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-weight: 500;
+}
+
+.manualSlotRescheduleList li + li {
+  margin-top: 6px;
+}
+
 .previewTableWrap {
   overflow-x: auto;
   border: 1px solid var(--color-border);
@@ -1291,6 +1330,24 @@
   padding-top: 4px;
 }
 
+.modalActionsSplit {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.modalActionsStart,
+.modalActionsEnd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modalActionsEnd {
+  margin-left: auto;
+}
+
 .stateMessage,
 .queueEmpty,
 .detailsEmpty {
@@ -1444,8 +1501,12 @@
 
 .registryStatsRow {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 8px;
+}
+
+.registryStatCardCancelled strong {
+  color: var(--color-danger-text);
 }
 
 .registryStatCard {
@@ -1474,8 +1535,39 @@
 }
 
 .registryWorkspace {
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
   align-items: start;
+}
+
+.registryQueueCardFields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px 12px;
+}
+
+.registryQueueCardFieldWide {
+  grid-column: 1 / -1;
+}
+
+.registryQueueCardFieldWide dd {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.registryQueueCardFieldParticipants {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.registryQueueCardFieldParticipants dt {
+  flex-shrink: 0;
+}
+
+.registryQueueCardFieldParticipants dd {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
 }
 
 .registryListPanel {
@@ -1550,6 +1642,12 @@
   text-align: right;
 }
 
+.registryStageBadge.registryStageBadgeCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
 .registryStageBadgeCompact {
   flex-shrink: 0;
   padding: 3px 8px;
@@ -1560,6 +1658,12 @@
   font-weight: 800;
   line-height: 1.25;
   white-space: nowrap;
+}
+
+.registryStageBadgeCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
 }
 
 .registryProgressDots {
@@ -1619,6 +1723,12 @@
   border-color: var(--color-border-accent);
 }
 
+.registryStepCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-color: var(--color-danger-border);
+}
+
 .registryStepIcon {
   display: inline-flex;
   flex-shrink: 0;
@@ -1658,8 +1768,182 @@
   border-style: dashed;
 }
 
+.registryEventCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-color: var(--color-danger-border);
+}
+
+.registrySuccessNote {
+  margin: 8px 0 0;
+  color: var(--color-success-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.modalOverlayNested {
+  z-index: 1100;
+}
+
+.manualSlotModalCard {
+  width: min(420px, 100%);
+}
+
+.manualSlotCalendar {
+  display: grid;
+  gap: 8px;
+}
+
+.manualSlotCalendarHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.manualSlotCalendarHead strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+}
+
+.manualSlotNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.manualSlotWeekdays,
+.manualSlotDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.manualSlotWeekdays span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.manualSlotDay,
+.manualSlotDayEmpty {
+  min-height: 34px;
+}
+
+.manualSlotDay {
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.manualSlotDaySelected {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.manualSlotDayDisabled {
+  color: var(--color-placeholder);
+  background: var(--color-hover);
+  cursor: not-allowed;
+}
+
+.manualSlotTimeFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.manualSlotTimeField {
+  display: grid;
+  gap: 6px;
+}
+
+.manualSlotTimeField span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.manualSlotTimeField input {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.manualSlotPreviewLabel {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.manualSlotValidationError {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modalActions .ghostButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.modalRescheduleContext {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.modalRescheduleContext p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.modalRescheduleContext strong {
+  color: var(--color-text-strong);
+}
+
 .registryActionRow {
   gap: 8px;
+}
+
+.registryActionRow .secondaryButton,
+.registryActionRow .rejectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .registryActionRow .ghostButton {

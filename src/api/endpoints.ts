@@ -102,6 +102,12 @@ import type {
   MeetingMemoApproveRead,
   MeetingMemoApproveRequest,
   MeetingRegistryContext,
+  MeetingRegistryCancelRequest,
+  MeetingRegistryCancelResponse,
+  MeetingRegistryRescheduleSlotPreviewRequest,
+  MeetingRegistryRescheduleSlotPreviewResponse,
+  MeetingRegistryRescheduleApproveRequest,
+  MeetingRegistryRescheduleApproveResponse,
   MeetingSlot,
   MeetingSlotsRequest,
   PorucheniyaDashboardParams,
@@ -134,6 +140,27 @@ export const meetingsApi = {
         params: stage ? { stage } : undefined,
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
       })
+      .then((r) => r.data),
+  cancelRegistryMeeting: (memoRefKey: string, payload?: MeetingRegistryCancelRequest) =>
+    longRunningApiClient
+      .post<MeetingRegistryCancelResponse>(`/meetings/registry/${memoRefKey}/cancel`, payload ?? {})
+      .then((r) => r.data),
+  rescheduleSlotPreview: (memoRefKey: string, payload?: MeetingRegistryRescheduleSlotPreviewRequest) =>
+    longRunningApiClient
+      .post<MeetingRegistryRescheduleSlotPreviewResponse>(
+        `/meetings/registry/${memoRefKey}/reschedule/slot-preview`,
+        payload ?? {}
+      )
+      .then((r) => r.data),
+  approveRegistryReschedule: (
+    memoRefKey: string,
+    payload: MeetingRegistryRescheduleApproveRequest
+  ) =>
+    longRunningApiClient
+      .post<MeetingRegistryRescheduleApproveResponse>(
+        `/meetings/registry/${memoRefKey}/reschedule/approve`,
+        payload
+      )
       .then((r) => r.data),
   getMemoDetail: (memoRefKey: string, options?: { forceRefresh?: boolean }) =>
     apiClient

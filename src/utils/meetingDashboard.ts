@@ -8,7 +8,8 @@ import type {
   MeetingSlotCandidate,
   MeetingSlotCoverage,
   MeetingSlotBlockingEvent,
-  MeetingSlotPreviewParticipant
+  MeetingSlotPreviewParticipant,
+  MeetingSlotRoomStatus
 } from "@/types/meetings";
 
 export type MeetingQueueFilter = "today" | "approved" | "unapproved" | "rejected";
@@ -49,8 +50,27 @@ export function formatMeetingTime(
   end: string | null | undefined
 ): string {
   if (!start && !end) return "—";
-  if (start && end) return `${start}–${end}`;
-  return start ?? end ?? "—";
+  if (start && end) return formatMeetingSlot({ start, end });
+  const single = start ?? end;
+  return single ? formatMeetingDateTime(single) : "—";
+}
+
+const MANAGER_LOCATION_PREFIX = "Руководитель совещания ";
+
+/** Переговорная из строки места Outlook-приглашения (без ФИО руководителя). */
+export function meetingPlaceFromInviteLocation(location: string | null | undefined): string {
+  const text = location?.trim();
+  if (!text) return "—";
+  if (text.startsWith(MANAGER_LOCATION_PREFIX)) {
+    const rest = text.slice(MANAGER_LOCATION_PREFIX.length);
+    const commaIndex = rest.indexOf(", ");
+    if (commaIndex >= 0) {
+      const place = rest.slice(commaIndex + 2).trim();
+      return place || "—";
+    }
+    return "—";
+  }
+  return text;
 }
 
 export function formatShortPersonName(fullName?: string | null): string {
@@ -153,6 +173,52 @@ export function formatMeetingSlot(slot: { start: string; end: string }): string 
     return `${date}, ${startTime}–${endTime}`;
   }
   return `${formatMeetingDateTime(slot.start)} – ${formatMeetingDateTime(slot.end)}`;
+}
+
+function padDatePart(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+export function formatMeetingIsoWithOffset(date: Date): string {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? "+" : "-";
+  const absoluteOffset = Math.abs(offsetMinutes);
+  const offsetHours = padDatePart(Math.floor(absoluteOffset / 60));
+  const offsetMins = padDatePart(absoluteOffset % 60);
+
+  return (
+    `${date.getFullYear()}-${padDatePart(date.getMonth() + 1)}-${padDatePart(date.getDate())}` +
+    `T${padDatePart(date.getHours())}:${padDatePart(date.getMinutes())}:00` +
+    `${sign}${offsetHours}:${offsetMins}`
+  );
+}
+
+export function buildMeetingSlotRangeFromLocal(
+  date: string,
+  startTime: string,
+  durationMinutes: number
+): { start: string; end: string } | null {
+  const [year, month, day] = date.split("-").map((part) => Number(part));
+  const [hours, minutes] = startTime.split(":").map((part) => Number(part));
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    durationMinutes <= 0
+  ) {
+    return null;
+  }
+
+  const start = new Date(year, month - 1, day, hours, minutes, 0);
+  if (Number.isNaN(start.getTime())) return null;
+
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+  return {
+    start: formatMeetingIsoWithOffset(start),
+    end: formatMeetingIsoWithOffset(end)
+  };
 }
 
 export function getMeetingItemTags(
@@ -275,7 +341,7 @@ export function getMeetingParticipantNames(
   application: MeetingApplication,
   queueItem?: MeetingDashboardItem | null
 ): string[] {
-  const names = application.participants
+  const names = (application.participants ?? [])
     .map((participant) => participant.full_name?.trim())
     .filter((name): name is string => Boolean(name));
 
@@ -395,7 +461,8 @@ export function countPassedStoChecklist(detail: MeetingMemoDetail): number {
 const ATTENDEE_ROLE_LABELS: Record<string, string> = {
   initiator: "Инициатор",
   manager: "Руководитель",
-  participant: "Участник"
+  participant: "Участник",
+  room: "Переговорная"
 };
 
 export function getMeetingAttendeeRoleLabel(attendee: MeetingAttendee): string {
@@ -481,7 +548,8 @@ export function formatMeetingSlotPreviewErrorStage(stage?: string | null): strin
     participants: "участники",
     email: "e-mail",
     calendar: "календарь",
-    no_slot: "нет слота"
+    no_slot: "нет слота",
+    slot: "слот"
   };
   return labels[stage] ?? stage;
 }
@@ -516,6 +584,7 @@ export function resolveMeetingSlotCandidateTimes(
 }
 
 export function formatMeetingBlockingEventRange(event: MeetingSlotBlockingEvent): string {
+  if (event.event_time_label?.trim()) return event.event_time_label.trim();
   if (event.event_start && event.event_end) {
     return formatMeetingTime(event.event_start, event.event_end);
   }
@@ -530,6 +599,62 @@ export function formatMeetingSlotParticipantStatus(
   return "Неизвестно";
 }
 
+export function filterPreviewAttendeePeople(attendees: MeetingAttendee[]): MeetingAttendee[] {
+  return (attendees ?? []).filter((attendee) => attendee.role !== "room");
+}
+
+export function filterMeetingSlotPreviewPeople(
+  participants?: MeetingSlotPreviewParticipant[] | null
+): MeetingSlotPreviewParticipant[] {
+  return (participants ?? []).filter((participant) => participant.role !== "room");
+}
+
+export function resolveMeetingSlotRoomFromAttendee(attendee: MeetingAttendee): MeetingSlotRoomStatus {
+  const status =
+    attendee.status ??
+    (attendee.found ? "free" : attendee.found === false ? "unknown" : "unknown");
+
+  return {
+    name: attendee.fio,
+    email: attendee.email,
+    status,
+    status_label:
+      attendee.status_label?.trim() ||
+      (status === "free" ? "свободна" : status === "busy" ? "занята" : "неизвестно"),
+    available: status === "free"
+  };
+}
+
+export function resolveMeetingSlotPreviewRoom(
+  source: {
+    room?: MeetingSlotRoomStatus | null;
+    attendees?: MeetingAttendee[];
+    participants?: MeetingSlotPreviewParticipant[] | null;
+  }
+): MeetingSlotRoomStatus | null {
+  if (source.room) return source.room;
+
+  const roomAttendee = (source.attendees ?? []).find((attendee) => attendee.role === "room");
+  if (roomAttendee) return resolveMeetingSlotRoomFromAttendee(roomAttendee);
+
+  const roomParticipant = (source.participants ?? []).find((participant) => participant.role === "room");
+  if (!roomParticipant) return null;
+
+  return {
+    name: roomParticipant.fio,
+    email: roomParticipant.email,
+    status: roomParticipant.status,
+    status_label:
+      roomParticipant.status === "free"
+        ? "свободна"
+        : roomParticipant.status === "busy"
+          ? "занята"
+          : "неизвестно",
+    available: roomParticipant.status === "free",
+    calendar_access_error: roomParticipant.calendar_access_error
+  };
+}
+
 export function formatMeetingConflictMovability(movability?: string | null): string {
   if (!movability) return "—";
   const normalized = movability.trim().toLowerCase();
@@ -537,6 +662,45 @@ export function formatMeetingConflictMovability(movability?: string | null): str
   if (normalized === "medium") return "Средняя";
   if (normalized === "low") return "Низкая";
   return movability;
+}
+
+export function isMeetingSlotDetailAvailable(
+  details: {
+    slot_available?: boolean | null;
+    participants?: MeetingSlotPreviewParticipant[] | null;
+    room?: MeetingSlotRoomStatus | null;
+    error?: string | null;
+  } | null | undefined
+): boolean | null {
+  if (!details || details.error) return null;
+  if (typeof details.slot_available === "boolean") return details.slot_available;
+
+  const people = filterMeetingSlotPreviewPeople(details.participants);
+  if (!people.length) return null;
+
+  const participantsFree = people.every((participant) => participant.status === "free");
+  const roomFree = !details.room || details.room.status !== "busy";
+  return participantsFree && roomFree;
+}
+
+export function resolveManualSlotDefaultsFromIso(
+  iso: string | null | undefined
+): { initialDate?: string; initialStartTime?: string } {
+  if (!iso?.trim()) return {};
+
+  const parsed = new Date(iso);
+  if (Number.isNaN(parsed.getTime())) return {};
+
+  const year = parsed.getFullYear();
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const hours = String(parsed.getHours()).padStart(2, "0");
+  const minutes = String(parsed.getMinutes()).padStart(2, "0");
+
+  return {
+    initialDate: `${year}-${month}-${day}`,
+    initialStartTime: `${hours}:${minutes}`
+  };
 }
 
 export function resolveMeetingSlotPreviewLabel(preview: MeetingAgentSlotPreview): string | null {

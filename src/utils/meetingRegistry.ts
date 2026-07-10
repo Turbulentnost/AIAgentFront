@@ -1,5 +1,9 @@
 import type {
+  MeetingRegistryCancelResponse,
+  MeetingRegistryContext,
   MeetingRegistryItem,
+  MeetingRegistryReschedulableStage,
+  MeetingRegistryRescheduleApproveResponse,
   MeetingRegistryStage,
   MeetingRegistryStageFilter
 } from "@/types/meetings";
@@ -13,6 +17,8 @@ export interface MeetingRegistryViewItem {
   memoNumber: string;
   title: string;
   meetingAtLabel: string;
+  slotStart: string | null;
+  slotEnd: string | null;
   location: string | null;
   initiator: string;
   manager: string;
@@ -20,8 +26,15 @@ export interface MeetingRegistryViewItem {
   stage: MeetingRegistryStage;
   invitationsSentAt: string;
   protocolNumber: string | null;
+  cancelledAt: string | null;
   updatedAt: string;
 }
+
+export const meetingRegistryCancelledStage = {
+  id: "cancelled" as const,
+  label: "Отменено",
+  shortLabel: "Отменено"
+};
 
 export const meetingRegistryStages: {
   id: MeetingRegistryStepStage;
@@ -47,6 +60,8 @@ export function mapMeetingRegistryItem(item: MeetingRegistryItem): MeetingRegist
     memoNumber: item.memo_number ?? "—",
     title: item.title ?? item.subject ?? "Заявка на совещание",
     meetingAtLabel,
+    slotStart: item.slot_start,
+    slotEnd: item.slot_end,
     location: item.location,
     initiator: item.initiator_name ?? "—",
     manager: item.manager_name ?? "—",
@@ -54,11 +69,15 @@ export function mapMeetingRegistryItem(item: MeetingRegistryItem): MeetingRegist
     stage: item.stage,
     invitationsSentAt: item.invitations_sent_at,
     protocolNumber: item.protocol_number,
+    cancelledAt: item.cancelled_at,
     updatedAt: item.updated_at
   };
 }
 
 export function getMeetingRegistryStageLabel(stage: MeetingRegistryStage): string {
+  if (stage === "cancelled") {
+    return meetingRegistryCancelledStage.label;
+  }
   return (
     meetingRegistryStages.find((entry) => entry.id === stage)?.label ??
     stage
@@ -66,6 +85,9 @@ export function getMeetingRegistryStageLabel(stage: MeetingRegistryStage): strin
 }
 
 export function getMeetingRegistryStageIndex(stage: MeetingRegistryStage): number {
+  if (stage === "cancelled") {
+    return 1;
+  }
   const executionIndex = meetingRegistryStages.findIndex((entry) => entry.id === stage);
   return executionIndex >= 0 ? executionIndex : 1;
 }
@@ -86,7 +108,8 @@ export function defaultRegistryStageCounts(): Record<string, number> {
     invitations_sent: 0,
     protocol_created: 0,
     protocol_conducted: 0,
-    meeting_completed: 0
+    meeting_completed: 0,
+    cancelled: 0
   };
 }
 
@@ -98,4 +121,99 @@ export function filterMeetingRegistryItems(
     return items;
   }
   return items.filter((item) => item.stage === filter);
+}
+
+export function isMeetingRegistryReschedulable(
+  stage: MeetingRegistryStage
+): stage is MeetingRegistryReschedulableStage {
+  return stage === "invitations_sent" || stage === "cancelled";
+}
+
+export function patchRegistryContextAfterCancel(
+  data: MeetingRegistryContext,
+  refKey: string,
+  result: MeetingRegistryCancelResponse,
+  stageFilter: MeetingRegistryStageFilter = "all"
+): MeetingRegistryContext {
+  const target = data.items.find((item) => item.ref_key === refKey);
+  if (!target) return data;
+
+  const wasAlreadyCancelled = target.stage === "cancelled";
+  const cancelledAt = result.cancelled_at ?? target.cancelled_at ?? new Date().toISOString();
+  const updatedItem: MeetingRegistryItem = {
+    ...target,
+    stage: "cancelled",
+    cancelled_at: cancelledAt,
+    updated_at: cancelledAt
+  };
+
+  let nextItems = data.items.map((item) => (item.ref_key === refKey ? updatedItem : item));
+
+  if (
+    stageFilter !== "all" &&
+    stageFilter !== "approved" &&
+    stageFilter !== "cancelled"
+  ) {
+    nextItems = nextItems.filter((item) => item.ref_key !== refKey);
+  }
+
+  const nextCounts = { ...data.stage_counts };
+  if (!wasAlreadyCancelled) {
+    const previousStage = target.stage;
+    if (previousStage && typeof nextCounts[previousStage] === "number") {
+      nextCounts[previousStage] = Math.max(0, nextCounts[previousStage] - 1);
+    }
+    nextCounts.cancelled = (nextCounts.cancelled ?? 0) + 1;
+  }
+
+  return {
+    ...data,
+    items: nextItems,
+    stage_counts: nextCounts
+  };
+}
+
+export function patchRegistryContextAfterReschedule(
+  data: MeetingRegistryContext,
+  refKey: string,
+  result: MeetingRegistryRescheduleApproveResponse,
+  stageFilter: MeetingRegistryStageFilter = "all"
+): MeetingRegistryContext {
+  const target = data.items.find((item) => item.ref_key === refKey);
+  if (!target) return data;
+
+  const wasCancelled = target.stage === "cancelled";
+  const updatedAt = new Date().toISOString();
+  const updatedItem: MeetingRegistryItem = {
+    ...target,
+    stage: "invitations_sent",
+    slot_start: result.start,
+    slot_end: result.end,
+    location: result.location ?? target.location,
+    subject: result.subject ?? target.subject,
+    cancelled_at: null,
+    updated_at: updatedAt
+  };
+
+  let nextItems = data.items.map((item) => (item.ref_key === refKey ? updatedItem : item));
+
+  if (stageFilter !== "all" && stageFilter !== "approved") {
+    if (wasCancelled && stageFilter === "cancelled") {
+      nextItems = nextItems.filter((item) => item.ref_key !== refKey);
+    } else if (!wasCancelled && stageFilter !== "invitations_sent") {
+      nextItems = nextItems.filter((item) => item.ref_key !== refKey);
+    }
+  }
+
+  const nextCounts = { ...data.stage_counts };
+  if (wasCancelled) {
+    nextCounts.cancelled = Math.max(0, (nextCounts.cancelled ?? 0) - 1);
+    nextCounts.invitations_sent = (nextCounts.invitations_sent ?? 0) + 1;
+  }
+
+  return {
+    ...data,
+    items: nextItems,
+    stage_counts: nextCounts
+  };
 }

@@ -172,7 +172,8 @@ export type MeetingSlotPreviewErrorStage =
   | "participants"
   | "email"
   | "calendar"
-  | "no_slot";
+  | "no_slot"
+  | "slot";
 
 export interface MeetingSlotCoverage {
   free: number;
@@ -211,6 +212,7 @@ export interface MeetingSlotCandidate {
 export interface MeetingAgentSlotPreviewDetailsRequest {
   slot_start: string;
   slot_end: string;
+  duration_minutes?: number;
 }
 
 export interface MeetingSlotBlockingEvent {
@@ -218,6 +220,7 @@ export interface MeetingSlotBlockingEvent {
   event_subject?: string | null;
   event_start?: string | null;
   event_end?: string | null;
+  event_time_label?: string | null;
   organizer?: string | null;
   movability?: string | null;
   movability_reason?: string | null;
@@ -236,6 +239,13 @@ export interface MeetingSlotPreviewParticipant {
   calendar_access_error?: string | null;
 }
 
+export interface MeetingSlotRescheduleRecommendation {
+  participant_fio: string;
+  event_label: string;
+  event_time_label?: string | null;
+  reschedule_hint_label?: string | null;
+}
+
 export interface MeetingAgentSlotPreviewDetails {
   memo_ref_key: string;
   slot_start: string;
@@ -243,7 +253,20 @@ export interface MeetingAgentSlotPreviewDetails {
   slot_label: string;
   duration_minutes?: number | null;
   participants: MeetingSlotPreviewParticipant[];
+  room?: MeetingSlotRoomStatus | null;
+  slot_available?: boolean | null;
+  reschedule_recommendations?: MeetingSlotRescheduleRecommendation[];
   error?: string | null;
+  error_stage?: MeetingSlotPreviewErrorStage | null;
+}
+
+export interface MeetingSlotRoomStatus {
+  name: string;
+  email?: string | null;
+  status: "free" | "busy" | "unknown";
+  status_label: string;
+  available?: boolean | null;
+  calendar_access_error?: string | null;
 }
 
 export interface MeetingAttendee {
@@ -252,6 +275,8 @@ export interface MeetingAttendee {
   role: string;
   role_label?: string;
   found: boolean;
+  status?: "free" | "busy" | "unknown";
+  status_label?: string | null;
   nearest_slot_start?: string | null;
   nearest_slot_end?: string | null;
   nearest_slot_label?: string | null;
@@ -268,6 +293,7 @@ export interface MeetingAgentSlotPreview {
   slot_candidates?: MeetingSlotCandidate[];
   conflicts?: MeetingSlotConflict[];
   attendees: MeetingAttendee[];
+  room?: MeetingSlotRoomStatus | null;
   missing_emails?: string[];
   error?: string | null;
   error_stage?: MeetingSlotPreviewErrorStage | null;
@@ -332,7 +358,8 @@ export type MeetingRegistryStage =
   | "invitations_sent"
   | "protocol_created"
   | "protocol_conducted"
-  | "meeting_completed";
+  | "meeting_completed"
+  | "cancelled";
 
 export type MeetingRegistryStageFilter = MeetingRegistryStage | "all" | "approved";
 
@@ -351,7 +378,66 @@ export interface MeetingRegistryItem {
   invitations_sent_at: string;
   approved_at: string | null;
   protocol_number: string | null;
+  cancelled_at: string | null;
   updated_at: string;
+}
+
+export interface MeetingRegistryCancelRequest {
+  message?: string;
+}
+
+export interface MeetingRegistryCancelResponse {
+  ref_key: string;
+  stage: "cancelled";
+  cancelled: boolean;
+  outlook_cancelled: boolean;
+  message: string | null;
+  cancelled_at: string | null;
+}
+
+export type MeetingRegistryReschedulableStage = "invitations_sent" | "cancelled";
+
+export interface MeetingRegistryRescheduleSlotPreviewRequest {
+  duration_minutes?: number;
+}
+
+export interface MeetingRegistryRescheduleSlotPreviewResponse {
+  ref_key: string;
+  stage: MeetingRegistryReschedulableStage | MeetingRegistryStage;
+  previous_slot_start: string | null;
+  previous_slot_end: string | null;
+  previous_slot_label: string | null;
+  search_after: string | null;
+  slot_preview: MeetingAgentSlotPreview;
+}
+
+export interface MeetingRegistryRescheduleApproveRequest {
+  slot_start: string;
+  slot_end: string;
+  subject?: string;
+  location?: string;
+  attendees?: MeetingAttendee[];
+  attendee_emails?: string[];
+  message?: string;
+}
+
+export interface MeetingRegistryRescheduleApproveResponse {
+  ref_key: string;
+  stage: "invitations_sent";
+  previous_slot_label?: string | null;
+  slot_label?: string | null;
+  subject: string;
+  start: string;
+  end: string;
+  location?: string | null;
+  attendees: string[];
+  rescheduled: boolean;
+  outlook_updated: boolean;
+  new_invite_sent: boolean;
+  message?: string | null;
+  outlook_item_id?: string | null;
+  outlook_changekey?: string | null;
+  outlook_meeting_url?: string | null;
 }
 
 export interface MeetingRegistryContext {

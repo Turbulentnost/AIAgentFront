@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -70,7 +70,38 @@ import styles from "./MeetingAgent.module.css";
 
 type MeetingPageTab = "queue" | "registry";
 
-export default function MeetingAgent() {
+class MeetingAgentErrorBoundary extends Component<
+  { children: ReactNode },
+  { error: Error | null }
+> {
+  state = { error: null as Error | null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <section className={styles.page}>
+          <div className={styles.stateMessage} role="alert">
+            Не удалось отобразить страницу агента совещаний.
+            <button
+              type="button"
+              className={styles.retryButton}
+              onClick={() => this.setState({ error: null })}
+            >
+              Повторить
+            </button>
+          </div>
+        </section>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MeetingAgentPage() {
   const queryClient = useQueryClient();
   const permissionsQuery = useMeetingPermissions();
   const canAccessAgent = permissionsQuery.data?.can_access_agent ?? false;
@@ -132,9 +163,12 @@ export default function MeetingAgent() {
   useEffect(() => {
     if (!detail || !selectedItem || forceMemoRefresh || detailQuery.isFetching) return;
 
-    const participantNames = getMeetingParticipantNames(detail.application, selectedItem);
+    const application = detail.application;
+    if (!application) return;
+
+    const participantNames = getMeetingParticipantNames(application, selectedItem);
     const participantsCount = Math.max(
-      detail.application.participants_count ?? 0,
+      application.participants_count ?? 0,
       selectedItem.participants_count ?? 0
     );
 
@@ -249,10 +283,28 @@ export default function MeetingAgent() {
     approveMemoMutation.reset();
   }
 
-  async function handleConfirmApprove() {
+  const handleFetchSlotDetails = useCallback(
+    async (slotStart: string, slotEnd: string) => {
+      if (!detail?.ref_key) {
+        throw new Error("У заявки нет ref_key для загрузки деталей слота.");
+      }
+      const durationMinutes = slotPreviewMutation.data?.duration_minutes ?? undefined;
+      return slotPreviewDetailsMutation.mutateAsync({
+        memoRefKey: detail.ref_key,
+        payload: {
+          slot_start: slotStart,
+          slot_end: slotEnd,
+          ...(durationMinutes ? { duration_minutes: durationMinutes } : {})
+        }
+      });
+    },
+    [detail?.ref_key, slotPreviewDetailsMutation, slotPreviewMutation.data?.duration_minutes]
+  );
+
+  async function handleConfirmApprove(slotOverride?: { start: string; end: string }) {
     const preview = slotPreviewMutation.data;
-    if (!preview || !isMeetingSlotPreviewAssignable(preview)) return;
-    const slot = resolveMeetingSlotPreview(preview);
+    if (!preview || (!isMeetingSlotPreviewAssignable(preview) && !slotOverride)) return;
+    const slot = slotOverride ?? resolveMeetingSlotPreview(preview);
     const shouldApproveMemoFirst = queueFilter === "unapproved";
     if (
       !detail?.ref_key ||
@@ -418,18 +470,10 @@ export default function MeetingAgent() {
         requestError={slotPreviewRequestError}
         approveError={approveRequestError}
         onClose={handleCloseSlotPreview}
-        onConfirmApprove={() => void handleConfirmApprove()}
+        onConfirmApprove={(slotOverride) => void handleConfirmApprove(slotOverride)}
         isApproving={approveSlotMutation.isPending || approveMemoMutation.isPending}
         approveWithMemo={queueFilter === "unapproved"}
-        onFetchSlotDetails={async (slotStart, slotEnd) => {
-          if (!detail?.ref_key) {
-            throw new Error("У заявки нет ref_key для загрузки деталей слота.");
-          }
-          return slotPreviewDetailsMutation.mutateAsync({
-            memoRefKey: detail.ref_key,
-            payload: { slot_start: slotStart, slot_end: slotEnd }
-          });
-        }}
+        onFetchSlotDetails={handleFetchSlotDetails}
       />
       <MeetingAgentRejectModal
         open={rejectModalOpen}
@@ -827,9 +871,9 @@ function MeetingDetails({
           <History size={16} aria-hidden="true" />
           История
         </h3>
-        {detail.history.length ? (
+        {(detail.history ?? []).length ? (
           <ol className={styles.historyList}>
-            {detail.history.map((item, index) => (
+            {(detail.history ?? []).map((item, index) => (
               <li className={styles.historyItem} key={`${item.timestamp}-${index}`}>
                 <span className={styles.historyTime}>
                   <Clock3 size={14} aria-hidden="true" />
@@ -905,5 +949,13 @@ function MeetingDetails({
         </p>
       </div>
     </>
+  );
+}
+
+export default function MeetingAgent() {
+  return (
+    <MeetingAgentErrorBoundary>
+      <MeetingAgentPage />
+    </MeetingAgentErrorBoundary>
   );
 }
