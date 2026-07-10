@@ -1,0 +1,300 @@
+.contextMain {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.contextIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
+  border: 1px solid var(--color-border-accent);
+  border-radius: 10px;
+}
+
+.contextText {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.contextText strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.contextText span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.contextMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.responsible {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.reasonPanel .panelTitle,
+.routePanel .panelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.reasonText {
+  margin: 0 0 14px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.priceTileRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.priceTile {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+}
+
+.priceTileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.tileBlue .priceTileIcon {
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
+}
+
+.tileGreen .priceTileIcon {
+  color: var(--color-success);
+  background: var(--color-green-soft);
+}
+
+.tileViolet .priceTileIcon {
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.1);
+}
+
+.priceTileLabel {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.priceTileValue {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.routeList {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-x: auto;
+}
+
+.routeItem {
+  flex: 1 1 0;
+  min-width: 120px;
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr);
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface-muted);
+}
+
+.routeDot {
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  border-radius: 50%;
+  background: var(--color-border-strong);
+}
+
+.routeApproved .routeDot {
+  background: var(--color-success);
+}
+
+.routeInProgress .routeDot {
+  background: var(--color-primary);
+}
+
+.routeBody {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.routeBody strong {
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.routeBody span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.routeBody small,
+.routeBody time {
+  color: var(--color-text-muted);
+  font-size: 10px;
+  font-weight: 400;
+}
+
+.memoPanel {
+  display: grid;
+  gap: 14px;
+}
+
+.memoGrid {
+  display: grid;
+  grid-template-columns: minmax(180px, 220px) minmax(0, 1fr);
+  gap: 20px;
+}
+
+.memoSummary {
+  display: grid;
+  gap: 12px;
+  padding-right: 16px;
+  border-right: 1px solid var(--color-border);
+}
+
+.memoMetric {
+  display: grid;
+  gap: 4px;
+}
+
+.memoMetric span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.memoMetric strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.memoPercent {
+  color: var(--color-success) !important;
+}
+
+.memoDetails {
+  display: grid;
+  gap: 14px;
+}
+
+.memoField {
+  display: grid;
+  gap: 6px;
+}
+
+.memoField span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.memoField p {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.attachmentList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.attachmentChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.attachment_pdf {
+  color: #dc2626;
+  background: rgba(220, 38, 38, 0.06);
+}
+
+.attachment_xlsx {
+  color: var(--color-success);
+  background: var(--color-green-soft);
+}
+
+.attachment_eml {
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
+}
+
+@media (max-width: 1100px) {
+  .memoGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .memoSummary {
+    padding-right: 0;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding-bottom: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .priceTileRow {
+    grid-template-columns: 1fr;
+  }
+}

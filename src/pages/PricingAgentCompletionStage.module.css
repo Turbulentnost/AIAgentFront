@@ -1,0 +1,204 @@
+.processBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.processItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.topRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.statusPanel {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+}
+
+.statusIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  color: #c2410c;
+  background: rgba(251, 146, 60, 0.15);
+  border-radius: 12px;
+}
+
+.statusTitle {
+  margin: 0 0 4px;
+  color: #c2410c;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.statusDescription {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.indicatorRow {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.indicatorCard {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 24px var(--color-shadow-06);
+}
+
+.indicatorCard svg {
+  color: var(--color-primary);
+}
+
+.indicatorCard span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.indicatorCard strong {
+  color: var(--color-text-strong);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.checksPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.checksTable {
+  display: grid;
+}
+
+.checksHead,
+.checksRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) 120px minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.checksHead {
+  padding-top: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.checksRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.checkLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.checkLabel svg {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.statusPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  border-radius: 999px;
+}
+
+.statusWaiting {
+  color: #c2410c;
+  background: rgba(251, 146, 60, 0.15);
+}
+
+.statusNo {
+  color: var(--color-text-muted);
+  background: var(--color-surface-muted);
+}
+
+.statusYes {
+  color: #c2410c;
+  background: rgba(251, 146, 60, 0.15);
+}
+
+.checkComment {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+}
+
+.recommendText {
+  margin: 0 0 14px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.recommendActions {
+  display: grid;
+  gap: 8px;
+}
+
+.recommendActions .primaryAction,
+.recommendActions .outlineAction {
+  width: 100%;
+  justify-content: center;
+}
+
+@media (max-width: 1100px) {
+  .topRow {
+    grid-template-columns: 1fr;
+  }
+
+  .indicatorRow {
+    grid-template-columns: 1fr;
+  }
+
+  .checksHead,
+  .checksRow {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+}

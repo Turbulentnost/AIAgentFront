@@ -2,6 +2,9 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import NdControlAgent from "@/pages/NdControlAgent";
 import MeetingAgent from "@/pages/MeetingAgent";
 import TasksAgent from "@/pages/TasksAgent";
+import WarehouseAgent from "@/pages/WarehouseAgent";
+import PricingAgent from "@/pages/PricingAgent";
+import PricingAgentStageRouter from "@/pages/PricingAgentStageRouter";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
@@ -35,6 +38,9 @@ export default function App() {
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/warehouse" element={<ProtectedRoute><Layout title="Агент склада, запасов и выдачи в производство"><WarehouseAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/pricing" element={<ProtectedRoute><Layout title="Агент цен, проектных цен, оплаты и договоров"><PricingAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/pricing/:stageSlug" element={<ProtectedRoute><Layout title="Агент цен, проектных цен, оплаты и договоров"><PricingAgentStageRouter /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

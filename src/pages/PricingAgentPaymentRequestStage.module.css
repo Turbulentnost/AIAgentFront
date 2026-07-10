@@ -1,0 +1,250 @@
+.invoiceContext {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+}
+
+.invoiceIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  color: var(--color-primary);
+  background: var(--color-blue-soft);
+  border: 1px solid var(--color-border-accent);
+  border-radius: 10px;
+}
+
+.invoiceText {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.invoiceText strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.invoiceText span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.topGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(260px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.resultBanner {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 14px;
+  color: var(--color-success);
+  background: var(--color-green-soft);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: 12px;
+}
+
+.resultBody {
+  display: grid;
+  gap: 6px;
+}
+
+.resultBody strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.resultBody p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.successBadge {
+  display: inline-flex;
+  width: fit-content;
+  padding: 2px 8px;
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 500;
+  background: rgba(34, 197, 94, 0.12);
+  border-radius: 999px;
+}
+
+.contractList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.contractRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.contractRow:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.contractRow dt {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.contractRow dd {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: right;
+}
+
+.statusActive {
+  display: inline-flex;
+  padding: 2px 8px;
+  color: var(--color-success);
+  font-size: 11px;
+  font-weight: 500;
+  background: var(--color-green-soft);
+  border-radius: 999px;
+}
+
+.yesText {
+  color: var(--color-success) !important;
+}
+
+.fallbackPanel .panelTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.fallbackHint {
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.45;
+}
+
+.fallbackList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.fallbackAction {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 12px;
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.fallbackAction svg:last-child {
+  margin-left: auto;
+  color: var(--color-text-muted);
+}
+
+.fallbackAction:hover {
+  border-color: var(--color-border-accent);
+  background: var(--color-blue-soft);
+}
+
+.fallbackAction:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.checksPanel {
+  display: grid;
+  gap: 12px;
+}
+
+.checksTable {
+  display: grid;
+  gap: 0;
+}
+
+.checksHead,
+.checksRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 120px;
+  gap: 12px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.checksHead {
+  padding-top: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.checksRow {
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.checksRow:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.resultYes,
+.resultNo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.resultYes {
+  color: var(--color-success);
+}
+
+.resultNo {
+  color: var(--color-text-muted);
+}
+
+@media (max-width: 1100px) {
+  .topGrid {
+    grid-template-columns: 1fr;
+  }
+}

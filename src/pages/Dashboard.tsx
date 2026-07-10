@@ -25,6 +25,7 @@ import {
   isTasksAgent,
   navigateToAgentLaunch
 } from "@/utils/agentLaunch";
+import { withMockAvailableAgents } from "@/utils/availableAgents";
 import { usePorucheniyaPermissions } from "@/hooks/usePorucheniyaDashboard";
 import {
   dashboardActivities,
@@ -145,20 +146,25 @@ export default function Dashboard() {
 
   const porucheniyaPermissionsQuery = usePorucheniyaPermissions();
 
+  const availableAgents = useMemo(
+    () => withMockAvailableAgents(agentsQuery.data ?? []),
+    [agentsQuery.data]
+  );
+
   const launchAgents = useMemo(() => {
-    const agents = pickLaunchAgents(agentsQuery.data ?? []);
+    const agents = pickLaunchAgents(availableAgents);
     if (porucheniyaPermissionsQuery.data?.can_access_agent === false) {
       return agents.filter((agent) => !isTasksAgent(agent));
     }
     return agents;
-  }, [agentsQuery.data, porucheniyaPermissionsQuery.data?.can_access_agent]);
+  }, [availableAgents, porucheniyaPermissionsQuery.data?.can_access_agent]);
 
   const stats = useMemo(
     () =>
       dashboardStats.map((stat) =>
-        stat.id === "agents" ? { ...stat, value: agentsQuery.data?.length ?? 0 } : stat
+        stat.id === "agents" ? { ...stat, value: availableAgents.length } : stat
       ),
-    [agentsQuery.data]
+    [availableAgents]
   );
 
   function handleAgentIconError(agentId: string) {

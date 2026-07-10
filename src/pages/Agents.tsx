@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { hasDedicatedLaunchPage, navigateToAgentLaunch } from "@/utils/agentLaunch";
+import { isMockAgent, withMockAvailableAgents } from "@/utils/availableAgents";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { AgentAccessEditor } from "@/components/AgentAccessEditor";
 import { FormSelect } from "@/components/form-controls";
@@ -117,6 +118,7 @@ function AgentIconArt({
   const queryClient = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const isAdmin = Boolean(user?.is_superuser);
+  const canEditIcon = isAdmin && !isMockAgent(agent);
   const [useFallbackIcon, setUseFallbackIcon] = useState(false);
   const iconReloadAttempted = useRef(false);
   const iconSrc = useFallbackIcon || !agent.icon_url ? AGENT_ILLUSTRATION : agent.icon_url;
@@ -153,8 +155,8 @@ function AgentIconArt({
 
   return (
     <div
-      className={`${artClass} ${isAdmin ? styles.agentArtEditable : ""}`}
-      onClick={isAdmin ? stopCardOpen : undefined}
+      className={`${artClass} ${canEditIcon ? styles.agentArtEditable : ""}`}
+      onClick={canEditIcon ? stopCardOpen : undefined}
     >
       <img
         src={iconSrc}
@@ -169,7 +171,7 @@ function AgentIconArt({
           setUseFallbackIcon(true);
         }}
       />
-      {isAdmin ? (
+      {canEditIcon ? (
         <>
           <span className={styles.agentArtOverlay} aria-hidden="true" />
           <button
@@ -210,6 +212,7 @@ function RecommendedAgentCard({
 }) {
   const { user } = useAuth();
   const isAdmin = Boolean(user?.is_superuser);
+  const canManageAccess = isAdmin && !isMockAgent(agent);
   const capability = getCapabilityLabel(agent);
 
   const stopPropagation = (event: React.MouseEvent) => {
@@ -250,7 +253,7 @@ function RecommendedAgentCard({
               <span className={styles.compactMetaText}>{formatUsageCount(usageCount)}</span>
             </span>
           </div>
-          {isAdmin ? (
+          {canManageAccess ? (
             <button
               type="button"
               className={styles.compactAccessButton}
@@ -391,6 +394,11 @@ export default function Agents() {
     [tasksQuery.data]
   );
 
+  const availableAgents = useMemo(
+    () => withMockAvailableAgents(agentsQuery.data ?? []),
+    [agentsQuery.data]
+  );
+
   const departmentOptions = useMemo(
     () =>
       (departmentsQuery.data ?? []).map((department) => ({
@@ -401,7 +409,7 @@ export default function Agents() {
   );
 
   const filteredAgents = useMemo(() => {
-    let items = agentsQuery.data ?? [];
+    let items = availableAgents;
 
     if (kindTab === "chat") items = items.filter((agent) => getAgentKind(agent) === "chat");
     if (kindTab === "abstract") items = items.filter((agent) => getAgentKind(agent) === "abstract");
@@ -418,11 +426,11 @@ export default function Agents() {
     }
 
     return items;
-  }, [agentsQuery.data, categoryFilter, departmentFilter, kindTab]);
+  }, [availableAgents, categoryFilter, departmentFilter, kindTab]);
 
   const recommendedAgents = useMemo(
-    () => pickRecommended(agentsQuery.data ?? []),
-    [agentsQuery.data]
+    () => pickRecommended(availableAgents),
+    [availableAgents]
   );
 
   const openAgent = (agent: AgentAccess) => {
@@ -489,7 +497,7 @@ export default function Agents() {
             <div className={styles.errorState}>Не удалось загрузить агентов</div>
           ) : !filteredAgents.length ? (
             <div className={styles.emptyState}>
-              {agentsQuery.data?.length
+              {agentsQuery.data?.length || availableAgents.length
                 ? "По выбранным фильтрам агенты не найдены."
                 : "Нет агентов, доступных текущему пользователю."}
             </div>
