@@ -451,6 +451,9 @@ export interface MeetingRegistryParticipantsResponse {
   ref_key: string;
   participants: string[];
   participants_count: number;
+  pending_confirmation?: boolean;
+  pending_removed?: string[];
+  pending_participants?: string[] | null;
   fetched_at: string;
 }
 
@@ -461,6 +464,22 @@ export interface MeetingRegistryParticipantsApplyRequest {
   message?: string;
 }
 
+export interface MeetingRegistryEarlierSlotCandidate {
+  slot_start: string;
+  slot_end: string;
+  slot_label: string;
+  coverage_ratio: number | null;
+  free_attendees_count: number | null;
+}
+
+export interface MeetingRegistryEarlierSlotSuggestion {
+  message: string;
+  current_slot_label: string;
+  search_from: string;
+  search_until: string;
+  candidates: MeetingRegistryEarlierSlotCandidate[];
+}
+
 export interface MeetingRegistryParticipantsApplyResponse {
   ref_key: string;
   participants: string[];
@@ -469,6 +488,30 @@ export interface MeetingRegistryParticipantsApplyResponse {
   removed: string[];
   outlook_updated: boolean;
   outlook_warning: string | null;
+  message: string | null;
+  earlier_slot_suggestion: MeetingRegistryEarlierSlotSuggestion | null;
+  pending_confirmation: boolean;
+  fetched_at: string;
+}
+
+export interface MeetingRegistryParticipantsRemovalConfirmRequest {
+  participants: string[];
+  removed: string[];
+  slot_start: string;
+  slot_end: string;
+  message?: string;
+}
+
+export interface MeetingRegistryParticipantsRemovalConfirmResponse {
+  ref_key: string;
+  participants: string[];
+  participants_count: number;
+  removed: string[];
+  previous_slot_label: string | null;
+  slot_label: string;
+  slot_start: string;
+  slot_end: string;
+  outlook_updated: boolean;
   message: string | null;
   fetched_at: string;
 }

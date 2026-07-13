@@ -36,6 +36,12 @@ import {
 
   useMeetingRegistryParticipantsApply,
 
+  useMeetingRegistryParticipantsConfirmRemoval,
+
+  useMeetingRegistryParticipantsCancelRemoval,
+
+  useMeetingRegistryParticipants,
+
   useMeetingRegistryRescheduleApprove,
 
   useMeetingRegistryRescheduleSlotPreview,
@@ -50,7 +56,11 @@ import {
 
 import { getMeetingMemoActionError, getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 
-import type { MeetingRegistryStageFilter } from "@/types/meetings";
+import type {
+  MeetingRegistryEarlierSlotCandidate,
+  MeetingRegistryEarlierSlotSuggestion,
+  MeetingRegistryStageFilter
+} from "@/types/meetings";
 
 import {
 
@@ -129,6 +139,20 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   const [participantsSuccessMessage, setParticipantsSuccessMessage] = useState<string | null>(null);
 
+  const [participantsEarlierSlotSuggestion, setParticipantsEarlierSlotSuggestion] =
+    useState<MeetingRegistryEarlierSlotSuggestion | null>(null);
+
+  const [participantsApplySuccessMessage, setParticipantsApplySuccessMessage] = useState<string | null>(null);
+
+  const [participantsPendingRemoval, setParticipantsPendingRemoval] = useState<{
+    participants: string[];
+    removed: string[];
+  } | null>(null);
+
+  const [participantsPendingOnCurrentSlot, setParticipantsPendingOnCurrentSlot] = useState(false);
+
+  const [confirmingRemovalSlotKey, setConfirmingRemovalSlotKey] = useState<string | null>(null);
+
   const registryQuery = useMeetingRegistry(canAccessAgent, stageFilter);
 
   const refreshRegistry = useRefreshMeetingRegistry();
@@ -140,6 +164,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const rescheduleApproveMutation = useMeetingRegistryRescheduleApprove();
 
   const participantsApplyMutation = useMeetingRegistryParticipantsApply();
+
+  const participantsConfirmRemovalMutation = useMeetingRegistryParticipantsConfirmRemoval();
+
+  const participantsCancelRemovalMutation = useMeetingRegistryParticipantsCancelRemoval();
 
   const slotPreviewDetailsMutation = useMeetingAgentSlotPreviewDetails();
 
@@ -156,6 +184,11 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const stageCounts = registryQuery.data?.stage_counts ?? defaultRegistryStageCounts();
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+
+  const participantsRestoreQuery = useMeetingRegistryParticipants(
+    selectedItem?.refKey ?? null,
+    participantsModalOpen
+  );
 
   const requestError = registryQuery.isError ? getMeetingRequestError(registryQuery.error) : null;
 
@@ -184,6 +217,44 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
     ? getMeetingMemoActionError(participantsApplyMutation.error)
 
     : null;
+
+  const participantsConfirmRemovalError = participantsConfirmRemovalMutation.isError
+
+    ? getMeetingMemoActionError(participantsConfirmRemovalMutation.error)
+
+    : null;
+
+
+
+  useEffect(() => {
+    if (!participantsModalOpen) return;
+
+    const data = participantsRestoreQuery.data;
+    if (!data?.pending_confirmation) return;
+
+    const pendingParticipants = data.pending_participants ?? [];
+    const pendingRemoved = data.pending_removed ?? [];
+    if (!pendingParticipants.length || !pendingRemoved.length) return;
+
+    setParticipantsPendingRemoval({
+      participants: pendingParticipants,
+      removed: pendingRemoved
+    });
+
+    if (!participantsEarlierSlotSuggestion?.candidates?.length) {
+      setParticipantsPendingOnCurrentSlot(true);
+      if (!participantsApplySuccessMessage) {
+        setParticipantsApplySuccessMessage(
+          "Подтвердите удаление участников на текущем слоте."
+        );
+      }
+    }
+  }, [
+    participantsModalOpen,
+    participantsRestoreQuery.data,
+    participantsEarlierSlotSuggestion,
+    participantsApplySuccessMessage
+  ]);
 
 
 
@@ -214,6 +285,14 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
     setRescheduleSuccessMessage(null);
 
     setParticipantsSuccessMessage(null);
+
+    setParticipantsEarlierSlotSuggestion(null);
+
+    setParticipantsApplySuccessMessage(null);
+
+    setParticipantsPendingRemoval(null);
+
+    setParticipantsPendingOnCurrentSlot(false);
 
   }, [selectedId]);
 
@@ -343,6 +422,14 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
       );
 
+      setParticipantsEarlierSlotSuggestion(null);
+
+      setParticipantsApplySuccessMessage(null);
+
+      setParticipantsPendingRemoval(null);
+
+      setParticipantsModalOpen(false);
+
     } catch {
 
       // error shown in modal
@@ -425,16 +512,53 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
     setParticipantsSuccessMessage(null);
 
+    setParticipantsEarlierSlotSuggestion(null);
+
+    setParticipantsApplySuccessMessage(null);
+
+    setParticipantsPendingRemoval(null);
+
+    setParticipantsPendingOnCurrentSlot(false);
+
+    participantsApplyMutation.reset();
+
+    participantsConfirmRemovalMutation.reset();
+
     setParticipantsModalOpen(true);
 
   }
 
 
 
-  function handleCloseParticipantsModal() {
-
+  function resetParticipantsModalState() {
     setParticipantsModalOpen(false);
+    setParticipantsEarlierSlotSuggestion(null);
+    setParticipantsApplySuccessMessage(null);
+    setParticipantsPendingRemoval(null);
+    setParticipantsPendingOnCurrentSlot(false);
+    participantsApplyMutation.reset();
+    participantsConfirmRemovalMutation.reset();
+    participantsCancelRemovalMutation.reset();
+  }
 
+  function handleCloseParticipantsModal() {
+    const refKey = selectedItem?.refKey;
+    const hasPendingConfirmation =
+      Boolean(participantsPendingRemoval) ||
+      participantsPendingOnCurrentSlot ||
+      Boolean(participantsEarlierSlotSuggestion) ||
+      Boolean(participantsRestoreQuery.data?.pending_confirmation);
+
+    if (refKey && hasPendingConfirmation) {
+      void participantsCancelRemovalMutation
+        .mutateAsync({ refKey })
+        .finally(() => {
+          resetParticipantsModalState();
+        });
+      return;
+    }
+
+    resetParticipantsModalState();
   }
 
 
@@ -456,17 +580,95 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
         }
       })
       .then((result) => {
-        setParticipantsModalOpen(false);
+        if (result.pending_confirmation) {
+          setParticipantsPendingRemoval({
+            participants: result.participants,
+            removed: result.removed
+          });
+
+          if (result.earlier_slot_suggestion?.candidates?.length) {
+            setParticipantsPendingOnCurrentSlot(false);
+            setParticipantsApplySuccessMessage(
+              "Выберите более ранний слот для совещания с обновлённым составом участников."
+            );
+            setParticipantsEarlierSlotSuggestion(result.earlier_slot_suggestion);
+            return;
+          }
+
+          setParticipantsEarlierSlotSuggestion(null);
+          setParticipantsPendingOnCurrentSlot(true);
+          setParticipantsApplySuccessMessage(
+            "Более ранних слотов не найдено. Подтвердите удаление участников на текущем слоте."
+          );
+          return;
+        }
 
         const details: string[] = [];
         if (result.added.length) details.push(`добавлено: ${result.added.length}`);
         if (result.removed.length) details.push(`удалено: ${result.removed.length}`);
         const suffix = details.length ? ` (${details.join(", ")})` : "";
 
+        setParticipantsModalOpen(false);
         setParticipantsSuccessMessage(`Список участников обновлён${suffix}.`);
+        setParticipantsEarlierSlotSuggestion(null);
+        setParticipantsApplySuccessMessage(null);
+        setParticipantsPendingRemoval(null);
+        setParticipantsPendingOnCurrentSlot(false);
       })
       .catch(() => {
         // error shown in modal via participantsApplyError
+      });
+  }
+
+  function handleConfirmParticipantsRemovalOnCurrentSlot() {
+    if (!selectedItem?.refKey || !selectedItem.slotStart || !selectedItem.slotEnd) return;
+    if (!participantsPendingRemoval) return;
+
+    handleConfirmParticipantsRemoval({
+      slot_start: selectedItem.slotStart,
+      slot_end: selectedItem.slotEnd,
+      slot_label: selectedItem.meetingAtLabel,
+      coverage_ratio: 1,
+      free_attendees_count: null
+    });
+  }
+
+
+
+  function handleConfirmParticipantsRemoval(candidate: MeetingRegistryEarlierSlotCandidate) {
+    if (!selectedItem?.refKey || !participantsPendingRemoval) return;
+
+    const candidateKey = `${candidate.slot_start}|${candidate.slot_end}`;
+    setConfirmingRemovalSlotKey(candidateKey);
+
+    void participantsConfirmRemovalMutation
+      .mutateAsync({
+        refKey: selectedItem.refKey,
+        payload: {
+          participants: participantsPendingRemoval.participants,
+          removed: participantsPendingRemoval.removed,
+          slot_start: candidate.slot_start,
+          slot_end: candidate.slot_end
+        }
+      })
+      .then((result) => {
+        setParticipantsModalOpen(false);
+        setParticipantsEarlierSlotSuggestion(null);
+        setParticipantsApplySuccessMessage(null);
+        setParticipantsPendingRemoval(null);
+        setParticipantsPendingOnCurrentSlot(false);
+
+        const removedNote =
+          result.removed.length > 0 ? ` Удалено: ${result.removed.length}.` : "";
+        setParticipantsSuccessMessage(
+          `Совещание перенесено на ${result.slot_label}.${removedNote}`
+        );
+      })
+      .catch(() => {
+        // error shown in modal via participantsConfirmRemovalError
+      })
+      .finally(() => {
+        setConfirmingRemovalSlotKey(null);
       });
   }
 
@@ -542,9 +744,36 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         applyError={participantsApplyError}
 
+        confirmRemovalError={participantsConfirmRemovalError}
+
+        applySuccessMessage={participantsApplySuccessMessage}
+
+        earlierSlotSuggestion={participantsEarlierSlotSuggestion}
+
+        pendingOnCurrentSlot={participantsPendingOnCurrentSlot}
+
+        pendingRemoved={participantsPendingRemoval?.removed ?? []}
+
+        currentSlotLabel={selectedItem?.meetingAtLabel ?? null}
+
+        currentSlotStart={selectedItem?.slotStart ?? null}
+
+        currentSlotEnd={selectedItem?.slotEnd ?? null}
+
+        confirmingRemovalSlotKey={confirmingRemovalSlotKey}
+
+        isConfirmingRemoval={
+          participantsConfirmRemovalMutation.isPending ||
+          participantsCancelRemovalMutation.isPending
+        }
+
         onClose={handleCloseParticipantsModal}
 
         onApply={handleApplyParticipants}
+
+        onConfirmRemoval={handleConfirmParticipantsRemoval}
+
+        onConfirmRemovalOnCurrentSlot={handleConfirmParticipantsRemovalOnCurrentSlot}
 
       />
 

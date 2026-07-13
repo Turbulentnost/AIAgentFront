@@ -1969,6 +1969,75 @@
   line-height: 1.4;
 }
 
+.registryEarlierSlotSection {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--color-info-surface, var(--color-hover));
+  border: 1px solid var(--color-border-accent);
+  border-radius: 12px;
+}
+
+.registryEarlierSlotHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.registryEarlierSlotHead h3 {
+  margin: 0;
+}
+
+.registryEarlierSlotMessage {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.registryEarlierSlotMeta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.registryEarlierSlotCard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.registryEarlierSlotCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.registryEarlierSlotLabel {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.registryEarlierSlotStats {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.registryEarlierSlotActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .modalOverlayNested {
   z-index: 1100;
 }

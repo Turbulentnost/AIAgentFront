@@ -3,6 +3,7 @@ import type {
   MeetingRegistryContext,
   MeetingRegistryItem,
   MeetingRegistryParticipantsApplyResponse,
+  MeetingRegistryParticipantsRemovalConfirmResponse,
   MeetingRegistryReschedulableStage,
   MeetingRegistryRescheduleApproveResponse,
   MeetingRegistryStage,
@@ -224,7 +225,8 @@ export function patchRegistryContextAfterParticipantsApply(
   refKey: string,
   result: MeetingRegistryParticipantsApplyResponse
 ): MeetingRegistryContext {
-  const target = data.items.find((item) => item.ref_key === refKey);
+  const items = Array.isArray(data.items) ? data.items : [];
+  const target = items.find((item) => item.ref_key === refKey);
   if (!target) return data;
 
   const updatedAt = result.fetched_at ?? new Date().toISOString();
@@ -236,6 +238,30 @@ export function patchRegistryContextAfterParticipantsApply(
 
   return {
     ...data,
-    items: data.items.map((item) => (item.ref_key === refKey ? updatedItem : item))
+    items: items.map((item) => (item.ref_key === refKey ? updatedItem : item))
+  };
+}
+
+export function patchRegistryContextAfterParticipantsRemovalConfirm(
+  data: MeetingRegistryContext,
+  refKey: string,
+  result: MeetingRegistryParticipantsRemovalConfirmResponse
+): MeetingRegistryContext {
+  const items = Array.isArray(data.items) ? data.items : [];
+  const target = items.find((item) => item.ref_key === refKey);
+  if (!target) return data;
+
+  const updatedAt = result.fetched_at ?? new Date().toISOString();
+  const updatedItem: MeetingRegistryItem = {
+    ...target,
+    participants_count: result.participants_count,
+    slot_start: result.slot_start,
+    slot_end: result.slot_end,
+    updated_at: updatedAt
+  };
+
+  return {
+    ...data,
+    items: items.map((item) => (item.ref_key === refKey ? updatedItem : item))
   };
 }
