@@ -1640,6 +1640,8 @@ export type {
   MeetingRegistryCancelRequest,
   MeetingRegistryCancelResponse,
   MeetingRegistryParticipantsResponse,
+  MeetingRegistryParticipantsApplyRequest,
+  MeetingRegistryParticipantsApplyResponse,
   MeetingRegistryRescheduleSlotPreviewRequest,
   MeetingRegistryRescheduleSlotPreviewResponse,
   MeetingRegistryRescheduleApproveRequest,

@@ -105,6 +105,8 @@ import type {
   MeetingRegistryCancelRequest,
   MeetingRegistryCancelResponse,
   MeetingRegistryParticipantsResponse,
+  MeetingRegistryParticipantsApplyRequest,
+  MeetingRegistryParticipantsApplyResponse,
   MeetingRegistryRescheduleSlotPreviewRequest,
   MeetingRegistryRescheduleSlotPreviewResponse,
   MeetingRegistryRescheduleApproveRequest,
@@ -145,6 +147,13 @@ export const meetingsApi = {
   getRegistryParticipants: (memoRefKey: string) =>
     longRunningApiClient
       .get<MeetingRegistryParticipantsResponse>(`/meetings/registry/${memoRefKey}/participants`)
+      .then((r) => r.data),
+  applyRegistryParticipants: (memoRefKey: string, payload: MeetingRegistryParticipantsApplyRequest) =>
+    longRunningApiClient
+      .post<MeetingRegistryParticipantsApplyResponse>(
+        `/meetings/registry/${memoRefKey}/participants/apply`,
+        payload
+      )
       .then((r) => r.data),
   cancelRegistryMeeting: (memoRefKey: string, payload?: MeetingRegistryCancelRequest) =>
     longRunningApiClient

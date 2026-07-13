@@ -2,6 +2,7 @@ import type {
   MeetingRegistryCancelResponse,
   MeetingRegistryContext,
   MeetingRegistryItem,
+  MeetingRegistryParticipantsApplyResponse,
   MeetingRegistryReschedulableStage,
   MeetingRegistryRescheduleApproveResponse,
   MeetingRegistryStage,
@@ -215,5 +216,26 @@ export function patchRegistryContextAfterReschedule(
     ...data,
     items: nextItems,
     stage_counts: nextCounts
+  };
+}
+
+export function patchRegistryContextAfterParticipantsApply(
+  data: MeetingRegistryContext,
+  refKey: string,
+  result: MeetingRegistryParticipantsApplyResponse
+): MeetingRegistryContext {
+  const target = data.items.find((item) => item.ref_key === refKey);
+  if (!target) return data;
+
+  const updatedAt = result.fetched_at ?? new Date().toISOString();
+  const updatedItem: MeetingRegistryItem = {
+    ...target,
+    participants_count: result.participants_count,
+    updated_at: updatedAt
+  };
+
+  return {
+    ...data,
+    items: data.items.map((item) => (item.ref_key === refKey ? updatedItem : item))
   };
 }

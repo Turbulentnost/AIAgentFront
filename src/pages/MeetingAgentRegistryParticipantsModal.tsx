@@ -23,6 +23,22 @@ function normalizeParticipantName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
 }
 
+function participantListsEqual(left: string[], right: string[]): boolean {
+  const leftKeys = new Set(left.map((name) => name.toLowerCase()));
+  const rightKeys = new Set(right.map((name) => name.toLowerCase()));
+  if (leftKeys.size !== rightKeys.size) return false;
+  for (const key of leftKeys) {
+    if (!rightKeys.has(key)) return false;
+  }
+  return true;
+}
+
+type ParticipantsApplyPayload = {
+  participants: string[];
+  added: string[];
+  removed: string[];
+};
+
 type Props = {
   open: boolean;
   refKey: string | null;
@@ -30,7 +46,7 @@ type Props = {
   applying: boolean;
   applyError: string | null;
   onClose: () => void;
-  onApply: (participants: string[]) => void;
+  onApply: (payload: ParticipantsApplyPayload) => void;
 };
 
 export default function MeetingAgentRegistryParticipantsModal({
@@ -81,10 +97,10 @@ export default function MeetingAgentRegistryParticipantsModal({
     [draft]
   );
 
-  const hasChanges = useMemo(() => {
-    if (normalizedDraft.length !== normalizedInitial.length) return true;
-    return normalizedDraft.some((name, index) => name !== normalizedInitial[index]);
-  }, [normalizedDraft, normalizedInitial]);
+  const hasChanges = useMemo(
+    () => !participantListsEqual(normalizedDraft, normalizedInitial),
+    [normalizedDraft, normalizedInitial]
+  );
 
   const searchQuery = search.trim().toLowerCase();
 
@@ -157,7 +173,13 @@ export default function MeetingAgentRegistryParticipantsModal({
 
   function handleApply() {
     if (!hasChanges || applying || loading || !normalizedDraft.length) return;
-    onApply(normalizedDraft);
+    const added = normalizedDraft.filter(
+      (name) => !normalizedInitial.some((item) => item.toLowerCase() === name.toLowerCase())
+    );
+    const removed = normalizedInitial.filter(
+      (name) => !normalizedDraft.some((item) => item.toLowerCase() === name.toLowerCase())
+    );
+    onApply({ participants: normalizedDraft, added, removed });
   }
 
   const isBusy = loading || applying;

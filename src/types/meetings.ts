@@ -453,3 +453,22 @@ export interface MeetingRegistryParticipantsResponse {
   participants_count: number;
   fetched_at: string;
 }
+
+export interface MeetingRegistryParticipantsApplyRequest {
+  added: string[];
+  removed: string[];
+  participants: string[];
+  message?: string;
+}
+
+export interface MeetingRegistryParticipantsApplyResponse {
+  ref_key: string;
+  participants: string[];
+  participants_count: number;
+  added: string[];
+  removed: string[];
+  outlook_updated: boolean;
+  outlook_warning: string | null;
+  message: string | null;
+  fetched_at: string;
+}

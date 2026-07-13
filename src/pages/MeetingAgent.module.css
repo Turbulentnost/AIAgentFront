@@ -550,6 +550,12 @@
   box-shadow: var(--shadow-md);
 }
 
+.primaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
 .secondaryButton {
   color: var(--color-primary-text);
   background: var(--color-surface);

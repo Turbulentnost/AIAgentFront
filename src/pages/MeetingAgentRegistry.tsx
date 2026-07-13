@@ -34,6 +34,8 @@ import {
 
   useMeetingRegistryCancel,
 
+  useMeetingRegistryParticipantsApply,
+
   useMeetingRegistryRescheduleApprove,
 
   useMeetingRegistryRescheduleSlotPreview,
@@ -137,6 +139,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   const rescheduleApproveMutation = useMeetingRegistryRescheduleApprove();
 
+  const participantsApplyMutation = useMeetingRegistryParticipantsApply();
+
   const slotPreviewDetailsMutation = useMeetingAgentSlotPreviewDetails();
 
 
@@ -172,6 +176,12 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const rescheduleApproveError = rescheduleApproveMutation.isError
 
     ? getMeetingMemoActionError(rescheduleApproveMutation.error)
+
+    : null;
+
+  const participantsApplyError = participantsApplyMutation.isError
+
+    ? getMeetingMemoActionError(participantsApplyMutation.error)
 
     : null;
 
@@ -429,20 +439,35 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
 
 
-  function handleApplyParticipants(participants: string[]) {
+  function handleApplyParticipants(payload: {
+    participants: string[];
+    added: string[];
+    removed: string[];
+  }) {
+    if (!selectedItem?.refKey) return;
 
-    setParticipantsModalOpen(false);
+    void participantsApplyMutation
+      .mutateAsync({
+        refKey: selectedItem.refKey,
+        payload: {
+          participants: payload.participants,
+          added: payload.added,
+          removed: payload.removed
+        }
+      })
+      .then((result) => {
+        setParticipantsModalOpen(false);
 
-    setParticipantsSuccessMessage(
+        const details: string[] = [];
+        if (result.added.length) details.push(`добавлено: ${result.added.length}`);
+        if (result.removed.length) details.push(`удалено: ${result.removed.length}`);
+        const suffix = details.length ? ` (${details.join(", ")})` : "";
 
-      participants.length
-
-        ? `Список участников обновлён (${participants.length}).`
-
-        : "Список участников очищен."
-
-    );
-
+        setParticipantsSuccessMessage(`Список участников обновлён${suffix}.`);
+      })
+      .catch(() => {
+        // error shown in modal via participantsApplyError
+      });
   }
 
 
@@ -513,9 +538,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         meetingLabel={participantsMeetingLabel}
 
-        applying={false}
+        applying={participantsApplyMutation.isPending}
 
-        applyError={null}
+        applyError={participantsApplyError}
 
         onClose={handleCloseParticipantsModal}
 

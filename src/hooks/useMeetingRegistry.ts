@@ -2,8 +2,17 @@ import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import { useCallback } from "react";
 import { meetingsApi } from "@/api/endpoints";
-import type { MeetingRegistryContext, MeetingRegistryStageFilter } from "@/types/meetings";
-import { patchRegistryContextAfterCancel, patchRegistryContextAfterReschedule, registryStageQueryParam } from "@/utils/meetingRegistry";
+import type {
+  MeetingRegistryContext,
+  MeetingRegistryParticipantsApplyRequest,
+  MeetingRegistryStageFilter
+} from "@/types/meetings";
+import {
+  patchRegistryContextAfterCancel,
+  patchRegistryContextAfterParticipantsApply,
+  patchRegistryContextAfterReschedule,
+  registryStageQueryParam
+} from "@/utils/meetingRegistry";
 
 export function useMeetingRegistry(enabled = true, stageFilter: MeetingRegistryStageFilter = "all") {
   const stage = registryStageQueryParam(stageFilter);
@@ -116,6 +125,36 @@ export function useMeetingRegistryParticipants(refKey: string | null, enabled = 
         return false;
       }
       return failureCount < 1;
+    }
+  });
+}
+
+export function useMeetingRegistryParticipantsApply() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      refKey,
+      payload
+    }: {
+      refKey: string;
+      payload: MeetingRegistryParticipantsApplyRequest;
+    }) => meetingsApi.applyRegistryParticipants(refKey, payload),
+    onSuccess: (result, { refKey }) => {
+      const queries = queryClient.getQueriesData<MeetingRegistryContext>({
+        queryKey: ["meetings", "registry"]
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data) continue;
+        queryClient.setQueryData(
+          queryKey,
+          patchRegistryContextAfterParticipantsApply(data, refKey, result)
+        );
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["meetings", "registry"] });
+      void queryClient.invalidateQueries({ queryKey: ["meetings", "registry", "participants", refKey] });
     }
   });
 }
