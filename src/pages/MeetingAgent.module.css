@@ -1416,6 +1416,43 @@
   border-color: var(--color-primary-border);
 }
 
+.participantsUndoRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.participantsUndoButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 6px 10px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-tint);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.participantsUndoButton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participantsUndoButton:hover:not(:disabled) {
+  background: var(--color-surface);
+}
+
+.participantsUndoButton:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
 .participantsChipPanel {
   min-height: 120px;
   padding: 12px;

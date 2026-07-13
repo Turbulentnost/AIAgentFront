@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Loader2, Search, X } from "lucide-react";
+import { AlertTriangle, Loader2, Search, Undo2, X } from "lucide-react";
 import { usersApi } from "@/api/endpoints";
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 import { useMeetingRegistryParticipants } from "@/hooks/useMeetingRegistry";
@@ -44,6 +44,7 @@ export default function MeetingAgentRegistryParticipantsModal({
 }: Props) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<string[]>([]);
+  const [undoStack, setUndoStack] = useState<string[]>([]);
 
   const participantsQuery = useMeetingRegistryParticipants(refKey, open);
 
@@ -62,7 +63,10 @@ export default function MeetingAgentRegistryParticipantsModal({
     if (!open) return;
     setSearch("");
     setDraft(initialParticipants.map(normalizeParticipantName).filter(Boolean));
+    setUndoStack([]);
   }, [open, initialParticipants]);
+
+  const lastRemovedParticipant = undoStack[undoStack.length - 1] ?? null;
 
   const normalizedInitial = useMemo(
     () =>
@@ -107,6 +111,22 @@ export default function MeetingAgentRegistryParticipantsModal({
 
   function handleRemove(name: string) {
     setDraft((current) => current.filter((item) => item !== name));
+    setUndoStack((stack) => [...stack, name]);
+  }
+
+  function handleUndoRemove() {
+    setUndoStack((stack) => {
+      const next = [...stack];
+      const restored = next.pop();
+      if (!restored) return stack;
+
+      setDraft((current) => {
+        const exists = current.some((item) => item.toLowerCase() === restored.toLowerCase());
+        return exists ? current : [...current, restored];
+      });
+
+      return next;
+    });
   }
 
   function handleAdd(name: string) {
@@ -116,6 +136,7 @@ export default function MeetingAgentRegistryParticipantsModal({
       const exists = current.some((item) => item.toLowerCase() === normalized.toLowerCase());
       return exists ? current : [...current, normalized];
     });
+    setUndoStack((stack) => stack.filter((item) => item.toLowerCase() !== normalized.toLowerCase()));
     setSearch("");
   }
 
@@ -190,6 +211,21 @@ export default function MeetingAgentRegistryParticipantsModal({
               </li>
             ))}
           </ul>
+        ) : null}
+
+        {lastRemovedParticipant && !loading && !error ? (
+          <div className={styles.participantsUndoRow}>
+            <button
+              type="button"
+              className={styles.participantsUndoButton}
+              onClick={handleUndoRemove}
+              disabled={isBusy}
+              aria-label={`Вернуть ${lastRemovedParticipant}`}
+            >
+              <Undo2 size={15} aria-hidden="true" />
+              <span>Вернуть {lastRemovedParticipant}</span>
+            </button>
+          </div>
         ) : null}
 
         {loading ? (
