@@ -43,8 +43,7 @@ import {
 } from "@/hooks/useMeetingRegistry";
 
 import {
-  useMeetingAgentSlotPreviewDetails,
-  useMeetingMemoDetail
+  useMeetingAgentSlotPreviewDetails
 } from "@/hooks/useMeetingMemoDetail";
 
 import { getMeetingMemoActionError, getMeetingRequestError } from "@/hooks/useMeetingDashboard";
@@ -75,7 +74,6 @@ import {
   formatMeetingDateTime,
   formatMeetingTime,
   formatShortPersonName,
-  getMeetingParticipantNames,
   isMeetingSlotPreviewAssignable,
   meetingPlaceFromInviteLocation,
   resolveMeetingSlotPreview
@@ -154,23 +152,6 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const stageCounts = registryQuery.data?.stage_counts ?? defaultRegistryStageCounts();
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
-
-  const participantsDetailQuery = useMeetingMemoDetail(
-    selectedItem?.refKey ?? null,
-    participantsModalOpen
-  );
-
-  const participantsDetailError = participantsDetailQuery.isError
-    ? getMeetingRequestError(participantsDetailQuery.error)
-    : null;
-
-  const participantsInitial = useMemo(() => {
-    if (!participantsDetailQuery.data) return [];
-    return getMeetingParticipantNames(
-      participantsDetailQuery.data.application,
-      participantsDetailQuery.data.queue
-    );
-  }, [participantsDetailQuery.data]);
 
   const requestError = registryQuery.isError ? getMeetingRequestError(registryQuery.error) : null;
 
@@ -430,7 +411,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   function handleOpenParticipantsModal() {
 
-    if (!selectedItem) return;
+    if (!selectedItem?.refKey) return;
 
     setParticipantsSuccessMessage(null);
 
@@ -528,13 +509,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         open={participantsModalOpen}
 
+        refKey={selectedItem?.refKey ?? null}
+
         meetingLabel={participantsMeetingLabel}
-
-        loading={participantsDetailQuery.isLoading}
-
-        error={participantsDetailError}
-
-        initialParticipants={participantsInitial}
 
         applying={false}
 

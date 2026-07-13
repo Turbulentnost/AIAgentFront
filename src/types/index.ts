@@ -1639,6 +1639,7 @@ export type {
   MeetingRegistryContext,
   MeetingRegistryCancelRequest,
   MeetingRegistryCancelResponse,
+  MeetingRegistryParticipantsResponse,
   MeetingRegistryRescheduleSlotPreviewRequest,
   MeetingRegistryRescheduleSlotPreviewResponse,
   MeetingRegistryRescheduleApproveRequest,

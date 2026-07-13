@@ -102,3 +102,20 @@ export function useMeetingRegistryRescheduleApprove() {
     }
   });
 }
+
+export function useMeetingRegistryParticipants(refKey: string | null, enabled = false) {
+  return useQuery({
+    queryKey: ["meetings", "registry", "participants", refKey],
+    queryFn: () => meetingsApi.getRegistryParticipants(refKey!),
+    enabled: enabled && Boolean(refKey),
+    staleTime: 0,
+    gcTime: 0,
+    refetchOnMount: "always",
+    retry: (failureCount, error) => {
+      if (axios.isAxiosError(error) && [403, 404].includes(error.response?.status ?? 0)) {
+        return false;
+      }
+      return failureCount < 1;
+    }
+  });
+}

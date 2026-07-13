@@ -446,3 +446,10 @@ export interface MeetingRegistryContext {
   fetched_at: string;
   error: string | null;
 }
+
+export interface MeetingRegistryParticipantsResponse {
+  ref_key: string;
+  participants: string[];
+  participants_count: number;
+  fetched_at: string;
+}

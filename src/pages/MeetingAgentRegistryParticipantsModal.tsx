@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, Loader2, Search, X } from "lucide-react";
 import { usersApi } from "@/api/endpoints";
+import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
+import { useMeetingRegistryParticipants } from "@/hooks/useMeetingRegistry";
 import type { User } from "@/types";
 import styles from "./MeetingAgent.module.css";
 
@@ -23,10 +25,8 @@ function normalizeParticipantName(name: string): string {
 
 type Props = {
   open: boolean;
+  refKey: string | null;
   meetingLabel: string;
-  loading: boolean;
-  error: string | null;
-  initialParticipants: string[];
   applying: boolean;
   applyError: string | null;
   onClose: () => void;
@@ -35,10 +35,8 @@ type Props = {
 
 export default function MeetingAgentRegistryParticipantsModal({
   open,
+  refKey,
   meetingLabel,
-  loading,
-  error,
-  initialParticipants,
   applying,
   applyError,
   onClose,
@@ -46,6 +44,12 @@ export default function MeetingAgentRegistryParticipantsModal({
 }: Props) {
   const [search, setSearch] = useState("");
   const [draft, setDraft] = useState<string[]>([]);
+
+  const participantsQuery = useMeetingRegistryParticipants(refKey, open);
+
+  const loading = participantsQuery.isLoading || participantsQuery.isFetching;
+  const error = participantsQuery.isError ? getMeetingRequestError(participantsQuery.error) : null;
+  const initialParticipants = participantsQuery.data?.participants ?? [];
 
   const usersQuery = useQuery({
     queryKey: ["users", "participants-search"],

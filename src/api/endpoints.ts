@@ -104,6 +104,7 @@ import type {
   MeetingRegistryContext,
   MeetingRegistryCancelRequest,
   MeetingRegistryCancelResponse,
+  MeetingRegistryParticipantsResponse,
   MeetingRegistryRescheduleSlotPreviewRequest,
   MeetingRegistryRescheduleSlotPreviewResponse,
   MeetingRegistryRescheduleApproveRequest,
@@ -140,6 +141,10 @@ export const meetingsApi = {
         params: stage ? { stage } : undefined,
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
       })
+      .then((r) => r.data),
+  getRegistryParticipants: (memoRefKey: string) =>
+    longRunningApiClient
+      .get<MeetingRegistryParticipantsResponse>(`/meetings/registry/${memoRefKey}/participants`)
       .then((r) => r.data),
   cancelRegistryMeeting: (memoRefKey: string, payload?: MeetingRegistryCancelRequest) =>
     longRunningApiClient
