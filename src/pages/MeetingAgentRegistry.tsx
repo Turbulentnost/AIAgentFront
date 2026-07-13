@@ -42,7 +42,10 @@ import {
 
 } from "@/hooks/useMeetingRegistry";
 
-import { useMeetingAgentSlotPreviewDetails } from "@/hooks/useMeetingMemoDetail";
+import {
+  useMeetingAgentSlotPreviewDetails,
+  useMeetingMemoDetail
+} from "@/hooks/useMeetingMemoDetail";
 
 import { getMeetingMemoActionError, getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 
@@ -72,10 +75,13 @@ import {
   formatMeetingDateTime,
   formatMeetingTime,
   formatShortPersonName,
+  getMeetingParticipantNames,
   isMeetingSlotPreviewAssignable,
   meetingPlaceFromInviteLocation,
   resolveMeetingSlotPreview
 } from "@/utils/meetingDashboard";
+
+import MeetingAgentRegistryParticipantsModal from "@/pages/MeetingAgentRegistryParticipantsModal";
 
 import MeetingAgentRegistryCancelModal from "@/pages/MeetingAgentRegistryCancelModal";
 
@@ -119,6 +125,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   const [rescheduleSuccessMessage, setRescheduleSuccessMessage] = useState<string | null>(null);
 
+  const [participantsModalOpen, setParticipantsModalOpen] = useState(false);
+
+  const [participantsSuccessMessage, setParticipantsSuccessMessage] = useState<string | null>(null);
+
   const registryQuery = useMeetingRegistry(canAccessAgent, stageFilter);
 
   const refreshRegistry = useRefreshMeetingRegistry();
@@ -144,6 +154,23 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const stageCounts = registryQuery.data?.stage_counts ?? defaultRegistryStageCounts();
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? items[0] ?? null;
+
+  const participantsDetailQuery = useMeetingMemoDetail(
+    selectedItem?.refKey ?? null,
+    participantsModalOpen
+  );
+
+  const participantsDetailError = participantsDetailQuery.isError
+    ? getMeetingRequestError(participantsDetailQuery.error)
+    : null;
+
+  const participantsInitial = useMemo(() => {
+    if (!participantsDetailQuery.data) return [];
+    return getMeetingParticipantNames(
+      participantsDetailQuery.data.application,
+      participantsDetailQuery.data.queue
+    );
+  }, [participantsDetailQuery.data]);
 
   const requestError = registryQuery.isError ? getMeetingRequestError(registryQuery.error) : null;
 
@@ -194,6 +221,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
     setCancelSuccessMessage(null);
 
     setRescheduleSuccessMessage(null);
+
+    setParticipantsSuccessMessage(null);
 
   }, [selectedId]);
 
@@ -399,6 +428,44 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
 
 
+  function handleOpenParticipantsModal() {
+
+    if (!selectedItem) return;
+
+    setParticipantsSuccessMessage(null);
+
+    setParticipantsModalOpen(true);
+
+  }
+
+
+
+  function handleCloseParticipantsModal() {
+
+    setParticipantsModalOpen(false);
+
+  }
+
+
+
+  function handleApplyParticipants(participants: string[]) {
+
+    setParticipantsModalOpen(false);
+
+    setParticipantsSuccessMessage(
+
+      participants.length
+
+        ? `Список участников обновлён (${participants.length}).`
+
+        : "Список участников очищен."
+
+    );
+
+  }
+
+
+
   if (!canAccessAgent) {
 
     return <div className={styles.queueEmpty}>Нет доступа к реестру совещаний</div>;
@@ -431,6 +498,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
 
 
+  const participantsMeetingLabel = cancelMeetingLabel;
+
+
+
   return (
 
     <>
@@ -448,6 +519,30 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
         onClose={handleCloseCancelModal}
 
         onConfirm={(message) => void handleConfirmCancel(message)}
+
+      />
+
+
+
+      <MeetingAgentRegistryParticipantsModal
+
+        open={participantsModalOpen}
+
+        meetingLabel={participantsMeetingLabel}
+
+        loading={participantsDetailQuery.isLoading}
+
+        error={participantsDetailError}
+
+        initialParticipants={participantsInitial}
+
+        applying={false}
+
+        applyError={null}
+
+        onClose={handleCloseParticipantsModal}
+
+        onApply={handleApplyParticipants}
 
       />
 
@@ -667,6 +762,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
               onReschedule={handleOpenRescheduleModal}
 
+              onParticipants={handleOpenParticipantsModal}
+
+              participantsSuccessMessage={participantsSuccessMessage}
+
             />
 
           )}
@@ -822,7 +921,11 @@ function RegistryDetails({
 
   onCancel,
 
-  onReschedule
+  onReschedule,
+
+  onParticipants,
+
+  participantsSuccessMessage
 
 }: {
 
@@ -839,6 +942,10 @@ function RegistryDetails({
   onCancel: () => void;
 
   onReschedule: () => void;
+
+  onParticipants: () => void;
+
+  participantsSuccessMessage: string | null;
 
 }) {
 
@@ -1194,7 +1301,7 @@ function RegistryDetails({
 
           </button>
 
-          <button type="button" className={styles.ghostButton} disabled title="Скоро">
+          <button type="button" className={styles.ghostButton} onClick={onParticipants}>
 
             <Users size={15} aria-hidden="true" />
 
@@ -1219,6 +1326,16 @@ function RegistryDetails({
           <p className={styles.registrySuccessNote} role="status">
 
             {rescheduleSuccessMessage}
+
+          </p>
+
+        ) : null}
+
+        {participantsSuccessMessage ? (
+
+          <p className={styles.registrySuccessNote} role="status">
+
+            {participantsSuccessMessage}
 
           </p>
 
