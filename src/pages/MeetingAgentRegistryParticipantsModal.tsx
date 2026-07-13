@@ -1,23 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CalendarClock, Loader2, Search, Undo2, X } from "lucide-react";
-import { usersApi } from "@/api/endpoints";
+import { meetingsApi } from "@/api/endpoints";
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 import { useMeetingRegistryParticipants } from "@/hooks/useMeetingRegistry";
-import type { MeetingRegistryEarlierSlotCandidate, MeetingRegistryEarlierSlotSuggestion, User } from "@/types";
+import type {
+  MeetingRegistryConfirmationKind,
+  MeetingRegistryEarlierSlotCandidate,
+  MeetingRegistryEarlierSlotSuggestion,
+  MeetingRegistryParticipantSearchResponse
+} from "@/types";
 import styles from "./MeetingAgent.module.css";
-
-function getUserFullName(user: User): string {
-  const fullName = user.full_name?.trim();
-  if (fullName) return fullName;
-
-  const composed = [user.last_name, user.first_name, user.middle_name]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(" ");
-
-  return composed || user.email;
-}
 
 function normalizeParticipantName(name: string): string {
   return name.trim().replace(/\s+/g, " ");
@@ -39,27 +31,118 @@ type ParticipantsApplyPayload = {
   removed: string[];
 };
 
+export type ParticipantsPendingState = {
+  participants: string[];
+  added: string[];
+  removed: string[];
+  confirmationKind: NonNullable<MeetingRegistryConfirmationKind>;
+  message: string | null;
+  earlierSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
+  commonSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
+};
+
 type Props = {
   open: boolean;
   refKey: string | null;
   meetingLabel: string;
   applying: boolean;
   applyError: string | null;
-  confirmRemovalError: string | null;
-  applySuccessMessage: string | null;
-  earlierSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
-  pendingOnCurrentSlot: boolean;
-  pendingRemoved: string[];
+  confirmActionError: string | null;
+  pendingState: ParticipantsPendingState | null;
   currentSlotLabel: string | null;
   currentSlotStart: string | null;
   currentSlotEnd: string | null;
-  confirmingRemovalSlotKey: string | null;
-  isConfirmingRemoval: boolean;
+  confirmingPendingSlotKey: string | null;
+  isConfirmingPending: boolean;
+  isCancellingPending: boolean;
   onClose: () => void;
   onApply: (payload: ParticipantsApplyPayload) => void;
+  onConfirmAdd: () => void;
+  onCancelConfirmation: () => void;
+  onConfirmAddWithSlot: (candidate: MeetingRegistryEarlierSlotCandidate) => void;
   onConfirmRemoval: (candidate: MeetingRegistryEarlierSlotCandidate) => void;
   onConfirmRemovalOnCurrentSlot: () => void;
 };
+
+function isParticipantInDraft(draft: string[], fio: string): boolean {
+  const key = fio.toLowerCase();
+  return draft.some((name) => name.toLowerCase() === key);
+}
+
+function SlotCandidateList({
+  suggestion,
+  confirmLabel,
+  confirmingSlotKey,
+  isConfirming,
+  onConfirm
+}: {
+  suggestion: MeetingRegistryEarlierSlotSuggestion;
+  confirmLabel: string;
+  confirmingSlotKey: string | null;
+  isConfirming: boolean;
+  onConfirm: (candidate: MeetingRegistryEarlierSlotCandidate) => void;
+}) {
+  return (
+    <div className={styles.registryEarlierSlotSection}>
+      <p className={styles.registryEarlierSlotMessage}>{suggestion.message}</p>
+      <p className={styles.registryEarlierSlotMeta}>Текущий слот: {suggestion.current_slot_label}</p>
+      {suggestion.search_from && suggestion.search_until ? (
+        <p className={styles.registryEarlierSlotMeta}>
+          Поиск: {suggestion.search_from} — {suggestion.search_until}
+        </p>
+      ) : null}
+
+      <div className={styles.slotCandidateList}>
+        {suggestion.candidates.map((candidate, index) => {
+          const candidateKey = `${candidate.slot_start}|${candidate.slot_end}`;
+          const isCandidateConfirming = isConfirming && confirmingSlotKey === candidateKey;
+
+          return (
+            <div key={candidateKey} className={styles.registryEarlierSlotCard}>
+              <div className={styles.registryEarlierSlotCardTop}>
+                <strong className={styles.registryEarlierSlotLabel}>{candidate.slot_label}</strong>
+                {index === 0 ? <span className={styles.slotCandidateBadge}>Рекомендуем</span> : null}
+              </div>
+
+              {candidate.coverage_ratio != null ? (
+                <p className={styles.registryEarlierSlotStats}>
+                  Доступность: {Math.round(candidate.coverage_ratio * 100)}%
+                </p>
+              ) : null}
+
+              {candidate.free_attendees_count != null ? (
+                <p className={styles.registryEarlierSlotStats}>
+                  Свободны: {candidate.free_attendees_count}
+                </p>
+              ) : null}
+
+              <div className={styles.registryEarlierSlotActions}>
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={isConfirming}
+                  onClick={() => onConfirm(candidate)}
+                >
+                  {isCandidateConfirming ? (
+                    <>
+                      <Loader2 size={15} className={styles.spinner} aria-hidden="true" />
+                      Подтверждаем…
+                    </>
+                  ) : (
+                    <>
+                      <CalendarClock size={15} aria-hidden="true" />
+                      {confirmLabel}
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
 
 export default function MeetingAgentRegistryParticipantsModal({
   open,
@@ -67,55 +150,91 @@ export default function MeetingAgentRegistryParticipantsModal({
   meetingLabel,
   applying,
   applyError,
-  confirmRemovalError,
-  applySuccessMessage,
-  earlierSlotSuggestion,
-  pendingOnCurrentSlot,
-  pendingRemoved,
+  confirmActionError,
+  pendingState,
   currentSlotLabel,
   currentSlotStart,
   currentSlotEnd,
-  confirmingRemovalSlotKey,
-  isConfirmingRemoval,
+  confirmingPendingSlotKey,
+  isConfirmingPending,
+  isCancellingPending,
   onClose,
   onApply,
+  onConfirmAdd,
+  onCancelConfirmation,
+  onConfirmAddWithSlot,
   onConfirmRemoval,
   onConfirmRemovalOnCurrentSlot
 }: Props) {
-  const [search, setSearch] = useState("");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResult, setSearchResult] = useState<MeetingRegistryParticipantSearchResponse | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
   const [draft, setDraft] = useState<string[]>([]);
   const [undoStack, setUndoStack] = useState<string[]>([]);
 
-  const participantsQuery = useMeetingRegistryParticipants(
-    refKey,
-    open && !earlierSlotSuggestion && !pendingOnCurrentSlot
+  const showConfirmation = Boolean(pendingState);
+  const showAddCurrentSlot = pendingState?.confirmationKind === "add_current_slot";
+  const showAddReschedule = Boolean(
+    pendingState?.confirmationKind === "add_reschedule" && pendingState.commonSlotSuggestion?.candidates?.length
   );
+  const showRemovalEarlier = Boolean(
+    pendingState?.confirmationKind === "removal" && pendingState.earlierSlotSuggestion?.candidates?.length
+  );
+  const showRemovalCurrent =
+    pendingState?.confirmationKind === "removal" &&
+    !showRemovalEarlier &&
+    pendingState.removed.length > 0 &&
+    Boolean(currentSlotStart && currentSlotEnd);
+
+  const participantsQuery = useMeetingRegistryParticipants(refKey, open && !showConfirmation);
 
   const loading = participantsQuery.isLoading || participantsQuery.isFetching;
   const error = participantsQuery.isError ? getMeetingRequestError(participantsQuery.error) : null;
   const initialParticipants = participantsQuery.data?.participants ?? [];
-  const showEarlierSlots = Boolean(earlierSlotSuggestion?.candidates?.length);
-  const apiPendingRemoval = Boolean(participantsQuery.data?.pending_confirmation);
-  const pendingRemovedFromApi = participantsQuery.data?.pending_removed ?? [];
-  const pendingRemovedNames = pendingRemoved.length ? pendingRemoved : pendingRemovedFromApi;
-  const showPendingCurrentSlot =
-    (pendingOnCurrentSlot || (apiPendingRemoval && !showEarlierSlots)) &&
-    pendingRemovedNames.length > 0 &&
-    Boolean(currentSlotStart && currentSlotEnd);
-
-  const usersQuery = useQuery({
-    queryKey: ["users", "participants-search"],
-    queryFn: () => usersApi.list(),
-    enabled: open && !showEarlierSlots && !showPendingCurrentSlot,
-    staleTime: 5 * 60 * 1000
-  });
 
   useEffect(() => {
-    if (!open || showEarlierSlots || showPendingCurrentSlot) return;
-    setSearch("");
+    if (!open || showConfirmation) return;
+    setSearchQuery("");
+    setSearchResult(null);
+    setIsSearching(false);
     setDraft(initialParticipants.map(normalizeParticipantName).filter(Boolean));
     setUndoStack([]);
-  }, [open, initialParticipants, showEarlierSlots, showPendingCurrentSlot]);
+  }, [open, initialParticipants, showConfirmation]);
+
+  useEffect(() => {
+    if (!open || showConfirmation || !refKey) return;
+
+    const query = searchQuery.trim();
+    if (query.length < 3) {
+      setSearchResult(null);
+      setIsSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      setIsSearching(true);
+      try {
+        const result = await meetingsApi.searchRegistryParticipants(refKey, query);
+        if (!cancelled) {
+          setSearchResult(result);
+        }
+      } catch {
+        if (!cancelled) {
+          setSearchResult(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsSearching(false);
+        }
+      }
+    }, 400);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchQuery, refKey, open, showConfirmation]);
 
   const lastRemovedParticipant = undoStack[undoStack.length - 1] ?? null;
 
@@ -137,26 +256,18 @@ export default function MeetingAgentRegistryParticipantsModal({
     [normalizedDraft, normalizedInitial]
   );
 
-  const searchQuery = search.trim().toLowerCase();
-
-  const visibleParticipants = useMemo(() => {
-    if (!searchQuery) return draft;
-    return draft.filter((name) => name.toLowerCase().includes(searchQuery));
-  }, [draft, searchQuery]);
-
-  const suggestions = useMemo(() => {
-    if (searchQuery.length < 2) return [];
-    const selected = new Set(draft.map((name) => name.toLowerCase()));
-    const users = usersQuery.data ?? [];
-
-    return users
-      .map((user) => getUserFullName(user))
-      .filter((name) => {
-        const normalized = name.toLowerCase();
-        return normalized.includes(searchQuery) && !selected.has(normalized);
-      })
-      .slice(0, 8);
-  }, [draft, searchQuery, usersQuery.data]);
+  const trimmedSearchQuery = searchQuery.trim();
+  const showSuggestions = Boolean(
+    searchResult &&
+      (searchResult.suggestions.length > 1 || searchResult.message === "Выберите участника из списка")
+  );
+  const canAddSingle = Boolean(
+    searchResult?.can_add &&
+      !isSearching &&
+      searchResult.fio &&
+      !isParticipantInDraft(draft, searchResult.fio) &&
+      !searchResult.already_added
+  );
 
   if (!open) return null;
 
@@ -180,29 +291,25 @@ export default function MeetingAgentRegistryParticipantsModal({
     });
   }
 
-  function handleAdd(name: string) {
-    const normalized = normalizeParticipantName(name);
-    if (!normalized) return;
-    setDraft((current) => {
-      const exists = current.some((item) => item.toLowerCase() === normalized.toLowerCase());
-      return exists ? current : [...current, normalized];
-    });
+  function handleAddParticipant(fio: string) {
+    const normalized = normalizeParticipantName(fio);
+    if (!normalized || isParticipantInDraft(draft, normalized)) return;
+    setDraft((current) => [...current, normalized]);
     setUndoStack((stack) => stack.filter((item) => item.toLowerCase() !== normalized.toLowerCase()));
-    setSearch("");
+    setSearchQuery("");
+    setSearchResult(null);
+  }
+
+  function handleAddFromSearch() {
+    if (!searchResult?.can_add || !searchResult.fio) return;
+    handleAddParticipant(searchResult.fio);
   }
 
   function handleSearchKeyDown(event: React.KeyboardEvent<HTMLInputElement>) {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    const trimmed = search.trim();
-    if (!trimmed) return;
-    if (suggestions.length === 1) {
-      handleAdd(suggestions[0]);
-      return;
-    }
-    const exists = draft.some((name) => name.toLowerCase() === trimmed.toLowerCase());
-    if (!exists) {
-      handleAdd(trimmed);
+    if (canAddSingle) {
+      handleAddFromSearch();
     }
   }
 
@@ -217,8 +324,18 @@ export default function MeetingAgentRegistryParticipantsModal({
     onApply({ participants: normalizedDraft, added, removed });
   }
 
-  const isBusy = loading || applying || isConfirmingRemoval;
-  const slotActionError = confirmRemovalError ?? applyError;
+  const isBusy = loading || applying || isConfirmingPending || isCancellingPending;
+  const actionError = confirmActionError ?? applyError;
+
+  const modalTitle = showAddCurrentSlot
+    ? "Добавить участника в текущее время?"
+    : showAddReschedule
+      ? "Выбор слота для совещания"
+      : showRemovalEarlier
+        ? "Более ранние слоты"
+        : showRemovalCurrent
+          ? "Подтверждение удаления"
+          : "Список участников";
 
   return (
     <div className={styles.modalOverlay} onClick={onClose} role="presentation">
@@ -230,13 +347,7 @@ export default function MeetingAgentRegistryParticipantsModal({
         aria-labelledby="meeting-registry-participants-title"
       >
         <div className={styles.modalHeader}>
-          <h2 id="meeting-registry-participants-title">
-            {showEarlierSlots
-              ? "Более ранние слоты"
-              : showPendingCurrentSlot
-                ? "Подтверждение удаления"
-                : "Список участников"}
-          </h2>
+          <h2 id="meeting-registry-participants-title">{modalTitle}</h2>
           <button
             type="button"
             className={styles.modalCloseButton}
@@ -250,78 +361,154 @@ export default function MeetingAgentRegistryParticipantsModal({
 
         <p className={styles.modalHint}>{meetingLabel}</p>
 
-        {showEarlierSlots && earlierSlotSuggestion ? (
+        {showAddCurrentSlot && pendingState ? (
           <>
-            {applySuccessMessage ? (
-              <p className={styles.registrySuccessNote} role="status">
-                {applySuccessMessage}
+            <p className={styles.registrySuccessNote} role="status">
+              {pendingState.message ??
+                "Новый участник свободен в текущее время совещания. Подтвердите добавление."}
+            </p>
+            {pendingState.added.length ? (
+              <p className={styles.registryEarlierSlotMeta}>
+                Будут добавлены: {pendingState.added.join(", ")}
               </p>
             ) : null}
 
-            <div className={styles.registryEarlierSlotSection}>
-              <p className={styles.registryEarlierSlotMessage}>{earlierSlotSuggestion.message}</p>
-              <p className={styles.registryEarlierSlotMeta}>
-                Текущий слот: {earlierSlotSuggestion.current_slot_label}
-              </p>
-              <p className={styles.registryEarlierSlotMeta}>
-                Поиск: {earlierSlotSuggestion.search_from} — {earlierSlotSuggestion.search_until}
-              </p>
-
-              <div className={styles.slotCandidateList}>
-                {earlierSlotSuggestion.candidates.map((candidate, index) => {
-                  const candidateKey = `${candidate.slot_start}|${candidate.slot_end}`;
-                  const isCandidateConfirming =
-                    isConfirmingRemoval && confirmingRemovalSlotKey === candidateKey;
-
-                  return (
-                    <div key={candidateKey} className={styles.registryEarlierSlotCard}>
-                      <div className={styles.registryEarlierSlotCardTop}>
-                        <strong className={styles.registryEarlierSlotLabel}>{candidate.slot_label}</strong>
-                        {index === 0 ? <span className={styles.slotCandidateBadge}>Рекомендуем</span> : null}
-                      </div>
-
-                      {candidate.coverage_ratio != null ? (
-                        <p className={styles.registryEarlierSlotStats}>
-                          Доступность: {Math.round(candidate.coverage_ratio * 100)}%
-                        </p>
-                      ) : null}
-
-                      {candidate.free_attendees_count != null ? (
-                        <p className={styles.registryEarlierSlotStats}>
-                          Свободны: {candidate.free_attendees_count}
-                        </p>
-                      ) : null}
-
-                      <div className={styles.registryEarlierSlotActions}>
-                        <button
-                          type="button"
-                          className={styles.secondaryButton}
-                          disabled={isConfirmingRemoval}
-                          onClick={() => onConfirmRemoval(candidate)}
-                        >
-                          {isCandidateConfirming ? (
-                            <>
-                              <Loader2 size={15} className={styles.spinner} aria-hidden="true" />
-                              Подтверждаем…
-                            </>
-                          ) : (
-                            <>
-                              <CalendarClock size={15} aria-hidden="true" />
-                              Подтвердить слот
-                            </>
-                          )}
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {slotActionError ? (
+            {actionError ? (
               <div className={styles.modalError} role="alert">
                 <AlertTriangle size={16} aria-hidden="true" />
-                <span>{slotActionError}</span>
+                <span>{actionError}</span>
+              </div>
+            ) : null}
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={isBusy}
+                onClick={onCancelConfirmation}
+              >
+                {isCancellingPending ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                    Отменяем…
+                  </>
+                ) : (
+                  "Нет"
+                )}
+              </button>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={isBusy}
+                onClick={onConfirmAdd}
+              >
+                {isConfirmingPending ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                    Подтверждаем…
+                  </>
+                ) : (
+                  "Да"
+                )}
+              </button>
+            </div>
+          </>
+        ) : showAddReschedule && pendingState?.commonSlotSuggestion ? (
+          <>
+            {pendingState.message ? (
+              <p className={styles.registrySuccessNote} role="status">
+                {pendingState.message}
+              </p>
+            ) : null}
+            {pendingState.added.length ? (
+              <p className={styles.registryEarlierSlotMeta}>
+                Будут добавлены: {pendingState.added.join(", ")}
+              </p>
+            ) : null}
+
+            <SlotCandidateList
+              suggestion={pendingState.commonSlotSuggestion}
+              confirmLabel="Подтвердить слот"
+              confirmingSlotKey={confirmingPendingSlotKey}
+              isConfirming={isConfirmingPending}
+              onConfirm={onConfirmAddWithSlot}
+            />
+
+            {actionError ? (
+              <div className={styles.modalError} role="alert">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>{actionError}</span>
+              </div>
+            ) : null}
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={isBusy}
+                onClick={onCancelConfirmation}
+              >
+                {isCancellingPending ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                    Отменяем…
+                  </>
+                ) : (
+                  "Отмена"
+                )}
+              </button>
+            </div>
+          </>
+        ) : pendingState?.confirmationKind === "add_reschedule" ? (
+          <>
+            <p className={styles.registrySuccessNote} role="status">
+              {pendingState.message ?? "Не удалось подобрать общий свободный слот для всех участников."}
+            </p>
+            {pendingState.added.length ? (
+              <p className={styles.registryEarlierSlotMeta}>
+                Будут добавлены: {pendingState.added.join(", ")}
+              </p>
+            ) : null}
+
+            {actionError ? (
+              <div className={styles.modalError} role="alert">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>{actionError}</span>
+              </div>
+            ) : null}
+
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                disabled={isBusy}
+                onClick={onCancelConfirmation}
+              >
+                {isCancellingPending ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                    Отменяем…
+                  </>
+                ) : (
+                  "Отмена"
+                )}
+              </button>
+            </div>
+          </>
+        ) : showRemovalEarlier && pendingState?.earlierSlotSuggestion ? (
+          <>
+            <SlotCandidateList
+              suggestion={pendingState.earlierSlotSuggestion}
+              confirmLabel="Подтвердить слот"
+              confirmingSlotKey={confirmingPendingSlotKey}
+              isConfirming={isConfirmingPending}
+              onConfirm={onConfirmRemoval}
+            />
+
+            {actionError ? (
+              <div className={styles.modalError} role="alert">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>{actionError}</span>
               </div>
             ) : null}
 
@@ -331,25 +518,18 @@ export default function MeetingAgentRegistryParticipantsModal({
               </button>
             </div>
           </>
-        ) : showPendingCurrentSlot ? (
+        ) : showRemovalCurrent && pendingState ? (
           <>
-            {applySuccessMessage ? (
-              <p className={styles.registrySuccessNote} role="status">
-                {applySuccessMessage}
-              </p>
-            ) : (
-              <p className={styles.registrySuccessNote} role="status">
-                Подтвердите удаление участников. Совещание останется в текущем времени.
-              </p>
-            )}
+            <p className={styles.registrySuccessNote} role="status">
+              {pendingState.message ??
+                "Подтвердите удаление участников. Совещание останется в текущем времени."}
+            </p>
 
             <div className={styles.registryEarlierSlotSection}>
-              <p className={styles.registryEarlierSlotMeta}>
-                Текущий слот: {currentSlotLabel ?? "—"}
-              </p>
-              {pendingRemovedNames.length ? (
+              <p className={styles.registryEarlierSlotMeta}>Текущий слот: {currentSlotLabel ?? "—"}</p>
+              {pendingState.removed.length ? (
                 <p className={styles.registryEarlierSlotMeta}>
-                  Будут удалены: {pendingRemovedNames.join(", ")}
+                  Будут удалены: {pendingState.removed.join(", ")}
                 </p>
               ) : null}
 
@@ -357,10 +537,10 @@ export default function MeetingAgentRegistryParticipantsModal({
                 <button
                   type="button"
                   className={styles.secondaryButton}
-                  disabled={isConfirmingRemoval}
+                  disabled={isConfirmingPending}
                   onClick={onConfirmRemovalOnCurrentSlot}
                 >
-                  {isConfirmingRemoval ? (
+                  {isConfirmingPending ? (
                     <>
                       <Loader2 size={15} className={styles.spinner} aria-hidden="true" />
                       Подтверждаем…
@@ -375,10 +555,10 @@ export default function MeetingAgentRegistryParticipantsModal({
               </div>
             </div>
 
-            {slotActionError ? (
+            {actionError ? (
               <div className={styles.modalError} role="alert">
                 <AlertTriangle size={16} aria-hidden="true" />
-                <span>{slotActionError}</span>
+                <span>{actionError}</span>
               </div>
             ) : null}
 
@@ -390,111 +570,157 @@ export default function MeetingAgentRegistryParticipantsModal({
           </>
         ) : (
           <>
-        <div className={styles.participantsSearchField}>
-          <Search className={styles.participantsSearchIcon} size={16} aria-hidden="true" />
-          <input
-            type="search"
-            className={styles.participantsSearchInput}
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            onKeyDown={handleSearchKeyDown}
-            placeholder="Поиск участника"
-            disabled={isBusy}
-            autoComplete="off"
-            aria-label="Поиск участника"
-          />
-        </div>
+            <div className={styles.participantsSearchField}>
+              <Search className={styles.participantsSearchIcon} size={16} aria-hidden="true" />
+              <input
+                type="search"
+                className={styles.participantsSearchInput}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Поиск участника"
+                disabled={isBusy}
+                autoComplete="off"
+                aria-label="Поиск участника"
+              />
+            </div>
 
-        {suggestions.length ? (
-          <ul className={styles.participantsSuggestions} role="listbox" aria-label="Найденные участники">
-            {suggestions.map((name) => (
-              <li key={name}>
-                <button type="button" className={styles.participantsSuggestionItem} onClick={() => handleAdd(name)}>
-                  {name}
+            {trimmedSearchQuery.length >= 3 ? (
+              <div>
+                {isSearching ? (
+                  <p className={styles.participantsSearchStatus} role="status">
+                    Ищем…
+                  </p>
+                ) : showSuggestions ? (
+                  <ul className={styles.participantsSuggestions} role="listbox" aria-label="Найденные участники">
+                    {searchResult?.suggestions.map((suggestion) => {
+                      const disabled =
+                        suggestion.already_added || isParticipantInDraft(draft, suggestion.fio);
+                      return (
+                        <li key={`${suggestion.fio}|${suggestion.email}`}>
+                          <button
+                            type="button"
+                            className={styles.participantsSuggestionItem}
+                            disabled={disabled || isBusy}
+                            onClick={() => handleAddParticipant(suggestion.fio)}
+                          >
+                            <span>{suggestion.fio}</span>
+                            <span className={styles.participantsSearchResultEmail}>{suggestion.email}</span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : canAddSingle && searchResult ? (
+                  <div className={styles.participantsSearchResultRow}>
+                    <div className={styles.participantsSearchResultInfo}>
+                      <span className={styles.participantsSearchResultName}>{searchResult.fio}</span>
+                      {searchResult.email ? (
+                        <span className={styles.participantsSearchResultEmail}>{searchResult.email}</span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={isBusy}
+                      onClick={handleAddFromSearch}
+                    >
+                      Добавить
+                    </button>
+                  </div>
+                ) : searchResult?.already_added ||
+                  (searchResult?.fio && isParticipantInDraft(draft, searchResult.fio)) ? (
+                  <p className={styles.participantsSearchResultHint} role="status">
+                    Уже в списке
+                  </p>
+                ) : searchResult?.message === "Не найден в Outlook" || (searchResult && !searchResult.found) ? (
+                  <p className={styles.participantsSearchResultHint} role="status">
+                    Не найден в Outlook
+                  </p>
+                ) : searchResult?.message ? (
+                  <p className={styles.participantsSearchResultHint} role="status">
+                    {searchResult.message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {lastRemovedParticipant && !loading && !error ? (
+              <div className={styles.participantsUndoRow}>
+                <button
+                  type="button"
+                  className={styles.participantsUndoButton}
+                  onClick={handleUndoRemove}
+                  disabled={isBusy}
+                  aria-label={`Вернуть ${lastRemovedParticipant}`}
+                >
+                  <Undo2 size={15} aria-hidden="true" />
+                  <span>Вернуть {lastRemovedParticipant}</span>
                 </button>
-              </li>
-            ))}
-          </ul>
-        ) : null}
+              </div>
+            ) : null}
 
-        {lastRemovedParticipant && !loading && !error ? (
-          <div className={styles.participantsUndoRow}>
-            <button
-              type="button"
-              className={styles.participantsUndoButton}
-              onClick={handleUndoRemove}
-              disabled={isBusy}
-              aria-label={`Вернуть ${lastRemovedParticipant}`}
-            >
-              <Undo2 size={15} aria-hidden="true" />
-              <span>Вернуть {lastRemovedParticipant}</span>
-            </button>
-          </div>
-        ) : null}
-
-        {loading ? (
-          <div className={styles.modalLoader}>
-            <Loader2 size={18} className={styles.spinner} aria-hidden="true" />
-            <span>Загружаем участников…</span>
-          </div>
-        ) : error ? (
-          <div className={styles.modalError} role="alert">
-            <AlertTriangle size={16} aria-hidden="true" />
-            <span>{error}</span>
-          </div>
-        ) : (
-          <div className={styles.participantsChipPanel}>
-            {visibleParticipants.length ? (
-              <ul className={styles.participantsChipList}>
-                {visibleParticipants.map((name) => (
-                  <li key={name}>
-                    <span className={styles.participantChip}>
-                      <span className={styles.participantChipLabel}>{name}</span>
-                      <button
-                        type="button"
-                        className={styles.participantChipRemove}
-                        onClick={() => handleRemove(name)}
-                        disabled={isBusy}
-                        aria-label={`Удалить ${name}`}
-                      >
-                        <X size={14} aria-hidden="true" />
-                      </button>
-                    </span>
-                  </li>
-                ))}
-              </ul>
+            {loading ? (
+              <div className={styles.modalLoader}>
+                <Loader2 size={18} className={styles.spinner} aria-hidden="true" />
+                <span>Загружаем участников…</span>
+              </div>
+            ) : error ? (
+              <div className={styles.modalError} role="alert">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>{error}</span>
+              </div>
             ) : (
-              <p className={styles.participantsEmpty}>
-                {searchQuery ? "Нет участников по запросу" : "Участники не указаны"}
-              </p>
+              <div className={styles.participantsChipPanel}>
+                {draft.length ? (
+                  <ul className={styles.participantsChipList}>
+                    {draft.map((name) => (
+                      <li key={name}>
+                        <span className={styles.participantChip}>
+                          <span className={styles.participantChipLabel}>{name}</span>
+                          <button
+                            type="button"
+                            className={styles.participantChipRemove}
+                            onClick={() => handleRemove(name)}
+                            disabled={isBusy}
+                            aria-label={`Удалить ${name}`}
+                          >
+                            <X size={14} aria-hidden="true" />
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className={styles.participantsEmpty}>Участники не указаны</p>
+                )}
+              </div>
             )}
-          </div>
-        )}
 
-        {slotActionError ? (
-          <div className={styles.modalError} role="alert">
-            <AlertTriangle size={16} aria-hidden="true" />
-            <span>{slotActionError}</span>
-          </div>
-        ) : null}
+            {actionError ? (
+              <div className={styles.modalError} role="alert">
+                <AlertTriangle size={16} aria-hidden="true" />
+                <span>{actionError}</span>
+              </div>
+            ) : null}
 
-        <div className={styles.modalActions}>
-          <button
-            type="button"
-            className={styles.primaryButton}
-            disabled={isBusy || !hasChanges || !normalizedDraft.length}
-            onClick={handleApply}
-          >
-            {applying ? (
-              <>
-                <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-                Сохраняем…
-              </>
-            ) : (
-              "Применить"
-            )}
-          </button>
-        </div>
+            <div className={styles.modalActions}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                disabled={isBusy || !hasChanges || !normalizedDraft.length}
+                onClick={handleApply}
+              >
+                {applying ? (
+                  <>
+                    <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                    Сохраняем…
+                  </>
+                ) : (
+                  "Применить"
+                )}
+              </button>
+            </div>
           </>
         )}
       </div>

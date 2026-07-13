@@ -36,6 +36,8 @@ import {
 
   useMeetingRegistryParticipantsApply,
 
+  useMeetingRegistryParticipantsConfirmAdd,
+
   useMeetingRegistryParticipantsConfirmRemoval,
 
   useMeetingRegistryParticipantsCancelRemoval,
@@ -57,6 +59,7 @@ import {
 import { getMeetingMemoActionError, getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 
 import type {
+  MeetingRegistryConfirmationKind,
   MeetingRegistryEarlierSlotCandidate,
   MeetingRegistryEarlierSlotSuggestion,
   MeetingRegistryStageFilter
@@ -113,6 +116,16 @@ const registryFilters: { id: MeetingRegistryStageFilter; label: string }[] = [
 
 
 
+type ParticipantsPendingState = {
+  participants: string[];
+  added: string[];
+  removed: string[];
+  confirmationKind: NonNullable<MeetingRegistryConfirmationKind>;
+  message: string | null;
+  earlierSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
+  commonSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
+};
+
 type Props = {
 
   canAccessAgent: boolean;
@@ -139,19 +152,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   const [participantsSuccessMessage, setParticipantsSuccessMessage] = useState<string | null>(null);
 
-  const [participantsEarlierSlotSuggestion, setParticipantsEarlierSlotSuggestion] =
-    useState<MeetingRegistryEarlierSlotSuggestion | null>(null);
+  const [participantsPendingState, setParticipantsPendingState] = useState<ParticipantsPendingState | null>(null);
 
-  const [participantsApplySuccessMessage, setParticipantsApplySuccessMessage] = useState<string | null>(null);
-
-  const [participantsPendingRemoval, setParticipantsPendingRemoval] = useState<{
-    participants: string[];
-    removed: string[];
-  } | null>(null);
-
-  const [participantsPendingOnCurrentSlot, setParticipantsPendingOnCurrentSlot] = useState(false);
-
-  const [confirmingRemovalSlotKey, setConfirmingRemovalSlotKey] = useState<string | null>(null);
+  const [confirmingPendingSlotKey, setConfirmingPendingSlotKey] = useState<string | null>(null);
 
   const registryQuery = useMeetingRegistry(canAccessAgent, stageFilter);
 
@@ -164,6 +167,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const rescheduleApproveMutation = useMeetingRegistryRescheduleApprove();
 
   const participantsApplyMutation = useMeetingRegistryParticipantsApply();
+
+  const participantsConfirmAddMutation = useMeetingRegistryParticipantsConfirmAdd();
 
   const participantsConfirmRemovalMutation = useMeetingRegistryParticipantsConfirmRemoval();
 
@@ -224,36 +229,89 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
     : null;
 
+  const participantsConfirmAddError = participantsConfirmAddMutation.isError
+
+    ? getMeetingMemoActionError(participantsConfirmAddMutation.error)
+
+    : null;
+
+
+
+  function buildParticipantsPendingState(
+    result: {
+      participants: string[];
+      added: string[];
+      removed: string[];
+      confirmation_kind?: MeetingRegistryConfirmationKind;
+      message: string | null;
+      earlier_slot_suggestion?: MeetingRegistryEarlierSlotSuggestion | null;
+      common_slot_suggestion?: MeetingRegistryEarlierSlotSuggestion | null;
+    }
+  ): ParticipantsPendingState | null {
+    if (!result.confirmation_kind) return null;
+
+    return {
+      participants: result.participants,
+      added: result.added,
+      removed: result.removed,
+      confirmationKind: result.confirmation_kind,
+      message: result.message,
+      earlierSlotSuggestion: result.earlier_slot_suggestion ?? null,
+      commonSlotSuggestion: result.common_slot_suggestion ?? null
+    };
+  }
+
 
 
   useEffect(() => {
-    if (!participantsModalOpen) return;
+    if (!participantsModalOpen || participantsPendingState) return;
 
     const data = participantsRestoreQuery.data;
-    if (!data?.pending_confirmation) return;
+    if (!data?.pending_confirmation || !data.confirmation_kind) return;
 
     const pendingParticipants = data.pending_participants ?? [];
+    const pendingAdded = data.pending_added ?? [];
     const pendingRemoved = data.pending_removed ?? [];
-    if (!pendingParticipants.length || !pendingRemoved.length) return;
+    const refKey = selectedItem?.refKey;
+    if (!refKey) return;
 
-    setParticipantsPendingRemoval({
-      participants: pendingParticipants,
-      removed: pendingRemoved
-    });
-
-    if (!participantsEarlierSlotSuggestion?.candidates?.length) {
-      setParticipantsPendingOnCurrentSlot(true);
-      if (!participantsApplySuccessMessage) {
-        setParticipantsApplySuccessMessage(
-          "Подтвердите удаление участников на текущем слоте."
-        );
-      }
+    if (data.confirmation_kind === "add_current_slot") {
+      setParticipantsPendingState({
+        participants: pendingParticipants,
+        added: pendingAdded,
+        removed: pendingRemoved,
+        confirmationKind: "add_current_slot",
+        message: null,
+        earlierSlotSuggestion: null,
+        commonSlotSuggestion: null
+      });
+      return;
     }
+
+    void participantsApplyMutation
+      .mutateAsync({
+        refKey,
+        payload: {
+          participants: pendingParticipants,
+          added: pendingAdded,
+          removed: pendingRemoved
+        }
+      })
+      .then((result) => {
+        if (!result.pending_confirmation) return;
+        const pending = buildParticipantsPendingState(result);
+        if (pending) {
+          setParticipantsPendingState(pending);
+        }
+      })
+      .catch(() => {
+        // error shown in modal via participantsApplyError
+      });
   }, [
     participantsModalOpen,
+    participantsPendingState,
     participantsRestoreQuery.data,
-    participantsEarlierSlotSuggestion,
-    participantsApplySuccessMessage
+    selectedItem?.refKey
   ]);
 
 
@@ -286,13 +344,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
     setParticipantsSuccessMessage(null);
 
-    setParticipantsEarlierSlotSuggestion(null);
-
-    setParticipantsApplySuccessMessage(null);
-
-    setParticipantsPendingRemoval(null);
-
-    setParticipantsPendingOnCurrentSlot(false);
+    setParticipantsPendingState(null);
 
   }, [selectedId]);
 
@@ -422,11 +474,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
       );
 
-      setParticipantsEarlierSlotSuggestion(null);
-
-      setParticipantsApplySuccessMessage(null);
-
-      setParticipantsPendingRemoval(null);
+      setParticipantsPendingState(null);
 
       setParticipantsModalOpen(false);
 
@@ -512,15 +560,11 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
     setParticipantsSuccessMessage(null);
 
-    setParticipantsEarlierSlotSuggestion(null);
-
-    setParticipantsApplySuccessMessage(null);
-
-    setParticipantsPendingRemoval(null);
-
-    setParticipantsPendingOnCurrentSlot(false);
+    setParticipantsPendingState(null);
 
     participantsApplyMutation.reset();
+
+    participantsConfirmAddMutation.reset();
 
     participantsConfirmRemovalMutation.reset();
 
@@ -532,11 +576,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   function resetParticipantsModalState() {
     setParticipantsModalOpen(false);
-    setParticipantsEarlierSlotSuggestion(null);
-    setParticipantsApplySuccessMessage(null);
-    setParticipantsPendingRemoval(null);
-    setParticipantsPendingOnCurrentSlot(false);
+    setParticipantsPendingState(null);
     participantsApplyMutation.reset();
+    participantsConfirmAddMutation.reset();
     participantsConfirmRemovalMutation.reset();
     participantsCancelRemovalMutation.reset();
   }
@@ -544,9 +586,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   function handleCloseParticipantsModal() {
     const refKey = selectedItem?.refKey;
     const hasPendingConfirmation =
-      Boolean(participantsPendingRemoval) ||
-      participantsPendingOnCurrentSlot ||
-      Boolean(participantsEarlierSlotSuggestion) ||
+      Boolean(participantsPendingState) ||
       Boolean(participantsRestoreQuery.data?.pending_confirmation);
 
     if (refKey && hasPendingConfirmation) {
@@ -581,25 +621,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
       })
       .then((result) => {
         if (result.pending_confirmation) {
-          setParticipantsPendingRemoval({
-            participants: result.participants,
-            removed: result.removed
-          });
-
-          if (result.earlier_slot_suggestion?.candidates?.length) {
-            setParticipantsPendingOnCurrentSlot(false);
-            setParticipantsApplySuccessMessage(
-              "Выберите более ранний слот для совещания с обновлённым составом участников."
-            );
-            setParticipantsEarlierSlotSuggestion(result.earlier_slot_suggestion);
-            return;
+          const pending = buildParticipantsPendingState(result);
+          if (pending) {
+            setParticipantsPendingState(pending);
           }
-
-          setParticipantsEarlierSlotSuggestion(null);
-          setParticipantsPendingOnCurrentSlot(true);
-          setParticipantsApplySuccessMessage(
-            "Более ранних слотов не найдено. Подтвердите удаление участников на текущем слоте."
-          );
           return;
         }
 
@@ -610,19 +635,87 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         setParticipantsModalOpen(false);
         setParticipantsSuccessMessage(`Список участников обновлён${suffix}.`);
-        setParticipantsEarlierSlotSuggestion(null);
-        setParticipantsApplySuccessMessage(null);
-        setParticipantsPendingRemoval(null);
-        setParticipantsPendingOnCurrentSlot(false);
+        setParticipantsPendingState(null);
       })
       .catch(() => {
         // error shown in modal via participantsApplyError
       });
   }
 
+  function handleCancelParticipantsConfirmation() {
+    if (!selectedItem?.refKey) return;
+
+    void participantsCancelRemovalMutation
+      .mutateAsync({ refKey: selectedItem.refKey })
+      .then(() => {
+        setParticipantsPendingState(null);
+      })
+      .catch(() => {
+        // error shown in modal
+      });
+  }
+
+  function handleConfirmParticipantsAdd() {
+    if (!selectedItem?.refKey || !participantsPendingState) return;
+
+    void participantsConfirmAddMutation
+      .mutateAsync({
+        refKey: selectedItem.refKey,
+        payload: {
+          participants: participantsPendingState.participants,
+          added: participantsPendingState.added
+        }
+      })
+      .then((result) => {
+        setParticipantsModalOpen(false);
+        setParticipantsPendingState(null);
+
+        const slotNote = result.slot_label ? ` Слот: ${result.slot_label}.` : "";
+        const addedNote = result.added.length > 0 ? ` Добавлено: ${result.added.length}.` : "";
+        setParticipantsSuccessMessage(
+          `${result.message ?? "Состав участников совещания изменён"}.${slotNote}${addedNote}`
+        );
+      })
+      .catch(() => {
+        // error shown in modal via participantsConfirmAddError
+      });
+  }
+
+  function handleConfirmParticipantsAddWithSlot(candidate: MeetingRegistryEarlierSlotCandidate) {
+    if (!selectedItem?.refKey || !participantsPendingState) return;
+
+    const candidateKey = `${candidate.slot_start}|${candidate.slot_end}`;
+    setConfirmingPendingSlotKey(candidateKey);
+
+    void participantsConfirmAddMutation
+      .mutateAsync({
+        refKey: selectedItem.refKey,
+        payload: {
+          participants: participantsPendingState.participants,
+          added: participantsPendingState.added,
+          slot_start: candidate.slot_start,
+          slot_end: candidate.slot_end
+        }
+      })
+      .then((result) => {
+        setParticipantsModalOpen(false);
+        setParticipantsPendingState(null);
+
+        const slotNote = result.slot_label ? ` Совещание перенесено на ${result.slot_label}.` : "";
+        const addedNote = result.added.length > 0 ? ` Добавлено: ${result.added.length}.` : "";
+        setParticipantsSuccessMessage(`${result.message ?? "Состав участников изменён"}.${slotNote}${addedNote}`);
+      })
+      .catch(() => {
+        // error shown in modal via participantsConfirmAddError
+      })
+      .finally(() => {
+        setConfirmingPendingSlotKey(null);
+      });
+  }
+
   function handleConfirmParticipantsRemovalOnCurrentSlot() {
     if (!selectedItem?.refKey || !selectedItem.slotStart || !selectedItem.slotEnd) return;
-    if (!participantsPendingRemoval) return;
+    if (!participantsPendingState) return;
 
     handleConfirmParticipantsRemoval({
       slot_start: selectedItem.slotStart,
@@ -633,30 +726,25 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
     });
   }
 
-
-
   function handleConfirmParticipantsRemoval(candidate: MeetingRegistryEarlierSlotCandidate) {
-    if (!selectedItem?.refKey || !participantsPendingRemoval) return;
+    if (!selectedItem?.refKey || !participantsPendingState) return;
 
     const candidateKey = `${candidate.slot_start}|${candidate.slot_end}`;
-    setConfirmingRemovalSlotKey(candidateKey);
+    setConfirmingPendingSlotKey(candidateKey);
 
     void participantsConfirmRemovalMutation
       .mutateAsync({
         refKey: selectedItem.refKey,
         payload: {
-          participants: participantsPendingRemoval.participants,
-          removed: participantsPendingRemoval.removed,
+          participants: participantsPendingState.participants,
+          removed: participantsPendingState.removed,
           slot_start: candidate.slot_start,
           slot_end: candidate.slot_end
         }
       })
       .then((result) => {
         setParticipantsModalOpen(false);
-        setParticipantsEarlierSlotSuggestion(null);
-        setParticipantsApplySuccessMessage(null);
-        setParticipantsPendingRemoval(null);
-        setParticipantsPendingOnCurrentSlot(false);
+        setParticipantsPendingState(null);
 
         const removedNote =
           result.removed.length > 0 ? ` Удалено: ${result.removed.length}.` : "";
@@ -668,7 +756,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
         // error shown in modal via participantsConfirmRemovalError
       })
       .finally(() => {
-        setConfirmingRemovalSlotKey(null);
+        setConfirmingPendingSlotKey(null);
       });
   }
 
@@ -744,15 +832,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         applyError={participantsApplyError}
 
-        confirmRemovalError={participantsConfirmRemovalError}
+        confirmActionError={participantsConfirmRemovalError ?? participantsConfirmAddError}
 
-        applySuccessMessage={participantsApplySuccessMessage}
-
-        earlierSlotSuggestion={participantsEarlierSlotSuggestion}
-
-        pendingOnCurrentSlot={participantsPendingOnCurrentSlot}
-
-        pendingRemoved={participantsPendingRemoval?.removed ?? []}
+        pendingState={participantsPendingState}
 
         currentSlotLabel={selectedItem?.meetingAtLabel ?? null}
 
@@ -760,16 +842,25 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         currentSlotEnd={selectedItem?.slotEnd ?? null}
 
-        confirmingRemovalSlotKey={confirmingRemovalSlotKey}
+        confirmingPendingSlotKey={confirmingPendingSlotKey}
 
-        isConfirmingRemoval={
+        isConfirmingPending={
           participantsConfirmRemovalMutation.isPending ||
+          participantsConfirmAddMutation.isPending ||
           participantsCancelRemovalMutation.isPending
         }
+
+        isCancellingPending={participantsCancelRemovalMutation.isPending}
 
         onClose={handleCloseParticipantsModal}
 
         onApply={handleApplyParticipants}
+
+        onConfirmAdd={handleConfirmParticipantsAdd}
+
+        onCancelConfirmation={handleCancelParticipantsConfirmation}
+
+        onConfirmAddWithSlot={handleConfirmParticipantsAddWithSlot}
 
         onConfirmRemoval={handleConfirmParticipantsRemoval}
 

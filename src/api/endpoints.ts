@@ -105,8 +105,11 @@ import type {
   MeetingRegistryCancelRequest,
   MeetingRegistryCancelResponse,
   MeetingRegistryParticipantsResponse,
+  MeetingRegistryParticipantSearchResponse,
   MeetingRegistryParticipantsApplyRequest,
   MeetingRegistryParticipantsApplyResponse,
+  MeetingRegistryParticipantsAddConfirmRequest,
+  MeetingRegistryParticipantsAddConfirmResponse,
   MeetingRegistryParticipantsRemovalConfirmRequest,
   MeetingRegistryParticipantsRemovalConfirmResponse,
   MeetingRegistryRescheduleSlotPreviewRequest,
@@ -150,10 +153,27 @@ export const meetingsApi = {
     longRunningApiClient
       .get<MeetingRegistryParticipantsResponse>(`/meetings/registry/${memoRefKey}/participants`)
       .then((r) => r.data),
+  searchRegistryParticipants: (memoRefKey: string, fio: string) =>
+    longRunningApiClient
+      .get<MeetingRegistryParticipantSearchResponse>(
+        `/meetings/registry/${memoRefKey}/participants/search`,
+        { params: { fio } }
+      )
+      .then((r) => r.data),
   applyRegistryParticipants: (memoRefKey: string, payload: MeetingRegistryParticipantsApplyRequest) =>
     longRunningApiClient
       .post<MeetingRegistryParticipantsApplyResponse>(
         `/meetings/registry/${memoRefKey}/participants/apply`,
+        payload
+      )
+      .then((r) => r.data),
+  confirmRegistryParticipantsAdd: (
+    memoRefKey: string,
+    payload: MeetingRegistryParticipantsAddConfirmRequest
+  ) =>
+    longRunningApiClient
+      .post<MeetingRegistryParticipantsAddConfirmResponse>(
+        `/meetings/registry/${memoRefKey}/participants/confirm-add`,
         payload
       )
       .then((r) => r.data),

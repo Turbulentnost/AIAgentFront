@@ -5,12 +5,14 @@ import { meetingsApi } from "@/api/endpoints";
 import type {
   MeetingRegistryContext,
   MeetingRegistryParticipantsApplyRequest,
+  MeetingRegistryParticipantsAddConfirmRequest,
   MeetingRegistryParticipantsRemovalConfirmRequest,
   MeetingRegistryStageFilter
 } from "@/types/meetings";
 import {
   patchRegistryContextAfterCancel,
   patchRegistryContextAfterParticipantsApply,
+  patchRegistryContextAfterParticipantsAddConfirm,
   patchRegistryContextAfterParticipantsRemovalConfirm,
   patchRegistryContextAfterReschedule,
   registryStageQueryParam
@@ -161,6 +163,37 @@ export function useMeetingRegistryParticipantsApply() {
 
       void queryClient.invalidateQueries({ queryKey: ["meetings", "registry"] });
       void queryClient.invalidateQueries({ queryKey: ["meetings", "registry", "participants", refKey] });
+    }
+  });
+}
+
+export function useMeetingRegistryParticipantsConfirmAdd() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({
+      refKey,
+      payload
+    }: {
+      refKey: string;
+      payload: MeetingRegistryParticipantsAddConfirmRequest;
+    }) => meetingsApi.confirmRegistryParticipantsAdd(refKey, payload),
+    onSuccess: (result, { refKey }) => {
+      const queries = queryClient.getQueriesData<MeetingRegistryContext>({
+        queryKey: ["meetings", "registry"]
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data || !Array.isArray(data.items)) continue;
+        queryClient.setQueryData(
+          queryKey,
+          patchRegistryContextAfterParticipantsAddConfirm(data, refKey, result)
+        );
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["meetings", "registry"] });
+      void queryClient.invalidateQueries({ queryKey: ["meetings", "registry", "participants", refKey] });
+      void queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", refKey] });
     }
   });
 }

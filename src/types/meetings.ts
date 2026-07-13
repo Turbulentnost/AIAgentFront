@@ -447,14 +447,39 @@ export interface MeetingRegistryContext {
   error: string | null;
 }
 
+export type MeetingRegistryConfirmationKind =
+  | "add_current_slot"
+  | "add_reschedule"
+  | "removal"
+  | null;
+
 export interface MeetingRegistryParticipantsResponse {
   ref_key: string;
   participants: string[];
   participants_count: number;
   pending_confirmation?: boolean;
+  pending_added?: string[];
   pending_removed?: string[];
   pending_participants?: string[] | null;
+  confirmation_kind?: MeetingRegistryConfirmationKind;
   fetched_at: string;
+}
+
+export interface MeetingRegistryParticipantSuggestion {
+  fio: string;
+  email: string;
+  already_added: boolean;
+}
+
+export interface MeetingRegistryParticipantSearchResponse {
+  query: string;
+  fio: string;
+  email: string | null;
+  found: boolean;
+  already_added: boolean;
+  can_add: boolean;
+  suggestions: MeetingRegistryParticipantSuggestion[];
+  message: string | null;
 }
 
 export interface MeetingRegistryParticipantsApplyRequest {
@@ -475,10 +500,12 @@ export interface MeetingRegistryEarlierSlotCandidate {
 export interface MeetingRegistryEarlierSlotSuggestion {
   message: string;
   current_slot_label: string;
-  search_from: string;
-  search_until: string;
+  search_from?: string;
+  search_until?: string;
   candidates: MeetingRegistryEarlierSlotCandidate[];
 }
+
+export type MeetingRegistryCommonSlotSuggestion = MeetingRegistryEarlierSlotSuggestion;
 
 export interface MeetingRegistryParticipantsApplyResponse {
   ref_key: string;
@@ -490,7 +517,31 @@ export interface MeetingRegistryParticipantsApplyResponse {
   outlook_warning: string | null;
   message: string | null;
   earlier_slot_suggestion: MeetingRegistryEarlierSlotSuggestion | null;
+  common_slot_suggestion: MeetingRegistryCommonSlotSuggestion | null;
+  confirmation_kind: MeetingRegistryConfirmationKind;
   pending_confirmation: boolean;
+  fetched_at: string;
+}
+
+export interface MeetingRegistryParticipantsAddConfirmRequest {
+  participants: string[];
+  added: string[];
+  slot_start?: string;
+  slot_end?: string;
+  message?: string;
+}
+
+export interface MeetingRegistryParticipantsAddConfirmResponse {
+  ref_key: string;
+  participants: string[];
+  participants_count: number;
+  added: string[];
+  previous_slot_label: string | null;
+  slot_label: string | null;
+  slot_start: string | null;
+  slot_end: string | null;
+  outlook_updated: boolean;
+  message: string | null;
   fetched_at: string;
 }
 

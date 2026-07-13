@@ -3,6 +3,7 @@ import type {
   MeetingRegistryContext,
   MeetingRegistryItem,
   MeetingRegistryParticipantsApplyResponse,
+  MeetingRegistryParticipantsAddConfirmResponse,
   MeetingRegistryParticipantsRemovalConfirmResponse,
   MeetingRegistryReschedulableStage,
   MeetingRegistryRescheduleApproveResponse,
@@ -233,6 +234,30 @@ export function patchRegistryContextAfterParticipantsApply(
   const updatedItem: MeetingRegistryItem = {
     ...target,
     participants_count: result.participants_count,
+    updated_at: updatedAt
+  };
+
+  return {
+    ...data,
+    items: items.map((item) => (item.ref_key === refKey ? updatedItem : item))
+  };
+}
+
+export function patchRegistryContextAfterParticipantsAddConfirm(
+  data: MeetingRegistryContext,
+  refKey: string,
+  result: MeetingRegistryParticipantsAddConfirmResponse
+): MeetingRegistryContext {
+  const items = Array.isArray(data.items) ? data.items : [];
+  const target = items.find((item) => item.ref_key === refKey);
+  if (!target) return data;
+
+  const updatedAt = result.fetched_at ?? new Date().toISOString();
+  const updatedItem: MeetingRegistryItem = {
+    ...target,
+    participants_count: result.participants_count,
+    ...(result.slot_start ? { slot_start: result.slot_start } : {}),
+    ...(result.slot_end ? { slot_end: result.slot_end } : {}),
     updated_at: updatedAt
   };
 
