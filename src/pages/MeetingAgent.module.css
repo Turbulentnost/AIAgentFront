@@ -2271,6 +2271,473 @@
   flex-shrink: 0;
 }
 
+.scheduleHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.scheduleTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.scheduleSubtitle {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.scheduleStatsRow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scheduleStatCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.scheduleStatIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-radius: 10px;
+}
+
+.scheduleStatContent {
+  display: grid;
+  gap: 2px;
+}
+
+.scheduleStatContent strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.scheduleStatContent span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedulePanel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.scheduleTableWrap {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.scheduleTableScroll {
+  overflow-x: auto;
+}
+
+.scheduleTable {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.scheduleTableHead th {
+  padding: 12px 14px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.scheduleTable tbody td {
+  padding: 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.scheduleTable tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.scheduleTable tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.scheduleRowSelected {
+  background: var(--color-info-surface);
+}
+
+.scheduleColDrag {
+  width: 36px;
+  padding-inline: 8px !important;
+}
+
+.scheduleDragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-placeholder);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.scheduleDragHandle:hover {
+  color: var(--color-muted);
+  background: var(--color-hover);
+}
+
+.scheduleNameButton {
+  padding: 0;
+  color: var(--color-primary-text);
+  background: transparent;
+  border: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.scheduleNameButton:hover {
+  text-decoration: underline;
+}
+
+.scheduleTypeBadge,
+.scheduleStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.scheduleTypeBadgeblue {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+}
+
+.scheduleTypeBadgegreen {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+}
+
+.scheduleTypeBadgeviolet {
+  color: var(--color-violet);
+  background: color-mix(in srgb, var(--color-violet) 12%, white);
+}
+
+.scheduleTypeBadgeamber {
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+}
+
+.scheduleStatusBadgegreen {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+}
+
+.scheduleStatusBadgeamber {
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+}
+
+.scheduleStatusBadgeslate {
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+}
+
+.scheduleParticipants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scheduleParticipantPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.scheduleParticipantMore {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.scheduleFrequencyCell {
+  min-width: 180px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.scheduleDeadlineCell {
+  min-width: 108px;
+}
+
+.scheduleDeadlinePrimary,
+.scheduleDeadlineSecondary {
+  display: block;
+  line-height: 1.35;
+}
+
+.scheduleDeadlinePrimary {
+  color: var(--color-text-strong);
+  font-weight: 700;
+}
+
+.scheduleDeadlineSecondary {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.scheduleActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  transition: all 0.15s ease;
+}
+
+.scheduleActionButton:hover {
+  color: var(--color-primary-text);
+  border-color: var(--color-border-accent);
+  background: var(--color-info-surface);
+}
+
+.scheduleTotalCount {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleDetailsPanel {
+  display: grid;
+  gap: 18px;
+  padding: 18px 20px 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.scheduleDetailsHead h3 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.scheduleDetailsMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleDetailsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 16px;
+}
+
+.scheduleDetailsColumn {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+}
+
+.scheduleDetailsColumn h4 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.scheduleDetailsEmpty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scheduleHistoryList {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduleHistoryItem {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.scheduleHistoryMarker {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+
+.scheduleHistoryMarker::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 4px;
+  width: 2px;
+  height: calc(100% + 10px);
+  background: var(--color-border);
+}
+
+.scheduleHistoryItem:last-child .scheduleHistoryMarker::after {
+  display: none;
+}
+
+.scheduleHistoryContent {
+  display: grid;
+  gap: 4px;
+}
+
+.scheduleHistoryContent strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.scheduleHistoryProtocol {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleHistoryOutcome {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.scheduleHistoryOutcomesuccess {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+}
+
+.scheduleHistoryOutcomewarning {
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+}
+
+.scheduleHistoryOutcomeneutral {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.scheduleNextCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.scheduleNextDate {
+  color: var(--color-text-strong);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.scheduleNextFormat {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleNextActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.scheduleNextActions .secondaryButton,
+.scheduleNextActions .rejectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 @media (max-width: 1280px) {
   .statsRow {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2304,5 +2771,13 @@
 
   .queuePanel {
     max-height: min(420px, calc(100vh - 168px));
+  }
+
+  .scheduleStatsRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .scheduleDetailsGrid {
+    grid-template-columns: 1fr;
   }
 }

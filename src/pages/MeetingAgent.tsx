@@ -37,6 +37,7 @@ import {
   useMeetingRunResult
 } from "@/hooks/useMeetingMemoDetail";
 import MeetingAgentRegistry from "@/pages/MeetingAgentRegistry";
+import MeetingAgentSchedule from "@/pages/MeetingAgentSchedule";
 import MeetingAgentRejectModal from "@/pages/MeetingAgentRejectModal";
 import MeetingAgentSlotPreviewModal from "@/pages/MeetingAgentSlotPreviewModal";
 import type { MeetingDashboardItem, MeetingMemoDetail } from "@/types/meetings";
@@ -68,7 +69,7 @@ import {
 } from "@/utils/meetingDashboard";
 import styles from "./MeetingAgent.module.css";
 
-type MeetingPageTab = "queue" | "registry";
+type MeetingPageTab = "queue" | "registry" | "schedule";
 
 class MeetingAgentErrorBoundary extends Component<
   { children: ReactNode },
@@ -539,10 +540,21 @@ function MeetingAgentPage() {
         >
           Реестр совещаний
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pageTab === "schedule"}
+          className={`${styles.pageTab} ${pageTab === "schedule" ? styles.pageTabActive : ""}`}
+          onClick={() => setPageTab("schedule")}
+        >
+          График совещаний
+        </button>
       </div>
 
       {pageTab === "registry" ? (
         <MeetingAgentRegistry canAccessAgent={canAccessAgent} />
+      ) : pageTab === "schedule" ? (
+        <MeetingAgentSchedule canAccessAgent={canAccessAgent} />
       ) : (
         <>
       <div className={styles.statsRow} aria-label="Сводка по заявкам">

@@ -568,3 +568,58 @@ export interface MeetingRegistryParticipantsRemovalConfirmResponse {
   message: string | null;
   fetched_at: string;
 }
+
+export type MeetingScheduleType = "planned" | "report" | "selector" | "unplanned";
+
+export type MeetingScheduleStatus = "scheduled" | "created" | "archive";
+
+export interface MeetingScheduleSeriesItem {
+  id: string;
+  name: string;
+  type: MeetingScheduleType;
+  type_label?: string | null;
+  participant_roles: string[];
+  extra_participants_count?: number;
+  frequency_label: string;
+  deadline_start: string | null;
+  deadline_end: string | null;
+  status: MeetingScheduleStatus;
+  status_label?: string | null;
+  comment?: string | null;
+  sort_order?: number;
+}
+
+export interface MeetingSchedulePastMeeting {
+  id: string;
+  date_label: string;
+  time_label: string;
+  protocol_number?: string | null;
+  outcome_label: string;
+  outcome_tone: "success" | "neutral" | "warning";
+}
+
+export interface MeetingScheduleNextMeeting {
+  date_label: string;
+  time_range_label: string;
+  format_label: string;
+}
+
+export interface MeetingScheduleSeriesDetail {
+  series_id: string;
+  past_meetings: MeetingSchedulePastMeeting[];
+  next_meeting: MeetingScheduleNextMeeting | null;
+}
+
+export interface MeetingScheduleTypeCounts {
+  total: number;
+  planned: number;
+  report: number;
+  selector: number;
+  unplanned: number;
+}
+
+export interface MeetingScheduleContext {
+  type_counts: MeetingScheduleTypeCounts;
+  items: MeetingScheduleSeriesItem[];
+  fetched_at: string;
+}
