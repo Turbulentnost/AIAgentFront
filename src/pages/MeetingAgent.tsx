@@ -289,16 +289,23 @@ function MeetingAgentPage() {
         throw new Error("У заявки нет ref_key для загрузки деталей слота.");
       }
       const durationMinutes = slotPreviewMutation.data?.duration_minutes ?? undefined;
+      const availabilityCacheId = slotPreviewMutation.data?.availability_cache_id ?? undefined;
       return slotPreviewDetailsMutation.mutateAsync({
         memoRefKey: detail.ref_key,
         payload: {
           slot_start: slotStart,
           slot_end: slotEnd,
-          ...(durationMinutes ? { duration_minutes: durationMinutes } : {})
+          ...(durationMinutes ? { duration_minutes: durationMinutes } : {}),
+          ...(availabilityCacheId ? { availability_cache_id: availabilityCacheId } : {})
         }
       });
     },
-    [detail?.ref_key, slotPreviewDetailsMutation, slotPreviewMutation.data?.duration_minutes]
+    [
+      detail?.ref_key,
+      slotPreviewDetailsMutation,
+      slotPreviewMutation.data?.duration_minutes,
+      slotPreviewMutation.data?.availability_cache_id
+    ]
   );
 
   async function handleConfirmApprove(slotOverride?: { start: string; end: string }) {

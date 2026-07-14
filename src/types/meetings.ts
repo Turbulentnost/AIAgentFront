@@ -213,6 +213,7 @@ export interface MeetingAgentSlotPreviewDetailsRequest {
   slot_start: string;
   slot_end: string;
   duration_minutes?: number;
+  availability_cache_id?: string | null;
 }
 
 export interface MeetingSlotBlockingEvent {
@@ -288,6 +289,7 @@ export interface MeetingAgentSlotPreview {
   slot?: MeetingSlot | null;
   slot_label?: string | null;
   duration_minutes?: number | null;
+  availability_cache_id?: string | null;
   preview_note?: string | null;
   coverage?: MeetingSlotCoverage | null;
   slot_candidates?: MeetingSlotCandidate[];
