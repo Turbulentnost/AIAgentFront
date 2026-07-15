@@ -12,6 +12,7 @@ import type {
   MeetingScheduleType
 } from "@/types/meetings";
 import { meetingScheduleTypeOptions } from "@/utils/meetingSchedule";
+import { mapScheduleFormParticipantsToApi } from "@/utils/meetingScheduleApi";
 import {
   buildRecurrenceRule,
   createDefaultRecurrenceFormState
@@ -28,8 +29,9 @@ type Props = {
 };
 
 type ScheduleParticipant = {
-  departmentId: string;
+  id: string;
   name: string;
+  kind: "position" | "department";
 };
 
 type FormState = {
@@ -109,10 +111,10 @@ export default function MeetingAgentScheduleSeriesDrawer({
     updateField("participants", [...form.participants, participant]);
   }
 
-  function handleRemoveParticipant(departmentId: string) {
+  function handleRemoveParticipant(participantId: string) {
     updateField(
       "participants",
-      form.participants.filter((item) => item.departmentId !== departmentId)
+      form.participants.filter((item) => item.id !== participantId)
     );
   }
 
@@ -129,7 +131,7 @@ export default function MeetingAgentScheduleSeriesDrawer({
       title: form.title.trim(),
       meeting_type: form.meetingType,
       status: "created",
-      participant_department_ids: form.participants.map((participant) => participant.departmentId),
+      participants: mapScheduleFormParticipantsToApi(form.participants),
       recurrence: buildRecurrenceRule(form.recurrence),
       comment: form.comment.trim() || null,
       series_start_date: form.seriesStartDate || null,
@@ -259,19 +261,19 @@ function filterDepartmentSuggestions(
   if (!normalized) return [];
 
   return departments
-    .filter((department) => !selectedIds.includes(department.departmentId))
+    .filter((department) => !selectedIds.includes(department.id))
     .filter((department) => department.name.toLowerCase().replace("ё", "е").includes(normalized))
     .slice(0, 8);
 }
 
-function ScheduleParticipantField({
+export function ScheduleParticipantField({
   selectedParticipants,
   onAdd,
   onRemove
 }: {
   selectedParticipants: ScheduleParticipant[];
   onAdd: (participant: ScheduleParticipant) => void;
-  onRemove: (departmentId: string) => void;
+  onRemove: (participantId: string) => void;
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const trimmedSearch = searchQuery.trim();
@@ -285,14 +287,15 @@ function ScheduleParticipantField({
   const departmentOptions = useMemo(
     () =>
       (departmentsQuery.data ?? []).map((department) => ({
-        departmentId: department.id,
-        name: department.name.trim()
+        id: department.id,
+        name: department.name.trim(),
+        kind: "position" as const
       })),
     [departmentsQuery.data]
   );
 
   const selectedIds = useMemo(
-    () => selectedParticipants.map((participant) => participant.departmentId),
+    () => selectedParticipants.map((participant) => participant.id),
     [selectedParticipants]
   );
 
@@ -345,7 +348,7 @@ function ScheduleParticipantField({
       {trimmedSearch && suggestions.length > 1 ? (
         <ul className={styles.scheduleParticipantSuggestions} aria-label="Найденные должности">
           {suggestions.map((participant) => (
-            <li key={participant.departmentId}>
+            <li key={participant.id}>
               <button
                 type="button"
                 className={styles.scheduleParticipantSuggestionButton}
@@ -365,13 +368,13 @@ function ScheduleParticipantField({
       {selectedParticipants.length ? (
         <div className={styles.scheduleParticipantChipList}>
           {selectedParticipants.map((participant) => (
-            <span className={styles.scheduleParticipantChip} key={participant.departmentId}>
+            <span className={styles.scheduleParticipantChip} key={participant.id}>
               <span className={styles.scheduleParticipantChipLabel}>{participant.name}</span>
               <button
                 type="button"
                 className={styles.scheduleParticipantChipRemove}
                 aria-label={`Удалить ${participant.name}`}
-                onClick={() => onRemove(participant.departmentId)}
+                onClick={() => onRemove(participant.id)}
               >
                 <X size={12} aria-hidden="true" />
               </button>

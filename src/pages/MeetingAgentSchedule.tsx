@@ -4,11 +4,9 @@ import {
   BarChart3,
   Calendar,
   CalendarCheck2,
-  CalendarClock,
   GripVertical,
   Plus,
   Users,
-  X,
   Zap
 } from "lucide-react";
 
@@ -17,11 +15,14 @@ import {
   useMeetingSchedule,
   useMeetingScheduleCreateSeries,
   useMeetingSchedulePlanSeries,
-  useMeetingScheduleDetail
+  useMeetingScheduleDetail,
+  useMeetingScheduleSeriesForEdit,
+  useMeetingScheduleUpdateSeries
 } from "@/hooks/useMeetingSchedule";
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 import MeetingAgentScheduleSeriesDrawer from "@/pages/MeetingAgentScheduleSeriesDrawer";
-import type { MeetingScheduleSeriesDetail, MeetingScheduleSeriesSavePayload } from "@/types/meetings";
+import MeetingAgentScheduleSeriesEditDrawer from "@/pages/MeetingAgentScheduleSeriesEditDrawer";
+import type { MeetingScheduleSeriesSavePayload, ScheduledMeetingDetailRead, ScheduledMeetingRead } from "@/types/meetings";
 import {
   mapMeetingScheduleItem,
   sortMeetingScheduleItems,
@@ -45,8 +46,7 @@ const statCards = [
 
 const scheduleRowActions = [
   { id: "edit", label: "Изменить" },
-  { id: "reschedule", label: "Перенести" },
-  { id: "extend", label: "Продлить" }
+  { id: "cancel", label: "Отменить" }
 ] as const;
 
 const schedulePlanAction = { id: "plan", label: "Распланировать" } as const;
@@ -55,9 +55,17 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
   const scheduleQuery = useMeetingSchedule(canAccessAgent);
   const createSeriesMutation = useMeetingScheduleCreateSeries();
   const planSeriesMutation = useMeetingSchedulePlanSeries();
+  const updateSeriesMutation = useMeetingScheduleUpdateSeries();
   const [selectedId, setSelectedId] = useState("");
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [editSeriesId, setEditSeriesId] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
+  const [editSuccessMessage, setEditSuccessMessage] = useState<string | null>(null);
+
+  const editSeriesQuery = useMeetingScheduleSeriesForEdit(
+    editSeriesId,
+    canAccessAgent && Boolean(editSeriesId)
+  );
 
   const items = useMemo(
     () => sortMeetingScheduleItems((scheduleQuery.data?.items ?? []).map(mapMeetingScheduleItem)),
@@ -86,6 +94,29 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
 
   function handleCloseCreateDrawer() {
     setIsCreateDrawerOpen(false);
+  }
+
+  function handleOpenEditDrawer(meetingId: string) {
+    setEditSuccessMessage(null);
+    setEditSeriesId(meetingId);
+  }
+
+  function handleCloseEditDrawer() {
+    setEditSeriesId(null);
+  }
+
+  function handleUpdateSeries(input: {
+    meetingId: string;
+    original: ScheduledMeetingRead;
+    payload: MeetingScheduleSeriesSavePayload;
+  }) {
+    updateSeriesMutation.mutate(input, {
+      onSuccess: (result) => {
+        setSelectedId(result.series.id);
+        setEditSuccessMessage(buildEditSuccessMessage(result.applied_changes.changes));
+        setEditSeriesId(null);
+      }
+    });
   }
 
   function handleCreateSeries(payload: MeetingScheduleSeriesSavePayload) {
@@ -159,6 +190,9 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
             Добавить
           </button>
           {planError ? <p className={styles.scheduleToolbarError}>{planError}</p> : null}
+          {editSuccessMessage ? (
+            <p className={styles.scheduleToolbarSuccess}>{editSuccessMessage}</p>
+          ) : null}
         </div>
 
         <div className={styles.scheduleTableWrap}>
@@ -250,8 +284,15 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
                             <button
                               key={action.id}
                               type="button"
-                              className={styles.scheduleActionButton}
-                              onClick={(event) => event.stopPropagation()}
+                              className={`${styles.scheduleActionButton} ${
+                                action.id === "cancel" ? styles.scheduleActionButtonDanger : ""
+                              }`}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                if (action.id === "edit") {
+                                  handleOpenEditDrawer(item.id);
+                                }
+                              }}
                             >
                               {action.label}
                             </button>
@@ -301,8 +342,28 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
           createSeriesMutation.isError ? getMeetingRequestError(createSeriesMutation.error) : null
         }
       />
+      <MeetingAgentScheduleSeriesEditDrawer
+        open={Boolean(editSeriesId)}
+        meetingId={editSeriesId}
+        series={editSeriesQuery.data}
+        loadingSeries={editSeriesQuery.isLoading && !editSeriesQuery.data}
+        seriesError={
+          editSeriesQuery.isError ? getMeetingRequestError(editSeriesQuery.error) : null
+        }
+        onClose={handleCloseEditDrawer}
+        onSave={handleUpdateSeries}
+        saving={updateSeriesMutation.isPending}
+        saveError={
+          updateSeriesMutation.isError ? getMeetingRequestError(updateSeriesMutation.error) : null
+        }
+      />
     </>
   );
+}
+
+function buildEditSuccessMessage(changes: string[]): string {
+  if (!changes.length) return "Серия совещаний обновлена";
+  return `Серия обновлена: ${changes.join(", ")}`;
 }
 
 function ScheduleDetails({
@@ -312,7 +373,7 @@ function ScheduleDetails({
 }: {
   item: MeetingScheduleViewItem;
   loading: boolean;
-  detail: MeetingScheduleSeriesDetail | undefined;
+  detail: ScheduledMeetingDetailRead | undefined;
 }) {
   return (
     <section className={styles.scheduleDetailsPanel} aria-labelledby="schedule-details-title">
@@ -340,29 +401,10 @@ function ScheduleDetails({
           <h4 id="schedule-history-title">История прошедших совещаний по серии</h4>
           {loading ? (
             <p className={styles.scheduleDetailsEmpty}>Загружаем историю…</p>
-          ) : detail?.past_meetings.length ? (
-            <ol className={styles.scheduleHistoryList}>
-              {detail.past_meetings.map((meeting) => (
-                <li className={styles.scheduleHistoryItem} key={meeting.id}>
-                  <span className={styles.scheduleHistoryMarker} aria-hidden="true" />
-                  <div className={styles.scheduleHistoryContent}>
-                    <strong>
-                      {meeting.date_label}, {meeting.time_label}
-                    </strong>
-                    {meeting.protocol_number ? (
-                      <span className={styles.scheduleHistoryProtocol}>
-                        Протокол {meeting.protocol_number}
-                      </span>
-                    ) : null}
-                    <span
-                      className={`${styles.scheduleHistoryOutcome} ${styles[`scheduleHistoryOutcome${meeting.outcome_tone}`]}`}
-                    >
-                      {meeting.outcome_label}
-                    </span>
-                  </div>
-                </li>
-              ))}
-            </ol>
+          ) : detail?.past_occurrences?.length ? (
+            <p className={styles.scheduleDetailsEmpty}>
+              История загружена ({detail.past_occurrences.length})
+            </p>
           ) : (
             <p className={styles.scheduleDetailsEmpty}>История совещаний пока пуста</p>
           )}
@@ -372,27 +414,8 @@ function ScheduleDetails({
           <h4 id="schedule-next-title">Ближайшее совещание</h4>
           {loading ? (
             <p className={styles.scheduleDetailsEmpty}>Загружаем ближайшее совещание…</p>
-          ) : detail?.next_meeting ? (
-            <article className={styles.scheduleNextCard}>
-              <strong className={styles.scheduleNextDate}>
-                {detail.next_meeting.date_label}, {detail.next_meeting.time_range_label}
-              </strong>
-              <span className={styles.scheduleNextFormat}>{detail.next_meeting.format_label}</span>
-              <div className={styles.scheduleNextActions}>
-                <button type="button" className={styles.secondaryButton}>
-                  <Users size={15} aria-hidden="true" />
-                  Состав участников
-                </button>
-                <button type="button" className={styles.secondaryButton}>
-                  <CalendarClock size={15} aria-hidden="true" />
-                  Перенос
-                </button>
-                <button type="button" className={styles.rejectButton}>
-                  <X size={15} aria-hidden="true" />
-                  Отмена
-                </button>
-              </div>
-            </article>
+          ) : detail?.next_occurrence ? (
+            <p className={styles.scheduleDetailsEmpty}>Ближайшее совещание запланировано</p>
           ) : (
             <p className={styles.scheduleDetailsEmpty}>Ближайшее совещание не запланировано</p>
           )}

@@ -228,3 +228,99 @@ export function formatRecurrenceLabel(rule: MeetingScheduleRecurrenceRule): stri
 export function formatRecurrencePreview(form: MeetingScheduleRecurrenceFormState): string {
   return formatRecurrenceLabel(buildRecurrenceRule(form));
 }
+
+const apiWeekdayAliases: Record<string, MeetingScheduleWeekday> = {
+  mon: "mon",
+  monday: "mon",
+  tue: "tue",
+  tuesday: "tue",
+  wed: "wed",
+  wednesday: "wed",
+  thu: "thu",
+  thursday: "thu",
+  fri: "fri",
+  friday: "fri",
+  sat: "sat",
+  saturday: "sat",
+  sun: "sun",
+  sunday: "sun"
+};
+
+function parseApiWeekday(value: string | null | undefined): MeetingScheduleWeekday {
+  if (!value) return "mon";
+  return apiWeekdayAliases[value.trim().toLowerCase()] ?? "mon";
+}
+
+function detectRecurrencePreset(
+  frequency: MeetingScheduleRecurrenceRule["frequency"],
+  interval: number
+): MeetingScheduleHowOftenPreset {
+  if (frequency === "daily" && interval === 1) return "daily";
+  if (frequency === "weekly" && interval === 1) return "weekly";
+  if (frequency === "weekly" && interval === 2) return "biweekly";
+  if (frequency === "monthly" && interval === 1) return "monthly";
+  if (frequency === "monthly" && interval === 3) return "quarterly";
+  if (frequency === "yearly" && interval === 1) return "yearly";
+  return "custom";
+}
+
+type ScheduledMeetingReadLike = {
+  frequency: MeetingScheduleRecurrenceRule["frequency"];
+  interval: number;
+  time_local: string;
+  duration_minutes: number;
+  monthly_mode: MeetingScheduleRecurrenceRule["monthly_mode"] | null;
+  day_of_month: number | null;
+  weekday: string | null;
+  weekday_position: string | null;
+};
+
+/**
+ * Converts API series recurrence fields into recurrence form state for editing.
+ */
+export function mapScheduledMeetingReadToRecurrenceFormState(
+  read: Pick<
+    ScheduledMeetingReadLike,
+    | "frequency"
+    | "interval"
+    | "time_local"
+    | "duration_minutes"
+    | "monthly_mode"
+    | "day_of_month"
+    | "weekday"
+    | "weekday_position"
+  >
+): MeetingScheduleRecurrenceFormState {
+  const interval = Math.max(1, read.interval || 1);
+  const preset = detectRecurrencePreset(read.frequency, interval);
+  const weekday = parseApiWeekday(read.weekday);
+  const monthlyWeekday = weekday;
+  const monthlyMode =
+    read.monthly_mode === "by_day_of_month" ? "by_day_of_month" : "by_weekday_position";
+
+  const form = createDefaultRecurrenceFormState();
+  form.preset = preset;
+  form.timeLocal = read.time_local?.slice(0, 5) || form.timeLocal;
+  form.durationMinutes = read.duration_minutes || form.durationMinutes;
+  form.weekday = weekday;
+  form.monthlyMode = monthlyMode;
+  form.dayOfMonth = read.day_of_month ?? form.dayOfMonth;
+  form.weekdayPosition =
+    (read.weekday_position as MeetingScheduleWeekdayPosition | null) ?? form.weekdayPosition;
+  form.monthlyWeekday = monthlyWeekday;
+
+  if (preset === "custom") {
+    if (read.frequency === "daily") {
+      form.customUnit = "days";
+      form.customInterval = interval;
+    } else if (read.frequency === "weekly") {
+      form.customUnit = "weeks";
+      form.customInterval = interval;
+    } else {
+      form.customUnit = "months";
+      form.customInterval = interval;
+    }
+  }
+
+  return form;
+}

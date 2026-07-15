@@ -9,8 +9,10 @@ import type {
   MeetingScheduleWeekday,
   ScheduledMeetingApiWeekday,
   ScheduledMeetingCreate,
+  ScheduledMeetingParticipantRead,
   ScheduledMeetingRead,
-  ScheduledMeetingRecurrenceCreate
+  ScheduledMeetingRecurrenceCreate,
+  ScheduledMeetingUpdate
 } from "@/types/meetings";
 
 const weekdayToApi: Record<MeetingScheduleWeekday, ScheduledMeetingApiWeekday> = {
@@ -81,11 +83,74 @@ export function mapScheduleFormToApiPayload(
     series_end_date: payload.series_end_date ?? undefined,
     comment: payload.comment,
     recurrence: mapRecurrenceRuleToApi(payload.recurrence),
-    participants: payload.participant_department_ids.map((departmentId, index) => ({
-      department_id: departmentId,
-      sort_order: index,
-      is_required: true
+    participants: payload.participants.map((participant, index) => ({
+      ...participant,
+      sort_order: participant.sort_order ?? index,
+      is_required: participant.is_required ?? true
     }))
+  };
+}
+
+export function mapScheduleFormToUpdatePayload(
+  original: ScheduledMeetingRead,
+  payload: MeetingScheduleSeriesSavePayload
+): ScheduledMeetingUpdate {
+  return {
+    title: original.title,
+    meeting_type: original.meeting_type,
+    series_start_date: original.series_start_date,
+    series_end_date: payload.series_end_date ?? undefined,
+    comment: payload.comment,
+    recurrence: mapRecurrenceRuleToApi(payload.recurrence),
+    participants: payload.participants.map((participant, index) => ({
+      ...participant,
+      sort_order: participant.sort_order ?? index,
+      is_required: participant.is_required ?? true
+    }))
+  };
+}
+
+export type ScheduleFormParticipant = {
+  id: string;
+  name: string;
+  kind: "position" | "department";
+};
+
+export function mapScheduleFormParticipantsToApi(
+  participants: ScheduleFormParticipant[]
+): MeetingScheduleSeriesSavePayload["participants"] {
+  return participants.map((participant, index) => ({
+    ...(participant.kind === "position"
+      ? { position_id: participant.id }
+      : { department_id: participant.id }),
+    sort_order: index,
+    is_required: true
+  }));
+}
+
+export function mapScheduledMeetingReadToFormParticipants(
+  read: ScheduledMeetingRead
+): ScheduleFormParticipant[] {
+  return [...read.participants]
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((participant) => mapScheduledMeetingParticipantReadToForm(participant));
+}
+
+function mapScheduledMeetingParticipantReadToForm(
+  participant: ScheduledMeetingParticipantRead
+): ScheduleFormParticipant {
+  if (participant.position_id) {
+    return {
+      id: participant.position_id,
+      name: participant.position_name?.trim() || participant.position_id,
+      kind: "position"
+    };
+  }
+
+  return {
+    id: participant.department_id ?? participant.id,
+    name: participant.department_name?.trim() || participant.department_id || participant.id,
+    kind: "department"
   };
 }
 
@@ -99,7 +164,14 @@ export function mapScheduledMeetingReadToSeriesItem(
 ): MeetingScheduleSeriesItem {
   const participantRoles = [...read.participants]
     .sort((left, right) => left.sort_order - right.sort_order)
-    .map((participant) => participant.department_name?.trim() || participant.department_id)
+    .map(
+      (participant) =>
+        participant.position_name?.trim() ||
+        participant.department_name?.trim() ||
+        participant.position_id ||
+        participant.department_id ||
+        ""
+    )
     .filter((name) => name.length > 0);
 
   return {

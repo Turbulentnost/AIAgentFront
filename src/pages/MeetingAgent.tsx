@@ -106,7 +106,10 @@ function MeetingAgentPage() {
   const queryClient = useQueryClient();
   const permissionsQuery = useMeetingPermissions();
   const canAccessAgent = permissionsQuery.data?.can_access_agent ?? false;
-  const dashboardQuery = useMeetingDashboard(canAccessAgent);
+  const [pageTab, setPageTab] = useState<MeetingPageTab>("registry");
+  const isQueueTab = pageTab === "queue";
+
+  const dashboardQuery = useMeetingDashboard(canAccessAgent && isQueueTab);
   const refreshDashboard = useRefreshMeetingDashboard();
   const [queueFilter, setQueueFilter] = useState<MeetingQueueFilter>("unapproved");
   const [selectedId, setSelectedId] = useState("");
@@ -118,7 +121,6 @@ function MeetingAgentPage() {
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [outlookMeetingUrl, setOutlookMeetingUrl] = useState<string | null>(null);
-  const [pageTab, setPageTab] = useState<MeetingPageTab>("queue");
 
   const dashboard = dashboardQuery.data;
   const queueItems = useMemo(
@@ -135,7 +137,11 @@ function MeetingAgentPage() {
     queueItems.find((item) => getMeetingItemId(item) === selectedId) ?? queueItems[0] ?? null;
   const selectedRefKey = getMemoRefKey(selectedItem);
 
-  const detailQuery = useMeetingMemoDetail(selectedRefKey, canAccessAgent, forceMemoRefresh);
+  const detailQuery = useMeetingMemoDetail(
+    selectedRefKey,
+    canAccessAgent && isQueueTab,
+    forceMemoRefresh
+  );
   const detail = detailQuery.data;
 
   const createRun = useCreateMeetingRun();
@@ -207,43 +213,6 @@ function MeetingAgentPage() {
         <div className={styles.stateMessage}>
           Нет доступа к агенту совещаний. Раздел доступен сотрудникам Управления делами.
         </div>
-      </section>
-    );
-  }
-
-  if (dashboardQuery.isLoading && !dashboard) {
-    return (
-      <section className={styles.page}>
-        <div className={styles.stateMessage}>Загружаем рабочую очередь…</div>
-      </section>
-    );
-  }
-
-  if (dashboardQuery.isError && isMeetingDashboardForbidden(dashboardQuery.error)) {
-    return (
-      <section className={styles.page}>
-        <div className={styles.stateMessage}>Нет доступа к данным по совещаниям.</div>
-      </section>
-    );
-  }
-
-  if (dashboardQuery.isError) {
-    return (
-      <section className={styles.page}>
-        <div className={styles.stateMessage}>
-          Не удалось загрузить данные по совещаниям.
-          <button type="button" className={styles.retryButton} onClick={() => void dashboardQuery.refetch()}>
-            Повторить
-          </button>
-        </div>
-      </section>
-    );
-  }
-
-  if (!dashboard) {
-    return (
-      <section className={styles.page}>
-        <div className={styles.stateMessage}>Нет данных по совещаниям.</div>
       </section>
     );
   }
@@ -514,7 +483,7 @@ function MeetingAgentPage() {
         </div>
       ) : null}
 
-      {dashboard.error ? (
+      {dashboard?.error && isQueueTab ? (
         <div className={styles.errorBanner} role="alert">
           <AlertTriangle size={16} aria-hidden="true" />
           <span>{formatMeetingIntegrationError(dashboard.error)}</span>
@@ -525,20 +494,20 @@ function MeetingAgentPage() {
         <button
           type="button"
           role="tab"
-          aria-selected={pageTab === "queue"}
-          className={`${styles.pageTab} ${pageTab === "queue" ? styles.pageTabActive : ""}`}
-          onClick={() => setPageTab("queue")}
-        >
-          Рабочая очередь
-        </button>
-        <button
-          type="button"
-          role="tab"
           aria-selected={pageTab === "registry"}
           className={`${styles.pageTab} ${pageTab === "registry" ? styles.pageTabActive : ""}`}
           onClick={() => setPageTab("registry")}
         >
           Реестр совещаний
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={pageTab === "queue"}
+          className={`${styles.pageTab} ${pageTab === "queue" ? styles.pageTabActive : ""}`}
+          onClick={() => setPageTab("queue")}
+        >
+          Рабочая очередь
         </button>
         <button
           type="button"
@@ -555,6 +524,27 @@ function MeetingAgentPage() {
         <MeetingAgentRegistry canAccessAgent={canAccessAgent} />
       ) : pageTab === "schedule" ? (
         <MeetingAgentSchedule canAccessAgent={canAccessAgent} />
+      ) : !dashboard ? (
+        <div className={styles.stateMessage}>
+          {dashboardQuery.isError && isMeetingDashboardForbidden(dashboardQuery.error)
+            ? "Нет доступа к данным по совещаниям."
+            : dashboardQuery.isError
+              ? (
+                <>
+                  Не удалось загрузить данные по совещаниям.
+                  <button
+                    type="button"
+                    className={styles.retryButton}
+                    onClick={() => void dashboardQuery.refetch()}
+                  >
+                    Повторить
+                  </button>
+                </>
+              )
+              : dashboardQuery.isLoading
+                ? "Загружаем рабочую очередь…"
+                : "Нет данных по совещаниям."}
+        </div>
       ) : (
         <>
       <div className={styles.statsRow} aria-label="Сводка по заявкам">

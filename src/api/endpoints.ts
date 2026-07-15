@@ -116,12 +116,14 @@ import type {
   MeetingRegistryRescheduleSlotPreviewResponse,
   MeetingRegistryRescheduleApproveRequest,
   MeetingRegistryRescheduleApproveResponse,
-  MeetingScheduleSeriesDetail,
   MeetingScheduleSeriesItem,
   MeetingScheduleSeriesSavePayload,
   ScheduledMeetingCreate,
+  ScheduledMeetingDetailRead,
   ScheduledMeetingParticipantOption,
   ScheduledMeetingRead,
+  ScheduledMeetingUpdate,
+  ScheduledMeetingUpdateRead,
   MeetingSlot,
   MeetingSlotsRequest,
   PorucheniyaDashboardParams,
@@ -267,14 +269,24 @@ export const meetingsApi = {
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
       })
       .then((r) => r.data),
-  getScheduleDetail: (seriesId: string) =>
+  getScheduled: (meetingId: string) =>
     apiClient
-      .get<MeetingScheduleSeriesDetail>(`/meetings/schedule/${seriesId}/detail`, {
+      .get<ScheduledMeetingRead>(`/meetings/scheduled/${meetingId}`, {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  getScheduledDetail: (meetingId: string) =>
+    apiClient
+      .get<ScheduledMeetingDetailRead>(`/meetings/scheduled/${meetingId}/detail`, {
         headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
       })
       .then((r) => r.data),
   createScheduled: (payload: ScheduledMeetingCreate) =>
     apiClient.post<ScheduledMeetingRead>("/meetings/scheduled", payload).then((r) => r.data),
+  updateScheduled: (meetingId: string, payload: ScheduledMeetingUpdate) =>
+    longRunningApiClient
+      .patch<ScheduledMeetingUpdateRead>(`/meetings/scheduled/${meetingId}`, payload)
+      .then((r) => r.data),
   planScheduled: (meetingId: string) =>
     longRunningApiClient
       .post<ScheduledMeetingRead>(`/meetings/scheduled/${meetingId}/plan`, {})

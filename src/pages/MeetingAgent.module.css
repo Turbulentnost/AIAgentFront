@@ -2369,6 +2369,19 @@
   line-height: 1.4;
 }
 
+.scheduleToolbarSuccess {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-success-text, #166534);
+  background: var(--color-success-surface, #ecfdf3);
+  border: 1px solid color-mix(in srgb, var(--color-success-text, #166534) 20%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
 .scheduleTableToolbar .primaryButton {
   padding: 0 16px;
 }
@@ -2602,6 +2615,18 @@
   color: var(--color-success-dark, #166534);
   background: var(--color-green-soft, #ecfdf5);
   border-color: var(--color-success-dark, #166534);
+}
+
+.scheduleActionButtonDanger {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-color: color-mix(in srgb, var(--color-danger-text) 22%, transparent);
+}
+
+.scheduleActionButtonDanger:hover {
+  color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger-text) 8%, var(--color-danger-surface));
+  border-color: var(--color-danger-text);
 }
 
 .scheduleTotalCount {
@@ -2910,6 +2935,38 @@
   font-size: 12px;
   font-weight: 600;
   line-height: 1.4;
+}
+
+.scheduleEditDrawerBody {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+.scheduleEditSummary {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--color-surface-muted, #f6f7f9);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+}
+
+.scheduleEditSummaryTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-primary, #111827);
+}
+
+.scheduleEditSummaryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #6b7280);
 }
 
 .scheduleErrorPanel {

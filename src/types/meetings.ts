@@ -678,7 +678,7 @@ export interface MeetingScheduleSeriesSavePayload {
   title: string;
   meeting_type: MeetingScheduleType;
   status: ScheduledMeetingStatus;
-  participant_department_ids: string[];
+  participants: ScheduledMeetingParticipantCreate[];
   recurrence: MeetingScheduleRecurrenceRule;
   comment?: string | null;
   series_start_date?: string | null;
@@ -710,7 +710,8 @@ export interface ScheduledMeetingRecurrenceCreate {
 }
 
 export interface ScheduledMeetingParticipantCreate {
-  department_id: string;
+  department_id?: string;
+  position_id?: string;
   sort_order?: number;
   is_required?: boolean;
 }
@@ -728,8 +729,10 @@ export interface ScheduledMeetingCreate {
 
 export interface ScheduledMeetingParticipantRead {
   id: string;
-  department_id: string;
-  department_name: string | null;
+  department_id?: string;
+  department_name?: string | null;
+  position_id?: string;
+  position_name?: string | null;
   sort_order: number;
   is_required: boolean;
 }
@@ -761,4 +764,36 @@ export interface ScheduledMeetingRead {
   outlook_meeting_url: string | null;
   payload: { comment?: string } | null;
   participants: ScheduledMeetingParticipantRead[];
+}
+
+export interface ScheduledMeetingDetailRead {
+  series: ScheduledMeetingRead;
+  next_occurrence?: unknown | null;
+  past_occurrences?: unknown[];
+  current_card?: unknown | null;
+  history?: unknown[];
+}
+
+export interface ScheduledMeetingUpdate {
+  title: string;
+  meeting_type: MeetingScheduleType;
+  recurrence: ScheduledMeetingRecurrenceCreate;
+  series_start_date?: string;
+  series_end_date?: string;
+  participants: ScheduledMeetingParticipantCreate[];
+  comment?: string | null;
+}
+
+export interface ScheduledMeetingAppliedChanges {
+  db_updated: boolean;
+  outlook_updated: boolean;
+  changes: string[];
+  outlook_actions: string[];
+  participants_added: string[];
+  participants_removed: string[];
+}
+
+export interface ScheduledMeetingUpdateRead {
+  series: ScheduledMeetingRead;
+  applied_changes: ScheduledMeetingAppliedChanges;
 }
