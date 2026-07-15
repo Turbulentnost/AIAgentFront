@@ -2350,8 +2350,23 @@
 
 .scheduleTableToolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: 12px;
   justify-content: flex-start;
+}
+
+.scheduleToolbarError {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .scheduleTableToolbar .primaryButton {

@@ -1,4 +1,5 @@
 import type {
+  MeetingScheduleContext,
   MeetingScheduleRecurrenceRule,
   MeetingScheduleSeriesItem,
   MeetingScheduleSeriesSavePayload,
@@ -112,8 +113,15 @@ export function mapScheduledMeetingReadToSeriesItem(
     deadline_start: read.series_start_date,
     deadline_end: read.series_end_date,
     status: mapApiStatusToUi(read.status),
-    comment: read.payload?.comment ?? null
+    comment: read.payload?.comment ?? null,
+    outlook_series_id: read.outlook_series_id,
+    outlook_changekey: read.outlook_changekey,
+    outlook_meeting_url: read.outlook_meeting_url
   };
+}
+
+export function canPlanMeetingScheduleSeries(item: MeetingScheduleSeriesItem): boolean {
+  return item.status === "created" && !item.outlook_series_id;
 }
 
 export function buildMeetingScheduleTypeCounts(
@@ -147,5 +155,21 @@ export function mapScheduledMeetingsToContext(readItems: ScheduledMeetingRead[])
     type_counts: buildMeetingScheduleTypeCounts(items),
     items,
     fetched_at: new Date().toISOString()
+  };
+}
+
+export function updateMeetingScheduleItem(
+  context: MeetingScheduleContext,
+  read: ScheduledMeetingRead
+): MeetingScheduleContext {
+  const nextItem = mapScheduledMeetingReadToSeriesItem(read);
+  const hasItem = context.items.some((item) => item.id === nextItem.id);
+
+  return {
+    ...context,
+    fetched_at: new Date().toISOString(),
+    items: hasItem
+      ? context.items.map((item) => (item.id === nextItem.id ? nextItem : item))
+      : [...context.items, nextItem]
   };
 }

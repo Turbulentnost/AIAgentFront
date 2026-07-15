@@ -16,6 +16,7 @@ import LoadingPanel from "@/components/LoadingPanel";
 import {
   useMeetingSchedule,
   useMeetingScheduleCreateSeries,
+  useMeetingSchedulePlanSeries,
   useMeetingScheduleDetail
 } from "@/hooks/useMeetingSchedule";
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
@@ -26,6 +27,7 @@ import {
   sortMeetingScheduleItems,
   type MeetingScheduleViewItem
 } from "@/utils/meetingSchedule";
+import { canPlanMeetingScheduleSeries } from "@/utils/meetingScheduleApi";
 
 import styles from "./MeetingAgent.module.css";
 
@@ -52,8 +54,10 @@ const schedulePlanAction = { id: "plan", label: "Распланировать" }
 export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
   const scheduleQuery = useMeetingSchedule(canAccessAgent);
   const createSeriesMutation = useMeetingScheduleCreateSeries();
+  const planSeriesMutation = useMeetingSchedulePlanSeries();
   const [selectedId, setSelectedId] = useState("");
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
+  const [planError, setPlanError] = useState<string | null>(null);
 
   const items = useMemo(
     () => sortMeetingScheduleItems((scheduleQuery.data?.items ?? []).map(mapMeetingScheduleItem)),
@@ -89,6 +93,18 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
       onSuccess: (created) => {
         setSelectedId(created.id);
         setIsCreateDrawerOpen(false);
+      }
+    });
+  }
+
+  function handlePlanSeries(meetingId: string) {
+    setPlanError(null);
+    planSeriesMutation.mutate(meetingId, {
+      onSuccess: () => {
+        setPlanError(null);
+      },
+      onError: (error) => {
+        setPlanError(getMeetingRequestError(error));
       }
     });
   }
@@ -142,6 +158,7 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
             <Plus size={16} aria-hidden="true" />
             Добавить
           </button>
+          {planError ? <p className={styles.scheduleToolbarError}>{planError}</p> : null}
         </div>
 
         <div className={styles.scheduleTableWrap}>
@@ -239,13 +256,21 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
                               {action.label}
                             </button>
                           ))}
-                          {item.status !== "archive" ? (
+                          {canPlanMeetingScheduleSeries(item) ? (
                             <button
                               type="button"
                               className={`${styles.scheduleActionButton} ${styles.scheduleActionButtonPrimary}`}
-                              onClick={(event) => event.stopPropagation()}
+                              disabled={
+                                planSeriesMutation.isPending && planSeriesMutation.variables === item.id
+                              }
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handlePlanSeries(item.id);
+                              }}
                             >
-                              {schedulePlanAction.label}
+                              {planSeriesMutation.isPending && planSeriesMutation.variables === item.id
+                                ? "Распланируем…"
+                                : schedulePlanAction.label}
                             </button>
                           ) : null}
                         </div>

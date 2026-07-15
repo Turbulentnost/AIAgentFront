@@ -634,6 +634,9 @@ export interface MeetingScheduleSeriesItem {
   status_label?: string | null;
   comment?: string | null;
   sort_order?: number;
+  outlook_series_id?: string | null;
+  outlook_changekey?: string | null;
+  outlook_meeting_url?: string | null;
 }
 
 export interface MeetingSchedulePastMeeting {

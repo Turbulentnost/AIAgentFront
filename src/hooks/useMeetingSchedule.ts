@@ -7,7 +7,8 @@ import {
   incrementMeetingScheduleTypeCounts,
   mapScheduleFormToApiPayload,
   mapScheduledMeetingReadToSeriesItem,
-  mapScheduledMeetingsToContext
+  mapScheduledMeetingsToContext,
+  updateMeetingScheduleItem
 } from "@/utils/meetingScheduleApi";
 
 export const meetingScheduleQueryKey = ["meetings", "schedule"] as const;
@@ -88,6 +89,21 @@ export function useMeetingScheduleCreateSeries() {
         };
       });
 
+      void queryClient.invalidateQueries({ queryKey: meetingScheduleQueryKey });
+    }
+  });
+}
+
+export function useMeetingSchedulePlanSeries() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (meetingId: string) => meetingsApi.planScheduled(meetingId),
+    onSuccess: (read) => {
+      queryClient.setQueryData<MeetingScheduleContext>(meetingScheduleQueryKey, (current) => {
+        const base = current ?? emptyScheduleContext();
+        return updateMeetingScheduleItem(base, read);
+      });
       void queryClient.invalidateQueries({ queryKey: meetingScheduleQueryKey });
     }
   });

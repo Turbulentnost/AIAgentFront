@@ -274,7 +274,11 @@ export const meetingsApi = {
       })
       .then((r) => r.data),
   createScheduled: (payload: ScheduledMeetingCreate) =>
-    apiClient.post<ScheduledMeetingRead>("/meetings/scheduled", payload).then((r) => r.data)
+    apiClient.post<ScheduledMeetingRead>("/meetings/scheduled", payload).then((r) => r.data),
+  planScheduled: (meetingId: string) =>
+    longRunningApiClient
+      .post<ScheduledMeetingRead>(`/meetings/scheduled/${meetingId}/plan`, {})
+      .then((r) => r.data)
 };
 
 export const porucheniyaApi = {
