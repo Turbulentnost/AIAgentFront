@@ -116,6 +116,12 @@ import type {
   MeetingRegistryRescheduleSlotPreviewResponse,
   MeetingRegistryRescheduleApproveRequest,
   MeetingRegistryRescheduleApproveResponse,
+  MeetingScheduleSeriesDetail,
+  MeetingScheduleSeriesItem,
+  MeetingScheduleSeriesSavePayload,
+  ScheduledMeetingCreate,
+  ScheduledMeetingParticipantOption,
+  ScheduledMeetingRead,
   MeetingSlot,
   MeetingSlotsRequest,
   PorucheniyaDashboardParams,
@@ -247,7 +253,28 @@ export const meetingsApi = {
       .then((r) => r.data),
   createRun: (payload: MeetingRunCreate) =>
     apiClient.post<MeetingRun>("/meetings/runs", payload).then((r) => r.data),
-  getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data)
+  getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data),
+  getSchedule: () =>
+    apiClient
+      .get<ScheduledMeetingRead[]>("/meetings/scheduled", {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  listScheduleParticipantOptions: (search?: string) =>
+    apiClient
+      .get<ScheduledMeetingParticipantOption[]>("/meetings/scheduled/participant-options", {
+        params: search?.trim() ? { search: search.trim() } : undefined,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  getScheduleDetail: (seriesId: string) =>
+    apiClient
+      .get<MeetingScheduleSeriesDetail>(`/meetings/schedule/${seriesId}/detail`, {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  createScheduled: (payload: ScheduledMeetingCreate) =>
+    apiClient.post<ScheduledMeetingRead>("/meetings/scheduled", payload).then((r) => r.data)
 };
 
 export const porucheniyaApi = {
@@ -297,6 +324,10 @@ export const usersApi = {
 };
 export const departmentsApi = {
   list: () => apiClient.get<Department[]>("/departments").then((r) => r.data),
+  listActive: () =>
+    apiClient
+      .get<Department[]>("/departments", { params: { active_only: true } })
+      .then((r) => r.data),
   create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data),
   syncStatus: () => apiClient.get<DepartmentSyncStatus>("/departments/sync/status").then((r) => r.data),
   syncFrom1C: () => apiClient.post<DepartmentSyncStatus>("/departments/sync").then((r) => r.data)

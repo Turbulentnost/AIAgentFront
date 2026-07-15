@@ -2348,6 +2348,16 @@
   box-shadow: var(--shadow-lg);
 }
 
+.scheduleTableToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+}
+
+.scheduleTableToolbar .primaryButton {
+  padding: 0 16px;
+}
+
 .scheduleTableWrap {
   overflow: hidden;
   border: 1px solid var(--color-border);
@@ -2540,19 +2550,24 @@
 .scheduleActions {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
+  min-width: 220px;
 }
 
 .scheduleActionButton {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
-  height: 30px;
-  color: var(--color-muted);
+  min-height: 28px;
+  padding: 4px 10px;
+  color: var(--color-text-secondary);
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
   transition: all 0.15s ease;
 }
 
@@ -2560,6 +2575,18 @@
   color: var(--color-primary-text);
   border-color: var(--color-border-accent);
   background: var(--color-info-surface);
+}
+
+.scheduleActionButtonPrimary {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+  border-color: var(--color-success-border, #86efac);
+}
+
+.scheduleActionButtonPrimary:hover {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+  border-color: var(--color-success-dark, #166534);
 }
 
 .scheduleTotalCount {
@@ -2736,6 +2763,414 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+.scheduleDrawerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--color-overlay);
+}
+
+.scheduleDrawer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(420px, 100%);
+  height: 100%;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-xl);
+}
+
+.scheduleDrawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.scheduleDrawerHead h2 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.scheduleDrawerForm {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  overflow: auto;
+  padding: 20px;
+}
+
+.scheduleField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduleFieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scheduleFieldLabel {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scheduleControl {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.scheduleControl:focus {
+  border-color: var(--color-border-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.scheduleControlWithIcon {
+  padding-left: 38px;
+}
+
+.scheduleTextarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.scheduleSelectField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.scheduleSelectField .scheduleControl {
+  padding-right: 38px;
+  appearance: none;
+}
+
+.scheduleSelectIcon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-placeholder);
+  pointer-events: none;
+}
+
+.scheduleSelectChevron {
+  position: absolute;
+  right: 12px;
+  color: var(--color-placeholder);
+  pointer-events: none;
+}
+
+.scheduleDrawerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.scheduleDrawerError {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scheduleErrorPanel {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.scheduleParticipantField {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduleParticipantSearchRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.scheduleParticipantSearchField {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.scheduleParticipantSearchIcon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-placeholder);
+  pointer-events: none;
+}
+
+.scheduleParticipantSearchInput {
+  padding-left: 38px;
+}
+
+.scheduleParticipantAddButton {
+  flex-shrink: 0;
+  min-height: 42px;
+  padding: 0 14px;
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border-accent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.scheduleParticipantAddButton:hover {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.scheduleParticipantMatchHint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleParticipantSuggestions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduleParticipantSuggestionButton {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.scheduleParticipantSuggestionButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-accent);
+  background: var(--color-hover);
+}
+
+.scheduleParticipantEmptyHint {
+  margin: 0;
+  color: var(--color-placeholder);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleParticipantChipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scheduleParticipantChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 4px 10px 4px 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.scheduleParticipantChip:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-accent);
+}
+
+.scheduleParticipantChipLabel {
+  line-height: 1.2;
+}
+
+.scheduleParticipantChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.scheduleParticipantChip:hover .scheduleParticipantChipRemove,
+.scheduleParticipantChipRemove:focus-visible {
+  opacity: 1;
+}
+
+.scheduleParticipantChipRemove:hover {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+}
+
+.scheduleRecurrence {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-hover) 35%, var(--color-surface));
+}
+
+.scheduleRecurrenceLegend {
+  padding: 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scheduleRecurrenceRow {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleRecurrenceRowLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleRecurrenceCustomRow,
+.scheduleRecurrenceTimeRow,
+.scheduleRecurrenceMonthlyWeekdayRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scheduleRecurrenceInlineField {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleRecurrenceInlineLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleRecurrenceWeekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scheduleRecurrenceWeekdayButton {
+  min-width: 38px;
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.scheduleRecurrenceWeekdayButton:hover {
+  border-color: var(--color-border-accent);
+  color: var(--color-text);
+}
+
+.scheduleRecurrenceWeekdayButtonActive {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.scheduleRecurrenceMonthly {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduleRecurrenceMonthlyModes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.scheduleRecurrenceRadio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleRecurrenceRadio input {
+  accent-color: var(--color-primary);
+}
+
+.scheduleRecurrencePreview {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding-top: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scheduleRecurrencePreviewMarker {
+  color: var(--color-placeholder);
+  font-size: 11px;
 }
 
 @media (max-width: 1280px) {

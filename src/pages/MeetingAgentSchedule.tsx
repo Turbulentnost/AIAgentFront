@@ -5,19 +5,22 @@ import {
   Calendar,
   CalendarCheck2,
   CalendarClock,
-  CheckCircle2,
   GripVertical,
-  Pencil,
-  RefreshCw,
-  Trash2,
+  Plus,
   Users,
   X,
   Zap
 } from "lucide-react";
 
 import LoadingPanel from "@/components/LoadingPanel";
-import { useMeetingSchedule, useMeetingScheduleDetail } from "@/hooks/useMeetingSchedule";
-import type { MeetingScheduleSeriesDetail } from "@/types/meetings";
+import {
+  useMeetingSchedule,
+  useMeetingScheduleCreateSeries,
+  useMeetingScheduleDetail
+} from "@/hooks/useMeetingSchedule";
+import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
+import MeetingAgentScheduleSeriesDrawer from "@/pages/MeetingAgentScheduleSeriesDrawer";
+import type { MeetingScheduleSeriesDetail, MeetingScheduleSeriesSavePayload } from "@/types/meetings";
 import {
   mapMeetingScheduleItem,
   sortMeetingScheduleItems,
@@ -38,9 +41,19 @@ const statCards = [
   { id: "unplanned", key: "unplanned" as const, label: "Внеплановые", icon: Zap }
 ];
 
+const scheduleRowActions = [
+  { id: "edit", label: "Изменить" },
+  { id: "reschedule", label: "Перенести" },
+  { id: "extend", label: "Продлить" }
+] as const;
+
+const schedulePlanAction = { id: "plan", label: "Распланировать" } as const;
+
 export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
   const scheduleQuery = useMeetingSchedule(canAccessAgent);
+  const createSeriesMutation = useMeetingScheduleCreateSeries();
   const [selectedId, setSelectedId] = useState("");
+  const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
 
   const items = useMemo(
     () => sortMeetingScheduleItems((scheduleQuery.data?.items ?? []).map(mapMeetingScheduleItem)),
@@ -61,9 +74,35 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const detailQuery = useMeetingScheduleDetail(selectedId, canAccessAgent && Boolean(selectedId));
   const typeCounts = scheduleQuery.data?.type_counts;
+  const totalRecords = typeCounts?.total ?? items.length;
+
+  function handleOpenCreateDrawer() {
+    setIsCreateDrawerOpen(true);
+  }
+
+  function handleCloseCreateDrawer() {
+    setIsCreateDrawerOpen(false);
+  }
+
+  function handleCreateSeries(payload: MeetingScheduleSeriesSavePayload) {
+    createSeriesMutation.mutate(payload, {
+      onSuccess: (created) => {
+        setSelectedId(created.id);
+        setIsCreateDrawerOpen(false);
+      }
+    });
+  }
 
   if (scheduleQuery.isLoading && !scheduleQuery.data) {
     return <LoadingPanel title="Загружаем график совещаний…" />;
+  }
+
+  if (scheduleQuery.isError) {
+    return (
+      <div className={styles.scheduleErrorPanel}>
+        <p>{getMeetingRequestError(scheduleQuery.error)}</p>
+      </div>
+    );
   }
 
   return (
@@ -76,7 +115,7 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
           </p>
         </div>
         <span className={styles.scheduleTotalCount}>
-          Всего записей: {typeCounts?.total ?? items.length}
+          Всего записей: {totalRecords}
         </span>
       </header>
 
@@ -98,6 +137,13 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
       </div>
 
       <section className={styles.schedulePanel}>
+        <div className={styles.scheduleTableToolbar}>
+          <button type="button" className={styles.primaryButton} onClick={handleOpenCreateDrawer}>
+            <Plus size={16} aria-hidden="true" />
+            Добавить
+          </button>
+        </div>
+
         <div className={styles.scheduleTableWrap}>
           <div className={styles.scheduleTableScroll}>
             <table className={styles.scheduleTable}>
@@ -165,7 +211,7 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
                           ) : null}
                         </div>
                       </td>
-                      <td className={styles.scheduleFrequencyCell}>{item.frequency_label}</td>
+                      <td className={styles.scheduleFrequencyCell}>{item.recurrenceLabel}</td>
                       <td className={styles.scheduleDeadlineCell}>
                         <span className={styles.scheduleDeadlinePrimary}>{item.deadlinePrimary}</span>
                         {item.deadlineSecondary ? (
@@ -183,46 +229,25 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
                       </td>
                       <td>
                         <div className={styles.scheduleActions}>
-                          <button
-                            type="button"
-                            className={styles.scheduleActionButton}
-                            aria-label={`Редактировать ${item.name}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <Pencil size={15} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.scheduleActionButton}
-                            aria-label={`Перенести ${item.name}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <CalendarClock size={15} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.scheduleActionButton}
-                            aria-label={`Продлить ${item.name}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <RefreshCw size={15} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.scheduleActionButton}
-                            aria-label={`Удалить ${item.name}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <Trash2 size={15} aria-hidden="true" />
-                          </button>
-                          <button
-                            type="button"
-                            className={styles.scheduleActionButton}
-                            aria-label={`Распланировать ${item.name}`}
-                            onClick={(event) => event.stopPropagation()}
-                          >
-                            <CheckCircle2 size={15} aria-hidden="true" />
-                          </button>
+                          {scheduleRowActions.map((action) => (
+                            <button
+                              key={action.id}
+                              type="button"
+                              className={styles.scheduleActionButton}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {action.label}
+                            </button>
+                          ))}
+                          {item.status !== "archive" ? (
+                            <button
+                              type="button"
+                              className={`${styles.scheduleActionButton} ${styles.scheduleActionButtonPrimary}`}
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              {schedulePlanAction.label}
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     </tr>
@@ -241,6 +266,16 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
           detail={detailQuery.data}
         />
       ) : null}
+
+      <MeetingAgentScheduleSeriesDrawer
+        open={isCreateDrawerOpen}
+        onClose={handleCloseCreateDrawer}
+        onSave={handleCreateSeries}
+        saving={createSeriesMutation.isPending}
+        saveError={
+          createSeriesMutation.isError ? getMeetingRequestError(createSeriesMutation.error) : null
+        }
+      />
     </>
   );
 }
@@ -265,7 +300,7 @@ function ScheduleDetails({
             >
               {item.typeLabel}
             </span>
-            <span>{item.frequency_label}</span>
+            <span>{item.recurrenceLabel}</span>
             <span
               className={`${styles.scheduleStatusBadge} ${styles[`scheduleStatusBadge${item.statusTone}`]}`}
             >

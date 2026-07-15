@@ -573,6 +573,51 @@ export type MeetingScheduleType = "planned" | "report" | "selector" | "unplanned
 
 export type MeetingScheduleStatus = "scheduled" | "created" | "archive";
 
+export type MeetingScheduleRecurrenceFrequency = "daily" | "weekly" | "monthly" | "yearly";
+
+export type MeetingScheduleRecurrenceCustomUnit = "days" | "weeks" | "months";
+
+export type MeetingScheduleWeekday = "mon" | "tue" | "wed" | "thu" | "fri" | "sat" | "sun";
+
+export type MeetingScheduleWeekdayPosition = "first" | "second" | "third" | "fourth" | "last";
+
+export type MeetingScheduleMonthlyMode = "by_day_of_month" | "by_weekday_position";
+
+export type MeetingScheduleHowOftenPreset =
+  | "daily"
+  | "weekly"
+  | "biweekly"
+  | "monthly"
+  | "quarterly"
+  | "yearly"
+  | "custom";
+
+export interface MeetingScheduleRecurrenceRule {
+  frequency: MeetingScheduleRecurrenceFrequency;
+  interval: number;
+  time_local: string;
+  duration_minutes: number;
+  weekday?: MeetingScheduleWeekday;
+  monthly_mode?: MeetingScheduleMonthlyMode;
+  day_of_month?: number;
+  weekday_position?: MeetingScheduleWeekdayPosition;
+  monthly_weekday?: MeetingScheduleWeekday;
+  custom_unit?: MeetingScheduleRecurrenceCustomUnit;
+}
+
+export interface MeetingScheduleRecurrenceFormState {
+  preset: MeetingScheduleHowOftenPreset;
+  customInterval: number;
+  customUnit: MeetingScheduleRecurrenceCustomUnit;
+  weekday: MeetingScheduleWeekday;
+  monthlyMode: MeetingScheduleMonthlyMode;
+  dayOfMonth: number;
+  weekdayPosition: MeetingScheduleWeekdayPosition;
+  monthlyWeekday: MeetingScheduleWeekday;
+  timeLocal: string;
+  durationMinutes: number;
+}
+
 export interface MeetingScheduleSeriesItem {
   id: string;
   name: string;
@@ -581,6 +626,8 @@ export interface MeetingScheduleSeriesItem {
   participant_roles: string[];
   extra_participants_count?: number;
   frequency_label: string;
+  recurrence_label?: string | null;
+  recurrence?: MeetingScheduleRecurrenceRule | null;
   deadline_start: string | null;
   deadline_end: string | null;
   status: MeetingScheduleStatus;
@@ -622,4 +669,93 @@ export interface MeetingScheduleContext {
   type_counts: MeetingScheduleTypeCounts;
   items: MeetingScheduleSeriesItem[];
   fetched_at: string;
+}
+
+export interface MeetingScheduleSeriesSavePayload {
+  title: string;
+  meeting_type: MeetingScheduleType;
+  status: ScheduledMeetingStatus;
+  participant_department_ids: string[];
+  recurrence: MeetingScheduleRecurrenceRule;
+  comment?: string | null;
+  series_start_date?: string | null;
+  series_end_date?: string | null;
+}
+
+export type ScheduledMeetingStatus = "planned" | "created" | "archive";
+
+export type ScheduledMeetingApiWeekday =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday";
+
+export interface ScheduledMeetingRecurrenceCreate {
+  frequency: MeetingScheduleRecurrenceFrequency;
+  interval?: number;
+  time_local: string;
+  duration_minutes?: number;
+  monthly_mode?: MeetingScheduleMonthlyMode;
+  day_of_month?: number;
+  weekday?: ScheduledMeetingApiWeekday;
+  weekday_position?: MeetingScheduleWeekdayPosition;
+  series_start_date?: string;
+  series_end_date?: string;
+}
+
+export interface ScheduledMeetingParticipantCreate {
+  department_id: string;
+  sort_order?: number;
+  is_required?: boolean;
+}
+
+export interface ScheduledMeetingCreate {
+  title: string;
+  meeting_type: MeetingScheduleType;
+  status?: ScheduledMeetingStatus;
+  series_start_date?: string;
+  series_end_date?: string;
+  comment?: string | null;
+  recurrence: ScheduledMeetingRecurrenceCreate;
+  participants: ScheduledMeetingParticipantCreate[];
+}
+
+export interface ScheduledMeetingParticipantRead {
+  id: string;
+  department_id: string;
+  department_name: string | null;
+  sort_order: number;
+  is_required: boolean;
+}
+
+export interface ScheduledMeetingParticipantOption {
+  id: string;
+  name: string;
+}
+
+export interface ScheduledMeetingRead {
+  id: string;
+  title: string;
+  meeting_type: MeetingScheduleType;
+  status: ScheduledMeetingStatus;
+  time_local: string;
+  duration_minutes: number;
+  frequency: MeetingScheduleRecurrenceFrequency;
+  interval: number;
+  monthly_mode: MeetingScheduleMonthlyMode | null;
+  day_of_month: number | null;
+  weekday: string | null;
+  weekday_position: string | null;
+  series_start_date: string;
+  series_end_date: string;
+  recurrence_label: string;
+  recurrence_rule: Record<string, unknown>;
+  outlook_series_id: string | null;
+  outlook_changekey: string | null;
+  outlook_meeting_url: string | null;
+  payload: { comment?: string } | null;
+  participants: ScheduledMeetingParticipantRead[];
 }

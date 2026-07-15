@@ -1,4 +1,5 @@
 import type {
+  MeetingScheduleContext,
   MeetingScheduleSeriesItem,
   MeetingScheduleStatus,
   MeetingScheduleType
@@ -15,6 +16,7 @@ export interface MeetingScheduleViewItem extends MeetingScheduleSeriesItem {
   deadlinePrimary: string;
   deadlineSecondary: string;
   visibleParticipants: string[];
+  recurrenceLabel: string;
 }
 
 const typeLabels: Record<MeetingScheduleType, string> = {
@@ -42,6 +44,41 @@ const statusTones: Record<MeetingScheduleStatus, MeetingScheduleStatusTone> = {
   created: "amber",
   archive: "slate"
 };
+
+export const meetingScheduleTypeOptions: { id: MeetingScheduleType; label: string }[] = [
+  { id: "planned", label: typeLabels.planned },
+  { id: "report", label: typeLabels.report },
+  { id: "selector", label: typeLabels.selector },
+  { id: "unplanned", label: typeLabels.unplanned }
+];
+
+export const meetingScheduleStatusOptions: { id: MeetingScheduleStatus; label: string }[] = [
+  { id: "scheduled", label: statusLabels.scheduled },
+  { id: "created", label: statusLabels.created },
+  { id: "archive", label: statusLabels.archive }
+];
+
+type MeetingScheduleSeriesApiItem = MeetingScheduleSeriesItem & {
+  series_start_date?: string | null;
+  series_end_date?: string | null;
+};
+
+export function normalizeMeetingScheduleSeriesItem(
+  item: MeetingScheduleSeriesApiItem
+): MeetingScheduleSeriesItem {
+  return {
+    ...item,
+    deadline_start: item.deadline_start ?? item.series_start_date ?? null,
+    deadline_end: item.deadline_end ?? item.series_end_date ?? null
+  };
+}
+
+export function normalizeMeetingScheduleContext(context: MeetingScheduleContext): MeetingScheduleContext {
+  return {
+    ...context,
+    items: context.items.map((item) => normalizeMeetingScheduleSeriesItem(item))
+  };
+}
 
 function formatScheduleDate(value: string | null): string {
   if (!value) return "—";
@@ -73,9 +110,14 @@ export function formatMeetingScheduleDeadline(
   };
 }
 
+export function getMeetingScheduleRecurrenceLabel(item: MeetingScheduleSeriesItem): string {
+  return item.recurrence_label?.trim() || item.frequency_label;
+}
+
 export function mapMeetingScheduleItem(item: MeetingScheduleSeriesItem): MeetingScheduleViewItem {
   const deadline = formatMeetingScheduleDeadline(item.deadline_start, item.deadline_end);
   const visibleParticipants = item.participant_roles.slice(0, 2);
+  const recurrenceLabel = getMeetingScheduleRecurrenceLabel(item);
 
   return {
     ...item,
@@ -85,7 +127,8 @@ export function mapMeetingScheduleItem(item: MeetingScheduleSeriesItem): Meeting
     statusTone: statusTones[item.status],
     deadlinePrimary: deadline.primary,
     deadlineSecondary: deadline.secondary,
-    visibleParticipants
+    visibleParticipants,
+    recurrenceLabel
   };
 }
 
