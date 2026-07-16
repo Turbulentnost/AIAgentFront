@@ -1,12 +1,14 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import NdControlAgent from "@/pages/NdControlAgent";
 import MeetingAgent from "@/pages/MeetingAgent";
 import TasksAgent from "@/pages/TasksAgent";
+import ProcurementAgent from "@/pages/ProcurementAgent";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
+import NdControlAgent from "./pages/NdControlAgent";
+import IncomingMail from "./pages/IncomingMail";
 import AgentBuilder from "./pages/AgentBuilder";
 import Tasks from "./pages/Tasks";
 import KnowledgeBase from "./pages/KnowledgeBase";
@@ -35,6 +37,8 @@ export default function App() {
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/incoming-mail" element={<ProtectedRoute><Layout title="Входящая корреспонденция"><IncomingMail /></Layout></ProtectedRoute>} />
+      <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

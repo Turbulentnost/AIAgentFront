@@ -19,6 +19,8 @@ import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
   AGENT_LAUNCH_MORPH_MS,
+  hasDedicatedLaunchPage,
+  INCOMING_CORRESPONDENCE_AGENT_PATH,
   isMeetingAgent,
   isNdControlAgent,
   isIncomingCorrespondenceAgent,
@@ -184,6 +186,11 @@ export default function Dashboard() {
   function handleAgentLaunch(agent: AgentAccess, event: MouseEvent<HTMLButtonElement>) {
     if (!agent.can_run || launchMorphAgentId) return;
 
+    if (!isNdControlAgent(agent) && hasDedicatedLaunchPage(agent)) {
+      navigateToAgentLaunch(navigate, agent);
+      return;
+    }
+
     if (isMeetingAgent(agent)) {
       navigateToAgentLaunch(navigate, agent);
       return;
@@ -301,13 +308,17 @@ export default function Dashboard() {
                       </span>
                     </div>
                     <p>{agent.purpose || agent.slug}</p>
-                    <button
-                      type="button"
-                      disabled={!agent.can_run || Boolean(launchMorphAgentId)}
-                      onClick={(event) => handleAgentLaunch(agent, event)}
-                    >
-                      {isMorphing ? "Открываем…" : agent.can_run ? "Запустить" : "Нет доступа"}
-                    </button>
+                    {isIncomingCorrespondenceAgent(agent) && agent.can_run ? (
+                      <Link to={INCOMING_CORRESPONDENCE_AGENT_PATH}>Запустить</Link>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={!agent.can_run || Boolean(launchMorphAgentId)}
+                        onClick={(event) => handleAgentLaunch(agent, event)}
+                      >
+                        {isMorphing ? "Открываем…" : agent.can_run ? "Запустить" : "Нет доступа"}
+                      </button>
+                    )}
                   </div>
                 </article>
               );

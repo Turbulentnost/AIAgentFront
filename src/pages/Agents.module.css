@@ -98,6 +98,12 @@
   gap: var(--agents-card-gap);
 }
 
+.agentCardLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
 .agentCard {
   display: grid;
   grid-template-columns: var(--agents-art-size) minmax(0, 1fr);

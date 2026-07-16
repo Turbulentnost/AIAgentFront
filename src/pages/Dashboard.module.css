@@ -436,7 +436,8 @@
   overflow-wrap: anywhere;
 }
 
-.launchBody button {
+.launchBody button,
+.launchBody a {
   grid-column: 2;
   grid-row: 2;
   align-self: end;
@@ -453,9 +454,14 @@
   font-weight: 800;
   line-height: 1;
   white-space: nowrap;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.launchBody button:hover {
+.launchBody button:hover,
+.launchBody a:hover {
   background: var(--color-cta-hover);
 }
 
