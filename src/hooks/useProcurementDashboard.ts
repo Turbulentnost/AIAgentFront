@@ -1,5 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { procurementApi } from "@/api/endpoints";
+import type { ProcurementDashboardView } from "@/types/procurement";
 
 export function useProcurementPermissions() {
   return useQuery({
@@ -9,19 +10,19 @@ export function useProcurementPermissions() {
   });
 }
 
-export function useProcurementDashboard(enabled: boolean) {
+export function useProcurementDashboard(enabled: boolean, view: ProcurementDashboardView = "active") {
   return useQuery({
-    queryKey: ["procurement", "dashboard"],
-    queryFn: () => procurementApi.getDashboard(),
+    queryKey: ["procurement", "dashboard", view],
+    queryFn: () => procurementApi.getDashboard(view),
     enabled,
     refetchInterval: (query) => {
       const groups = query.state.data?.groups ?? [];
       const hasActive = groups.some((group) =>
         group.cases.some((item) =>
-          ["new", "data_check", "coverage_check"].includes(item.status)
+          ["new", "data_check", "coverage_check", "human_required", "blocked"].includes(item.status)
         )
       );
-      return hasActive ? 5000 : 30000;
+      return hasActive ? 10000 : 30000;
     }
   });
 }
@@ -33,8 +34,19 @@ export function useProcurementCase(caseId: string | null, enabled: boolean) {
     enabled: Boolean(caseId) && enabled,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && ["new", "data_check", "coverage_check"].includes(status) ? 4000 : false;
+      return status &&
+        ["new", "data_check", "coverage_check", "human_required", "blocked"].includes(status)
+        ? 8000
+        : false;
     }
+  });
+}
+
+export function useProcurementCaseEvents(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "case-events", caseId],
+    queryFn: () => procurementApi.listCaseEvents(caseId!),
+    enabled: Boolean(caseId) && enabled
   });
 }
 

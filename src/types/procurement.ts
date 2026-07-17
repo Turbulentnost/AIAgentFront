@@ -4,6 +4,8 @@ export type ProcurementSourceType =
   | "transfer_order"
   | "reorder_point";
 
+export type ProcurementDashboardView = "active" | "processing" | "archive";
+
 export interface ProcurementPermissions {
   can_access_orchestrator: boolean;
   can_refresh: boolean;
@@ -20,6 +22,7 @@ export interface ProcurementCasePosition {
   unit?: string | null;
   quantity: string;
   required_date?: string | null;
+  supply_action?: string | null;
   cancelled: boolean;
 }
 
@@ -32,6 +35,47 @@ export interface ProcurementCaseEvent {
   new_status?: string | null;
   payload: Record<string, unknown>;
   created_at?: string | null;
+}
+
+export type ProcurementStageStatus =
+  | "pending"
+  | "running"
+  | "completed"
+  | "blocked"
+  | "skipped";
+
+export interface ProcurementRouteStage {
+  stage_id: string;
+  label: string;
+  order: number;
+  status: ProcurementStageStatus;
+  summary?: string | null;
+}
+
+export interface ProcurementTimelineEntry {
+  id?: string | null;
+  at?: string | null;
+  kind: string;
+  title: string;
+  detail?: string | null;
+  actor_id?: string | null;
+  actor_label?: string | null;
+  stage_id?: string | null;
+  status?: string | null;
+  payload?: Record<string, unknown>;
+}
+
+export interface ProcurementCurrentState {
+  status: string;
+  control_point?: string | null;
+  current_agent_id?: string | null;
+  current_agent_label?: string | null;
+  requires_human_review: boolean;
+  summary?: string | null;
+  task_id?: string | null;
+  closed_reason?: string | null;
+  closed_reason_label?: string | null;
+  source_active: boolean;
 }
 
 export interface ProcurementCaseSummary {
@@ -53,6 +97,11 @@ export interface ProcurementCaseSummary {
   updated_at?: string | null;
   summary?: string | null;
   requires_human_review: boolean;
+  closed_at?: string | null;
+  closed_reason?: string | null;
+  closed_reason_label?: string | null;
+  reactivated_at?: string | null;
+  source_active?: boolean;
 }
 
 export interface ProcurementCaseDetail extends ProcurementCaseSummary {
@@ -75,6 +124,9 @@ export interface ProcurementCaseDetail extends ProcurementCaseSummary {
   case_metadata?: Record<string, unknown> | null;
   positions: ProcurementCasePosition[];
   events: ProcurementCaseEvent[];
+  route_stages: ProcurementRouteStage[];
+  timeline: ProcurementTimelineEntry[];
+  current_state?: ProcurementCurrentState | null;
 }
 
 export interface ProcurementSyncStatus {
@@ -107,10 +159,18 @@ export interface ProcurementSourceGroup {
   sync: ProcurementSyncStatus;
 }
 
+export interface ProcurementDashboardCounts {
+  active: number;
+  processing: number;
+  archive: number;
+}
+
 export interface ProcurementDashboard {
   generated_at: string;
+  view: ProcurementDashboardView;
   groups: ProcurementSourceGroup[];
   total_cases: number;
+  counts: ProcurementDashboardCounts;
 }
 
 export interface ProcurementRefreshResult {

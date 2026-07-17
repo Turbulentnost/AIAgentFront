@@ -146,6 +146,173 @@
   font-weight: 700;
 }
 
+.syncBadgeOk {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16a34a 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, #16a34a 35%, var(--color-border));
+  color: #15803d;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modeBlock {
+  display: grid;
+  gap: 10px;
+}
+
+.modeSwitch,
+.caseViewSwitch {
+  display: inline-flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.modeBtn,
+.modeBtnActive,
+.caseViewBtn,
+.caseViewActive {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-radius: 999px;
+  padding: 10px 14px;
+  cursor: pointer;
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.modeBtnActive,
+.caseViewActive {
+  border-color: var(--color-primary);
+  box-shadow: inset 0 0 0 1px var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.caseItemNote {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.routeCard,
+.stateCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-bg);
+}
+
+.routeHeader,
+.timelineTop {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.routeHeader span,
+.timelineTop span,
+.timelineActor,
+.stateCard span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.routeTrack {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.routeStep {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.routeDot {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-weight: 700;
+}
+
+.routeStep[data-status="completed"] .routeDot,
+.routeStep[data-status="running"] .routeDot {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.routeStep[data-status="running"] {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.caseBodySplit {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(260px, 0.8fr);
+  gap: 14px;
+}
+
+.stateCard div {
+  display: grid;
+  gap: 4px;
+}
+
+.stateCard p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.timeline {
+  display: grid;
+  gap: 10px;
+}
+
+.timelineItem {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  border-radius: 10px;
+}
+
+.timelineDot {
+  width: 10px;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  background: var(--color-primary);
+}
+
+.timelineBody {
+  display: grid;
+  gap: 4px;
+}
+
+.timelineItem p {
+  color: var(--color-muted);
+  font-size: 12px;
+  margin: 0;
+}
+
 .caseList {
   display: grid;
   gap: 8px;
@@ -237,22 +404,6 @@
   gap: 10px;
 }
 
-.timelineItem {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  border-left: 3px solid var(--color-primary);
-  background: var(--color-bg);
-  border-radius: 0 10px 10px 0;
-}
-
-.timelineItem span,
-.timelineItem p {
-  color: var(--color-muted);
-  font-size: 12px;
-  margin: 0;
-}
-
 .warningBox,
 .forbidden,
 .emptyState {
@@ -287,7 +438,9 @@
   .statsRow,
   .sourceTabs,
   .workspace,
-  .detailGrid {
+  .detailGrid,
+  .routeTrack,
+  .caseBodySplit {
     grid-template-columns: 1fr;
   }
 }

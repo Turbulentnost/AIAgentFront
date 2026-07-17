@@ -1,94 +1,98 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo } from "react";
 import { AlertTriangle, Loader2, RefreshCw } from "lucide-react";
+import { useSearchParams } from "react-router-dom";
 import {
   useProcurementCase,
   useProcurementDashboard,
   useProcurementPermissions,
   useRefreshProcurementSources
 } from "@/hooks/useProcurementDashboard";
-import type { ProcurementCaseSummary, ProcurementSourceGroup } from "@/types/procurement";
+import type { ProcurementDashboardView, ProcurementSourceGroup } from "@/types/procurement";
+import { SYNC_STATUS_LABELS } from "@/utils/procurementDashboard";
+import { CaseDetailPanel } from "./procurement/CaseDetailPanel";
+import { CaseListPanel } from "./procurement/CaseListPanel";
+import { ProcurementModeSwitch } from "./procurement/ProcurementModeSwitch";
 import styles from "./ProcurementAgent.module.css";
-
-const STATUS_LABELS: Record<string, string> = {
-  new: "Новый",
-  data_check: "Проверка данных",
-  coverage_check: "Проверка покрытия",
-  human_required: "Нужен человек",
-  blocked: "Заблокирован",
-  closed: "Закрыт",
-  failed: "Ошибка"
-};
-const SYNC_STATUS_LABELS: Record<string, string> = {
-  available: "доступен",
-  capability_unavailable: "недоступен",
-  error: "ошибка чтения",
-  unknown: "не проверен"
-};
-
-function formatDateTime(value?: string | null): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString("ru-RU");
-}
-
-function caseTitle(item: ProcurementCaseSummary): string {
-  return item.source_number || item.source_1c_ref.slice(0, 8);
-}
 
 export default function ProcurementAgent() {
   const permissionsQuery = useProcurementPermissions();
   const canAccess = permissionsQuery.data?.can_access_orchestrator ?? false;
-  const dashboardQuery = useProcurementDashboard(canAccess);
   const refreshMutation = useRefreshProcurementSources();
-  const [selectedSource, setSelectedSource] = useState<string>("");
-  const [selectedCaseId, setSelectedCaseId] = useState<string>("");
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const mode = searchParams.get("mode") === "cases" ? "cases" : "bases";
+  const caseView: ProcurementDashboardView =
+    searchParams.get("view") === "archive" ? "archive" : mode === "cases" ? "processing" : "active";
+  const selectedSource = searchParams.get("source") || "";
+  const selectedCaseId = searchParams.get("case") || "";
+
+  const dashboardView: ProcurementDashboardView =
+    mode === "bases" ? "active" : caseView === "archive" ? "archive" : "processing";
+  const dashboardQuery = useProcurementDashboard(canAccess, dashboardView);
+  const countsQuery = useProcurementDashboard(canAccess, "active");
 
   const groups = dashboardQuery.data?.groups ?? [];
+  const counts = dashboardQuery.data?.counts ??
+    countsQuery.data?.counts ?? { active: 0, processing: 0, archive: 0 };
   const activeGroup: ProcurementSourceGroup | null =
     groups.find((group) => group.source_type === selectedSource) ?? groups[0] ?? null;
+  const flatCases = useMemo(
+    () => (mode === "bases" ? activeGroup?.cases ?? [] : groups.flatMap((group) => group.cases)),
+    [activeGroup, groups, mode]
+  );
 
   useEffect(() => {
     if (!selectedSource && groups[0]) {
-      setSelectedSource(groups[0].source_type);
+      const next = new URLSearchParams(searchParams);
+      next.set("source", groups[0].source_type);
+      setSearchParams(next, { replace: true });
     }
-  }, [groups, selectedSource]);
+  }, [groups, searchParams, selectedSource, setSearchParams]);
 
   useEffect(() => {
-    if (!activeGroup) {
-      setSelectedCaseId("");
+    if (!flatCases.length) {
+      if (selectedCaseId) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("case");
+        setSearchParams(next, { replace: true });
+      }
       return;
     }
-    if (!activeGroup.cases.some((item) => item.id === selectedCaseId)) {
-      setSelectedCaseId(activeGroup.cases[0]?.id ?? "");
+    if (!flatCases.some((item) => item.id === selectedCaseId)) {
+      const next = new URLSearchParams(searchParams);
+      next.set("case", flatCases[0].id);
+      setSearchParams(next, { replace: true });
     }
-  }, [activeGroup, selectedCaseId]);
+  }, [flatCases, searchParams, selectedCaseId, setSearchParams]);
 
   const detailQuery = useProcurementCase(selectedCaseId || null, canAccess);
   const detail = detailQuery.data;
   const detailSourceLabel =
-    groups.find((group) => group.source_type === detail?.source_type)?.label_ru ?? "—";
+    groups.find((group) => group.source_type === detail?.source_type)?.label_ru ??
+    countsQuery.data?.groups.find((group) => group.source_type === detail?.source_type)?.label_ru ??
+    "—";
 
-  const stats = useMemo(() => {
-    const allCases = groups.flatMap((group) => group.cases);
-    return [
-      { label: "Неотработанные кейсы", value: allCases.length },
-      {
-        label: "Нужен человек",
-        value: allCases.filter((item) => item.status === "human_required").length
-      },
-      {
-        label: "В работе",
-        value: allCases.filter((item) =>
-          ["new", "data_check", "coverage_check"].includes(item.status)
-        ).length
-      },
+  const stats = useMemo(
+    () => [
+      { label: "Актуальные основания", value: counts.active },
+      { label: "Кейсы в работе", value: counts.processing },
+      { label: "Архив", value: counts.archive },
       {
         label: "Недоступные источники",
-        value: groups.filter((group) => !group.available).length
+        value: (countsQuery.data?.groups ?? groups).filter((group) => !group.available).length
       }
-    ];
-  }, [groups]);
+    ],
+    [counts, countsQuery.data?.groups, groups]
+  );
+
+  const updateParams = (patch: Record<string, string | null>) => {
+    const next = new URLSearchParams(searchParams);
+    Object.entries(patch).forEach(([key, value]) => {
+      if (!value) next.delete(key);
+      else next.set(key, value);
+    });
+    setSearchParams(next);
+  };
 
   if (permissionsQuery.isLoading) {
     return (
@@ -116,7 +120,10 @@ export default function ProcurementAgent() {
       <div className={styles.header}>
         <div>
           <h2>Оркестратор закупок</h2>
-          <p>Проверка оснований 1С за весь период каждые 30 минут · Level 0 · только чтение</p>
+          <p>
+            Актуальные основания и кейсы в обработке синхронизируются каждые 30 минут · только
+            чтение
+          </p>
         </div>
         <button
           className={styles.refreshButton}
@@ -129,6 +136,28 @@ export default function ProcurementAgent() {
         </button>
       </div>
 
+      <ProcurementModeSwitch
+        activeCount={counts.active}
+        archiveCount={counts.archive}
+        caseView={caseView === "archive" ? "archive" : "processing"}
+        mode={mode}
+        onCaseViewChange={(view) =>
+          updateParams({
+            mode: "cases",
+            view: view === "archive" ? "archive" : "processing",
+            case: null
+          })
+        }
+        onModeChange={(nextMode) =>
+          updateParams({
+            mode: nextMode === "cases" ? "cases" : null,
+            view: nextMode === "cases" ? "processing" : null,
+            case: null
+          })
+        }
+        processingCount={counts.processing}
+      />
+
       <div className={styles.statsRow}>
         {stats.map((stat) => (
           <div className={styles.statCard} key={stat.label}>
@@ -138,152 +167,117 @@ export default function ProcurementAgent() {
         ))}
       </div>
 
-      <div className={styles.sourceTabs}>
-        {groups.map((group) => (
-          <button
-            className={
-              group.source_type === activeGroup?.source_type
-                ? styles.sourceTabActive
-                : styles.sourceTab
-            }
-            key={group.source_type}
-            onClick={() => setSelectedSource(group.source_type)}
-            type="button"
-          >
-            <span>{group.label_ru}</span>
-            <strong>{group.cases_count}</strong>
-            {!group.available ? <em>недоступно</em> : null}
-          </button>
-        ))}
-      </div>
+      {mode === "bases" ? (
+        <div className={styles.sourceTabs}>
+          {groups.map((group) => (
+            <button
+              className={
+                group.source_type === activeGroup?.source_type
+                  ? styles.sourceTabActive
+                  : styles.sourceTab
+              }
+              key={group.source_type}
+              onClick={() => updateParams({ source: group.source_type, case: null })}
+              type="button"
+            >
+              <span>{group.label_ru}</span>
+              <strong>{group.cases_count}</strong>
+              {!group.available ? <em>недоступно</em> : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className={styles.workspace}>
-        <section className={styles.queuePanel}>
-          <div className={styles.panelHeader}>
-            <h3>{activeGroup?.label_ru ?? "Основания"}</h3>
-            {activeGroup?.sync ? (
-              <span className={styles.syncBadge}>
-                {SYNC_STATUS_LABELS[activeGroup.sync.capability_status] ??
-                  activeGroup.sync.capability_status}
-              </span>
+        {mode === "bases" ? (
+          <section className={styles.queuePanel}>
+            <div className={styles.panelHeader}>
+              <h3>{activeGroup?.label_ru ?? "Основания"}</h3>
+              {activeGroup?.sync ? (
+                <span className={styles.syncBadge}>
+                  {SYNC_STATUS_LABELS[activeGroup.sync.capability_status] ??
+                    activeGroup.sync.capability_status}
+                </span>
+              ) : null}
+            </div>
+            {!activeGroup?.available ? (
+              <div className={styles.warningBox}>
+                <AlertTriangle size={16} />
+                {activeGroup?.unavailable_reason || "Источник недоступен в OData."}
+              </div>
             ) : null}
-          </div>
-
-          {!activeGroup?.available ? (
-            <div className={styles.warningBox}>
-              <AlertTriangle size={16} />
-              {activeGroup?.unavailable_reason || "Источник недоступен в OData."}
+            {activeGroup?.sync.last_error ? (
+              <div className={styles.warningBox}>
+                <AlertTriangle size={16} />
+                {activeGroup.sync.last_error}
+              </div>
+            ) : null}
+            {dashboardQuery.isLoading ? (
+              <div className={styles.emptyState}>
+                <Loader2 className={styles.spin} size={16} /> Загрузка оснований...
+              </div>
+            ) : null}
+            {flatCases.length === 0 && !dashboardQuery.isLoading ? (
+              <div className={styles.emptyState}>Сейчас нет актуальных заказов этого типа.</div>
+            ) : null}
+            <div className={styles.caseList}>
+              {flatCases.map((item) => (
+                <button
+                  className={item.id === selectedCaseId ? styles.caseItemActive : styles.caseItem}
+                  key={item.id}
+                  onClick={() => updateParams({ case: item.id })}
+                  type="button"
+                >
+                  <div className={styles.caseItemTop}>
+                    <strong>{item.source_number || item.source_1c_ref.slice(0, 8)}</strong>
+                    <span>{item.positions_count} поз.</span>
+                  </div>
+                  <div className={styles.caseItemMeta}>
+                    <span>Актуально в 1С</span>
+                    <span>
+                      {item.source_date
+                        ? new Date(item.source_date).toLocaleString("ru-RU", {
+                            timeZone: "Europe/Moscow"
+                          })
+                        : "—"}
+                    </span>
+                  </div>
+                </button>
+              ))}
             </div>
-          ) : null}
-          {activeGroup?.sync.last_error ? (
-            <div className={styles.warningBox}>
-              <AlertTriangle size={16} />
-              {activeGroup.sync.last_error}
-            </div>
-          ) : null}
+          </section>
+        ) : (
+          <CaseListPanel
+            cases={flatCases}
+            emptyText={
+              caseView === "archive"
+                ? "Архив пока пуст."
+                : "Нет кейсов в обработке. Они появятся вместе с актуальными основаниями."
+            }
+            onSelect={(caseId) => updateParams({ case: caseId })}
+            selectedCaseId={selectedCaseId}
+            showArchiveMeta={caseView === "archive"}
+            title={caseView === "archive" ? "Архив кейсов" : "Кейсы в обработке"}
+          />
+        )}
 
-          {dashboardQuery.isLoading ? (
-            <div className={styles.emptyState}>
-              <Loader2 className={styles.spin} size={16} /> Загрузка кейсов...
-            </div>
-          ) : null}
-
-          {!dashboardQuery.isLoading && (activeGroup?.cases.length ?? 0) === 0 ? (
-            <div className={styles.emptyState}>Пока нет карточек по этому основанию.</div>
-          ) : null}
-
-          <div className={styles.caseList}>
-            {(activeGroup?.cases ?? []).map((item) => (
-              <button
-                className={item.id === selectedCaseId ? styles.caseItemActive : styles.caseItem}
-                key={item.id}
-                onClick={() => setSelectedCaseId(item.id)}
-                type="button"
-              >
-                <div className={styles.caseItemTop}>
-                  <strong>{caseTitle(item)}</strong>
-                  <span>{STATUS_LABELS[item.status] ?? item.status}</span>
-                </div>
-                <div className={styles.caseItemMeta}>
-                  <span>{item.positions_count} позиций</span>
-                  <span>{formatDateTime(item.updated_at)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className={styles.detailsPanel}>
-          {!selectedCaseId ? (
-            <div className={styles.emptyState}>Выберите карточку кейса.</div>
-          ) : detailQuery.isLoading ? (
+        {!selectedCaseId ? (
+          <section className={styles.detailsPanel}>
+            <div className={styles.emptyState}>Выберите карточку.</div>
+          </section>
+        ) : detailQuery.isLoading ? (
+          <section className={styles.detailsPanel}>
             <div className={styles.emptyState}>
               <Loader2 className={styles.spin} size={16} /> Загрузка карточки...
             </div>
-          ) : !detail ? (
+          </section>
+        ) : !detail ? (
+          <section className={styles.detailsPanel}>
             <div className={styles.emptyState}>Карточка не найдена.</div>
-          ) : (
-            <>
-              <div className={styles.panelHeader}>
-                <div>
-                  <h3>{caseTitle(detail)}</h3>
-                  <p>{STATUS_LABELS[detail.status] ?? detail.status}</p>
-                </div>
-                <span className={styles.syncBadge}>{detail.control_point || "KT1"}</span>
-              </div>
-
-              <div className={styles.detailGrid}>
-                <div><span>Текущий статус</span><strong>{STATUS_LABELS[detail.status] ?? detail.status}</strong></div>
-                <div><span>Кейс находится на агенте</span><strong>{detail.current_agent_name || "Оркестратор закупок"}</strong></div>
-                <div><span>Основание</span><strong>{detailSourceLabel}</strong></div>
-                <div><span>Номер документа</span><strong>{detail.source_number || "—"}</strong></div>
-                <div><span>Дата документа</span><strong>{formatDateTime(detail.source_date)}</strong></div>
-                <div><span>Статус документа 1С</span><strong>{detail.source_status || "—"}</strong></div>
-                <div><span>Инициатор</span><strong>{detail.initiator_name || "Название не получено"}</strong></div>
-                <div><span>Подразделение</span><strong>{detail.department_name || "Название не получено"}</strong></div>
-                <div><span>Склад</span><strong>{detail.warehouse_name || "Название не получено"}</strong></div>
-                <div><span>Требуемая дата</span><strong>{formatDateTime(detail.required_date)}</strong></div>
-              </div>
-
-              {detail.summary || detail.deviation_summary ? (
-                <div className={styles.warningBox}>
-                  {detail.summary || detail.deviation_summary}
-                </div>
-              ) : null}
-
-              <div>
-                <h4>Позиции ТМЦ</h4>
-                <div className={styles.tableWrap}>
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>#</th>
-                        <th>Номенклатура</th>
-                        <th>Кол-во</th>
-                        <th>Ед.</th>
-                        <th>Дата</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detail.positions.map((position) => (
-                        <tr key={position.id}>
-                          <td>{position.line_number}</td>
-                          <td>
-                            <div>{position.nomenclature_name || "Название не получено"}</div>
-                          </td>
-                          <td>{position.quantity}</td>
-                          <td>{position.unit || "—"}</td>
-                          <td>{formatDateTime(position.required_date)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-            </>
-          )}
-        </section>
+          </section>
+        ) : (
+          <CaseDetailPanel detail={detail} mode={mode} sourceLabel={detailSourceLabel} />
+        )}
       </div>
     </div>
   );

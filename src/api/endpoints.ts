@@ -178,8 +178,10 @@ export const porucheniyaApi = {
 export const procurementApi = {
   permissions: () =>
     apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
-  getDashboard: () =>
-    apiClient.get<ProcurementDashboard>("/procurement/dashboard").then((r) => r.data),
+  getDashboard: (view: "active" | "processing" | "archive" = "active") =>
+    apiClient
+      .get<ProcurementDashboard>("/procurement/dashboard", { params: { view } })
+      .then((r) => r.data),
   getCase: (caseId: string) =>
     apiClient.get<ProcurementCaseDetail>(`/procurement/cases/${caseId}`).then((r) => r.data),
   listCaseEvents: (caseId: string) =>
