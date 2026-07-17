@@ -116,7 +116,7 @@ export default function ProcurementAgent() {
       <div className={styles.header}>
         <div>
           <h2>Оркестратор закупок</h2>
-          <p>Polling оснований 1С каждые 5 минут · Level 0 · только чтение</p>
+          <p>Проверка оснований 1С за весь период каждые 30 минут · Level 0 · только чтение</p>
         </div>
         <button
           className={styles.refreshButton}
