@@ -2011,6 +2011,15 @@
   line-height: 1.4;
 }
 
+.registryFailureNote {
+  white-space: pre-line;
+  color: var(--color-danger-text);
+}
+
+.slotRescheduleRecommendations {
+  margin-top: 12px;
+}
+
 .registryEarlierSlotSection {
   display: grid;
   gap: 10px;
@@ -2692,6 +2701,175 @@
   color: var(--color-muted);
   font-size: 13px;
   line-height: 1.45;
+}
+
+.scheduleDetailsError {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleDetailsFallbackBadge {
+  padding: 2px 8px;
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.schedulePastList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedulePastItem {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+}
+
+.schedulePastDateBadge,
+.scheduleNextHeroDateBadge {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 6px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-radius: 10px;
+}
+
+.schedulePastDateBadge strong,
+.scheduleNextHeroDateBadge strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.schedulePastDateBadge span,
+.scheduleNextHeroDateBadge span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.schedulePastContent {
+  display: grid;
+  gap: 4px;
+}
+
+.schedulePastContent strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.schedulePastContent span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedulePastSubject {
+  color: var(--color-text-strong) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.scheduleNextHero {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary) 8%, white),
+    var(--color-surface)
+  );
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 14px;
+}
+
+.scheduleNextHeroBody {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleNextHeroTitle {
+  color: var(--color-text-strong);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.scheduleNextHeroDate {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.scheduleNextHeroTime {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleNextParticipants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scheduleNextOutlookLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.scheduleNextOutlookLink:hover {
+  text-decoration: underline;
+}
+
+.scheduleDetailsComment {
+  display: grid;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.scheduleDetailsCommentLabel {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scheduleDetailsComment p {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .scheduleHistoryList {

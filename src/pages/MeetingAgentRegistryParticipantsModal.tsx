@@ -5,10 +5,19 @@ import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 import { useMeetingRegistryParticipants } from "@/hooks/useMeetingRegistry";
 import type {
   MeetingRegistryConfirmationKind,
+  MeetingRegistryCurrentSlotAvailability,
   MeetingRegistryEarlierSlotCandidate,
   MeetingRegistryEarlierSlotSuggestion,
-  MeetingRegistryParticipantSearchResponse
+  MeetingRegistryParticipantSearchResponse,
+  MeetingSlotPreviewParticipant,
+  MeetingSlotRescheduleRecommendation
 } from "@/types";
+import {
+  filterMeetingSlotPreviewPeople,
+  formatMeetingBlockingEventRange,
+  formatMeetingConflictMovability,
+  formatMeetingSlotParticipantStatus
+} from "@/utils/meetingDashboard";
 import styles from "./MeetingAgent.module.css";
 
 function normalizeParticipantName(name: string): string {
@@ -39,6 +48,9 @@ export type ParticipantsPendingState = {
   message: string | null;
   earlierSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
   commonSlotSuggestion: MeetingRegistryEarlierSlotSuggestion | null;
+  currentSlotAvailability: MeetingRegistryCurrentSlotAvailability | null;
+  rescheduleRecommendations: MeetingSlotRescheduleRecommendation[];
+  requiresReschedule: boolean;
 };
 
 type Props = {
@@ -67,6 +79,126 @@ type Props = {
 function isParticipantInDraft(draft: string[], fio: string): boolean {
   const key = fio.toLowerCase();
   return draft.some((name) => name.toLowerCase() === key);
+}
+
+function SlotParticipantAvailabilityItem({
+  participant
+}: {
+  participant: MeetingSlotPreviewParticipant;
+}) {
+  return (
+    <li className={styles.slotParticipantItem}>
+      <div className={styles.slotParticipantHeader}>
+        <span className={styles.slotParticipantName}>{participant.fio}</span>
+        {participant.email ? (
+          <span className={styles.slotParticipantEmail}>{participant.email}</span>
+        ) : null}
+        <span
+          className={`${styles.slotParticipantStatus} ${
+            participant.status === "free"
+              ? styles.slotParticipantStatusFree
+              : participant.status === "busy"
+                ? styles.slotParticipantStatusBusy
+                : styles.slotParticipantStatusUnknown
+          }`}
+        >
+          {formatMeetingSlotParticipantStatus(participant)}
+        </span>
+      </div>
+
+      {participant.status === "busy" && (participant.blocking_events ?? []).length ? (
+        <ul className={styles.slotBlockingEvents}>
+          {(participant.blocking_events ?? []).map((event, index) => (
+            <li
+              className={styles.slotBlockingEvent}
+              key={`${event.event_label}-${event.event_start ?? index}`}
+            >
+              <span className={styles.slotBlockingEventLabel}>{event.event_label}</span>
+              <span className={styles.slotBlockingEventMeta}>
+                {formatMeetingBlockingEventRange(event)}
+                {event.movability
+                  ? ` · переносимость: ${formatMeetingConflictMovability(event.movability)}`
+                  : ""}
+                {event.reschedule_hint_label?.trim()
+                  ? ` · альтернатива: ${event.reschedule_hint_label.trim()}`
+                  : ""}
+              </span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
+      {participant.calendar_access_error ? (
+        <p className={styles.slotParticipantAccessError}>{participant.calendar_access_error}</p>
+      ) : null}
+    </li>
+  );
+}
+
+function CurrentSlotAvailabilityDetails({
+  availability,
+  rescheduleRecommendations
+}: {
+  availability: MeetingRegistryCurrentSlotAvailability | null;
+  rescheduleRecommendations: MeetingSlotRescheduleRecommendation[];
+}) {
+  const participants = filterMeetingSlotPreviewPeople(availability?.participants ?? []);
+  const busyParticipants = participants.filter((participant) => participant.status === "busy");
+  const hasStructuredDetails = Boolean(availability) || rescheduleRecommendations.length > 0;
+
+  if (!hasStructuredDetails) return null;
+
+  return (
+    <div className={styles.registryEarlierSlotSection}>
+      {availability ? (
+        <>
+          <p className={styles.registryEarlierSlotMeta}>
+            Текущий слот: {availability.slot_label} · свободны {availability.free_count} из{" "}
+            {availability.total_count}
+          </p>
+          {participants.length ? (
+            <ul className={styles.slotParticipantList}>
+              {participants.map((participant) => (
+                <SlotParticipantAvailabilityItem
+                  key={`${participant.fio}|${participant.email ?? ""}`}
+                  participant={participant}
+                />
+              ))}
+            </ul>
+          ) : null}
+        </>
+      ) : null}
+
+      {rescheduleRecommendations.length ? (
+        <div className={styles.slotRescheduleRecommendations}>
+          <p className={styles.registryEarlierSlotMeta}>Конфликты у добавляемых участников:</p>
+          <ul className={styles.slotBlockingEvents}>
+            {rescheduleRecommendations.map((recommendation, index) => (
+              <li
+                className={styles.slotBlockingEvent}
+                key={`${recommendation.participant_fio}-${recommendation.event_label}-${index}`}
+              >
+                <span className={styles.slotBlockingEventLabel}>
+                  {recommendation.participant_fio}: {recommendation.event_label}
+                </span>
+                <span className={styles.slotBlockingEventMeta}>
+                  {recommendation.event_time_label ?? ""}
+                  {recommendation.reschedule_hint_label?.trim()
+                    ? ` · альтернатива: ${recommendation.reschedule_hint_label.trim()}`
+                    : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : busyParticipants.length === 0 && availability ? (
+        <p className={styles.registryEarlierSlotMeta}>
+          В текущем слоте занятости не обнаружено, но общий свободный слот для всего состава не
+          найден в доступном периоде поиска.
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function SlotCandidateList({
@@ -174,6 +306,18 @@ export default function MeetingAgentRegistryParticipantsModal({
 
   const showConfirmation = Boolean(pendingState);
   const showAddCurrentSlot = pendingState?.confirmationKind === "add_current_slot";
+  const showAddRescheduleOnCurrentSlot = Boolean(
+    pendingState?.confirmationKind === "add_reschedule" &&
+      !pendingState.commonSlotSuggestion?.candidates?.length &&
+      pendingState.requiresReschedule &&
+      pendingState.rescheduleRecommendations.length > 0 &&
+      pendingState.currentSlotAvailability
+  );
+  const showAddConfirmation = showAddCurrentSlot || showAddRescheduleOnCurrentSlot;
+  const showAddWithReschedule = Boolean(
+    showAddConfirmation &&
+      (pendingState?.requiresReschedule || pendingState?.rescheduleRecommendations.length)
+  );
   const showAddReschedule = Boolean(
     pendingState?.confirmationKind === "add_reschedule" && pendingState.commonSlotSuggestion?.candidates?.length
   );
@@ -327,7 +471,9 @@ export default function MeetingAgentRegistryParticipantsModal({
   const isBusy = loading || applying || isConfirmingPending || isCancellingPending;
   const actionError = confirmActionError ?? applyError;
 
-  const modalTitle = showAddCurrentSlot
+  const modalTitle = showAddWithReschedule
+    ? "Перенос встреч и добавление участника"
+    : showAddConfirmation
     ? "Добавить участника в текущее время?"
     : showAddReschedule
       ? "Выбор слота для совещания"
@@ -361,16 +507,25 @@ export default function MeetingAgentRegistryParticipantsModal({
 
         <p className={styles.modalHint}>{meetingLabel}</p>
 
-        {showAddCurrentSlot && pendingState ? (
+        {showAddConfirmation && pendingState ? (
           <>
             <p className={styles.registrySuccessNote} role="status">
               {pendingState.message ??
-                "Новый участник свободен в текущее время совещания. Подтвердите добавление."}
+                (showAddWithReschedule
+                  ? "Новый участник занят в текущем слоте. Подтвердите перенос его конфликтующих встреч и добавление в совещание."
+                  : "Новый участник свободен в текущее время совещания. Подтвердите добавление.")}
             </p>
             {pendingState.added.length ? (
               <p className={styles.registryEarlierSlotMeta}>
                 Будут добавлены: {pendingState.added.join(", ")}
               </p>
+            ) : null}
+
+            {showAddWithReschedule ? (
+              <CurrentSlotAvailabilityDetails
+                availability={pendingState.currentSlotAvailability}
+                rescheduleRecommendations={pendingState.rescheduleRecommendations}
+              />
             ) : null}
 
             {actionError ? (
@@ -407,6 +562,8 @@ export default function MeetingAgentRegistryParticipantsModal({
                     <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
                     Подтверждаем…
                   </>
+                ) : showAddWithReschedule ? (
+                  "Подтвердить перенос и добавить"
                 ) : (
                   "Да"
                 )}
@@ -461,7 +618,7 @@ export default function MeetingAgentRegistryParticipantsModal({
           </>
         ) : pendingState?.confirmationKind === "add_reschedule" ? (
           <>
-            <p className={styles.registrySuccessNote} role="status">
+            <p className={`${styles.registrySuccessNote} ${styles.registryFailureNote}`} role="status">
               {pendingState.message ?? "Не удалось подобрать общий свободный слот для всех участников."}
             </p>
             {pendingState.added.length ? (
@@ -469,6 +626,11 @@ export default function MeetingAgentRegistryParticipantsModal({
                 Будут добавлены: {pendingState.added.join(", ")}
               </p>
             ) : null}
+
+            <CurrentSlotAvailabilityDetails
+              availability={pendingState.currentSlotAvailability}
+              rescheduleRecommendations={pendingState.rescheduleRecommendations}
+            />
 
             {actionError ? (
               <div className={styles.modalError} role="alert">

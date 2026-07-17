@@ -221,10 +221,15 @@ export interface MeetingSlotBlockingEvent {
   event_subject?: string | null;
   event_start?: string | null;
   event_end?: string | null;
+  event_start_iso?: string | null;
+  event_end_iso?: string | null;
   event_time_label?: string | null;
   organizer?: string | null;
   movability?: string | null;
   movability_reason?: string | null;
+  source?: string | null;
+  reschedule_hint_start?: string | null;
+  reschedule_hint_end?: string | null;
   reschedule_hint_label?: string | null;
   event_attendees?: string[];
   event_attendee_names?: string[];
@@ -256,7 +261,10 @@ export interface MeetingAgentSlotPreviewDetails {
   participants: MeetingSlotPreviewParticipant[];
   room?: MeetingSlotRoomStatus | null;
   slot_available?: boolean | null;
+  can_confirm?: boolean | null;
+  requires_reschedule?: boolean;
   reschedule_recommendations?: MeetingSlotRescheduleRecommendation[];
+  company_calendar_cache_id?: string | null;
   error?: string | null;
   error_stage?: MeetingSlotPreviewErrorStage | null;
 }
@@ -308,6 +316,9 @@ export interface MeetingAgentSlotApproveRequest {
   location?: string | null;
   attendees?: MeetingAttendee[];
   attendee_emails?: string[];
+  participants?: MeetingSlotPreviewParticipant[];
+  company_calendar_cache_id?: string | null;
+  reschedule_message?: string | null;
 }
 
 export interface MeetingAgentSlotApprove {
@@ -323,6 +334,7 @@ export interface MeetingAgentSlotApprove {
   outlook_item_id?: string | null;
   outlook_changekey?: string | null;
   outlook_meeting_url?: string | null;
+  rescheduled_events?: string[];
 }
 
 export interface MeetingMemoRejectRequest {
@@ -509,6 +521,14 @@ export interface MeetingRegistryEarlierSlotSuggestion {
 
 export type MeetingRegistryCommonSlotSuggestion = MeetingRegistryEarlierSlotSuggestion;
 
+export interface MeetingRegistryCurrentSlotAvailability {
+  slot_label: string;
+  free_count: number;
+  total_count: number;
+  all_free: boolean;
+  participants: MeetingSlotPreviewParticipant[];
+}
+
 export interface MeetingRegistryParticipantsApplyResponse {
   ref_key: string;
   participants: string[];
@@ -520,6 +540,9 @@ export interface MeetingRegistryParticipantsApplyResponse {
   message: string | null;
   earlier_slot_suggestion: MeetingRegistryEarlierSlotSuggestion | null;
   common_slot_suggestion: MeetingRegistryCommonSlotSuggestion | null;
+  current_slot_availability?: MeetingRegistryCurrentSlotAvailability | null;
+  reschedule_recommendations?: MeetingSlotRescheduleRecommendation[];
+  requires_reschedule?: boolean;
   confirmation_kind: MeetingRegistryConfirmationKind;
   pending_confirmation: boolean;
   fetched_at: string;
@@ -637,6 +660,39 @@ export interface MeetingScheduleSeriesItem {
   outlook_series_id?: string | null;
   outlook_changekey?: string | null;
   outlook_meeting_url?: string | null;
+}
+
+export interface ScheduledMeetingOccurrence {
+  occurrence_date: string;
+  slot_start: string;
+  slot_end: string;
+  subject: string;
+  outlook_item_id: string | null;
+  outlook_meeting_url: string | null;
+  source: "outlook" | "rule" | "none";
+}
+
+export interface MeetingScheduleOccurrenceView {
+  occurrenceKey: string;
+  dateLabel: string;
+  listDateLabel: string;
+  calendarDayLabel: string;
+  calendarMonthLabel: string;
+  timeRangeLabel: string;
+  subject: string;
+  outlookMeetingUrl: string | null;
+  source: ScheduledMeetingOccurrence["source"];
+}
+
+export interface MeetingScheduleSeriesDetailView {
+  seriesTitle: string;
+  nextOccurrence: MeetingScheduleOccurrenceView | null;
+  pastOccurrences: MeetingScheduleOccurrenceView[];
+  comment: string | null;
+  participants: string[];
+  recurrenceLabel: string;
+  outlookMeetingUrl: string | null;
+  usesRuleFallback: boolean;
 }
 
 export interface MeetingSchedulePastMeeting {
@@ -768,19 +824,19 @@ export interface ScheduledMeetingRead {
 
 export interface ScheduledMeetingDetailRead {
   series: ScheduledMeetingRead;
-  next_occurrence?: unknown | null;
-  past_occurrences?: unknown[];
+  next_occurrence: ScheduledMeetingOccurrence | null;
+  past_occurrences: ScheduledMeetingOccurrence[];
   current_card?: unknown | null;
   history?: unknown[];
 }
 
 export interface ScheduledMeetingUpdate {
-  title: string;
-  meeting_type: MeetingScheduleType;
-  recurrence: ScheduledMeetingRecurrenceCreate;
+  title?: string;
+  meeting_type?: MeetingScheduleType;
+  recurrence?: ScheduledMeetingRecurrenceCreate;
   series_start_date?: string;
   series_end_date?: string;
-  participants: ScheduledMeetingParticipantCreate[];
+  participants?: ScheduledMeetingParticipantCreate[];
   comment?: string | null;
 }
 

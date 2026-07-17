@@ -74,17 +74,27 @@ export default function MeetingAgentScheduleSeriesEditDrawer({
 }: Props) {
   const [form, setForm] = useState<EditFormState>(emptyEditForm);
   const canCloseRef = useRef(false);
+  const baselineSeriesRef = useRef<ScheduledMeetingRead | null>(null);
+  const initializedMeetingIdRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!open || !series) return;
+    if (!open) {
+      baselineSeriesRef.current = null;
+      initializedMeetingIdRef.current = null;
+      return;
+    }
+    if (!series || !meetingId || series.id !== meetingId) return;
+    if (initializedMeetingIdRef.current === meetingId) return;
 
+    initializedMeetingIdRef.current = meetingId;
+    baselineSeriesRef.current = series;
     setForm({
       participants: mapScheduledMeetingReadToFormParticipants(series),
       recurrence: mapScheduledMeetingReadToRecurrenceFormState(series),
       seriesEndDate: series.series_end_date?.slice(0, 10) ?? "",
       comment: series.payload?.comment ?? ""
     });
-  }, [open, series]);
+  }, [open, series, meetingId]);
 
   useEffect(() => {
     if (!open) {
@@ -146,19 +156,20 @@ export default function MeetingAgentScheduleSeriesEditDrawer({
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!canSave || !meetingId || !series) return;
+    const baseline = baselineSeriesRef.current ?? series;
+    if (!canSave || !meetingId || !baseline) return;
 
     onSave({
       meetingId,
-      original: series,
+      original: baseline,
       payload: {
-        title: series.title,
-        meeting_type: series.meeting_type,
-        status: series.status,
+        title: baseline.title,
+        meeting_type: baseline.meeting_type,
+        status: baseline.status,
         participants: mapScheduleFormParticipantsToApi(form.participants),
         recurrence: buildRecurrenceRule(form.recurrence),
         comment: form.comment.trim() || null,
-        series_start_date: series.series_start_date,
+        series_start_date: baseline.series_start_date,
         series_end_date: form.seriesEndDate || null
       }
     });

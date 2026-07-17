@@ -667,12 +667,14 @@ export function formatMeetingConflictMovability(movability?: string | null): str
 export function isMeetingSlotDetailAvailable(
   details: {
     slot_available?: boolean | null;
+    can_confirm?: boolean | null;
     participants?: MeetingSlotPreviewParticipant[] | null;
     room?: MeetingSlotRoomStatus | null;
     error?: string | null;
   } | null | undefined
 ): boolean | null {
   if (!details || details.error) return null;
+  if (typeof details.can_confirm === "boolean") return details.can_confirm;
   if (typeof details.slot_available === "boolean") return details.slot_available;
 
   const people = filterMeetingSlotPreviewPeople(details.participants);

@@ -1,5 +1,6 @@
 import { ChevronDown } from "lucide-react";
 
+import TimeField from "@/components/form-controls/TimeField";
 import type { MeetingScheduleRecurrenceFormState } from "@/types/meetings";
 import {
   formatRecurrencePreview,
@@ -205,11 +206,10 @@ export default function MeetingAgentScheduleRecurrenceField({ value, onChange }:
       <div className={styles.scheduleRecurrenceTimeRow}>
         <label className={styles.scheduleRecurrenceInlineField}>
           <span className={styles.scheduleRecurrenceInlineLabel}>Время</span>
-          <input
-            className={styles.scheduleControl}
-            type="time"
+          <TimeField
             value={value.timeLocal}
-            onChange={(event) => updateField("timeLocal", event.target.value)}
+            controlClassName={styles.scheduleControl}
+            onChange={(timeLocal) => updateField("timeLocal", timeLocal)}
           />
         </label>
         <label className={styles.scheduleRecurrenceInlineField}>

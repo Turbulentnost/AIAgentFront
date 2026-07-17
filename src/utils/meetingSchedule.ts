@@ -135,3 +135,89 @@ export function mapMeetingScheduleItem(item: MeetingScheduleSeriesItem): Meeting
 export function sortMeetingScheduleItems(items: MeetingScheduleViewItem[]): MeetingScheduleViewItem[] {
   return [...items].sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
 }
+
+const SCHEDULE_OCCURRENCE_TIMEZONE = "Europe/Moscow";
+
+function parseScheduleOccurrenceInstant(value: string): Date {
+  return new Date(value);
+}
+
+function formatScheduleOccurrenceWithTimezone(
+  value: string,
+  options: Intl.DateTimeFormatOptions
+): string {
+  return new Intl.DateTimeFormat("ru-RU", {
+    timeZone: SCHEDULE_OCCURRENCE_TIMEZONE,
+    ...options
+  }).format(parseScheduleOccurrenceInstant(value));
+}
+
+export function formatScheduledOccurrenceDate(slotStart: string, occurrenceDate?: string): string {
+  if (occurrenceDate) {
+    const match = occurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const date = new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00`);
+      return new Intl.DateTimeFormat("ru-RU", {
+        day: "numeric",
+        month: "long",
+        weekday: "long"
+      }).format(date);
+    }
+  }
+
+  return formatScheduleOccurrenceWithTimezone(slotStart, {
+    day: "numeric",
+    month: "long",
+    weekday: "long"
+  });
+}
+
+export function formatScheduledOccurrenceListDate(slotStart: string, occurrenceDate?: string): string {
+  if (occurrenceDate) {
+    const match = occurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      return `${match[3]}.${match[2]}.${match[1]}`;
+    }
+  }
+
+  return formatScheduleOccurrenceWithTimezone(slotStart, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric"
+  });
+}
+
+export function formatScheduledOccurrenceTimeRange(slotStart: string, slotEnd: string): string {
+  const start = formatScheduleOccurrenceWithTimezone(slotStart, {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  const end = formatScheduleOccurrenceWithTimezone(slotEnd, {
+    hour: "2-digit",
+    minute: "2-digit"
+  });
+  return `${start}–${end}`;
+}
+
+export function formatScheduledOccurrenceCalendarParts(
+  slotStart: string,
+  occurrenceDate?: string
+): { dayLabel: string; monthLabel: string } {
+  if (occurrenceDate) {
+    const match = occurrenceDate.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (match) {
+      const date = new Date(`${match[1]}-${match[2]}-${match[3]}T12:00:00`);
+      return {
+        dayLabel: new Intl.DateTimeFormat("ru-RU", { day: "2-digit" }).format(date),
+        monthLabel: new Intl.DateTimeFormat("ru-RU", { month: "short" })
+          .format(date)
+          .replace(".", "")
+      };
+    }
+  }
+
+  return {
+    dayLabel: formatScheduleOccurrenceWithTimezone(slotStart, { day: "2-digit" }),
+    monthLabel: formatScheduleOccurrenceWithTimezone(slotStart, { month: "short" }).replace(".", "")
+  };
+}

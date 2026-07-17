@@ -60,9 +60,11 @@ import { getMeetingMemoActionError, getMeetingRequestError } from "@/hooks/useMe
 
 import type {
   MeetingRegistryConfirmationKind,
+  MeetingRegistryCurrentSlotAvailability,
   MeetingRegistryEarlierSlotCandidate,
   MeetingRegistryEarlierSlotSuggestion,
-  MeetingRegistryStageFilter
+  MeetingRegistryStageFilter,
+  MeetingSlotRescheduleRecommendation
 } from "@/types/meetings";
 
 import {
@@ -246,6 +248,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
       message: string | null;
       earlier_slot_suggestion?: MeetingRegistryEarlierSlotSuggestion | null;
       common_slot_suggestion?: MeetingRegistryEarlierSlotSuggestion | null;
+      current_slot_availability?: MeetingRegistryCurrentSlotAvailability | null;
+      reschedule_recommendations?: MeetingSlotRescheduleRecommendation[];
+      requires_reschedule?: boolean;
     }
   ): ParticipantsPendingState | null {
     if (!result.confirmation_kind) return null;
@@ -257,7 +262,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
       confirmationKind: result.confirmation_kind,
       message: result.message,
       earlierSlotSuggestion: result.earlier_slot_suggestion ?? null,
-      commonSlotSuggestion: result.common_slot_suggestion ?? null
+      commonSlotSuggestion: result.common_slot_suggestion ?? null,
+      currentSlotAvailability: result.current_slot_availability ?? null,
+      rescheduleRecommendations: result.reschedule_recommendations ?? [],
+      requiresReschedule: Boolean(result.requires_reschedule)
     };
   }
 
@@ -283,7 +291,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
         confirmationKind: "add_current_slot",
         message: null,
         earlierSlotSuggestion: null,
-        commonSlotSuggestion: null
+        commonSlotSuggestion: null,
+        currentSlotAvailability: null,
+        rescheduleRecommendations: [],
+        requiresReschedule: false
       });
       return;
     }

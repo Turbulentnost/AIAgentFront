@@ -1,6 +1,8 @@
 import type {
   MeetingScheduleContext,
+  MeetingScheduleOccurrenceView,
   MeetingScheduleRecurrenceRule,
+  MeetingScheduleSeriesDetailView,
   MeetingScheduleSeriesItem,
   MeetingScheduleSeriesSavePayload,
   MeetingScheduleStatus,
@@ -9,11 +11,19 @@ import type {
   MeetingScheduleWeekday,
   ScheduledMeetingApiWeekday,
   ScheduledMeetingCreate,
+  ScheduledMeetingDetailRead,
+  ScheduledMeetingOccurrence,
   ScheduledMeetingParticipantRead,
   ScheduledMeetingRead,
   ScheduledMeetingRecurrenceCreate,
   ScheduledMeetingUpdate
 } from "@/types/meetings";
+import {
+  formatScheduledOccurrenceCalendarParts,
+  formatScheduledOccurrenceDate,
+  formatScheduledOccurrenceListDate,
+  formatScheduledOccurrenceTimeRange
+} from "@/utils/meetingSchedule";
 
 const weekdayToApi: Record<MeetingScheduleWeekday, ScheduledMeetingApiWeekday> = {
   mon: "monday",
@@ -91,31 +101,6 @@ export function mapScheduleFormToApiPayload(
   };
 }
 
-export function mapScheduleFormToUpdatePayload(
-  original: ScheduledMeetingRead,
-  payload: MeetingScheduleSeriesSavePayload
-): ScheduledMeetingUpdate {
-  return {
-    title: original.title,
-    meeting_type: original.meeting_type,
-    series_start_date: original.series_start_date,
-    series_end_date: payload.series_end_date ?? undefined,
-    comment: payload.comment,
-    recurrence: mapRecurrenceRuleToApi(payload.recurrence),
-    participants: payload.participants.map((participant, index) => ({
-      ...participant,
-      sort_order: participant.sort_order ?? index,
-      is_required: participant.is_required ?? true
-    }))
-  };
-}
-
-export type ScheduleFormParticipant = {
-  id: string;
-  name: string;
-  kind: "position" | "department";
-};
-
 export function mapScheduleFormParticipantsToApi(
   participants: ScheduleFormParticipant[]
 ): MeetingScheduleSeriesSavePayload["participants"] {
@@ -127,6 +112,64 @@ export function mapScheduleFormParticipantsToApi(
     is_required: true
   }));
 }
+
+function normalizeParticipantId(id: string | null | undefined): string {
+  return (id ?? "").trim().toLowerCase();
+}
+
+function mapParticipantIds(read: ScheduledMeetingRead): string[] {
+  return [...read.participants]
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map((participant) =>
+      normalizeParticipantId(participant.position_id ?? participant.department_id)
+    )
+    .filter((id) => id.length > 0);
+}
+
+export function mapScheduleFormToUpdatePayload(
+  original: ScheduledMeetingRead,
+  payload: MeetingScheduleSeriesSavePayload
+): ScheduledMeetingUpdate {
+  const update: ScheduledMeetingUpdate = {};
+
+  const originalEnd = original.series_end_date?.slice(0, 10) ?? null;
+  const nextEnd = payload.series_end_date?.slice(0, 10) ?? null;
+  if (nextEnd !== originalEnd) {
+    update.series_end_date = nextEnd ?? undefined;
+  }
+
+  const originalComment =
+    typeof original.payload?.comment === "string" ? original.payload.comment.trim() || null : null;
+  const nextComment = payload.comment?.trim() || null;
+  if (nextComment !== originalComment) {
+    update.comment = nextComment;
+  }
+
+  const originalParticipantIds = mapParticipantIds(original);
+  const nextParticipantIds = payload.participants
+    .map((participant) =>
+      normalizeParticipantId(participant.position_id ?? participant.department_id)
+    )
+    .filter((id) => id.length > 0);
+  const participantsChanged =
+    originalParticipantIds.length !== nextParticipantIds.length ||
+    originalParticipantIds.some((id, index) => id !== nextParticipantIds[index]);
+  if (participantsChanged) {
+    update.participants = payload.participants.map((participant, index) => ({
+      ...participant,
+      sort_order: participant.sort_order ?? index,
+      is_required: participant.is_required ?? true
+    }));
+  }
+
+  return update;
+}
+
+export type ScheduleFormParticipant = {
+  id: string;
+  name: string;
+  kind: "position" | "department";
+};
 
 export function mapScheduledMeetingReadToFormParticipants(
   read: ScheduledMeetingRead
@@ -243,5 +286,62 @@ export function updateMeetingScheduleItem(
     items: hasItem
       ? context.items.map((item) => (item.id === nextItem.id ? nextItem : item))
       : [...context.items, nextItem]
+  };
+}
+
+function mapOccurrenceToView(occurrence: ScheduledMeetingOccurrence): MeetingScheduleOccurrenceView {
+  const calendarParts = formatScheduledOccurrenceCalendarParts(
+    occurrence.slot_start,
+    occurrence.occurrence_date
+  );
+
+  return {
+    occurrenceKey:
+      occurrence.outlook_item_id ?? `${occurrence.slot_start}|${occurrence.slot_end}`,
+    dateLabel: formatScheduledOccurrenceDate(occurrence.slot_start, occurrence.occurrence_date),
+    listDateLabel: formatScheduledOccurrenceListDate(
+      occurrence.slot_start,
+      occurrence.occurrence_date
+    ),
+    calendarDayLabel: calendarParts.dayLabel,
+    calendarMonthLabel: calendarParts.monthLabel,
+    timeRangeLabel: formatScheduledOccurrenceTimeRange(occurrence.slot_start, occurrence.slot_end),
+    subject: occurrence.subject,
+    outlookMeetingUrl: occurrence.outlook_meeting_url,
+    source: occurrence.source
+  };
+}
+
+function mapSeriesParticipants(read: ScheduledMeetingRead): string[] {
+  return [...read.participants]
+    .sort((left, right) => left.sort_order - right.sort_order)
+    .map(
+      (participant) =>
+        participant.position_name?.trim() ||
+        participant.department_name?.trim() ||
+        participant.position_id ||
+        participant.department_id ||
+        ""
+    )
+    .filter((name) => name.length > 0);
+}
+
+export function normalizeMeetingScheduleDetail(
+  read: ScheduledMeetingDetailRead
+): MeetingScheduleSeriesDetailView {
+  const pastOccurrences = (read.past_occurrences ?? []).map(mapOccurrenceToView);
+  const nextOccurrence = read.next_occurrence ? mapOccurrenceToView(read.next_occurrence) : null;
+  const usesRuleFallback =
+    nextOccurrence?.source === "rule" || pastOccurrences.some((item) => item.source === "rule");
+
+  return {
+    seriesTitle: read.series.title,
+    nextOccurrence,
+    pastOccurrences,
+    comment: read.series.payload?.comment ?? null,
+    participants: mapSeriesParticipants(read.series),
+    recurrenceLabel: read.series.recurrence_label,
+    outlookMeetingUrl: read.series.outlook_meeting_url,
+    usesRuleFallback
   };
 }

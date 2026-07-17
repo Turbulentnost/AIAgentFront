@@ -4,6 +4,7 @@ import {
   buildMeetingSlotRangeFromLocal,
   formatMeetingSlot
 } from "@/utils/meetingDashboard";
+import TimeField from "@/components/form-controls/TimeField";
 import styles from "./MeetingAgent.module.css";
 
 const WEEKDAY_LABELS = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -215,11 +216,10 @@ export default function MeetingAgentManualSlotModal({
         <div className={styles.manualSlotTimeFields}>
           <label className={styles.manualSlotTimeField}>
             <span>Начало</span>
-            <input
-              type="time"
+            <TimeField
               value={startTime}
-              onChange={(event) => {
-                setStartTime(event.target.value);
+              onChange={(nextTime) => {
+                setStartTime(nextTime);
                 setValidationError(null);
               }}
             />

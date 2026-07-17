@@ -4,9 +4,12 @@ import {
   BarChart3,
   Calendar,
   CalendarCheck2,
+  CalendarClock,
+  ExternalLink,
   GripVertical,
   Plus,
   Users,
+  X,
   Zap
 } from "lucide-react";
 
@@ -22,13 +25,18 @@ import {
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 import MeetingAgentScheduleSeriesDrawer from "@/pages/MeetingAgentScheduleSeriesDrawer";
 import MeetingAgentScheduleSeriesEditDrawer from "@/pages/MeetingAgentScheduleSeriesEditDrawer";
-import type { MeetingScheduleSeriesSavePayload, ScheduledMeetingDetailRead, ScheduledMeetingRead } from "@/types/meetings";
+import type {
+  MeetingScheduleSeriesDetailView,
+  MeetingScheduleSeriesSavePayload,
+  ScheduledMeetingAppliedChanges,
+  ScheduledMeetingRead
+} from "@/types/meetings";
 import {
   mapMeetingScheduleItem,
   sortMeetingScheduleItems,
   type MeetingScheduleViewItem
 } from "@/utils/meetingSchedule";
-import { canPlanMeetingScheduleSeries } from "@/utils/meetingScheduleApi";
+import { canPlanMeetingScheduleSeries, normalizeMeetingScheduleDetail } from "@/utils/meetingScheduleApi";
 
 import styles from "./MeetingAgent.module.css";
 
@@ -85,6 +93,10 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
 
   const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const detailQuery = useMeetingScheduleDetail(selectedId, canAccessAgent && Boolean(selectedId));
+  const detailView = useMemo(
+    () => (detailQuery.data ? normalizeMeetingScheduleDetail(detailQuery.data) : null),
+    [detailQuery.data]
+  );
   const typeCounts = scheduleQuery.data?.type_counts;
   const totalRecords = typeCounts?.total ?? items.length;
 
@@ -113,7 +125,9 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
     updateSeriesMutation.mutate(input, {
       onSuccess: (result) => {
         setSelectedId(result.series.id);
-        setEditSuccessMessage(buildEditSuccessMessage(result.applied_changes.changes));
+        setEditSuccessMessage(
+          buildEditSuccessMessage(result.applied_changes.changes, result.applied_changes)
+        );
         setEditSeriesId(null);
       }
     });
@@ -329,7 +343,8 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
         <ScheduleDetails
           item={selectedItem}
           loading={detailQuery.isLoading}
-          detail={detailQuery.data}
+          error={detailQuery.isError ? getMeetingRequestError(detailQuery.error) : null}
+          detail={detailView}
         />
       ) : null}
 
@@ -361,20 +376,38 @@ export default function MeetingAgentSchedule({ canAccessAgent }: Props) {
   );
 }
 
-function buildEditSuccessMessage(changes: string[]): string {
-  if (!changes.length) return "Серия совещаний обновлена";
-  return `Серия обновлена: ${changes.join(", ")}`;
+function buildEditSuccessMessage(changes: string[], applied: ScheduledMeetingAppliedChanges): string {
+  const labels: Record<string, string> = {
+    series_end_date: "срок серии",
+    comment: "комментарий",
+    participants: "участники"
+  };
+  if (!changes.length) return "Изменений не было";
+  const readable = changes.map((change) => labels[change] ?? change);
+  const parts = [`Серия обновлена: ${readable.join(", ")}`];
+  if (applied.participants_added.length) {
+    parts.push(`добавлены: ${applied.participants_added.join(", ")}`);
+  }
+  if (applied.participants_removed.length) {
+    parts.push(`удалены: ${applied.participants_removed.join(", ")}`);
+  }
+  return parts.join(" — ");
 }
 
 function ScheduleDetails({
   item,
   loading,
+  error,
   detail
 }: {
   item: MeetingScheduleViewItem;
   loading: boolean;
-  detail: ScheduledMeetingDetailRead | undefined;
+  error: string | null;
+  detail: MeetingScheduleSeriesDetailView | null;
 }) {
+  const next = detail?.nextOccurrence ?? null;
+  const nextOutlookUrl = next?.outlookMeetingUrl ?? detail?.outlookMeetingUrl ?? null;
+
   return (
     <section className={styles.scheduleDetailsPanel} aria-labelledby="schedule-details-title">
       <header className={styles.scheduleDetailsHead}>
@@ -386,25 +419,42 @@ function ScheduleDetails({
             >
               {item.typeLabel}
             </span>
-            <span>{item.recurrenceLabel}</span>
+            <span>{detail?.recurrenceLabel ?? item.recurrenceLabel}</span>
             <span
               className={`${styles.scheduleStatusBadge} ${styles[`scheduleStatusBadge${item.statusTone}`]}`}
             >
               {item.statusLabel}
             </span>
+            {detail?.usesRuleFallback ? (
+              <span className={styles.scheduleDetailsFallbackBadge}>Расчёт по правилу</span>
+            ) : null}
           </div>
         </div>
       </header>
+
+      {error ? <p className={styles.scheduleDetailsError}>{error}</p> : null}
 
       <div className={styles.scheduleDetailsGrid}>
         <section className={styles.scheduleDetailsColumn} aria-labelledby="schedule-history-title">
           <h4 id="schedule-history-title">История прошедших совещаний по серии</h4>
           {loading ? (
             <p className={styles.scheduleDetailsEmpty}>Загружаем историю…</p>
-          ) : detail?.past_occurrences?.length ? (
-            <p className={styles.scheduleDetailsEmpty}>
-              История загружена ({detail.past_occurrences.length})
-            </p>
+          ) : detail?.pastOccurrences.length ? (
+            <ol className={styles.schedulePastList}>
+              {detail.pastOccurrences.map((occurrence) => (
+                <li className={styles.schedulePastItem} key={occurrence.occurrenceKey}>
+                  <div className={styles.schedulePastDateBadge} aria-hidden="true">
+                    <strong>{occurrence.calendarDayLabel}</strong>
+                    <span>{occurrence.calendarMonthLabel}</span>
+                  </div>
+                  <div className={styles.schedulePastContent}>
+                    <strong>{occurrence.listDateLabel}</strong>
+                    <span>{occurrence.timeRangeLabel}</span>
+                    <span className={styles.schedulePastSubject}>{occurrence.subject}</span>
+                  </div>
+                </li>
+              ))}
+            </ol>
           ) : (
             <p className={styles.scheduleDetailsEmpty}>История совещаний пока пуста</p>
           )}
@@ -414,13 +464,69 @@ function ScheduleDetails({
           <h4 id="schedule-next-title">Ближайшее совещание</h4>
           {loading ? (
             <p className={styles.scheduleDetailsEmpty}>Загружаем ближайшее совещание…</p>
-          ) : detail?.next_occurrence ? (
-            <p className={styles.scheduleDetailsEmpty}>Ближайшее совещание запланировано</p>
+          ) : next ? (
+            <article className={styles.scheduleNextHero}>
+              <div className={styles.scheduleNextHeroDateBadge} aria-hidden="true">
+                <strong>{next.calendarDayLabel}</strong>
+                <span>{next.calendarMonthLabel}</span>
+              </div>
+              <div className={styles.scheduleNextHeroBody}>
+                <strong className={styles.scheduleNextHeroTitle}>
+                  {next.subject || detail?.seriesTitle || item.name}
+                </strong>
+                <p className={styles.scheduleNextHeroDate}>{next.dateLabel}</p>
+                <p className={styles.scheduleNextHeroTime}>{next.timeRangeLabel}</p>
+
+                {detail?.participants.length ? (
+                  <div className={styles.scheduleNextParticipants}>
+                    {detail.participants.map((participant) => (
+                      <span className={styles.scheduleParticipantPill} key={participant}>
+                        {participant}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+
+                {nextOutlookUrl ? (
+                  <a
+                    className={styles.scheduleNextOutlookLink}
+                    href={nextOutlookUrl}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                  >
+                    <ExternalLink size={14} aria-hidden="true" />
+                    Открыть в Outlook
+                  </a>
+                ) : null}
+
+                <div className={styles.scheduleNextActions}>
+                  <button type="button" className={styles.secondaryButton}>
+                    <Users size={15} aria-hidden="true" />
+                    Состав участников
+                  </button>
+                  <button type="button" className={styles.secondaryButton}>
+                    <CalendarClock size={15} aria-hidden="true" />
+                    Перенос
+                  </button>
+                  <button type="button" className={styles.rejectButton}>
+                    <X size={15} aria-hidden="true" />
+                    Отмена
+                  </button>
+                </div>
+              </div>
+            </article>
           ) : (
             <p className={styles.scheduleDetailsEmpty}>Ближайшее совещание не запланировано</p>
           )}
         </section>
       </div>
+
+      {detail?.comment ? (
+        <footer className={styles.scheduleDetailsComment}>
+          <span className={styles.scheduleDetailsCommentLabel}>Комментарий</span>
+          <p>{detail.comment}</p>
+        </footer>
+      ) : null}
     </section>
   );
 }

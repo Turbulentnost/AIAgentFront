@@ -278,7 +278,10 @@ function MeetingAgentPage() {
     ]
   );
 
-  async function handleConfirmApprove(slotOverride?: { start: string; end: string }) {
+  async function handleConfirmApprove(
+    slotOverride?: { start: string; end: string },
+    slotDetails?: import("@/types/meetings").MeetingAgentSlotPreviewDetails | null
+  ) {
     const preview = slotPreviewMutation.data;
     if (!preview || (!isMeetingSlotPreviewAssignable(preview) && !slotOverride)) return;
     const slot = slotOverride ?? resolveMeetingSlotPreview(preview);
@@ -314,7 +317,12 @@ function MeetingAgentPage() {
             detail.application.invite_location ||
             detail.application.location ||
             undefined,
-          attendees: preview.attendees
+          attendees: preview.attendees,
+          participants: slotDetails?.participants,
+          company_calendar_cache_id: slotDetails?.company_calendar_cache_id,
+          reschedule_message: slotDetails?.requires_reschedule
+            ? "Встреча перенесена для освобождения слота по служебной записке"
+            : undefined
         }
       });
       setSlotPreviewOpen(false);
@@ -323,7 +331,11 @@ function MeetingAgentPage() {
       approveMemoMutation.reset();
 
       const slotMessage = result.sent
-        ? `Приглашение отправлено: ${result.slot_label}${result.subject ? ` · ${result.subject}` : ""}`
+        ? `Приглашение отправлено: ${result.slot_label}${result.subject ? ` · ${result.subject}` : ""}${
+            result.rescheduled_events?.length
+              ? ` · перенесено: ${result.rescheduled_events.join(", ")}`
+              : ""
+          }`
         : `Слот утверждён: ${result.slot_label}`;
       setSuccessMessage(memoMessage ? `${memoMessage} · ${slotMessage}` : slotMessage);
       setOutlookMeetingUrl(normalizeOutlookMeetingUrl(result.outlook_meeting_url));

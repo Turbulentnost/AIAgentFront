@@ -42,7 +42,10 @@ type Props = {
   requestError: string | null;
   approveError: string | null;
   onClose: () => void;
-  onConfirmApprove?: (slotOverride?: { start: string; end: string }) => void;
+  onConfirmApprove?: (
+    slotOverride?: { start: string; end: string },
+    slotDetails?: MeetingAgentSlotPreviewDetails | null
+  ) => void;
   isApproving?: boolean;
   approveWithMemo?: boolean;
   approveButtonLabel?: string;
@@ -472,6 +475,7 @@ export default function MeetingAgentSlotPreviewModal({
     return resolveManualSlotDefaultsFromIso(autoSlot?.start ?? manualSlot?.start);
   }, [preview, isAllMode, manualSlot?.start]);
   const manualSlotAvailable = manualSlot ? isMeetingSlotDetailAvailable(allModeDetails) : null;
+  const manualSlotRequiresReschedule = Boolean(allModeDetails?.requires_reschedule);
   const manualSlotRecommendations = allModeDetails?.reschedule_recommendations ?? [];
   const manualSlotDetailsError = allModeDetails?.error?.trim() || null;
   const manualSlotDetailsErrorStage = formatMeetingSlotPreviewErrorStage(allModeDetails?.error_stage);
@@ -554,8 +558,10 @@ export default function MeetingAgentSlotPreviewModal({
     : manualSlot && manualSlotDetailsError
       ? "Не удалось проверить слот"
       : manualSlot && manualSlotCheckComplete && manualSlotAvailable === false
-        ? "Слот занят — выберите другое время"
-        : manualSlot && !manualSlotCheckComplete
+        ? "Нет альтернативы переноса — выберите другое время"
+        : manualSlot && manualSlotCheckComplete && manualSlotRequiresReschedule
+          ? "Конфликтующие встречи будут перенесены в указанные альтернативные слоты"
+          : manualSlot && !manualSlotCheckComplete
           ? "Дождитесь проверки слота"
           : undefined;
   const canScheduleManually = Boolean(preview && onFetchSlotDetails && !loading && !requestError);
@@ -652,7 +658,11 @@ export default function MeetingAgentSlotPreviewModal({
                     {manualSlot ? (
                       manualSlotCheckComplete ? (
                         <span className={styles.modalSlotMeta}>
-                          {manualSlotAvailable ? "Слот свободен" : "Слот занят"}
+                          {manualSlotAvailable
+                            ? manualSlotRequiresReschedule
+                              ? "Слот с переносом конфликтов"
+                              : "Слот свободен"
+                            : "Слот занят"}
                         </span>
                       ) : allModeDetailsLoading ? (
                         <span className={styles.modalSlotMeta}>Проверяем доступность…</span>
@@ -837,7 +847,8 @@ export default function MeetingAgentSlotPreviewModal({
                       ? { start: manualSlot.start, end: manualSlot.end }
                       : activeSlot
                         ? { start: activeSlot.start, end: activeSlot.end }
-                        : undefined
+                        : undefined,
+                    manualSlot ? allModeDetails : null
                   )
                 }
               >
