@@ -9,6 +9,7 @@ type Props = {
   onSelect: (caseId: string) => void;
   emptyText: string;
   showArchiveMeta?: boolean;
+  showEngineerMeta?: boolean;
 };
 
 export function CaseListPanel({
@@ -17,7 +18,8 @@ export function CaseListPanel({
   selectedCaseId,
   onSelect,
   emptyText,
-  showArchiveMeta = false
+  showArchiveMeta = false,
+  showEngineerMeta = false
 }: Props) {
   return (
     <section className={styles.queuePanel}>
@@ -44,6 +46,9 @@ export function CaseListPanel({
             </div>
             {showArchiveMeta && item.closed_reason_label ? (
               <div className={styles.caseItemNote}>{item.closed_reason_label}</div>
+            ) : null}
+            {showEngineerMeta && item.engineer_bucket_reason ? (
+              <div className={styles.caseItemNote}>{item.engineer_bucket_reason}</div>
             ) : null}
           </button>
         ))}

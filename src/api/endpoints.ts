@@ -123,7 +123,11 @@ import type {
   ProcurementCaseEvent,
   ProcurementDashboard,
   ProcurementPermissions,
+  ProductionPreparationEngineerCaseDetail,
+  ProductionPreparationEngineerDashboard,
   ProcurementRefreshResult,
+  ProcurementRoleAgentResult,
+  ProcurementRoleAgentResume,
   ProcurementSyncStatus
 } from "@/types/procurement";
 
@@ -186,10 +190,31 @@ export const procurementApi = {
     apiClient.get<ProcurementCaseDetail>(`/procurement/cases/${caseId}`).then((r) => r.data),
   listCaseEvents: (caseId: string) =>
     apiClient.get<ProcurementCaseEvent[]>(`/procurement/cases/${caseId}/events`).then((r) => r.data),
+  submitRoleAgentResult: (caseId: string, payload: ProcurementRoleAgentResume) =>
+    apiClient
+      .post<ProcurementRoleAgentResult>(`/procurement/cases/${caseId}/agent-result`, payload)
+      .then((r) => r.data),
   getSyncStatus: () =>
     apiClient.get<ProcurementSyncStatus[]>("/procurement/sync-status").then((r) => r.data),
   refresh: () =>
     apiClient.post<ProcurementRefreshResult>("/procurement/refresh").then((r) => r.data)
+};
+
+export const productionPreparationEngineerApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: () =>
+    apiClient
+      .get<ProductionPreparationEngineerDashboard>(
+        "/procurement/role-agents/production_preparation_engineer_agent/dashboard"
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<ProductionPreparationEngineerCaseDetail>(
+        `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}`
+      )
+      .then((r) => r.data)
 };
 
 export const healthApi = {

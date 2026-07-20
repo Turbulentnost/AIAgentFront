@@ -8,8 +8,11 @@ export type ProcurementDashboardView = "active" | "processing" | "archive";
 
 export interface ProcurementPermissions {
   can_access_orchestrator: boolean;
+  can_access_role_workspace?: boolean;
+  can_submit_role_result?: boolean;
   can_refresh: boolean;
   is_superuser: boolean;
+  accessible_role_agents: string[];
 }
 
 export interface ProcurementCasePosition {
@@ -73,6 +76,9 @@ export interface ProcurementCurrentState {
   requires_human_review: boolean;
   summary?: string | null;
   task_id?: string | null;
+  task_status?: string | null;
+  wait_status?: string | null;
+  wait_reason?: string | null;
   closed_reason?: string | null;
   closed_reason_label?: string | null;
   source_active: boolean;
@@ -86,6 +92,7 @@ export interface ProcurementCaseSummary {
   source_number?: string | null;
   source_date?: string | null;
   source_status?: string | null;
+  source_synced_at?: string | null;
   status: string;
   control_point?: string | null;
   current_agent_id?: string | null;
@@ -102,6 +109,8 @@ export interface ProcurementCaseSummary {
   closed_reason_label?: string | null;
   reactivated_at?: string | null;
   source_active?: boolean;
+  engineer_bucket?: "success" | "attention" | "critical" | null;
+  engineer_bucket_reason?: string | null;
 }
 
 export interface ProcurementCaseDetail extends ProcurementCaseSummary {
@@ -177,3 +186,152 @@ export interface ProcurementRefreshResult {
   status: string;
   summary: Record<string, unknown>;
 }
+
+export type ProcurementRoleAgentStatus =
+  | "waiting_human"
+  | "waiting_external"
+  | "completed"
+  | "failed";
+
+export interface ProcurementRoleAgentResume {
+  role_status: ProcurementRoleAgentStatus;
+  summary?: string | null;
+  wait_reason?: string | null;
+  output_data?: Record<string, unknown>;
+}
+
+export interface ProcurementRoleAgentResult extends ProcurementRoleAgentResume {
+  agent_id?: string | null;
+  case_id: string;
+  correlation_id: string;
+}
+
+export interface ProductionPreparationEngineerCaseInput {
+  case_id: string;
+  case_number: string;
+  source_1c_ref: string;
+  source_number?: string | null;
+  source_date?: string | null;
+  source_status?: string | null;
+  source_data_version?: string | null;
+  source_synced_at?: string | null;
+  initiator_name?: string | null;
+  department_name?: string | null;
+  warehouse_name?: string | null;
+  required_date?: string | null;
+  production_order_1c_ref?: string | null;
+  production_order_number?: string | null;
+  production_order_status?: string | null;
+}
+
+export interface ProductionPreparationSpecificationMaterial {
+  line_id: string;
+  nomenclature_id: string;
+  nomenclature_name: string;
+  characteristic_name?: string | null;
+  unit?: string | null;
+  consumption_rate: string | number;
+  technological_loss_percent: string | number;
+  production_stage_name?: string | null;
+}
+
+export interface ProductionPreparationSpecification {
+  specification_id: string;
+  name: string;
+  version?: string | null;
+  status: string;
+  valid_from?: string | null;
+  valid_to?: string | null;
+  product_id: string;
+  completeness_score: number;
+  materials: ProductionPreparationSpecificationMaterial[];
+}
+
+export interface ProductionPreparationSupplyBreakdown {
+  source_type: string;
+  quantity: string | number;
+  supply_ids: string[];
+}
+
+export interface ProductionPreparationExclusion {
+  supply_id: string;
+  source_type: string;
+  quantity: string | number;
+  reason: string;
+  evidence_id?: string | null;
+}
+
+export interface ProductionPreparationCriticalImpact {
+  production_order?: string | null;
+  production_stage?: string | null;
+  shortage_start_date?: string | null;
+  possible_stop_date?: string | null;
+  unprovided_product_quantity?: string | number | null;
+  consequence: string;
+  recommended_priority: string;
+}
+
+export interface ProductionPreparationPositionCalculation {
+  line_id: string;
+  nomenclature_id: string;
+  nomenclature_name: string;
+  characteristic_name?: string | null;
+  unit: string;
+  production_order?: string | null;
+  production_stage?: string | null;
+  product_quantity: string | number;
+  consumption_rate: string | number;
+  technological_loss_percent: string | number;
+  gross_requirement: string | number;
+  free_stock: string | number;
+  available_other_warehouses: string | number;
+  confirmed_arrivals: string | number;
+  total_available_supply: string | number;
+  net_requirement: string | number;
+  required_date: string;
+  criticality: "normal" | "high" | "critical";
+  outcome: string;
+  coverage_method: string;
+  recommendation: string;
+  specification_id: string;
+  specification_version?: string | null;
+  supply_breakdown: ProductionPreparationSupplyBreakdown[];
+  excluded_supply: ProductionPreparationExclusion[];
+  linked_documents: Array<Record<string, string>>;
+  critical_impact?: ProductionPreparationCriticalImpact | null;
+}
+
+export interface ProductionPreparationValidationIssue {
+  code: string;
+  message: string;
+  field?: string | null;
+  line_id?: string | null;
+  source: string;
+}
+
+export interface ProductionPreparationEngineerOutput {
+  schema_version: string;
+  case: ProductionPreparationEngineerCaseInput;
+  calculated_at: string;
+  evidence_fingerprint: string;
+  specifications: ProductionPreparationSpecification[];
+  positions: ProductionPreparationPositionCalculation[];
+  validation_issues: ProductionPreparationValidationIssue[];
+  missing_data: string[];
+  excluded_capabilities: string[];
+  evidence_ids: string[];
+  summary: string;
+  recommended_next_step: string;
+}
+
+export interface ProductionPreparationEngineerResult
+  extends Omit<ProcurementRoleAgentResult, "output_data"> {
+  output_data: ProductionPreparationEngineerOutput;
+}
+
+export interface ProductionPreparationEngineerCaseDetail
+  extends Omit<ProcurementCaseDetail, "latest_result"> {
+  latest_result?: ProductionPreparationEngineerResult | null;
+}
+
+export type ProductionPreparationEngineerDashboard = ProcurementDashboard;

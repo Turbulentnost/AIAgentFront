@@ -6,12 +6,20 @@ import type {
 
 export const STATUS_LABELS: Record<string, string> = {
   new: "В работе",
+  agent_waiting: "Ожидание ролевого агента",
   data_check: "Проверка данных",
   coverage_check: "Проверка покрытия",
   human_required: "Нужен человек",
   blocked: "Заблокирован",
   closed: "Архив",
   failed: "Ошибка"
+};
+
+export const AGENT_WAIT_LABELS: Record<string, string> = {
+  waiting_human: "Ожидается действие человека",
+  waiting_external: "Ожидается внешнее событие или настройка",
+  completed: "Работа агента завершена",
+  failed: "Ошибка ролевого агента"
 };
 
 export const SYNC_STATUS_LABELS: Record<string, string> = {

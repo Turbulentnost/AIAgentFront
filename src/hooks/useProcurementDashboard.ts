@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { procurementApi } from "@/api/endpoints";
+import { procurementApi, productionPreparationEngineerApi } from "@/api/endpoints";
 import type { ProcurementDashboardView } from "@/types/procurement";
 
 export function useProcurementPermissions() {
@@ -66,5 +66,29 @@ export function useRefreshProcurementSources() {
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }
+  });
+}
+
+export function useProductionPreparationEngineerPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "production-preparation-engineer", "permissions"],
+    queryFn: () => productionPreparationEngineerApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useProductionPreparationEngineerDashboard(enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "production-preparation-engineer", "dashboard"],
+    queryFn: () => productionPreparationEngineerApi.getDashboard(),
+    enabled
+  });
+}
+
+export function useProductionPreparationEngineerCase(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "production-preparation-engineer", "case", caseId],
+    queryFn: () => productionPreparationEngineerApi.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled
   });
 }

@@ -5,6 +5,7 @@ import {
   formatDateTime,
   formatQuantity,
   sourceActiveLabel,
+  AGENT_WAIT_LABELS,
   STATUS_LABELS
 } from "@/utils/procurementDashboard";
 import { AgentTimeline } from "./AgentTimeline";
@@ -44,6 +45,14 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
               "Оркестратор закупок"}
           </strong>
         </div>
+        {currentState?.wait_status ? (
+          <div>
+            <span>Состояние агента</span>
+            <strong>
+              {AGENT_WAIT_LABELS[currentState.wait_status] || currentState.wait_status}
+            </strong>
+          </div>
+        ) : null}
         <div>
           <span>Основание</span>
           <strong>{sourceLabel}</strong>
@@ -59,6 +68,10 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
         <div>
           <span>Статус документа 1С</span>
           <strong>{detail.source_status || "—"}</strong>
+        </div>
+        <div>
+          <span>Последняя синхронизация с 1С</span>
+          <strong>{formatDateTime(detail.source_synced_at)}</strong>
         </div>
         <div>
           <span>Инициатор</span>
@@ -102,12 +115,22 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
                 <span>Статус</span>
                 <strong>{STATUS_LABELS[detail.status] ?? detail.status}</strong>
               </div>
+              {currentState?.task_status ? (
+                <div>
+                  <span>Статус задачи агента</span>
+                  <strong>
+                    {AGENT_WAIT_LABELS[currentState.wait_status || ""] ||
+                      currentState.task_status}
+                  </strong>
+                </div>
+              ) : null}
               <div>
                 <span>Контроль основания</span>
                 <strong>{detail.source_active ? "К обеспечению" : "Не актуально"}</strong>
               </div>
               <p>
                 {currentState?.summary ||
+                  currentState?.wait_reason ||
                   detail.summary ||
                   "Основание и кейс синхронизируются каждые 30 минут. При смене действия или отмене кейс уходит в архив."}
               </p>
