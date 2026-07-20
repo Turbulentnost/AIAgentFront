@@ -2,6 +2,7 @@ import { NavLink } from "react-router-dom";
 export const nav = [
   ["/", "Дашборд"],
   ["/agents", "Агенты"],
+  ["/contour4", "Контур 4 (KPI)"],
   ["/agent-builder", "Конструктор агентов"],
   ["/tasks", "Задачи"],
   ["/knowledge-base", "База знаний"],

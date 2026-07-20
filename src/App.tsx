@@ -21,6 +21,8 @@ import Profile from "./pages/Profile";
 import ProfileEdit from "./pages/ProfileEdit";
 import Users from "./pages/Users";
 import Departments from "./pages/Departments";
+import Contour4Hub from "./pages/contour4/Contour4Hub";
+import Contour4AgentWorkspace from "./pages/contour4/Contour4AgentWorkspace";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -33,6 +35,9 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      {/* Контур 4: mock UI без auth/API (дизайн из ui_mocks) */}
+      <Route path="/contour4" element={<Contour4Hub />} />
+      <Route path="/contour4/:agentId" element={<Contour4AgentWorkspace />} />
       <Route path="/" element={<ProtectedRoute><Layout title="Дашборд"><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/agents" element={<ProtectedRoute><Layout title="Агенты"><Agents /></Layout></ProtectedRoute>} />
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
