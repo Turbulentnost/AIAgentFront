@@ -31,7 +31,35 @@ function quantity(value?: string | number | null): string {
 function outputFrom(detail: ProductionPreparationEngineerCaseDetail) {
   const latest = detail.latest_result?.output_data;
   const stored = detail.case_metadata?.production_preparation_engineer_output;
-  return (latest || stored || null) as ProductionPreparationEngineerOutput | null;
+  const candidate = stored || latest;
+  if (!candidate || typeof candidate !== "object") {
+    return null;
+  }
+  const raw = candidate as Record<string, unknown>;
+  if (!Array.isArray(raw.positions)) return null;
+  return {
+    ...raw,
+    positions: raw.positions.map((value) => {
+      const position = value as ProductionPreparationPositionCalculation;
+      return {
+        ...position,
+        excluded_supply: Array.isArray(position.excluded_supply)
+          ? position.excluded_supply
+          : [],
+        supply_breakdown: Array.isArray(position.supply_breakdown)
+          ? position.supply_breakdown
+          : []
+      };
+    }),
+    specifications: Array.isArray(raw.specifications) ? raw.specifications : [],
+    missing_data: Array.isArray(raw.missing_data) ? raw.missing_data : [],
+    validation_issues: Array.isArray(raw.validation_issues)
+      ? raw.validation_issues
+      : [],
+    excluded_capabilities: Array.isArray(raw.excluded_capabilities)
+      ? raw.excluded_capabilities
+      : []
+  } as ProductionPreparationEngineerOutput;
 }
 
 const OUTCOME_LABELS: Record<string, string> = {
@@ -51,6 +79,8 @@ const CRITICALITY_LABELS: Record<string, string> = {
 };
 
 const SOURCE_LABELS: Record<string, string> = {
+  warehouse: "Свободный остаток на складах",
+  store_room: "Свободный остаток в кладовых",
   free_stock: "Свободный остаток",
   warehouse_stock: "Свободный остаток",
   other_warehouse: "Другие склады",
@@ -277,6 +307,22 @@ export function ProductionPreparationEngineerResultPanel({ detail }: Props) {
               </div>
               {positions.map((position) => {
                 const expanded = expandedRows.has(position.line_id);
+                const hasWarehouseCalculation =
+                  position.warehouse_stock_before !== undefined &&
+                  position.warehouse_stock_used !== undefined &&
+                  position.warehouse_stock_remaining !== undefined;
+                const baseRequirement =
+                  numeric(position.product_quantity) * numeric(position.consumption_rate);
+                const lossQuantity = Math.max(
+                  0,
+                  numeric(position.gross_requirement) - baseRequirement
+                );
+                const coverageParts = position.supply_breakdown
+                  .filter((item) => numeric(item.quantity) > 0)
+                  .map(
+                    (item) =>
+                      `${SOURCE_LABELS[item.source_type] || item.source_type}: ${withUnit(item.quantity, position.unit)}`
+                  );
                 return (
                   <div className={styles.calculationItem} key={position.line_id}>
                     <button aria-expanded={expanded} className={styles.calculationRow} onClick={() => toggleRow(position.line_id)} type="button">
@@ -286,7 +332,14 @@ export function ProductionPreparationEngineerResultPanel({ detail }: Props) {
                       </span>
                       <span><strong>{position.production_order || "Главная потребность"}</strong><small>{position.production_stage || "Этап не указан"}</small></span>
                       <span><strong>{withUnit(position.gross_requirement, position.unit)}</strong><small>по норме</small></span>
-                      <span><strong className={styles.metricCovered}>{withUnit(position.total_available_supply, position.unit)}</strong><small>подтверждено</small></span>
+                      <span>
+                        <strong className={styles.metricCovered}>{withUnit(position.total_available_supply, position.unit)}</strong>
+                        <small>
+                          {hasWarehouseCalculation
+                            ? `остаток склада: ${withUnit(position.warehouse_stock_remaining, position.unit)}`
+                            : "остаток склада пересчитывается"}
+                        </small>
+                      </span>
                       <span><strong className={numeric(position.net_requirement) > 0 ? styles.metricDeficit : ""}>{withUnit(position.net_requirement, position.unit)}</strong><small>{numeric(position.net_requirement) > 0 ? "требуется покрыть" : "не требуется"}</small></span>
                       <span><strong>{formatDate(position.required_date)}</strong><small>{position.criticality === "normal" ? "в срок" : CRITICALITY_LABELS[position.criticality]}</small></span>
                       <span className={styles.outcomeBadge} data-tone={outcomeTone(position)}>{OUTCOME_LABELS[position.outcome] || position.outcome}</span>
@@ -299,19 +352,68 @@ export function ProductionPreparationEngineerResultPanel({ detail }: Props) {
                         </div>
                         <div className={styles.formulaRow}>
                           <div className={styles.formulaCard}>
-                            <span>Расчёт по спецификации</span>
-                            <strong>{quantity(position.product_quantity)} изделий × {quantity(position.consumption_rate)} {position.unit} = {withUnit(position.gross_requirement, position.unit)}</strong>
-                            <small>Технологические потери: {quantity(position.technological_loss_percent)}%</small>
+                            <span>Потребность = количество × норма + потери</span>
+                            <strong>
+                              {quantity(position.product_quantity)} изделий ×{" "}
+                              {quantity(position.consumption_rate)} {position.unit} +{" "}
+                              {withUnit(lossQuantity, position.unit)} ={" "}
+                              {withUnit(position.gross_requirement, position.unit)}
+                            </strong>
+                            <small>
+                              Потери: {quantity(baseRequirement)} ×{" "}
+                              {quantity(position.technological_loss_percent)}% ={" "}
+                              {withUnit(lossQuantity, position.unit)}
+                            </small>
                           </div>
                           <div><span>01</span><small>Валовая потребность</small><strong>{withUnit(position.gross_requirement, position.unit)}</strong></div>
                           <div><span>02</span><small>Доступное покрытие</small><strong>− {withUnit(position.total_available_supply, position.unit)}</strong></div>
                           <div className={styles.netFormula}><span>03</span><small>Чистая потребность</small><strong>{withUnit(position.net_requirement, position.unit)}</strong></div>
                         </div>
+                        <div className={styles.calculationExplanation}>
+                          <div>
+                            <span>Как рассчитана обеспеченность</span>
+                            <strong>
+                              {coverageParts.length
+                                ? coverageParts.join(" + ")
+                                : "Подтверждённые источники отсутствуют"}
+                            </strong>
+                            <small>
+                              Итого принято в покрытие:{" "}
+                              {withUnit(position.total_available_supply, position.unit)}
+                            </small>
+                          </div>
+                          <div>
+                            <span>Формула чистой потребности</span>
+                            <strong>
+                              max(0, {quantity(position.gross_requirement)} −{" "}
+                              {quantity(position.total_available_supply)}) ={" "}
+                              {withUnit(position.net_requirement, position.unit)}
+                            </strong>
+                          </div>
+                          <div>
+                            <span>Остаток после обеспечения</span>
+                            {hasWarehouseCalculation ? (
+                              <>
+                                <strong>
+                                  {quantity(position.warehouse_stock_before)} −{" "}
+                                  {quantity(position.warehouse_stock_used)} ={" "}
+                                  {withUnit(position.warehouse_stock_remaining, position.unit)}
+                                </strong>
+                                <small>Остаток на складах минус использованное покрытие</small>
+                              </>
+                            ) : (
+                              <>
+                                <strong>Пересчитывается по данным 1С</strong>
+                                <small>Предыдущий расчёт не содержал полного складского остатка.</small>
+                              </>
+                            )}
+                          </div>
+                        </div>
                         <div className={styles.detailMetricRow}>
-                          <div><span>Количество изделий</span><strong>{quantity(position.product_quantity)} шт.</strong></div>
-                          <div><span>Норма расхода</span><strong>{withUnit(position.consumption_rate, position.unit)}</strong></div>
-                          <div><span>Технологические потери</span><strong>{quantity(position.technological_loss_percent)}%</strong></div>
-                          <div><span>Другие поступления</span><strong>{withUnit(numeric(position.available_other_warehouses) + numeric(position.confirmed_arrivals), position.unit)}</strong></div>
+                          <div><span>На складах до расчёта</span><strong>{hasWarehouseCalculation ? withUnit(position.warehouse_stock_before, position.unit) : "Пересчитывается"}</strong></div>
+                          <div><span>Использовано со складов</span><strong>{hasWarehouseCalculation ? withUnit(position.warehouse_stock_used, position.unit) : "Пересчитывается"}</strong></div>
+                          <div><span>Осталось на складах</span><strong>{hasWarehouseCalculation ? withUnit(position.warehouse_stock_remaining, position.unit) : "Пересчитывается"}</strong></div>
+                          <div><span>Другие склады и поступления</span><strong>{withUnit(numeric(position.available_other_warehouses) + numeric(position.confirmed_arrivals), position.unit)}</strong></div>
                         </div>
                       </div>
                     ) : null}

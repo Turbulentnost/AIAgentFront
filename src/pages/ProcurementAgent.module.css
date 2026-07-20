@@ -226,6 +226,13 @@
   gap: 10px;
 }
 
+.engineerToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .modeSwitch,
 .caseViewSwitch {
   display: inline-flex;
@@ -253,6 +260,78 @@
   border-color: var(--color-primary);
   box-shadow: inset 0 0 0 1px var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.documentSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 420px);
+  min-height: 38px;
+  padding-left: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.documentSearch:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.documentSearch input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.documentSearchClear {
+  display: grid;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.documentSearchClear:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.documentSearchSubmit {
+  align-self: stretch;
+  min-width: 68px;
+  padding: 0 13px;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0 9px 9px 0;
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
+  color: var(--color-primary);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.documentSearchSubmit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.documentSearchMessage {
+  margin-top: -8px;
+  color: var(--color-danger);
+  font-size: 12px;
+  text-align: right;
 }
 
 .caseItemNote {
@@ -1040,6 +1119,33 @@
   color: #15803d;
 }
 
+.calculationExplanation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calculationExplanation > div {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+
+.calculationExplanation span {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calculationExplanation small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
 .detailMetricRow {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -1190,6 +1296,19 @@
 }
 
 @media (max-width: 720px) {
+  .engineerToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .documentSearch {
+    width: 100%;
+  }
+
+  .documentSearchMessage {
+    text-align: left;
+  }
+
   .engineerPanelHeader,
   .sectionHeading,
   .calculationDetailsHeader {
@@ -1203,6 +1322,7 @@
 
   .engineerMetrics,
   .engineerFacts,
+  .calculationExplanation,
   .detailMetricRow {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

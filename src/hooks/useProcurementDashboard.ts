@@ -77,11 +77,19 @@ export function useProductionPreparationEngineerPermissions() {
   });
 }
 
-export function useProductionPreparationEngineerDashboard(enabled: boolean) {
+export function useProductionPreparationEngineerDashboard(
+  enabled: boolean,
+  view: "active" | "archive" = "active"
+) {
   return useQuery({
-    queryKey: ["procurement", "production-preparation-engineer", "dashboard"],
-    queryFn: () => productionPreparationEngineerApi.getDashboard(),
-    enabled
+    queryKey: ["procurement", "production-preparation-engineer", "dashboard", view],
+    queryFn: () => productionPreparationEngineerApi.getDashboard(view),
+    enabled,
+    refetchInterval: (query) => {
+      if (view === "archive") return 30000;
+      const cases = query.state.data?.groups.flatMap((group) => group.cases) ?? [];
+      return cases.some((item) => item.engineer_work_status === "processing") ? 10000 : 30000;
+    }
   });
 }
 

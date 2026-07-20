@@ -2,6 +2,13 @@ import type { ProcurementCaseSummary } from "@/types/procurement";
 import { caseTitle, formatDateTime, STATUS_LABELS } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
+const ENGINEER_WORK_LABELS = {
+  processing: "В работе",
+  awaiting_action: "Ожидает действий",
+  completed: "Завершено",
+  archived: "В архиве"
+} as const;
+
 type Props = {
   title: string;
   cases: ProcurementCaseSummary[];
@@ -38,7 +45,11 @@ export function CaseListPanel({
           >
             <div className={styles.caseItemTop}>
               <strong>{caseTitle(item)}</strong>
-              <span>{STATUS_LABELS[item.status] ?? item.status}</span>
+              <span>
+                {showEngineerMeta && item.engineer_work_status
+                  ? ENGINEER_WORK_LABELS[item.engineer_work_status]
+                  : (STATUS_LABELS[item.status] ?? item.status)}
+              </span>
             </div>
             <div className={styles.caseItemMeta}>
               <span>{item.positions_count} позиций</span>

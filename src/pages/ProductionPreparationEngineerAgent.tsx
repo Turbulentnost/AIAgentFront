@@ -1,5 +1,15 @@
-import { useEffect, useMemo } from "react";
-import { AlertTriangle, CheckCircle2, CircleAlert, Loader2, OctagonAlert } from "lucide-react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
+import {
+  AlertTriangle,
+  Archive,
+  CheckCircle2,
+  CircleAlert,
+  ListChecks,
+  Loader2,
+  OctagonAlert,
+  Search,
+  X
+} from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import {
   useProductionPreparationEngineerCase,
@@ -41,13 +51,26 @@ const BUCKETS: Array<{
 
 export default function ProductionPreparationEngineerAgent() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const [documentSearch, setDocumentSearch] = useState("");
+  const [searchMessage, setSearchMessage] = useState("");
   const permissionsQuery = useProductionPreparationEngineerPermissions();
   const canAccess =
     permissionsQuery.data?.accessible_role_agents?.includes(AGENT_ID) ?? false;
-  const dashboardQuery = useProductionPreparationEngineerDashboard(canAccess);
+  const activeView = searchParams.get("view") === "archive" ? "archive" : "active";
+  const activeDashboardQuery = useProductionPreparationEngineerDashboard(canAccess, "active");
+  const archiveDashboardQuery = useProductionPreparationEngineerDashboard(canAccess, "archive");
+  const dashboardQuery = activeView === "archive" ? archiveDashboardQuery : activeDashboardQuery;
   const cases = useMemo(
     () => dashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [],
     [dashboardQuery.data]
+  );
+  const activeCases = useMemo(
+    () => activeDashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [],
+    [activeDashboardQuery.data]
+  );
+  const archiveCases = useMemo(
+    () => archiveDashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [],
+    [archiveDashboardQuery.data]
   );
   const requestedBucket = searchParams.get("bucket");
   const activeBucket: EngineerBucket =
@@ -55,10 +78,13 @@ export default function ProductionPreparationEngineerAgent() {
     requestedBucket === "attention" ||
     requestedBucket === "critical"
       ? requestedBucket
-      : "critical";
+      : "success";
   const bucketCases = useMemo(
-    () => cases.filter((item) => (item.engineer_bucket || "attention") === activeBucket),
-    [activeBucket, cases]
+    () =>
+      activeView === "archive"
+        ? cases
+        : cases.filter((item) => (item.engineer_bucket || "attention") === activeBucket),
+    [activeBucket, activeView, cases]
   );
   const bucketCounts = useMemo(
     () =>
@@ -101,6 +127,59 @@ export default function ProductionPreparationEngineerAgent() {
     next.set("bucket", bucket);
     next.delete("case");
     setSearchParams(next);
+  };
+
+  const selectView = (view: "active" | "archive") => {
+    const next = new URLSearchParams(searchParams);
+    if (view === "archive") next.set("view", "archive");
+    else next.delete("view");
+    next.delete("case");
+    setSearchParams(next);
+  };
+
+  const submitDocumentSearch = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const query = documentSearch.trim().toLocaleLowerCase("ru-RU").replace(/\s+/g, "");
+    if (!query) {
+      setSearchMessage("Введите номер документа 1С.");
+      return;
+    }
+
+    const matches = (value?: string | null) =>
+      value?.toLocaleLowerCase("ru-RU").replace(/\s+/g, "").includes(query) ?? false;
+    const exactMatch = (value?: string | null) =>
+      value?.toLocaleLowerCase("ru-RU").replace(/\s+/g, "") === query;
+    const findCase = (items: typeof activeCases) =>
+      items.find((item) => exactMatch(item.source_number)) ||
+      items.find((item) => matches(item.source_number) || matches(item.source_1c_ref));
+
+    const bucketOrder: EngineerBucket[] = ["success", "attention", "critical"];
+    for (const bucket of bucketOrder) {
+      const found = findCase(
+        activeCases.filter((item) => (item.engineer_bucket || "attention") === bucket)
+      );
+      if (found) {
+        const next = new URLSearchParams(searchParams);
+        next.delete("view");
+        next.set("bucket", bucket);
+        next.set("case", found.id);
+        setSearchParams(next);
+        setSearchMessage("");
+        return;
+      }
+    }
+
+    const archived = findCase(archiveCases);
+    if (archived) {
+      const next = new URLSearchParams(searchParams);
+      next.set("view", "archive");
+      next.set("case", archived.id);
+      setSearchParams(next);
+      setSearchMessage("");
+      return;
+    }
+
+    setSearchMessage(`Документ «${documentSearch.trim()}» не найден.`);
   };
 
   if (permissionsQuery.isLoading) {
@@ -149,31 +228,87 @@ export default function ProductionPreparationEngineerAgent() {
         </div>
       ) : null}
 
-      <div className={styles.engineerBuckets}>
-        {BUCKETS.map((bucket) => {
-          const Icon = bucket.icon;
-          return (
+      <div className={styles.engineerToolbar}>
+        <div className={styles.caseViewSwitch}>
+          <button
+            className={activeView === "active" ? styles.caseViewActive : styles.caseViewBtn}
+            onClick={() => selectView("active")}
+            type="button"
+          >
+            <ListChecks size={16} /> Текущие
+          </button>
+          <button
+            className={activeView === "archive" ? styles.caseViewActive : styles.caseViewBtn}
+            onClick={() => selectView("archive")}
+            type="button"
+          >
+            <Archive size={16} /> Архив ({activeDashboardQuery.data?.counts.archive ?? archiveCases.length})
+          </button>
+        </div>
+        <form className={styles.documentSearch} onSubmit={submitDocumentSearch}>
+          <Search size={16} />
+          <input
+            aria-label="Номер документа 1С"
+            onChange={(event) => {
+              setDocumentSearch(event.target.value);
+              if (searchMessage) setSearchMessage("");
+            }}
+            placeholder="Номер документа 1С"
+            value={documentSearch}
+          />
+          {documentSearch ? (
             <button
-              className={
-                activeBucket === bucket.id
-                  ? `${styles.engineerBucket} ${styles.engineerBucketActive}`
-                  : styles.engineerBucket
-              }
-              data-bucket={bucket.id}
-              key={bucket.id}
-              onClick={() => selectBucket(bucket.id)}
+              aria-label="Очистить поиск"
+              className={styles.documentSearchClear}
+              onClick={() => {
+                setDocumentSearch("");
+                setSearchMessage("");
+              }}
               type="button"
             >
-              <Icon size={20} />
-              <span>
-                <strong>{bucket.label}</strong>
-                <small>{bucket.description}</small>
-              </span>
-              <b>{bucketCounts[bucket.id]}</b>
+              <X size={14} />
             </button>
-          );
-        })}
+          ) : null}
+          <button
+            className={styles.documentSearchSubmit}
+            disabled={activeDashboardQuery.isLoading || archiveDashboardQuery.isLoading}
+            type="submit"
+          >
+            {activeDashboardQuery.isLoading || archiveDashboardQuery.isLoading
+              ? <Loader2 className={styles.spin} size={14} />
+              : "Найти"}
+          </button>
+        </form>
       </div>
+      {searchMessage ? <div className={styles.documentSearchMessage}>{searchMessage}</div> : null}
+
+      {activeView === "active" ? (
+        <div className={styles.engineerBuckets}>
+          {BUCKETS.map((bucket) => {
+            const Icon = bucket.icon;
+            return (
+              <button
+                className={
+                  activeBucket === bucket.id
+                    ? `${styles.engineerBucket} ${styles.engineerBucketActive}`
+                    : styles.engineerBucket
+                }
+                data-bucket={bucket.id}
+                key={bucket.id}
+                onClick={() => selectBucket(bucket.id)}
+                type="button"
+              >
+                <Icon size={20} />
+                <span>
+                  <strong>{bucket.label}</strong>
+                  <small>{bucket.description}</small>
+                </span>
+                <b>{bucketCounts[bucket.id]}</b>
+              </button>
+            );
+          })}
+        </div>
+      ) : null}
 
       <div className={styles.workspace}>
         {dashboardQuery.isLoading ? (
@@ -185,11 +320,21 @@ export default function ProductionPreparationEngineerAgent() {
         ) : (
           <CaseListPanel
             cases={bucketCases}
-            emptyText={`В разделе «${BUCKETS.find((item) => item.id === activeBucket)?.label}» кейсов нет.`}
+            emptyText={
+              activeView === "archive"
+                ? "Архивных кейсов нет."
+                : `В разделе «${BUCKETS.find((item) => item.id === activeBucket)?.label}» кейсов нет.`
+            }
             onSelect={selectCase}
             selectedCaseId={selectedCaseId}
+            showArchiveMeta={activeView === "archive"}
             showEngineerMeta
-            title={BUCKETS.find((item) => item.id === activeBucket)?.label || "Производственные кейсы"}
+            title={
+              activeView === "archive"
+                ? "Архив"
+                : (BUCKETS.find((item) => item.id === activeBucket)?.label ||
+                  "Производственные кейсы")
+            }
           />
         )}
 
