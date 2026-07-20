@@ -124,6 +124,7 @@ import type {
   ProcurementDashboard,
   ProcurementPermissions,
   ProductionPreparationEngineerCaseDetail,
+  ProductionPreparationEngineerAction,
   ProductionPreparationEngineerDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
@@ -214,6 +215,18 @@ export const productionPreparationEngineerApi = {
     apiClient
       .get<ProductionPreparationEngineerCaseDetail>(
         `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}`
+      )
+      .then((r) => r.data),
+  confirmPurchase: (caseId: string) =>
+    apiClient
+      .post<ProductionPreparationEngineerAction>(
+        `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}/confirm-purchase`
+      )
+      .then((r) => r.data),
+  acknowledgeCritical: (caseId: string) =>
+    apiClient
+      .post<ProductionPreparationEngineerAction>(
+        `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}/acknowledge-critical`
       )
       .then((r) => r.data)
 };

@@ -158,6 +158,33 @@
   color: #b45309;
 }
 
+.engineerBucket[data-needs-attention="true"] {
+  animation: engineerAttentionPulse 10s ease-in-out infinite;
+}
+
+@keyframes engineerAttentionPulse {
+  0%,
+  45%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #f59e0b 0%, transparent);
+  }
+
+  12%,
+  36% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, #f59e0b 18%, transparent);
+  }
+
+  24% {
+    box-shadow: 0 0 18px 3px color-mix(in srgb, #f59e0b 32%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engineerBucket[data-needs-attention="true"] {
+    animation: none;
+  }
+}
+
 .engineerBucket[data-bucket="critical"] {
   color: #b91c1c;
 }
@@ -711,6 +738,28 @@
 
 .engineerDetailsPanel > .resultStatus {
   margin: 16px 20px 0;
+}
+
+.engineerActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 20px 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warning-dark) 35%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-warning-dark) 7%, var(--color-surface));
+}
+
+.engineerActionBar > div {
+  display: grid;
+  gap: 4px;
+}
+
+.engineerActionBar span {
+  color: var(--color-muted);
+  font-size: 12px;
 }
 
 .resultStatusWarning {

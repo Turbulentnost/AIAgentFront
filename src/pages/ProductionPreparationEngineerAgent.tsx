@@ -294,6 +294,11 @@ export default function ProductionPreparationEngineerAgent() {
                     : styles.engineerBucket
                 }
                 data-bucket={bucket.id}
+                data-needs-attention={
+                  bucket.id === "attention" && bucketCounts.attention > 0
+                    ? "true"
+                    : undefined
+                }
                 key={bucket.id}
                 onClick={() => selectBucket(bucket.id)}
                 type="button"

@@ -97,6 +97,25 @@ export function useProductionPreparationEngineerCase(caseId: string | null, enab
   return useQuery({
     queryKey: ["procurement", "production-preparation-engineer", "case", caseId],
     queryFn: () => productionPreparationEngineerApi.getCase(caseId!),
-    enabled: Boolean(caseId) && enabled
+    enabled: Boolean(caseId) && enabled,
+    refetchInterval: (query) =>
+      query.state.data?.engineer_work_status === "processing" ? 8000 : false
+  });
+}
+
+export function useProductionPreparationEngineerAction(
+  action: "confirm_purchase" | "acknowledge_critical"
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (caseId: string) =>
+      action === "confirm_purchase"
+        ? productionPreparationEngineerApi.confirmPurchase(caseId)
+        : productionPreparationEngineerApi.acknowledgeCritical(caseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["procurement", "production-preparation-engineer"]
+      });
+    }
   });
 }

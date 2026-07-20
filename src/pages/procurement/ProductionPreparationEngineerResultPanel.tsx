@@ -13,6 +13,7 @@ import type {
   ProductionPreparationEngineerOutput,
   ProductionPreparationPositionCalculation
 } from "@/types/procurement";
+import { useProductionPreparationEngineerAction } from "@/hooks/useProcurementDashboard";
 import { caseTitle, formatDate, formatDateTime } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
@@ -112,6 +113,10 @@ function outcomeTone(position: ProductionPreparationPositionCalculation): "succe
 export function ProductionPreparationEngineerResultPanel({ detail }: Props) {
   const [activeTab, setActiveTab] = useState<ResultTab>("overview");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const confirmPurchase = useProductionPreparationEngineerAction("confirm_purchase");
+  const acknowledgeCritical = useProductionPreparationEngineerAction(
+    "acknowledge_critical"
+  );
   const output = outputFrom(detail);
   const positions = output?.positions ?? [];
   const exclusions = positions.flatMap((position) =>
@@ -213,6 +218,57 @@ export function ProductionPreparationEngineerResultPanel({ detail }: Props) {
           </div>
         </div>
       )}
+
+      {detail.engineer_work_status !== "archived" &&
+      detail.engineer_decision_kind === "purchase_confirmation" ? (
+        <div className={styles.engineerActionBar}>
+          <div>
+            <strong>Оркестратор ожидает решения</strong>
+            <span>Подтвердите передачу рассчитанного дефицита в закупку.</span>
+          </div>
+          <button
+            className={styles.primaryAction}
+            disabled={confirmPurchase.isPending}
+            onClick={() => confirmPurchase.mutate(detail.id)}
+            type="button"
+          >
+            {confirmPurchase.isPending ? "Подтверждение..." : "Подтвердить закупку"}
+          </button>
+        </div>
+      ) : null}
+
+      {detail.engineer_work_status !== "archived" &&
+      detail.engineer_decision_kind === "critical_acknowledgement" ? (
+        <div className={styles.engineerActionBar}>
+          <div>
+            <strong>Расчёт остановлен</strong>
+            <span>
+              Подтвердите ознакомление. Кейс останется здесь до исправления данных в 1С.
+            </span>
+          </div>
+          <button
+            className={styles.secondaryAction}
+            disabled={
+              acknowledgeCritical.isPending ||
+              Boolean(detail.engineer_critical_acknowledged_at)
+            }
+            onClick={() => acknowledgeCritical.mutate(detail.id)}
+            type="button"
+          >
+            {detail.engineer_critical_acknowledged_at
+              ? "Ознакомление подтверждено"
+              : acknowledgeCritical.isPending
+                ? "Подтверждение..."
+                : "Подтвердить ознакомление"}
+          </button>
+        </div>
+      ) : null}
+
+      {confirmPurchase.isError || acknowledgeCritical.isError ? (
+        <div className={styles.documentSearchMessage}>
+          Не удалось сохранить действие. Обновите кейс и повторите попытку.
+        </div>
+      ) : null}
 
       {output ? (
         <>
