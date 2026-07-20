@@ -42,8 +42,18 @@ export function getPricingInvoiceStagePath(invoiceId: string): string {
   return getPricingStagePath("invoice", invoiceId);
 }
 export const INCOMING_CORRESPONDENCE_AGENT_SLUG = "incoming_correspondence_agent";
-export const INCOMING_CORRESPONDENCE_AGENT_PATH = "/agents";
+export const INCOMING_CORRESPONDENCE_AGENT_PATH = "/agents/incoming-mail";
+export const PROCUREMENT_AGENT_SLUG = "procurement_logistics_agent";
+export const PROCUREMENT_AGENT_PATH = "/agents/procurement";
+export const PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG =
+  "production_preparation_engineer_agent";
+export const PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH =
+  "/agents/production-preparation-engineer";
 export const AGENT_LAUNCH_MORPH_MS = 520;
+
+function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
+  return `${agent.slug} ${agent.name ?? ""} ${agent.purpose ?? ""}`.toLowerCase();
+}
 
 export function isNdControlAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === ND_CONTROL_AGENT_SLUG;
@@ -65,8 +75,27 @@ export function isPricingAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === PRICING_AGENT_SLUG;
 }
 
-export function isIncomingCorrespondenceAgent(agent: Pick<AgentAccess, "slug">): boolean {
-  return agent.slug === INCOMING_CORRESPONDENCE_AGENT_SLUG;
+export function isIncomingCorrespondenceAgent(
+  agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>
+): boolean {
+  const key = agentKey(agent);
+  return (
+    agent.slug === INCOMING_CORRESPONDENCE_AGENT_SLUG ||
+    agent.slug === "agent_pochta" ||
+    agent.slug === "incoming-mail" ||
+    agent.slug === "incoming_mail" ||
+    /pochta|incoming.?mail|входящ.*корресп|корреспонденц/.test(key)
+  );
+}
+
+export function isProcurementAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === PROCUREMENT_AGENT_SLUG;
+}
+
+export function isProductionPreparationEngineerAgent(
+  agent: Pick<AgentAccess, "slug">
+): boolean {
+  return agent.slug === PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG;
 }
 
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
@@ -76,7 +105,9 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isTasksAgent(agent) ||
     isWarehouseAgent(agent) ||
     isPricingAgent(agent) ||
-    isIncomingCorrespondenceAgent(agent)
+    isIncomingCorrespondenceAgent(agent) ||
+    isProductionPreparationEngineerAgent(agent) ||
+    isProcurementAgent(agent)
   );
 }
 
@@ -117,6 +148,18 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
       state: { from: "agent-launch" as const, agentId: agent.id, agentName: agent.name }
     };
   }
+  if (isProductionPreparationEngineerAgent(agent)) {
+    return {
+      path: PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isProcurementAgent(agent)) {
+    return {
+      path: PROCUREMENT_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
   return {
     path: "/tasks",
     state: { agentId: agent.id, agentName: agent.name }
@@ -128,6 +171,10 @@ export function navigateToAgentLaunch(
   agent: Pick<AgentAccess, "slug" | "id" | "name">
 ) {
   const target = getAgentLaunchTarget(agent);
+  if (isIncomingCorrespondenceAgent(agent)) {
+    window.location.assign(target.path);
+    return;
+  }
   const useTransition = isNdControlAgent(agent) && typeof document.startViewTransition === "function";
 
   const go = () => navigate(target.path, { state: target.state });

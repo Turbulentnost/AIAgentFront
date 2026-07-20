@@ -1,4 +1,5 @@
 import { apiClient, longRunningApiClient } from "./client";
+import { pochtaApiClient } from "./pochtaClient";
 import type {
   Agent,
   AgentAccess,
@@ -18,6 +19,14 @@ import type {
   DocumentListItem,
   DocumentUploadOptions,
   Page,
+  EmailMessage,
+  EmailMessageActionResponse,
+  EmailMessageFetchBodyResponse,
+  EmailMessagesPage,
+  EmailMessagesStats,
+  PochtaDepartment,
+  PochtaOrganization,
+  PochtaContractor,
   HealthResponse,
   Position,
   KnowledgeBase,
@@ -109,6 +118,18 @@ import type {
   AgentBuilderToolCatalogItem,
   SandboxRun
 } from "@/types";
+import type {
+  ProcurementCaseDetail,
+  ProcurementCaseEvent,
+  ProcurementDashboard,
+  ProcurementPermissions,
+  ProductionPreparationEngineerCaseDetail,
+  ProductionPreparationEngineerDashboard,
+  ProcurementRefreshResult,
+  ProcurementRoleAgentResult,
+  ProcurementRoleAgentResume,
+  ProcurementSyncStatus
+} from "@/types/procurement";
 
 export const meetingsApi = {
   permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
@@ -155,6 +176,44 @@ export const porucheniyaApi = {
   refreshDashboard: (payload?: PorucheniyaDashboardRefreshPayload) =>
     longRunningApiClient
       .post<TasksDashboardRead>("/porucheniya/dashboard/refresh", payload ?? {})
+      .then((r) => r.data)
+};
+
+export const procurementApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: (view: "active" | "processing" | "archive" = "active") =>
+    apiClient
+      .get<ProcurementDashboard>("/procurement/dashboard", { params: { view } })
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient.get<ProcurementCaseDetail>(`/procurement/cases/${caseId}`).then((r) => r.data),
+  listCaseEvents: (caseId: string) =>
+    apiClient.get<ProcurementCaseEvent[]>(`/procurement/cases/${caseId}/events`).then((r) => r.data),
+  submitRoleAgentResult: (caseId: string, payload: ProcurementRoleAgentResume) =>
+    apiClient
+      .post<ProcurementRoleAgentResult>(`/procurement/cases/${caseId}/agent-result`, payload)
+      .then((r) => r.data),
+  getSyncStatus: () =>
+    apiClient.get<ProcurementSyncStatus[]>("/procurement/sync-status").then((r) => r.data),
+  refresh: () =>
+    apiClient.post<ProcurementRefreshResult>("/procurement/refresh").then((r) => r.data)
+};
+
+export const productionPreparationEngineerApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: () =>
+    apiClient
+      .get<ProductionPreparationEngineerDashboard>(
+        "/procurement/role-agents/production_preparation_engineer_agent/dashboard"
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<ProductionPreparationEngineerCaseDetail>(
+        `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}`
+      )
       .then((r) => r.data)
 };
 
@@ -374,13 +433,19 @@ export const ndChangeRequestsApi = {
   create: (payload: NdChangeRequestCreate) => apiClient.post<NdChangeRequest>("/nd-change-requests", payload).then((r) => r.data),
   get: (requestId: string) => apiClient.get<NdChangePreview>(`/nd-change-requests/${requestId}`).then((r) => r.data),
   detectDocument: (requestId: string) =>
-    apiClient.post<NdChangeCandidateDocument[]>(`/nd-change-requests/${requestId}/detect-document`).then((r) => r.data),
+    longRunningApiClient
+      .post<NdChangeCandidateDocument[]>(`/nd-change-requests/${requestId}/detect-document`)
+      .then((r) => r.data),
   selectDocument: (requestId: string, payload: { document_id: string; document_version_id?: string | null }) =>
     apiClient.post<NdChangeRequest>(`/nd-change-requests/${requestId}/select-document`, payload).then((r) => r.data),
   findLocation: (requestId: string, payload: { document_id?: string | null; document_version_id?: string | null } = {}) =>
-    apiClient.post<NdChangeTargetLocation[]>(`/nd-change-requests/${requestId}/find-location`, payload).then((r) => r.data),
+    longRunningApiClient
+      .post<NdChangeTargetLocation[]>(`/nd-change-requests/${requestId}/find-location`, payload)
+      .then((r) => r.data),
   applyChanges: (requestId: string, payload: { location_id?: string | null; mark_user_reviewed?: boolean; approval_user_ids?: string[] } = {}) =>
-    apiClient.post<NdChangePreview>(`/nd-change-requests/${requestId}/apply-changes`, payload).then((r) => r.data),
+    longRunningApiClient
+      .post<NdChangePreview>(`/nd-change-requests/${requestId}/apply-changes`, payload)
+      .then((r) => r.data),
   preview: (requestId: string) => apiClient.get<NdChangePreview>(`/nd-change-requests/${requestId}/preview`).then((r) => r.data),
   sendApproval: (requestId: string, payload: { approval_user_ids: string[]; mark_user_reviewed?: boolean }) =>
     apiClient.post(`/nd-change-requests/${requestId}/send-approval`, payload).then((r) => r.data),
@@ -388,6 +453,60 @@ export const ndChangeRequestsApi = {
     apiClient.get<Blob>(`/nd-change-requests/${requestId}/download-draft`, { responseType: "blob" }).then((r) => r.data),
   downloadNotice: (requestId: string) =>
     apiClient.get<Blob>(`/nd-change-requests/${requestId}/download-notice`, { responseType: "blob" }).then((r) => r.data)
+};
+
+export const emailMessagesApi = {
+  list: (params?: {
+    status?: string;
+    limit?: number;
+    offset?: number;
+    date_from?: string;
+    date_to?: string;
+    q?: string;
+    only_info_to_test_ii?: boolean;
+  }) =>
+    pochtaApiClient.get<EmailMessagesPage>("/api/v1/email-messages", { params }).then((r) => r.data),
+  stats: (params?: { date_from?: string; date_to?: string; q?: string; only_info_to_test_ii?: boolean }) =>
+    pochtaApiClient.get<EmailMessagesStats>("/api/v1/email-messages/stats", { params }).then((r) => r.data),
+  get: (messageRowId: string) =>
+    pochtaApiClient.get<EmailMessage>(`/api/v1/email-messages/${messageRowId}`).then((r) => r.data),
+  fetchBody: (messageRowId: string) =>
+    pochtaApiClient
+      .post<EmailMessageFetchBodyResponse>(`/api/v1/email-messages/${messageRowId}/fetch-body`, null, {
+        timeout: 90_000
+      })
+      .then((r) => r.data),
+  listDepartments: () =>
+    pochtaApiClient.get<PochtaDepartment[]>("/api/v1/departments").then((r) => r.data),
+  listOrganizations: () =>
+    pochtaApiClient.get<PochtaOrganization[]>("/api/v1/organizations").then((r) => r.data),
+  searchContractors: (q: string, limit = 20) =>
+    pochtaApiClient
+      .get<PochtaContractor[]>("/api/v1/contractors/search", { params: { q, limit } })
+      .then((r) => r.data),
+  restoreFromSpam: (messageRowId: string) =>
+    pochtaApiClient
+      .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/restore-from-spam`)
+      .then((r) => r.data),
+  retryErp: (messageRowId: string) =>
+    pochtaApiClient
+      .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/retry-erp`)
+      .then((r) => r.data),
+  resolveHuman: (
+    messageRowId: string,
+    body: {
+      decision: "approve_routing" | "mark_spam" | "mark_not_spam";
+      department_id?: string;
+      department_name?: string;
+      partner_name?: string;
+      contractor_id?: string;
+      process?: string;
+      organization?: string;
+    }
+  ) =>
+    pochtaApiClient
+      .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/resolve-human`, body)
+      .then((r) => r.data)
 };
 
 export const ndControlApi = {

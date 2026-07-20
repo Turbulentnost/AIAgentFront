@@ -12,6 +12,63 @@ import type { AgentAccess, AgentStatus, Task } from "@/types";
 import styles from "./Agents.module.css";
 
 const AGENT_ILLUSTRATION = "/agent-catalog-illustration.png";
+const ND_CONTROL_AGENT_ROUTE = "/agents/nd-control";
+const INCOMING_MAIL_ROUTE = "/agents/incoming-mail";
+const INCOMING_MAIL_DISPLAY_NAME = "Агент по входящей корреспонденции";
+
+const INCOMING_MAIL_CATALOG_AGENT: AgentAccess = {
+  id: "catalog-incoming_correspondence_agent",
+  name: INCOMING_MAIL_DISPLAY_NAME,
+  slug: "incoming_correspondence_agent",
+  purpose:
+    "ИИ-агент обрабатывает входящую корреспонденцию: фильтрует спам, определяет отправителя и отдел, формирует обзор и создаёт задачу в 1С:ERP.",
+  status: "active",
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+  access_level: "run",
+  can_run: true,
+  can_view_results: true,
+  can_approve: false,
+  can_configure: false
+};
+
+function withIncomingMailDisplayName(agents: AgentAccess[]) {
+  return agents.map((agent) =>
+    isIncomingMailAgent(agent) ? { ...agent, name: INCOMING_MAIL_DISPLAY_NAME } : agent
+  );
+}
+
+function mergePinnedCatalogAgents(agents: AgentAccess[]) {
+  const normalized = withIncomingMailDisplayName(agents);
+  if (normalized.some(isIncomingMailAgent)) return normalized;
+  return [INCOMING_MAIL_CATALOG_AGENT, ...normalized];
+}
+
+function isNdControlAgent(agent: AgentAccess) {
+  const key = agentSearchKey(agent);
+  return (
+    agent.slug === "nd_control_agent" ||
+    agent.slug === "nd-control" ||
+    /nd[_-]?control/.test(key) ||
+    /контрол.*нд|нд.*изменен/.test(key)
+  );
+}
+
+function isIncomingMailAgent(agent: AgentAccess) {
+  const key = agentSearchKey(agent);
+  return (
+    agent.slug === "agent_pochta" ||
+    agent.slug === "incoming_correspondence_agent" ||
+    agent.slug === "incoming-mail" ||
+    /pochta|incoming.?mail|входящ.*корресп/.test(key)
+  );
+}
+
+function getAgentRoute(agent: AgentAccess) {
+  if (isNdControlAgent(agent)) return ND_CONTROL_AGENT_ROUTE;
+  if (isIncomingMailAgent(agent)) return INCOMING_MAIL_ROUTE;
+  return null;
+}
 
 type KindTab = "all" | "chat" | "abstract";
 type CategoryFilter = "all" | "generative" | "analytic";
@@ -63,6 +120,7 @@ function getCapabilityLabel(agent: AgentAccess) {
   if (/document|документ|\bkd\b|\btd\b|кд|тд/.test(key)) return "Анализирует документы";
   if (/tender|тендер|закуп|procurement/.test(key)) return "Анализирует закупки";
   if (/comment|коммент|исполн/.test(key)) return "Анализирует комментарии";
+  if (/mail|почт|корресп|email|письм|imap/.test(key)) return "Обрабатывает корреспонденцию";
   return "Автоматизирует задачи";
 }
 
@@ -394,8 +452,8 @@ export default function Agents() {
     [tasksQuery.data]
   );
 
-  const availableAgents = useMemo(
-    () => withMockAvailableAgents(agentsQuery.data ?? []),
+  const catalogAgents = useMemo(
+    () => mergePinnedCatalogAgents(withMockAvailableAgents(agentsQuery.data ?? [])),
     [agentsQuery.data]
   );
 
@@ -409,7 +467,7 @@ export default function Agents() {
   );
 
   const filteredAgents = useMemo(() => {
-    let items = availableAgents;
+    let items = catalogAgents;
 
     if (kindTab === "chat") items = items.filter((agent) => getAgentKind(agent) === "chat");
     if (kindTab === "abstract") items = items.filter((agent) => getAgentKind(agent) === "abstract");
@@ -426,11 +484,11 @@ export default function Agents() {
     }
 
     return items;
-  }, [availableAgents, categoryFilter, departmentFilter, kindTab]);
+  }, [catalogAgents, categoryFilter, departmentFilter, kindTab]);
 
   const recommendedAgents = useMemo(
-    () => pickRecommended(availableAgents),
-    [availableAgents]
+    () => pickRecommended(catalogAgents),
+    [catalogAgents]
   );
 
   const openAgent = (agent: AgentAccess) => {
@@ -439,7 +497,7 @@ export default function Agents() {
   };
 
   const isLoading = agentsQuery.isLoading || departmentsQuery.isLoading;
-  const isError = agentsQuery.isError;
+  const isError = agentsQuery.isError && !catalogAgents.length;
 
   return (
     <div className={styles.page}>
@@ -497,7 +555,7 @@ export default function Agents() {
             <div className={styles.errorState}>Не удалось загрузить агентов</div>
           ) : !filteredAgents.length ? (
             <div className={styles.emptyState}>
-              {agentsQuery.data?.length || availableAgents.length
+              {catalogAgents.length
                 ? "По выбранным фильтрам агенты не найдены."
                 : "Нет агентов, доступных текущему пользователю."}
             </div>

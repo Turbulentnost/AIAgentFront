@@ -1,15 +1,18 @@
 import { Navigate, Route, Routes } from "react-router-dom";
-import NdControlAgent from "@/pages/NdControlAgent";
 import MeetingAgent from "@/pages/MeetingAgent";
 import TasksAgent from "@/pages/TasksAgent";
 import WarehouseAgent from "@/pages/WarehouseAgent";
 import PricingAgent from "@/pages/PricingAgent";
 import PricingAgentStageRouter from "@/pages/PricingAgentStageRouter";
+import ProcurementAgent from "@/pages/ProcurementAgent";
+import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEngineerAgent";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
+import NdControlAgent from "./pages/NdControlAgent";
+import IncomingMail from "./pages/IncomingMail";
 import AgentBuilder from "./pages/AgentBuilder";
 import Tasks from "./pages/Tasks";
 import KnowledgeBase from "./pages/KnowledgeBase";
@@ -41,6 +44,9 @@ export default function App() {
       <Route path="/agents/warehouse" element={<ProtectedRoute><Layout title="Агент склада, запасов и выдачи в производство"><WarehouseAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/pricing" element={<ProtectedRoute><Layout title="Агент цен, проектных цен, оплаты и договоров"><PricingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/pricing/:stageSlug" element={<ProtectedRoute><Layout title="Агент цен, проектных цен, оплаты и договоров"><PricingAgentStageRouter /></Layout></ProtectedRoute>} />
+      <Route path="/agents/incoming-mail" element={<ProtectedRoute><Layout title="Входящая корреспонденция"><IncomingMail /></Layout></ProtectedRoute>} />
+      <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="Инженер по подготовке производства"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />
