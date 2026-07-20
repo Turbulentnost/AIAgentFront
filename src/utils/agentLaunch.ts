@@ -15,6 +15,8 @@ export const PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG =
   "production_preparation_engineer_agent";
 export const PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH =
   "/agents/production-preparation-engineer";
+export const OMTO_SUPPORT_MANAGER_AGENT_SLUG = "omto_support_manager_agent";
+export const OMTO_SUPPORT_MANAGER_AGENT_PATH = "/agents/omto-support-manager";
 export const AGENT_LAUNCH_MORPH_MS = 520;
 
 function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
@@ -56,6 +58,10 @@ export function isProductionPreparationEngineerAgent(
   return agent.slug === PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG;
 }
 
+export function isOmtoSupportManagerAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === OMTO_SUPPORT_MANAGER_AGENT_SLUG;
+}
+
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
   return (
     isNdControlAgent(agent) ||
@@ -63,6 +69,7 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isTasksAgent(agent) ||
     isIncomingCorrespondenceAgent(agent) ||
     isProductionPreparationEngineerAgent(agent) ||
+    isOmtoSupportManagerAgent(agent) ||
     isProcurementAgent(agent)
   );
 }
@@ -95,6 +102,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isProductionPreparationEngineerAgent(agent)) {
     return {
       path: PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isOmtoSupportManagerAgent(agent)) {
+    return {
+      path: OMTO_SUPPORT_MANAGER_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }

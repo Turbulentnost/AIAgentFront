@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { procurementApi, productionPreparationEngineerApi } from "@/api/endpoints";
+import {
+  omtoSupportManagerApi,
+  procurementApi,
+  productionPreparationEngineerApi
+} from "@/api/endpoints";
 import type { ProcurementDashboardView } from "@/types/procurement";
 
 export function useProcurementPermissions() {
@@ -89,6 +93,30 @@ export function useProductionPreparationEngineerCase(caseId: string | null, enab
   return useQuery({
     queryKey: ["procurement", "production-preparation-engineer", "case", caseId],
     queryFn: () => productionPreparationEngineerApi.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled
+  });
+}
+
+export function useOmtoSupportManagerPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "omto-support-manager", "permissions"],
+    queryFn: () => omtoSupportManagerApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useOmtoSupportManagerDashboard(enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "omto-support-manager", "dashboard"],
+    queryFn: () => omtoSupportManagerApi.getDashboard(),
+    enabled
+  });
+}
+
+export function useOmtoSupportManagerCase(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "omto-support-manager", "case", caseId],
+    queryFn: () => omtoSupportManagerApi.getCase(caseId!),
     enabled: Boolean(caseId) && enabled
   });
 }

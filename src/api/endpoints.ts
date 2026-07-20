@@ -125,6 +125,8 @@ import type {
   ProcurementPermissions,
   ProductionPreparationEngineerCaseDetail,
   ProductionPreparationEngineerDashboard,
+  OmtoSupportManagerCaseDetail,
+  OmtoSupportManagerDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
   ProcurementRoleAgentResume,
@@ -213,6 +215,23 @@ export const productionPreparationEngineerApi = {
     apiClient
       .get<ProductionPreparationEngineerCaseDetail>(
         `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}`
+      )
+      .then((r) => r.data)
+};
+
+export const omtoSupportManagerApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: () =>
+    apiClient
+      .get<OmtoSupportManagerDashboard>(
+        "/procurement/role-agents/omto_support_manager_agent/dashboard"
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<OmtoSupportManagerCaseDetail>(
+        `/procurement/role-agents/omto_support_manager_agent/cases/${caseId}`
       )
       .then((r) => r.data)
 };

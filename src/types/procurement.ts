@@ -111,6 +111,8 @@ export interface ProcurementCaseSummary {
   source_active?: boolean;
   engineer_bucket?: "success" | "attention" | "critical" | null;
   engineer_bucket_reason?: string | null;
+  omto_bucket?: "success" | "attention" | "critical" | null;
+  omto_bucket_reason?: string | null;
 }
 
 export interface ProcurementCaseDetail extends ProcurementCaseSummary {
@@ -335,3 +337,42 @@ export interface ProductionPreparationEngineerCaseDetail
 }
 
 export type ProductionPreparationEngineerDashboard = ProcurementDashboard;
+
+export type OmtoQualityStatus = "ok" | "incomplete" | "critical";
+export type OmtoFindingSeverity = "info" | "warning" | "critical";
+
+export interface OmtoFinding {
+  field: string;
+  rule_id: string;
+  source_ref: string;
+  message: string;
+  severity: OmtoFindingSeverity;
+  suggested_fix?: string | null;
+  current_value?: unknown;
+}
+
+export interface OmtoSupportManagerOutput {
+  quality_status: OmtoQualityStatus;
+  findings: OmtoFinding[];
+  checked_fields: string[];
+  actions: string[];
+  clarification_draft?: string | null;
+  summary: string;
+  calculated_at?: string | null;
+}
+
+export interface OmtoSupportManagerResult
+  extends Omit<ProcurementRoleAgentResult, "output_data"> {
+  output_data: OmtoSupportManagerOutput;
+}
+
+export interface OmtoSupportManagerCaseDetail
+  extends Omit<ProcurementCaseDetail, "latest_result" | "case_metadata"> {
+  latest_result?: OmtoSupportManagerResult | null;
+  case_metadata?: {
+    omto_support_manager_output?: OmtoSupportManagerOutput | null;
+    omto_calculated_at?: string | null;
+  } | null;
+}
+
+export type OmtoSupportManagerDashboard = ProcurementDashboard;
