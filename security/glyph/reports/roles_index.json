@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-07-20T11:04:26.557212+00:00",
+  "engine": "glyph AnalysisEngine (Contour4 front bridge)",
+  "note": "CLI glyph scan ignores tools[]; runner attaches descriptions from mock HITL/widgets.",
+  "agents": [
+    {
+      "agent": "cfo_head",
+      "status": "PASS",
+      "exit_code": 0,
+      "findings": 0,
+      "by_severity": {},
+      "rules": [],
+      "titles": []
+    },
+    {
+      "agent": "finance_director",
+      "status": "PASS",
+      "exit_code": 0,
+      "findings": 0,
+      "by_severity": {},
+      "rules": [],
+      "titles": []
+    },
+    {
+      "agent": "executive_director",
+      "status": "FAIL",
+      "exit_code": 1,
+      "findings": 4,
+      "by_severity": {
+        "high": 4
+      },
+      "rules": [
+        "command-injection"
+      ],
+      "titles": [
+        {
+          "severity": "high",
+          "rule": "command-injection",
+          "title": "Command Injection: Java System Call",
+          "location": "hitl_contract",
+          "evidence": "exec"
+        },
+        {
+          "severity": "high",
+          "rule": "command-injection",
+          "title": "Command Injection: Java System Call",
+          "location": "hitl_contract",
+          "evidence": "exec"
+        },
+        {
+          "severity": "high",
+          "rule": "command-injection",
+          "title": "Command Injection: Java System Call",
+          "location": "widgets_mvp",
+          "evidence": "EXEC"
+        },
+        {
+          "severity": "high",
+          "rule": "command-injection",
+          "title": "Command Injection: Java System Call",
+          "location": "widgets_mvp",
+          "evidence": "EXEC"
+        }
+      ]
+    },
+    {
+      "agent": "chief_accountant",
+      "status": "FAIL",
+      "exit_code": 1,
+      "findings": 1,
+      "by_severity": {
+        "high": 1
+      },
+      "rules": [
+        "command-injection"
+      ],
+      "titles": [
+        {
+          "severity": "high",
+          "rule": "command-injection",
+          "title": "Command Injection: Java System Call",
+          "location": "widgets_mvp",
+          "evidence": "exec"
+        }
+      ]
+    },
+    {
+      "agent": "accountant",
+      "status": "PASS",
+      "exit_code": 0,
+      "findings": 0,
+      "by_severity": {},
+      "rules": [],
+      "titles": []
+    },
+    {
+      "agent": "legal_specialist",
+      "status": "PASS",
+      "exit_code": 0,
+      "findings": 0,
+      "by_severity": {},
+      "rules": [],
+      "titles": []
+    }
+  ],
+  "worst_exit_code": 1
+}
