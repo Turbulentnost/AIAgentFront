@@ -127,6 +127,9 @@ import type {
   ProductionPreparationEngineerDashboard,
   OmtoSupportManagerCaseDetail,
   OmtoSupportManagerDashboard,
+  QualityKpiReport,
+  QualityRoleCaseDetail,
+  QualityRoleDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
   ProcurementRoleAgentResume,
@@ -233,6 +236,34 @@ export const omtoSupportManagerApi = {
       .get<OmtoSupportManagerCaseDetail>(
         `/procurement/role-agents/omto_support_manager_agent/cases/${caseId}`
       )
+      .then((r) => r.data)
+};
+
+function roleAgentApi(agentId: string) {
+  return {
+    permissions: () =>
+      apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+    getDashboard: () =>
+      apiClient
+        .get<QualityRoleDashboard>(`/procurement/role-agents/${agentId}/dashboard`)
+        .then((r) => r.data),
+    getCase: (caseId: string) =>
+      apiClient
+        .get<QualityRoleCaseDetail>(`/procurement/role-agents/${agentId}/cases/${caseId}`)
+        .then((r) => r.data)
+  };
+}
+
+export const otkHeadApi = roleAgentApi("otk_head_agent");
+export const qualityEngineerApi = roleAgentApi("quality_engineer_agent");
+export const qualityDeputyDirectorApi = roleAgentApi("quality_deputy_director_agent");
+
+export const qualityKpiApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: (params?: { period_from?: string; period_to?: string }) =>
+    apiClient
+      .get<QualityKpiReport>("/procurement/quality-kpi/dashboard", { params })
       .then((r) => r.data)
 };
 

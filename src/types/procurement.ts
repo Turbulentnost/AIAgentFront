@@ -376,3 +376,76 @@ export interface OmtoSupportManagerCaseDetail
 }
 
 export type OmtoSupportManagerDashboard = ProcurementDashboard;
+
+export interface QualityFinding {
+  field: string;
+  rule_id: string;
+  source_ref: string;
+  message: string;
+  severity: OmtoFindingSeverity;
+  suggested_fix?: string | null;
+  current_value?: unknown;
+}
+
+export interface QualityRoleOutput {
+  actions?: string[];
+  findings?: QualityFinding[];
+  next_status?: string | null;
+  next_agent?: string | null;
+  summary: string;
+  calculated_at?: string | null;
+  quality_control?: Record<string, unknown> | null;
+  draft_artifacts?: Record<string, unknown> | null;
+  assigned_engineer_id?: string | null;
+  assigned_engineer_name?: string | null;
+  act_ref?: string | null;
+  label_ref?: string | null;
+  disposition?: string | null;
+  disposition_label?: string | null;
+  execution_conditions?: string[];
+  fitness_status?: string | null;
+  category?: string | null;
+  stage?: string | null;
+  [key: string]: unknown;
+}
+
+export interface QualityRoleCaseDetail
+  extends Omit<ProcurementCaseDetail, "latest_result" | "case_metadata"> {
+  latest_result?: (Omit<ProcurementRoleAgentResult, "output_data"> & {
+    output_data: QualityRoleOutput;
+  }) | null;
+  case_metadata?: Record<string, unknown> | null;
+}
+
+export type QualityRoleDashboard = ProcurementDashboard;
+
+export interface KpiMetric {
+  id: string;
+  title: string;
+  formula: string;
+  value?: number | null;
+  target?: number | null;
+  target_label: string;
+  unit?: string;
+  tone: "ok" | "warn" | "bad" | "unknown";
+  sample_size?: number;
+  details?: Record<string, unknown>;
+}
+
+export interface AgentKpiBlock {
+  agent_id: string;
+  agent_label: string;
+  common: KpiMetric[];
+  special: KpiMetric[];
+  below_target: string[];
+}
+
+export interface QualityKpiReport {
+  period_from?: string | null;
+  period_to?: string | null;
+  agents: AgentKpiBlock[];
+  system: KpiMetric[];
+  summary: string;
+  calculated_at?: string | null;
+  actions?: string[];
+}
