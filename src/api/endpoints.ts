@@ -124,6 +124,7 @@ import type {
   ProcurementDashboard,
   ProcurementPermissions,
   ProductionPreparationEngineerCaseDetail,
+  ProductionPreparationEngineerAction,
   ProductionPreparationEngineerDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
@@ -203,16 +204,29 @@ export const procurementApi = {
 export const productionPreparationEngineerApi = {
   permissions: () =>
     apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
-  getDashboard: () =>
+  getDashboard: (view: "active" | "archive" = "active") =>
     apiClient
       .get<ProductionPreparationEngineerDashboard>(
-        "/procurement/role-agents/production_preparation_engineer_agent/dashboard"
+        "/procurement/role-agents/production_preparation_engineer_agent/dashboard",
+        { params: { view } }
       )
       .then((r) => r.data),
   getCase: (caseId: string) =>
     apiClient
       .get<ProductionPreparationEngineerCaseDetail>(
         `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}`
+      )
+      .then((r) => r.data),
+  confirmPurchase: (caseId: string) =>
+    apiClient
+      .post<ProductionPreparationEngineerAction>(
+        `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}/confirm-purchase`
+      )
+      .then((r) => r.data),
+  acknowledgeCritical: (caseId: string) =>
+    apiClient
+      .post<ProductionPreparationEngineerAction>(
+        `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}/acknowledge-critical`
       )
       .then((r) => r.data)
 };
@@ -240,6 +254,7 @@ export const usersApi = {
   update: (userId: string, payload: UserUpdate) =>
     apiClient.patch<User>(`/users/${userId}`, payload).then((r) => r.data),
   deactivate: (userId: string) => apiClient.post<User>(`/users/${userId}/deactivate`).then((r) => r.data),
+  delete: (userId: string) => apiClient.delete<void>(`/admin/users/${userId}`).then((r) => r.data),
   uploadAvatar: (userId: string, file: File) => {
     const formData = new FormData();
     formData.append("file", file);

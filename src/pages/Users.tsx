@@ -1,5 +1,6 @@
 import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { isAxiosError } from "axios";
 import { departmentsApi, positionsApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import DepartmentSelect from "@/components/DepartmentSelect";
@@ -56,6 +57,14 @@ function matchesUserSearch(user: User, query: string, departments: Department[])
   return haystack.includes(normalized);
 }
 
+function getDeleteErrorMessage(error: unknown) {
+  if (isAxiosError(error)) {
+    const detail = error.response?.data?.detail;
+    if (typeof detail === "string" && detail.trim()) return detail;
+  }
+  return "Не удалось удалить пользователя.";
+}
+
 export default function Users() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -96,6 +105,16 @@ export default function Users() {
     }
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: usersApi.delete,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["users"] });
+    },
+    onError: (error) => {
+      window.alert(getDeleteErrorMessage(error));
+    }
+  });
+
   if (!user?.is_superuser) {
     return <div className="card">Раздел доступен только суперпользователю.</div>;
   }
@@ -106,6 +125,14 @@ export default function Users() {
       ...form,
       department_id: form.department_id || null
     });
+  }
+
+  function handleDelete(item: User) {
+    const displayName = getUserDisplayName(item);
+    const confirmed = window.confirm(
+      `Удалить пользователя «${displayName}»?\n\nПользователь потеряет доступ и исчезнет из списка.`
+    );
+    if (confirmed) deleteMutation.mutate(item.id);
   }
 
   const totalCount = usersQuery.data?.length ?? 0;
@@ -293,14 +320,27 @@ export default function Users() {
                           </span>
                         </td>
                         <td>
-                          <button
-                            className={styles.deactivateButton}
-                            type="button"
-                            onClick={() => deactivateMutation.mutate(item.id)}
-                            disabled={!item.is_active || deactivateMutation.isPending}
-                          >
-                            Заблокировать
-                          </button>
+                          <div className={styles.actions}>
+                            <button
+                              className={styles.deactivateButton}
+                              type="button"
+                              onClick={() => deactivateMutation.mutate(item.id)}
+                              disabled={!item.is_active || deactivateMutation.isPending || deleteMutation.isPending}
+                            >
+                              Заблокировать
+                            </button>
+                            <button
+                              className={styles.deleteButton}
+                              type="button"
+                              onClick={() => handleDelete(item)}
+                              disabled={item.id === user.id || deleteMutation.isPending}
+                              title={item.id === user.id ? "Нельзя удалить собственную учётную запись" : undefined}
+                            >
+                              {deleteMutation.isPending && deleteMutation.variables === item.id
+                                ? "Удаляем..."
+                                : "Удалить"}
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     ))}

@@ -111,6 +111,18 @@ export interface ProcurementCaseSummary {
   source_active?: boolean;
   engineer_bucket?: "success" | "attention" | "critical" | null;
   engineer_bucket_reason?: string | null;
+  engineer_work_status?: "processing" | "awaiting_action" | "completed" | "archived" | null;
+  engineer_decision_kind?: "none" | "purchase_confirmation" | "critical_acknowledgement" | null;
+  engineer_invoked_at?: string | null;
+  engineer_workspace_archived_at?: string | null;
+  engineer_action_at?: string | null;
+  engineer_critical_acknowledged_at?: string | null;
+}
+
+export interface ProductionPreparationEngineerAction {
+  status: string;
+  action: "purchase_confirmed" | "critical_acknowledged";
+  case_id: string;
 }
 
 export interface ProcurementCaseDetail extends ProcurementCaseSummary {
@@ -285,6 +297,9 @@ export interface ProductionPreparationPositionCalculation {
   gross_requirement: string | number;
   free_stock: string | number;
   available_other_warehouses: string | number;
+  warehouse_stock_before?: string | number;
+  warehouse_stock_used?: string | number;
+  warehouse_stock_remaining?: string | number;
   confirmed_arrivals: string | number;
   total_available_supply: string | number;
   net_requirement: string | number;

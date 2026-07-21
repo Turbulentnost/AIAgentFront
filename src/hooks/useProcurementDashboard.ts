@@ -77,11 +77,19 @@ export function useProductionPreparationEngineerPermissions() {
   });
 }
 
-export function useProductionPreparationEngineerDashboard(enabled: boolean) {
+export function useProductionPreparationEngineerDashboard(
+  enabled: boolean,
+  view: "active" | "archive" = "active"
+) {
   return useQuery({
-    queryKey: ["procurement", "production-preparation-engineer", "dashboard"],
-    queryFn: () => productionPreparationEngineerApi.getDashboard(),
-    enabled
+    queryKey: ["procurement", "production-preparation-engineer", "dashboard", view],
+    queryFn: () => productionPreparationEngineerApi.getDashboard(view),
+    enabled,
+    refetchInterval: (query) => {
+      if (view === "archive") return 30000;
+      const cases = query.state.data?.groups.flatMap((group) => group.cases) ?? [];
+      return cases.some((item) => item.engineer_work_status === "processing") ? 10000 : 30000;
+    }
   });
 }
 
@@ -89,6 +97,25 @@ export function useProductionPreparationEngineerCase(caseId: string | null, enab
   return useQuery({
     queryKey: ["procurement", "production-preparation-engineer", "case", caseId],
     queryFn: () => productionPreparationEngineerApi.getCase(caseId!),
-    enabled: Boolean(caseId) && enabled
+    enabled: Boolean(caseId) && enabled,
+    refetchInterval: (query) =>
+      query.state.data?.engineer_work_status === "processing" ? 8000 : false
+  });
+}
+
+export function useProductionPreparationEngineerAction(
+  action: "confirm_purchase" | "acknowledge_critical"
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (caseId: string) =>
+      action === "confirm_purchase"
+        ? productionPreparationEngineerApi.confirmPurchase(caseId)
+        : productionPreparationEngineerApi.acknowledgeCritical(caseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["procurement", "production-preparation-engineer"]
+      });
+    }
   });
 }

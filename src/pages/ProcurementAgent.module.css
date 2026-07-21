@@ -104,6 +104,7 @@
   grid-template-columns: 360px minmax(0, 1fr);
   gap: 16px;
   align-items: start;
+  min-width: 0;
 }
 
 .engineerBuckets {
@@ -157,6 +158,33 @@
   color: #b45309;
 }
 
+.engineerBucket[data-needs-attention="true"] {
+  animation: engineerAttentionPulse 10s ease-in-out infinite;
+}
+
+@keyframes engineerAttentionPulse {
+  0%,
+  45%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #f59e0b 0%, transparent);
+  }
+
+  12%,
+  36% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, #f59e0b 18%, transparent);
+  }
+
+  24% {
+    box-shadow: 0 0 18px 3px color-mix(in srgb, #f59e0b 32%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .engineerBucket[data-needs-attention="true"] {
+    animation: none;
+  }
+}
+
 .engineerBucket[data-bucket="critical"] {
   color: #b91c1c;
 }
@@ -175,6 +203,7 @@
   padding: 16px;
   display: grid;
   gap: 14px;
+  min-width: 0;
 }
 
 .panelHeader {
@@ -224,6 +253,13 @@
   gap: 10px;
 }
 
+.engineerToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .modeSwitch,
 .caseViewSwitch {
   display: inline-flex;
@@ -251,6 +287,78 @@
   border-color: var(--color-primary);
   box-shadow: inset 0 0 0 1px var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+}
+
+.documentSearch {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: min(100%, 420px);
+  min-height: 38px;
+  padding-left: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-muted);
+}
+
+.documentSearch:focus-within {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.documentSearch input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+}
+
+.documentSearchClear {
+  display: grid;
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.documentSearchClear:hover {
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+.documentSearchSubmit {
+  align-self: stretch;
+  min-width: 68px;
+  padding: 0 13px;
+  border: 0;
+  border-left: 1px solid var(--color-border);
+  border-radius: 0 9px 9px 0;
+  background: color-mix(in srgb, var(--color-primary) 9%, var(--color-surface));
+  color: var(--color-primary);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.documentSearchSubmit:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.documentSearchMessage {
+  margin-top: -8px;
+  color: var(--color-danger);
+  font-size: 12px;
+  text-align: right;
 }
 
 .caseItemNote {
@@ -583,6 +691,605 @@
   font-size: 13px;
 }
 
+.engineerDetailsPanel {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.engineerPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.engineerPanelHeader h3,
+.engineerPanelHeader p {
+  margin: 0;
+}
+
+.engineerPanelHeader p {
+  margin-top: 5px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.engineerTitleRow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lastCalculation {
+  display: grid;
+  gap: 3px;
+  flex: 0 0 auto;
+  text-align: right;
+  font-size: 12px;
+}
+
+.lastCalculation span {
+  color: var(--color-muted);
+}
+
+.engineerDetailsPanel > .resultStatus {
+  margin: 16px 20px 0;
+}
+
+.engineerActionBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 12px 20px 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warning-dark) 35%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-warning-dark) 7%, var(--color-surface));
+}
+
+.engineerActionBar > div {
+  display: grid;
+  gap: 4px;
+}
+
+.engineerActionBar span {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.resultStatusWarning {
+  border-color: color-mix(in srgb, var(--color-warning-dark) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning-dark) 8%, var(--color-surface));
+  color: var(--color-warning-dark);
+}
+
+.engineerMetrics {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 14px 20px 0;
+}
+
+.engineerMetrics > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-bg);
+}
+
+.engineerMetrics span,
+.positionSummary span,
+.calculationRow small,
+.calculationDetails small,
+.engineerFacts span,
+.detailMetricRow span {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.engineerMetrics strong {
+  font-size: 18px;
+}
+
+.metricCovered {
+  color: #15803d;
+}
+
+.metricDeficit {
+  color: var(--color-danger);
+}
+
+.engineerTabs {
+  display: flex;
+  gap: 18px;
+  margin-top: 12px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--color-border);
+  overflow-x: auto;
+}
+
+.engineerTab,
+.engineerTabActive {
+  flex: 0 0 auto;
+  padding: 11px 0;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.engineerTabActive {
+  border-bottom-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 700;
+}
+
+.engineerTab b,
+.engineerTabActive b {
+  margin-left: 4px;
+  font-size: 11px;
+}
+
+.engineerTabContent {
+  display: grid;
+  gap: 12px;
+  padding: 16px 20px 20px;
+}
+
+.engineerOverviewGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) minmax(240px, 1fr);
+  gap: 12px;
+}
+
+.engineerSectionCard {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.engineerFacts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.engineerFacts > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.engineerFacts strong {
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.specificationHighlight {
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+}
+
+.specificationHighlight span {
+  color: var(--color-primary);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.specificationHighlight small {
+  color: var(--color-muted);
+}
+
+.positionSummaryList {
+  display: grid;
+}
+
+.positionSummary {
+  display: grid;
+  grid-template-columns: minmax(180px, 1.8fr) repeat(3, minmax(80px, 0.7fr)) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.positionSummary > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.positionSummary small {
+  overflow: hidden;
+  color: var(--color-muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outcomeBadge {
+  display: inline-flex;
+  justify-content: center;
+  width: fit-content;
+  max-width: 140px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 700;
+  text-align: center;
+}
+
+.outcomeBadge[data-tone="success"] {
+  background: color-mix(in srgb, #16a34a 12%, var(--color-surface));
+  color: #15803d;
+}
+
+.outcomeBadge[data-tone="warning"] {
+  background: color-mix(in srgb, var(--color-warning-dark) 12%, var(--color-surface));
+  color: var(--color-warning-dark);
+}
+
+.outcomeBadge[data-tone="danger"] {
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface));
+  color: var(--color-danger);
+}
+
+.primaryAction,
+.secondaryAction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: fit-content;
+  border: 1px solid var(--color-primary);
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: white;
+  padding: 9px 12px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.secondaryAction {
+  border-color: var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+}
+
+.secondaryAction:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.informationBox {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 25%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.informationBox > div {
+  display: grid;
+  gap: 3px;
+}
+
+.informationBox span {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.sectionHeading {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.sectionHeading h4,
+.sectionHeading p {
+  margin: 0;
+}
+
+.sectionHeading p {
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.calculationTable {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+  overflow: hidden;
+}
+
+.calculationHeader,
+.calculationRow {
+  display: grid;
+  grid-template-columns: minmax(185px, 1.6fr) minmax(120px, 1fr) repeat(3, minmax(80px, 0.7fr)) minmax(92px, 0.75fr) minmax(105px, 0.8fr);
+  gap: 10px;
+  align-items: center;
+}
+
+.calculationHeader {
+  padding: 9px 12px;
+  background: var(--color-bg);
+  color: var(--color-muted);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.calculationItem + .calculationItem {
+  border-top: 1px solid var(--color-border);
+}
+
+.calculationRow {
+  width: 100%;
+  padding: 12px;
+  border: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.calculationRow:hover {
+  background: color-mix(in srgb, var(--color-primary) 4%, var(--color-surface));
+}
+
+.calculationRow > span:not(.outcomeBadge),
+.rowNomenclature > span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.calculationRow strong {
+  overflow: hidden;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rowNomenclature {
+  display: flex !important;
+  align-items: center;
+  gap: 7px !important;
+}
+
+.rowNomenclature i {
+  display: grid;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  font-style: normal;
+}
+
+.calculationDetails {
+  display: grid;
+  gap: 12px;
+  margin: 0 10px 10px 40px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 3%, var(--color-surface));
+}
+
+.calculationDetailsHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.calculationDetailsHeader > div {
+  display: grid;
+  gap: 3px;
+}
+
+.calculationDetailsHeader > div > span,
+.formulaCard > span {
+  color: var(--color-primary);
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.confirmedBadge {
+  display: inline-flex;
+  align-items: center;
+  align-self: start;
+  gap: 5px;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #16a34a 10%, var(--color-surface));
+  color: #15803d;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.formulaRow {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.5fr) repeat(3, minmax(100px, 0.75fr));
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.formulaRow > div {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 13px;
+  border-right: 1px solid var(--color-border);
+}
+
+.formulaRow > div:last-child {
+  border-right: 0;
+}
+
+.formulaCard {
+  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-surface));
+}
+
+.netFormula {
+  background: color-mix(in srgb, #16a34a 9%, var(--color-surface));
+}
+
+.netFormula strong {
+  color: #15803d;
+}
+
+.calculationExplanation {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.calculationExplanation > div {
+  display: grid;
+  gap: 5px;
+  padding: 11px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+
+.calculationExplanation span {
+  color: var(--color-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.calculationExplanation small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.detailMetricRow {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.detailMetricRow > div {
+  display: grid;
+  gap: 5px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  background: var(--color-surface);
+}
+
+.sourceGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sourceCard {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 11px;
+}
+
+.sourceCard > span {
+  width: fit-content;
+  padding: 3px 6px;
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.sourceCard[data-status="used"] {
+  border-color: color-mix(in srgb, #16a34a 30%, var(--color-border));
+}
+
+.sourceCard[data-status="used"] > span {
+  background: color-mix(in srgb, #16a34a 10%, var(--color-surface));
+  color: #15803d;
+}
+
+.sourceCard[data-status="excluded"] {
+  border-color: color-mix(in srgb, var(--color-danger) 25%, var(--color-border));
+}
+
+.sourceCard[data-status="excluded"] > span {
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-surface));
+  color: var(--color-danger);
+}
+
+.sourceCard p,
+.issueCard p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.deficitBlock {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-danger) 7%, var(--color-surface));
+  color: var(--color-danger);
+}
+
+.deficitBlock > div,
+.issueCard > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.deficitBlock span,
+.issueCard span {
+  font-size: 11px;
+}
+
+.issueCard {
+  display: grid;
+  gap: 9px;
+  padding: 13px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -602,5 +1309,105 @@
   .resultCards,
   .resultColumns {
     grid-template-columns: 1fr;
+  }
+
+  .engineerMetrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .engineerOverviewGrid,
+  .sourceGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .calculationHeader {
+    display: none;
+  }
+
+  .calculationRow {
+    grid-template-columns: minmax(180px, 1.5fr) repeat(3, minmax(80px, 0.7fr)) minmax(100px, 0.8fr);
+  }
+
+  .calculationRow > span:nth-child(2),
+  .calculationRow > span:nth-child(6) {
+    display: none;
+  }
+
+  .formulaRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .formulaCard {
+    grid-column: 1 / -1;
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--color-border);
+  }
+}
+
+@media (max-width: 720px) {
+  .engineerToolbar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .documentSearch {
+    width: 100%;
+  }
+
+  .documentSearchMessage {
+    text-align: left;
+  }
+
+  .engineerPanelHeader,
+  .sectionHeading,
+  .calculationDetailsHeader {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .lastCalculation {
+    text-align: left;
+  }
+
+  .engineerMetrics,
+  .engineerFacts,
+  .calculationExplanation,
+  .detailMetricRow {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .positionSummary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .positionSummary > div:first-child,
+  .positionSummary > .outcomeBadge {
+    grid-column: 1 / -1;
+  }
+
+  .calculationRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .calculationRow > span:first-child,
+  .calculationRow > .outcomeBadge {
+    grid-column: 1 / -1;
+  }
+
+  .calculationDetails {
+    margin-left: 10px;
+  }
+
+  .formulaRow {
+    grid-template-columns: 1fr;
+  }
+
+  .formulaRow > div {
+    border-right: 0;
+    border-bottom: 1px solid var(--color-border);
+  }
+
+  .formulaRow > div:last-child {
+    border-bottom: 0;
   }
 }
