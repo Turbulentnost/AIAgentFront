@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
+  Clock3,
   CircleAlert,
   ListChecks,
   Loader2,
@@ -22,6 +23,7 @@ import styles from "./ProcurementAgent.module.css";
 
 const AGENT_ID = "production_preparation_engineer_agent";
 type EngineerBucket = "success" | "attention" | "critical";
+type AttentionSection = "processing" | "awaiting";
 
 const BUCKETS: Array<{
   id: EngineerBucket;
@@ -79,12 +81,22 @@ export default function ProductionPreparationEngineerAgent() {
     requestedBucket === "critical"
       ? requestedBucket
       : "success";
+  const attentionSection: AttentionSection =
+    searchParams.get("attention") === "awaiting" ? "awaiting" : "processing";
   const bucketCases = useMemo(
-    () =>
-      activeView === "archive"
-        ? cases
-        : cases.filter((item) => (item.engineer_bucket || "attention") === activeBucket),
-    [activeBucket, activeView, cases]
+    () => {
+      if (activeView === "archive") return cases;
+      const matchingBucket = cases.filter(
+        (item) => (item.engineer_bucket || "attention") === activeBucket
+      );
+      if (activeBucket !== "attention") return matchingBucket;
+      return matchingBucket.filter((item) =>
+        attentionSection === "processing"
+          ? item.engineer_work_status === "processing"
+          : item.engineer_work_status !== "processing"
+      );
+    },
+    [activeBucket, activeView, attentionSection, cases]
   );
   const bucketCounts = useMemo(
     () =>
@@ -94,6 +106,19 @@ export default function ProductionPreparationEngineerAgent() {
           return counts;
         },
         { success: 0, attention: 0, critical: 0 }
+      ),
+    [cases]
+  );
+  const attentionCounts = useMemo(
+    () =>
+      cases.reduce(
+        (counts, item) => {
+          if ((item.engineer_bucket || "attention") !== "attention") return counts;
+          if (item.engineer_work_status === "processing") counts.processing += 1;
+          else counts.awaiting += 1;
+          return counts;
+        },
+        { processing: 0, awaiting: 0 }
       ),
     [cases]
   );
@@ -125,6 +150,14 @@ export default function ProductionPreparationEngineerAgent() {
   const selectBucket = (bucket: EngineerBucket) => {
     const next = new URLSearchParams(searchParams);
     next.set("bucket", bucket);
+    next.delete("case");
+    setSearchParams(next);
+  };
+
+  const selectAttentionSection = (section: AttentionSection) => {
+    const next = new URLSearchParams(searchParams);
+    if (section === "awaiting") next.set("attention", "awaiting");
+    else next.delete("attention");
     next.delete("case");
     setSearchParams(next);
   };
@@ -162,6 +195,14 @@ export default function ProductionPreparationEngineerAgent() {
         const next = new URLSearchParams(searchParams);
         next.delete("view");
         next.set("bucket", bucket);
+        if (
+          bucket === "attention" &&
+          found.engineer_work_status !== "processing"
+        ) {
+          next.set("attention", "awaiting");
+        } else {
+          next.delete("attention");
+        }
         next.set("case", found.id);
         setSearchParams(next);
         setSearchMessage("");
@@ -217,8 +258,8 @@ export default function ProductionPreparationEngineerAgent() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h2>Инженер по подготовке производства</h2>
-          <p>Расчёты обеспеченности по производственным заказам</p>
+          <h2>ИИ-агент закупок и логистики</h2>
+          <p>Для инженера по подготовке производства</p>
         </div>
       </div>
 
@@ -283,35 +324,68 @@ export default function ProductionPreparationEngineerAgent() {
       {searchMessage ? <div className={styles.documentSearchMessage}>{searchMessage}</div> : null}
 
       {activeView === "active" ? (
-        <div className={styles.engineerBuckets}>
-          {BUCKETS.map((bucket) => {
-            const Icon = bucket.icon;
-            return (
+        <div className={styles.engineerBucketArea}>
+          <div className={styles.engineerBuckets}>
+            {BUCKETS.map((bucket) => {
+              const Icon = bucket.icon;
+              return (
+                <button
+                  className={
+                    activeBucket === bucket.id
+                      ? `${styles.engineerBucket} ${styles.engineerBucketActive}`
+                      : styles.engineerBucket
+                  }
+                  data-bucket={bucket.id}
+                  data-needs-attention={
+                    bucket.id === "attention" && attentionCounts.awaiting > 0
+                      ? "true"
+                      : undefined
+                  }
+                  key={bucket.id}
+                  onClick={() => selectBucket(bucket.id)}
+                  type="button"
+                >
+                  <Icon size={20} />
+                  <span>
+                    <strong>{bucket.label}</strong>
+                    <small>{bucket.description}</small>
+                  </span>
+                  <b>{bucketCounts[bucket.id]}</b>
+                </button>
+              );
+            })}
+          </div>
+          {activeBucket === "attention" ? (
+            <div className={styles.attentionSectionSwitch}>
               <button
                 className={
-                  activeBucket === bucket.id
-                    ? `${styles.engineerBucket} ${styles.engineerBucketActive}`
-                    : styles.engineerBucket
+                  attentionSection === "processing"
+                    ? styles.caseViewActive
+                    : styles.caseViewBtn
                 }
-                data-bucket={bucket.id}
-                data-needs-attention={
-                  bucket.id === "attention" && bucketCounts.attention > 0
-                    ? "true"
-                    : undefined
-                }
-                key={bucket.id}
-                onClick={() => selectBucket(bucket.id)}
+                onClick={() => selectAttentionSection("processing")}
                 type="button"
               >
-                <Icon size={20} />
-                <span>
-                  <strong>{bucket.label}</strong>
-                  <small>{bucket.description}</small>
-                </span>
-                <b>{bucketCounts[bucket.id]}</b>
+                <Loader2
+                  className={attentionCounts.processing > 0 ? styles.spin : undefined}
+                  size={15}
+                />
+                Рассчитывается ({attentionCounts.processing})
               </button>
-            );
-          })}
+              <button
+                className={
+                  attentionSection === "awaiting"
+                    ? styles.caseViewActive
+                    : styles.caseViewBtn
+                }
+                onClick={() => selectAttentionSection("awaiting")}
+                type="button"
+              >
+                <Clock3 size={15} />
+                Требуют внимания ({attentionCounts.awaiting})
+              </button>
+            </div>
+          ) : null}
         </div>
       ) : null}
 
@@ -328,7 +402,11 @@ export default function ProductionPreparationEngineerAgent() {
             emptyText={
               activeView === "archive"
                 ? "Архивных кейсов нет."
-                : `В разделе «${BUCKETS.find((item) => item.id === activeBucket)?.label}» кейсов нет.`
+                : activeBucket === "attention"
+                  ? attentionSection === "processing"
+                    ? "Кейсов в расчёте нет."
+                    : "Кейсов, требующих внимания, нет."
+                  : `В разделе «${BUCKETS.find((item) => item.id === activeBucket)?.label}» кейсов нет.`
             }
             onSelect={selectCase}
             selectedCaseId={selectedCaseId}
@@ -337,8 +415,12 @@ export default function ProductionPreparationEngineerAgent() {
             title={
               activeView === "archive"
                 ? "Архив"
-                : (BUCKETS.find((item) => item.id === activeBucket)?.label ||
-                  "Производственные кейсы")
+                : activeBucket === "attention"
+                  ? attentionSection === "processing"
+                    ? "Рассчитывается"
+                    : "Требуют внимания"
+                  : (BUCKETS.find((item) => item.id === activeBucket)?.label ||
+                    "Производственные кейсы")
             }
           />
         )}

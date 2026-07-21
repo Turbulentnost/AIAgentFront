@@ -28,8 +28,16 @@ export default function ProcurementAgent() {
 
   const dashboardView: ProcurementDashboardView =
     mode === "bases" ? "active" : caseView === "archive" ? "archive" : "processing";
-  const dashboardQuery = useProcurementDashboard(canAccess, dashboardView);
-  const countsQuery = useProcurementDashboard(canAccess, "active");
+  const activeDashboardQuery = useProcurementDashboard(canAccess, "active");
+  const processingDashboardQuery = useProcurementDashboard(canAccess, "processing");
+  const archiveDashboardQuery = useProcurementDashboard(canAccess, "archive");
+  const dashboardQuery =
+    dashboardView === "archive"
+      ? archiveDashboardQuery
+      : dashboardView === "processing"
+        ? processingDashboardQuery
+        : activeDashboardQuery;
+  const countsQuery = activeDashboardQuery;
 
   const groups = dashboardQuery.data?.groups ?? [];
   const counts = dashboardQuery.data?.counts ??
@@ -94,6 +102,34 @@ export default function ProcurementAgent() {
     setSearchParams(next);
   };
 
+  const searchCaseByNumber = (rawQuery: string): boolean => {
+    const query = rawQuery.trim().toLocaleLowerCase("ru-RU").replace(/\s+/g, "");
+    if (!query) return false;
+    const normalize = (value?: string | null) =>
+      value?.toLocaleLowerCase("ru-RU").replace(/\s+/g, "") ?? "";
+    const findCase = (items: typeof flatCases) =>
+      items.find((item) => normalize(item.source_number) === query) ||
+      items.find(
+        (item) =>
+          normalize(item.source_number).includes(query) ||
+          normalize(item.source_1c_ref).includes(query)
+      );
+    const processingCases =
+      processingDashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [];
+    const archiveCases = archiveDashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [];
+    const processingCase = findCase(processingCases);
+    if (processingCase) {
+      updateParams({ mode: "cases", view: "processing", case: processingCase.id });
+      return true;
+    }
+    const archiveCase = findCase(archiveCases);
+    if (archiveCase) {
+      updateParams({ mode: "cases", view: "archive", case: archiveCase.id });
+      return true;
+    }
+    return false;
+  };
+
   if (permissionsQuery.isLoading) {
     return (
       <div className={styles.page}>
@@ -155,7 +191,9 @@ export default function ProcurementAgent() {
             case: null
           })
         }
+        onSearch={searchCaseByNumber}
         processingCount={counts.processing}
+        searchLoading={processingDashboardQuery.isLoading || archiveDashboardQuery.isLoading}
       />
 
       <div className={styles.statsRow}>

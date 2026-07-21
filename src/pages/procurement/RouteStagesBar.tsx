@@ -1,15 +1,18 @@
+import { Check } from "lucide-react";
 import type { ProcurementRouteStage } from "@/types/procurement";
 import { completedStageCount } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
 type Props = {
   stages: ProcurementRouteStage[];
+  selectedStageId?: string;
+  onSelect?: (stageId: string) => void;
 };
 
-export function RouteStagesBar({ stages }: Props) {
+export function RouteStagesBar({ stages, selectedStageId, onSelect }: Props) {
   const completed = completedStageCount(stages);
   return (
-    <div className={styles.routeCard}>
+    <div className={styles.orchestratorRoute}>
       <div className={styles.routeHeader}>
         <strong>Маршрут кейса</strong>
         <span>
@@ -18,10 +21,21 @@ export function RouteStagesBar({ stages }: Props) {
       </div>
       <div className={styles.routeTrack}>
         {stages.map((stage, index) => (
-          <div className={styles.routeStep} data-status={stage.status} key={stage.stage_id}>
-            <div className={styles.routeDot}>{index + 1}</div>
+          <button
+            aria-pressed={selectedStageId === stage.stage_id}
+            className={styles.routeStep}
+            data-selected={selectedStageId === stage.stage_id}
+            data-status={stage.status}
+            disabled={stage.status === "pending" || stage.status === "skipped"}
+            key={stage.stage_id}
+            onClick={() => onSelect?.(stage.stage_id)}
+            type="button"
+          >
+            <div className={styles.routeDot}>
+              {stage.status === "completed" ? <Check size={14} /> : index + 1}
+            </div>
             <span>{stage.label}</span>
-          </div>
+          </button>
         ))}
       </div>
     </div>

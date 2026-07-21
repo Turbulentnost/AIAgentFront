@@ -113,9 +113,7 @@ export function useProductionPreparationEngineerAction(
         ? productionPreparationEngineerApi.confirmPurchase(caseId)
         : productionPreparationEngineerApi.acknowledgeCritical(caseId),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({
-        queryKey: ["procurement", "production-preparation-engineer"]
-      });
+      await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }
   });
 }
