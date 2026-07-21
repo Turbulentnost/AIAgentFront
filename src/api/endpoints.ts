@@ -1,4 +1,11 @@
 import { apiClient, longRunningApiClient } from "./client";
+import type {
+  OmtoDashboard,
+  OmtoPermissions,
+  OmtoResumeRequest,
+  OmtoRunRequest,
+  OmtoRunResult
+} from "@/types/omto";
 import { pochtaApiClient } from "./pochtaClient";
 import type {
   Agent,
@@ -229,6 +236,18 @@ export const productionPreparationEngineerApi = {
         `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}/acknowledge-critical`
       )
       .then((r) => r.data)
+};
+
+// Ролевые агенты ОМТО — KPI-дашборды с доступом по должности пользователя.
+export const omtoApi = {
+  permissions: () =>
+    apiClient.get<OmtoPermissions>("/omto/me/permissions").then((r) => r.data),
+  getDashboard: (slug: string) =>
+    apiClient.get<OmtoDashboard>(`/omto/role-agents/${slug}/dashboard`).then((r) => r.data),
+  run: (slug: string, body: OmtoRunRequest) =>
+    apiClient.post<OmtoRunResult>(`/omto/role-agents/${slug}/run`, body).then((r) => r.data),
+  resume: (slug: string, body: OmtoResumeRequest) =>
+    apiClient.post<OmtoRunResult>(`/omto/role-agents/${slug}/resume`, body).then((r) => r.data)
 };
 
 export const healthApi = {

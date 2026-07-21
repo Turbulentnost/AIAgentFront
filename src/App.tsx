@@ -3,6 +3,7 @@ import MeetingAgent from "@/pages/MeetingAgent";
 import TasksAgent from "@/pages/TasksAgent";
 import ProcurementAgent from "@/pages/ProcurementAgent";
 import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEngineerAgent";
+import OmtoAgentDashboard from "@/pages/OmtoAgentDashboard";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
@@ -41,6 +42,11 @@ export default function App() {
       <Route path="/agents/incoming-mail" element={<ProtectedRoute><Layout title="Входящая корреспонденция"><IncomingMail /></Layout></ProtectedRoute>} />
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="ИИ-агент закупок и логистики"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/procurement-manager" element={<ProtectedRoute><Layout title="KPI · Агент менеджера по закупкам"><OmtoAgentDashboard slug="procurement_manager_agent" /></Layout></ProtectedRoute>} />
+      <Route path="/agents/omto-head" element={<ProtectedRoute><Layout title="KPI · Агент начальника ОМТО"><OmtoAgentDashboard slug="omto_head_agent" /></Layout></ProtectedRoute>} />
+      <Route path="/agents/omto-deputy" element={<ProtectedRoute><Layout title="KPI · Агент заместителя начальника ОМТО"><OmtoAgentDashboard slug="omto_deputy_agent" /></Layout></ProtectedRoute>} />
+      <Route path="/agents/kb-engineer" element={<ProtectedRoute><Layout title="KPI · Агент инженера КБ / ГСПП"><OmtoAgentDashboard slug="kb_engineer_agent" /></Layout></ProtectedRoute>} />
+      <Route path="/agents/security-officer" element={<ProtectedRoute><Layout title="KPI · Агент сотрудника СБ"><OmtoAgentDashboard slug="security_officer_agent" /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />
