@@ -1,4 +1,5 @@
 import type { Contour4AgentId, Contour4SessionRole } from "@/types/contour4";
+import { asBool } from "./lib/asBool";
 
 const STORAGE_KEY = "contour4_session_role";
 
@@ -44,5 +45,9 @@ export function isRegistryLineBlocked(
   row: Record<string, string | number | boolean | null | undefined>
 ): boolean {
   const approved = row.cfo_approved;
-  return approved === false || approved === "false" || approved === 0;
+  // Explicit false / "false" / 0 only — missing field is not treated as blocked.
+  if (approved === null || approved === undefined || approved === "") {
+    return false;
+  }
+  return !asBool(approved);
 }

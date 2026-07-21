@@ -1,19 +1,21 @@
 import type { Contour4Widget } from "@/types/contour4";
 import { isRegistryLineBlocked } from "./contour4Session";
 import styles from "./Contour4Workspace.module.css";
+import { formatCell, formatMoney } from "./lib/formatters";
+import { statusClass, timelineStatusClassMap } from "./lib/statusClass";
 
-function formatCell(value: string | number | boolean | null | undefined): string {
-  if (value === null || value === undefined) return "—";
-  if (typeof value === "boolean") return value ? "да" : "нет";
-  return String(value);
-}
-
-function formatMoney(value: string | number): string {
-  const n = typeof value === "number" ? value : Number(String(value).replace(/\s/g, ""));
-  if (Number.isFinite(n)) {
-    return new Intl.NumberFormat("ru-RU").format(n) + " ₽";
+function renderTableCell(
+  key: string,
+  row: Record<string, string | number | boolean | null | undefined>,
+  blocked: boolean
+) {
+  if (key === "cfo_approved" && blocked) {
+    return <span className={styles.badgeBlocked}>без ЦФО</span>;
   }
-  return String(value);
+  if (key === "amount") {
+    return formatMoney(row[key] as string | number);
+  }
+  return formatCell(row[key]);
 }
 
 function ChartBars({
@@ -29,13 +31,18 @@ function ChartBars({
       {labels.map((label, i) => {
         const v = values[i] ?? 0;
         const pct = Math.round((Math.abs(v) / max) * 100);
-        const over = v > (values.find((_, j) => labels[j]?.includes("Лимит")) ?? Infinity);
+        const over =
+          v > (values.find((_, j) => labels[j]?.includes("Лимит")) ?? Infinity);
         return (
           <div key={label} className={styles.chartBarRow}>
             <span className={styles.chartBarLabel}>{label}</span>
             <div className={styles.chartBarTrack}>
               <i
-                className={over && label.includes("Сумма") ? styles.chartBarFillBad : styles.chartBarFill}
+                className={
+                  over && label.includes("Сумма")
+                    ? styles.chartBarFillBad
+                    : styles.chartBarFill
+                }
                 style={{ width: `${pct}%` }}
               />
             </div>
@@ -64,8 +71,17 @@ function ChartLine({
     .join(" ");
   return (
     <div className={styles.chartLineWrap}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" className={styles.chartLineSvg}>
-        <polyline fill="none" stroke="currentColor" strokeWidth="2" points={points} />
+      <svg
+        viewBox="0 0 100 100"
+        preserveAspectRatio="none"
+        className={styles.chartLineSvg}
+      >
+        <polyline
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          points={points}
+        />
       </svg>
       <div className={styles.chartLineLabels}>
         {labels.map((l) => (
@@ -84,6 +100,7 @@ function WidgetBody({
   highlightBlockedRows?: boolean;
 }) {
   const data = widget.data;
+  const timelineMap = timelineStatusClassMap(styles);
 
   if (widget.type === "kpi_cards") {
     return (
@@ -91,13 +108,18 @@ function WidgetBody({
         {(data.cards ?? []).map((card) => {
           const raw = card.value;
           const display =
-            card.format === "money" ? formatMoney(raw as string | number) : formatCell(raw);
+            card.format === "money"
+              ? formatMoney(raw as string | number)
+              : formatCell(raw);
           const negative =
-            card.format === "money" && Number(String(raw).replace(/\s/g, "")) < 0;
+            card.format === "money" &&
+            Number(String(raw).replace(/\s/g, "")) < 0;
           return (
             <div
               key={card.key}
-              className={negative ? styles.widgetKpiCardBad : styles.widgetKpiCard}
+              className={
+                negative ? styles.widgetKpiCardBad : styles.widgetKpiCard
+              }
             >
               <span className={styles.widgetKpiLabel}>{card.label}</span>
               <span className={styles.widgetKpiValue}>{display}</span>
@@ -131,13 +153,7 @@ function WidgetBody({
                 >
                   {columns.map((c) => (
                     <td key={c.key}>
-                      {c.key === "cfo_approved" && blocked ? (
-                        <span className={styles.badgeBlocked}>без ЦФО</span>
-                      ) : c.key === "amount" ? (
-                        formatMoney(row[c.key] as string | number)
-                      ) : (
-                        formatCell(row[c.key])
-                      )}
+                      {renderTableCell(c.key, row, Boolean(blocked))}
                     </td>
                   ))}
                 </tr>
@@ -166,15 +182,7 @@ function WidgetBody({
       <ul className={styles.widgetTimeline}>
         {(data.items ?? []).map((item) => (
           <li key={item.label} className={styles.widgetTimelineItem}>
-            <span
-              className={
-                item.status === "ok"
-                  ? styles.tlOk
-                  : item.status === "warn" || item.status === "bad"
-                    ? styles.tlBad
-                    : styles.tlPending
-              }
-            />
+            <span className={statusClass(timelineMap, item.status)} />
             <div>
               <strong>{item.label}</strong>
               <div className={styles.muted}>{item.value}</div>
@@ -213,7 +221,10 @@ export default function Contour4WidgetHost({
               <span className={styles.kpiId}>{widget.id}</span>
               <h3 className={styles.widgetTitle}>{widget.title}</h3>
             </header>
-            <WidgetBody widget={widget} highlightBlockedRows={highlightBlockedRows} />
+            <WidgetBody
+              widget={widget}
+              highlightBlockedRows={highlightBlockedRows}
+            />
           </article>
         ))}
       </div>
