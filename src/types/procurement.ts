@@ -93,6 +93,11 @@ export interface ProcurementCaseSummary {
   source_date?: string | null;
   source_status?: string | null;
   source_synced_at?: string | null;
+  source_basis_1c_ref?: string | null;
+  source_basis_type?: string | null;
+  source_basis_number?: string | null;
+  source_basis_date?: string | null;
+  source_basis_status?: string | null;
   status: string;
   control_point?: string | null;
   current_agent_id?: string | null;

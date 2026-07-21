@@ -238,6 +238,23 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
           <span>Основание</span>
           <strong>{sourceLabel}</strong>
         </div>
+        {detail.source_type === "reorder_point" ? (
+          <div>
+            <span>Основание точки заказа</span>
+            <strong>
+              {detail.source_basis_number
+                ? `№ ${detail.source_basis_number}`
+                : detail.source_basis_1c_ref || "Не указано"}
+            </strong>
+            {detail.source_basis_date || detail.source_basis_status ? (
+              <small>
+                {[formatDateTime(detail.source_basis_date), detail.source_basis_status]
+                  .filter((value) => value && value !== "—")
+                  .join(" · ")}
+              </small>
+            ) : null}
+          </div>
+        ) : null}
         <div>
           <span>Номер документа</span>
           <strong>{detail.source_number || "—"}</strong>
