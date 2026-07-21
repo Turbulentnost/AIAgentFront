@@ -16,6 +16,14 @@ export const PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG =
 export const PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH =
   "/agents/production-preparation-engineer";
 export const AGENT_LAUNCH_MORPH_MS = 520;
+// Ролевые агенты ОМТО: slug -> путь KPI-дашборда.
+export const OMTO_AGENT_PATHS: Record<string, string> = {
+  procurement_manager_agent: "/agents/procurement-manager",
+  omto_head_agent: "/agents/omto-head",
+  omto_deputy_agent: "/agents/omto-deputy",
+  kb_engineer_agent: "/agents/kb-engineer",
+  security_officer_agent: "/agents/security-officer"
+};
 
 function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
   return `${agent.slug} ${agent.name ?? ""} ${agent.purpose ?? ""}`.toLowerCase();
@@ -56,6 +64,10 @@ export function isProductionPreparationEngineerAgent(
   return agent.slug === PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG;
 }
 
+export function isOmtoRoleAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug in OMTO_AGENT_PATHS;
+}
+
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
   return (
     isNdControlAgent(agent) ||
@@ -63,7 +75,8 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isTasksAgent(agent) ||
     isIncomingCorrespondenceAgent(agent) ||
     isProductionPreparationEngineerAgent(agent) ||
-    isProcurementAgent(agent)
+    isProcurementAgent(agent) ||
+    isOmtoRoleAgent(agent)
   );
 }
 
@@ -101,6 +114,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isProcurementAgent(agent)) {
     return {
       path: PROCUREMENT_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isOmtoRoleAgent(agent)) {
+    return {
+      path: OMTO_AGENT_PATHS[agent.slug],
       state: { from: "agent-launch" as const }
     };
   }
