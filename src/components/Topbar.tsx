@@ -2,11 +2,16 @@ import { useMemo, useState } from "react";
 import { Bell, ChevronDown, Search } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
+import { isStandaloneIncomingMail } from "@/auth/standaloneIncomingMail";
 import { nav } from "./Sidebar";
 import ThemeToggle from "./ThemeToggle";
 
+const standaloneNav = [["/agents/incoming-mail", "Входящая корреспонденция"]] as const;
+
 export default function Topbar({ title }: { title: string }) {
+  const standalone = isStandaloneIncomingMail();
   const { user, logout } = useAuth();
+  const headerNav = standalone ? standaloneNav : nav;
   const [notificationCount, setNotificationCount] = useState(8);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const displayName = user?.full_name || user?.email || "Пользователь";
@@ -23,13 +28,13 @@ export default function Topbar({ title }: { title: string }) {
 
   return (
     <header className="topbar">
-      <Link className="header-brand" to="/" aria-label="AI Agents Platform">
+      <Link className="header-brand" to={standalone ? "/agents/incoming-mail" : "/"} aria-label="AI Agents Platform">
         <img src="/platform-logo.png" alt="" width={28} height={28} />
         <span>AI Agents Platform</span>
       </Link>
 
       <nav className="header-nav" aria-label="Основная навигация">
-        {nav.map(([to, label]) => (
+        {headerNav.map(([to, label]) => (
           <NavLink key={to} to={to} end={to === "/"} className={({ isActive }) => `header-nav-link ${isActive ? "active" : ""}`}>
             {label}
           </NavLink>
@@ -74,7 +79,7 @@ export default function Topbar({ title }: { title: string }) {
             <ChevronDown aria-hidden="true" className={isProfileOpen ? "profile-chevron open" : "profile-chevron"} size={16} strokeWidth={2.2} />
           </button>
 
-          {isProfileOpen && (
+          {isProfileOpen && !standalone && (
             <div className="profile-dropdown">
               <NavLink to="/profile" onClick={() => setIsProfileOpen(false)}>
                 Профиль

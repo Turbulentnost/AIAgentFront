@@ -1,4 +1,4 @@
-import { apiClient, longRunningApiClient } from "./client";
+﻿import { apiClient, longRunningApiClient } from "./client";
 import { pochtaApiClient } from "./pochtaClient";
 import type {
   Agent,
@@ -513,16 +513,38 @@ export const emailMessagesApi = {
     date_from?: string;
     date_to?: string;
     q?: string;
-    only_info_to_test_ii?: boolean;
+    recipient_q?: string;
+    info_recipient_only?: boolean;
   }) =>
     pochtaApiClient.get<EmailMessagesPage>("/api/v1/email-messages", { params }).then((r) => r.data),
-  stats: (params?: { date_from?: string; date_to?: string; q?: string; only_info_to_test_ii?: boolean }) =>
+  stats: (params?: {
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+    q?: string;
+    recipient_q?: string;
+    info_recipient_only?: boolean;
+  }) =>
     pochtaApiClient.get<EmailMessagesStats>("/api/v1/email-messages/stats", { params }).then((r) => r.data),
   get: (messageRowId: string) =>
     pochtaApiClient.get<EmailMessage>(`/api/v1/email-messages/${messageRowId}`).then((r) => r.data),
   fetchBody: (messageRowId: string) =>
     pochtaApiClient
       .post<EmailMessageFetchBodyResponse>(`/api/v1/email-messages/${messageRowId}/fetch-body`, null, {
+        timeout: 90_000
+      })
+      .then((r) => r.data),
+  downloadAttachment: (messageRowId: string, index: number) =>
+    pochtaApiClient
+      .get<Blob>(`/api/v1/email-messages/${messageRowId}/attachments/${index}`, {
+        responseType: "blob",
+        timeout: 90_000
+      })
+      .then((r) => r.data),
+  downloadXml: (messageRowId: string) =>
+    pochtaApiClient
+      .get<Blob>(`/api/v1/email-messages/${messageRowId}/xml`, {
+        responseType: "blob",
         timeout: 90_000
       })
       .then((r) => r.data),
@@ -542,10 +564,14 @@ export const emailMessagesApi = {
     pochtaApiClient
       .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/retry-erp`)
       .then((r) => r.data),
+  reanalyze: (messageRowId: string) =>
+    pochtaApiClient
+      .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/reanalyze`)
+      .then((r) => r.data),
   resolveHuman: (
     messageRowId: string,
     body: {
-      decision: "approve_routing" | "mark_spam" | "mark_not_spam";
+      decision: "approve_routing" | "mark_verified" | "mark_spam" | "mark_not_spam";
       department_id?: string;
       department_name?: string;
       partner_name?: string;
@@ -556,49 +582,23 @@ export const emailMessagesApi = {
   ) =>
     pochtaApiClient
       .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/resolve-human`, body)
-      .then((r) => r.data)
+      .then((r) => r.data),
+  exportReport: (period: "day" | "week" | "month") =>
+    pochtaApiClient
+      .get<Blob>("/api/v1/email-messages/export", {
+        params: { period },
+        responseType: "blob",
+        timeout: 120_000
+      })
+      .then((response) => ({
+        blob: response.data,
+        filename: parseContentDispositionFilename(
+          response.headers["content-disposition"],
+          `tanyafication_report_${period}.xlsx`
+        )
+      }))
 };
 
-export const ndControlApi = {
-  permissions: () => apiClient.get<NdControlPermissions>("/nd-control/me/permissions").then((r) => r.data),
-  listChangeJournal: (params: NdChangeJournalParams = {}) =>
-    apiClient.get<Page<NdChangeJournalEntry>>("/nd-control/change-journal", { params }).then((r) => r.data),
-  getChangeJournalEntry: (entryId: string) =>
-    apiClient.get<NdChangeJournalEntry>(`/nd-control/change-journal/${entryId}`).then((r) => r.data),
-  templates: {
-    types: () => apiClient.get<NdTemplateTypeOption[]>("/nd-control/templates/types").then((r) => r.data),
-    list: (params: {
-      template_type?: NdTemplateType;
-      knowledge_base_id?: string;
-      query?: string;
-      active_only?: boolean;
-      page?: number;
-      size?: number;
-    } = {}) =>
-      apiClient.get<Page<NdControlTemplate>>("/nd-control/templates", { params }).then((r) => r.data),
-    get: (templateId: string) =>
-      apiClient.get<NdControlTemplateDetail>(`/nd-control/templates/${templateId}`).then((r) => r.data),
-    update: (templateId: string, payload: NdControlTemplateUpdate) =>
-      apiClient.patch<NdControlTemplateDetail>(`/nd-control/templates/${templateId}`, payload).then((r) => r.data),
-    setKnowledgeBases: (templateId: string, payload: NdControlTemplateKnowledgeBasesUpdate) =>
-      apiClient
-        .put<NdControlTemplateDetail>(`/nd-control/templates/${templateId}/knowledge-bases`, payload)
-        .then((r) => r.data),
-    documents: (templateId: string, params: { page?: number; size?: number; classification_status?: string } = {}) =>
-      apiClient
-        .get<Page<NdControlTemplateDocument>>(`/nd-control/templates/${templateId}/documents`, { params })
-        .then((r) => r.data),
-    addDocument: (templateId: string, payload: NdControlTemplateDocumentCreate) =>
-      apiClient
-        .post<NdControlTemplateDocument>(`/nd-control/templates/${templateId}/documents`, payload)
-        .then((r) => r.data),
-    updateDocument: (templateId: string, documentLinkId: string, payload: NdControlTemplateDocumentUpdate) =>
-      apiClient
-        .patch<NdControlTemplateDocument>(`/nd-control/templates/${templateId}/documents/${documentLinkId}`, payload)
-        .then((r) => r.data),
-    deleteDocument: (templateId: string, documentLinkId: string) =>
-      apiClient.delete(`/nd-control/templates/${templateId}/documents/${documentLinkId}`).then((r) => r.data)
-  },
   listTemplateTypes: () => apiClient.get<NdTemplateTypeOption[]>("/nd-control/templates/types").then((r) => r.data),
   listTemplates: (params: {
     template_type?: NdTemplateType;
@@ -731,3 +731,19 @@ export const ndControlApi = {
       .get<ProcessUmlResponse>(`/nd-control/processes/${processId}/uml`, { params })
       .then((r) => r.data),
 };
+function parseContentDispositionFilename(
+  contentDisposition: string | undefined,
+  fallback: string
+): string {
+  if (contentDisposition) {
+    const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+    if (utfMatch?.[1]) {
+      return decodeURIComponent(utfMatch[1]);
+    }
+    const plainMatch = /filename="([^"]+)"/i.exec(contentDisposition);
+    if (plainMatch?.[1]) {
+      return plainMatch[1];
+    }
+  }
+  return fallback;
+}

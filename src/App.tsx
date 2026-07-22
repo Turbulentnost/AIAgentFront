@@ -10,6 +10,7 @@ import QualityEngineerAgent from "@/pages/QualityEngineerAgent";
 import QualityKpiAgent from "@/pages/QualityKpiAgent";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
+import { isIncomingMailPublic } from "./auth/standaloneIncomingMail";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
@@ -34,6 +35,16 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
+function IncomingMailRoute() {
+  const page = (
+    <Layout title="Входящая корреспонденция">
+      <IncomingMail />
+    </Layout>
+  );
+  if (isIncomingMailPublic()) return page;
+  return <ProtectedRoute>{page}</ProtectedRoute>;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -43,7 +54,7 @@ export default function App() {
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
-      <Route path="/agents/incoming-mail" element={<ProtectedRoute><Layout title="Входящая корреспонденция"><IncomingMail /></Layout></ProtectedRoute>} />
+      <Route path="/agents/incoming-mail" element={<IncomingMailRoute />} />
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="Инженер по подготовке производства"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />

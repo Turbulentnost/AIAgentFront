@@ -37,6 +37,7 @@
 | Восстановить из спама | `POST …/restore-from-spam` |
 | Повторить 1С | `POST …/retry-erp` |
 | Подтвердить отдел | `POST …/resolve-human` `approve_routing` |
+| Проверено (done/error) | `POST …/resolve-human` `mark_verified` |
 | Отметить спам | `resolve-human` `mark_spam` |
 | Не спам | `resolve-human` `mark_not_spam` |
 
@@ -48,12 +49,20 @@
 REM agent-pochta
 python scripts/run_api.py
 
-REM фронт (portable Node)
+REM фронт (portable Node) — или run_frontend.cmd из agent-pochta
 cd C:\Users\d.zalibin\agent_nd_front
 powershell -ExecutionPolicy Bypass -File .\run-dev.ps1
 ```
 
-`.env` фронта: `VITE_POCHTA_API_PROXY=http://localhost:8080`
+`.env` фронта:
+
+```env
+VITE_POCHTA_API_PROXY=http://localhost:8080
+VITE_STANDALONE_INCOMING_MAIL=true
+VITE_INCOMING_MAIL_PUBLIC=true
+```
+
+Страница `/agents/incoming-mail` открывается **без логина** на платформу (`192.168.1.157:5454`). Нужен только `agent-pochta` API на `:8080`.
 
 ## Следующие шаги UI
 
