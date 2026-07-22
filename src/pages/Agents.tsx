@@ -90,18 +90,28 @@ const statusPresentation: Record<
 > = {
   active: { label: "Активен", tone: "active" },
   ope: { label: "Активен", tone: "active" },
-  testing: { label: "Деактивирован", tone: "inactive" },
-  refinement: { label: "Деактивирован", tone: "inactive" },
-  draft: { label: "Деактивирован", tone: "inactive" },
+  testing: { label: "Тестирование", tone: "inactive" },
+  refinement: { label: "Доработка", tone: "inactive" },
+  draft: { label: "Черновик", tone: "inactive" },
   suspended: { label: "Заблокирован", tone: "blocked" },
   archived: { label: "Заблокирован", tone: "blocked" }
 };
+
+/** Conversation-first agents for the «Чат-агенты» catalog tab. */
+const CHAT_AGENT_SLUGS = new Set([
+  "meeting_agent",
+  "tasks_agent",
+  "agent_builder",
+  "incoming_correspondence_agent",
+  "task_compliting_agent"
+]);
 
 function agentSearchKey(agent: AgentAccess) {
   return `${agent.slug} ${agent.name} ${agent.purpose ?? ""}`.toLowerCase();
 }
 
 function getAgentKind(agent: AgentAccess): "chat" | "abstract" {
+  if (CHAT_AGENT_SLUGS.has(agent.slug)) return "chat";
   const key = agentSearchKey(agent);
   if (/chat|чат|assistant|ассистент|dialog|диалог/.test(key)) return "chat";
   return "abstract";
@@ -136,19 +146,33 @@ function buildUsageMap(tasks: Task[]) {
   return map;
 }
 
+const PRIORITY_RECOMMENDED_SLUGS = new Set([
+  "otk_head_agent",
+  "quality_engineer_agent",
+  "quality_deputy_director_agent",
+  "quality_kpi_agent",
+  "procurement_logistics_agent",
+  "nd_control_agent",
+  "incoming_correspondence_agent"
+]);
+
 function pickRecommended(agents: AgentAccess[]) {
   const score = (agent: AgentAccess) => {
-    const status = statusPresentation[agent.status];
-    if (status.tone === "active") return 0;
-    if (status.tone === "inactive") return 1;
-    return 2;
+    const status = statusPresentation[agent.status] ?? { tone: "blocked" as const };
+    const priorityBoost = PRIORITY_RECOMMENDED_SLUGS.has(agent.slug) ? -10 : 0;
+    if (status.tone === "active") return 0 + priorityBoost;
+    if (status.tone === "inactive") return 1 + priorityBoost;
+    return 2 + priorityBoost;
   };
 
   return [...agents].sort((left, right) => score(left) - score(right)).slice(0, 6);
 }
 
 function AgentStatusBadge({ status }: { status: AgentStatus }) {
-  const presentation = statusPresentation[status];
+  const presentation = statusPresentation[status] ?? {
+    label: status,
+    tone: "inactive" as const
+  };
   return (
     <span
       className={`${styles.statusBadge} ${
@@ -552,7 +576,7 @@ export default function Agents() {
           ) : !filteredAgents.length ? (
             <div className={styles.emptyState}>
               {catalogAgents.length
-                ? "По выбранным фильтрам агенты не найдены."
+                ? "По выбранным фильтрам агенты не найдены. Выберите вкладку «Все»."
                 : "Нет агентов, доступных текущему пользователю."}
             </div>
           ) : (

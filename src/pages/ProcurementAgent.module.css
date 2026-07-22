@@ -151,13 +151,31 @@
 
 .engineerBucket[data-bucket="success"] {
   color: #15803d;
+  border-color: color-mix(in srgb, #16a34a 35%, var(--color-border));
+  background: color-mix(in srgb, #16a34a 8%, var(--color-surface));
 }
 
 .engineerBucket[data-bucket="attention"] {
   color: #b45309;
+  border-color: color-mix(in srgb, #d97706 40%, var(--color-border));
+  background: color-mix(in srgb, #f59e0b 12%, var(--color-surface));
 }
 
 .engineerBucket[data-bucket="critical"] {
+  color: #b91c1c;
+  border-color: color-mix(in srgb, #dc2626 40%, var(--color-border));
+  background: color-mix(in srgb, #ef4444 10%, var(--color-surface));
+}
+
+.resultStatus[data-bucket="attention"] {
+  border-color: color-mix(in srgb, #d97706 40%, var(--color-border));
+  background: color-mix(in srgb, #f59e0b 12%, var(--color-surface));
+  color: #b45309;
+}
+
+.resultStatus[data-bucket="critical"] {
+  border-color: color-mix(in srgb, #dc2626 40%, var(--color-border));
+  background: color-mix(in srgb, #ef4444 10%, var(--color-surface));
   color: #b91c1c;
 }
 
