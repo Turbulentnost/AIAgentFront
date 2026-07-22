@@ -1732,6 +1732,8 @@ export interface EmailMessage {
   organization_name?: string;
   direction?: string;
   payer_direction_label?: string;
+  is_dialog?: boolean;
+  document_category_label?: string | null;
   mail_date?: string;
   access_label?: string;
   responsible_label?: string;

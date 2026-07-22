@@ -360,6 +360,16 @@
 
 
 
+.categoryCell {
+
+  min-width: 72px;
+
+  color: #222;
+
+}
+
+
+
 .accessCell {
 
   min-width: 64px;

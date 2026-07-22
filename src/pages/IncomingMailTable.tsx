@@ -153,6 +153,13 @@ function cell(value: string | null | undefined): string {
 
 }
 
+function documentCategoryLabel(message: EmailMessage): string {
+  const label = message.document_category_label?.trim();
+  if (label) return label;
+  if (message.is_dialog) return "Диалог";
+  return "—";
+}
+
 function downloadBlob(blob: Blob, filename: string) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -997,6 +1004,8 @@ export default function IncomingMailTable({
 
             <col className={styles.colNumber} />
 
+            <col />
+
             <col className={styles.colAttachment} />
 
             <col className={styles.colOrg} />
@@ -1048,6 +1057,8 @@ export default function IncomingMailTable({
               </th>
 
               <th className={styles.numberCell}>Номер</th>
+
+              <th className={styles.categoryCell}>Категория</th>
 
               <th className={styles.attachmentCell}>Влож.</th>
 
@@ -1102,6 +1113,8 @@ export default function IncomingMailTable({
                 organizationOptions.find((option) => option.value === organizationValue)?.label ??
 
                 organizationValue;
+
+              const categoryLabel = documentCategoryLabel(message);
 
 
 
@@ -1259,6 +1272,13 @@ export default function IncomingMailTable({
 
                     {cell(message.erp_document_number)}
 
+                  </td>
+
+                  <td
+                    className={styles.categoryCell}
+                    title={categoryLabel !== "—" ? categoryLabel : undefined}
+                  >
+                    {categoryLabel}
                   </td>
 
                   <td className={styles.attachmentCell} onClick={(event) => event.stopPropagation()}>
