@@ -255,6 +255,15 @@ export function isSpamMarkDisabled(
   return isBusy || (!spamMarks.confirm && !spamMarks.reject);
 }
 
+function isInteractiveMarkStatus(status: EmailMessageStatus): boolean {
+  return (
+    status === "done" ||
+    status === "error" ||
+    status === "awaiting_human" ||
+    status === "dialog"
+  );
+}
+
 function operatorMarkAvailability(status: EmailMessageStatus): OperatorMarkAvailability {
   if (status === "spam") {
     return {
@@ -270,6 +279,9 @@ function operatorMarkAvailability(status: EmailMessageStatus): OperatorMarkAvail
       disabledReason: "Дождитесь обработки"
     };
   }
+  if (isInteractiveMarkStatus(status)) {
+    return { approve: true, correct: true };
+  }
   return { approve: true, correct: true };
 }
 
@@ -280,7 +292,10 @@ export function spamMarkAvailability(
   if (status === "spam") {
     return { confirm: false, reject: true };
   }
-  if (status === "processing" || status === "done" || status === "error" || status === "awaiting_human") {
+  if (status === "processing") {
+    return { confirm: true, reject: false };
+  }
+  if (isInteractiveMarkStatus(status)) {
     return {
       confirm: true,
       reject: status === "awaiting_human" || isSpam
@@ -302,7 +317,9 @@ function spamCellClass(message: EmailMessage): string {
 
   if (message.status === "spam" || message.is_spam) return styles.spamCellReject;
 
-  if (message.status === "done" && !message.is_spam) return styles.spamCellOk;
+  if ((message.status === "done" || message.status === "dialog") && !message.is_spam) {
+    return styles.spamCellOk;
+  }
 
   return "";
 
@@ -318,7 +335,7 @@ export function spamSelectClass(message: EmailMessage): string {
   if (message.status === "spam" || message.is_spam) {
     return `${styles.markSelect} ${styles.markSelectReject}`;
   }
-  if (message.status === "done" && !message.is_spam) {
+  if ((message.status === "done" || message.status === "dialog") && !message.is_spam) {
     return `${styles.markSelect} ${styles.markSelectOk}`;
   }
   return styles.markSelect;
