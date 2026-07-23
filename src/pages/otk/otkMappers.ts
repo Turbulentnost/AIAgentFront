@@ -50,6 +50,8 @@ export function mapPresentation(api: OtkPresentationCardApi): OtkPresentationCar
     id: api.id,
     organization: api.organization,
     purchaseOrder: api.purchase_order,
+    projectCode: api.project_code ?? null,
+    projectName: api.project_name ?? null,
     supplier: api.supplier,
     counterparty: api.counterparty,
     warehouse: api.warehouse,
@@ -71,6 +73,8 @@ export function toPresentationUpdate(
   const out: OtkPresentationUpdateApi = {};
   if (patch.organization !== undefined) out.organization = patch.organization;
   if (patch.purchaseOrder !== undefined) out.purchase_order = patch.purchaseOrder;
+  if (patch.projectCode !== undefined) out.project_code = patch.projectCode;
+  if (patch.projectName !== undefined) out.project_name = patch.projectName;
   if (patch.supplier !== undefined) out.supplier = patch.supplier;
   if (patch.counterparty !== undefined) out.counterparty = patch.counterparty;
   if (patch.warehouse !== undefined) out.warehouse = patch.warehouse;

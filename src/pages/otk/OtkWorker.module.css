@@ -161,11 +161,6 @@
   background: var(--color-bg);
 }
 
-.fieldSand {
-  background: color-mix(in srgb, #f5e6c8 55%, var(--color-bg));
-  border-color: color-mix(in srgb, #d6b56a 35%, var(--color-border));
-}
-
 .field span {
   color: var(--color-muted);
   font-size: 11px;

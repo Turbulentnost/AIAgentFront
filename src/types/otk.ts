@@ -46,6 +46,8 @@ export interface OtkPresentationCardApi {
   id: string;
   organization: string;
   purchase_order: string;
+  project_code?: string | null;
+  project_name?: string | null;
   supplier: string;
   counterparty: string;
   warehouse: string;
@@ -70,6 +72,8 @@ export interface OtkPresentationSummaryApi {
   status: OtkPresentationStatus;
   lines_count: number;
   executor_id: string;
+  project_code?: string | null;
+  project_name?: string | null;
 }
 
 export interface OtkPresentationListApi {
@@ -82,6 +86,8 @@ export interface OtkPresentationListApi {
 export interface OtkPresentationUpdateApi {
   organization?: string;
   purchase_order?: string;
+  project_code?: string | null;
+  project_name?: string | null;
   supplier?: string;
   counterparty?: string;
   warehouse?: string;

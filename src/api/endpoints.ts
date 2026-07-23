@@ -136,6 +136,36 @@ import type {
   ProcurementSyncStatus
 } from "@/types/procurement";
 import type {
+  ApprovalPayload,
+  AgentResumePayload,
+  AgentRunPayload,
+  AgentStatus,
+  CaptureQuotePayload,
+  CreateRfqDraftPayload,
+  LineAmountsUpdatePayload,
+  NonconformityPayload,
+  OperationStatus,
+  ApprovalRecord,
+  AllPositionsResponse,
+  MaterialAllocationResult,
+  MaterialBankResponse,
+  ProcurementManagerCaseDetail,
+  ProcurementManagerDashboard,
+  ProcurementManagerWorkspaceSummary,
+  ProcurementSyncFrom1CResult,
+  PurchaseOrderDraft,
+  QuoteComparison,
+  RecommendationRecord,
+  RecommendationPayload,
+  RfqDraft,
+  ShipmentEventPayload,
+  Supplier,
+  SupplierOffersResponse,
+  SupplierQuote,
+  SupplierSearchRequest,
+  SupplierSearchResult
+} from "@/types/procurementManager";
+import type {
   OtkPresentationCardApi,
   OtkPresentationListApi,
   OtkPresentationUpdateApi,
@@ -243,6 +273,163 @@ export const omtoSupportManagerApi = {
     apiClient
       .get<OmtoSupportManagerCaseDetail>(
         `/procurement/role-agents/omto_support_manager_agent/cases/${caseId}`
+      )
+      .then((r) => r.data)
+};
+
+const PROCUREMENT_MANAGER_BASE =
+  "/procurement/role-agents/procurement_logistics_agent";
+
+export const procurementManagerApi = {
+  permissions: (config?: { signal?: AbortSignal; timeout?: number }) =>
+    apiClient
+      .get<ProcurementPermissions>("/procurement/me/permissions", {
+        signal: config?.signal,
+        timeout: config?.timeout ?? 12_000
+      })
+      .then((r) => r.data),
+  getDashboard: () =>
+    apiClient
+      .get<ProcurementManagerDashboard>(`${PROCUREMENT_MANAGER_BASE}/dashboard`)
+      .then((r) => r.data),
+  getWorkspaceSummary: () =>
+    apiClient
+      .get<ProcurementManagerWorkspaceSummary>(`${PROCUREMENT_MANAGER_BASE}/workspace-summary`)
+      .then((r) => r.data),
+  getMaterialBank: () =>
+    apiClient
+      .get<MaterialBankResponse>(`${PROCUREMENT_MANAGER_BASE}/material-bank`)
+      .then((r) => r.data),
+  getCoverage: () =>
+    apiClient
+      .get<MaterialAllocationResult>(`${PROCUREMENT_MANAGER_BASE}/coverage`)
+      .then((r) => r.data),
+  getAllPositions: () =>
+    apiClient
+      .get<AllPositionsResponse>(`${PROCUREMENT_MANAGER_BASE}/all-positions`)
+      .then((r) => r.data),
+  getSupplierOffers: (
+    caseId: string,
+    params: { nomenclature: string; need_qty?: number; top_n?: number }
+  ) =>
+    apiClient
+      .get<SupplierOffersResponse>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/supplier-offers`,
+        { params }
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<ProcurementManagerCaseDetail>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}`)
+      .then((r) => r.data),
+  updateLineAmounts: (caseId: string, payload: LineAmountsUpdatePayload) =>
+    apiClient
+      .put<{ line_amounts: Record<string, LineAmountsUpdatePayload["lines"][number]> }>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/line-amounts`,
+        payload
+      )
+      .then((r) => r.data),
+  downloadEstimateReport: (caseId: string) =>
+    apiClient
+      .get<Blob>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/estimate-report`, {
+        responseType: "blob"
+      })
+      .then((response) => ({
+        blob: response.data,
+        filename: parseContentDispositionFilename(
+          response.headers["content-disposition"],
+          `estimate_${caseId}.xlsx`
+        )
+      })),
+  syncFrom1C: () =>
+    longRunningApiClient
+      .post<ProcurementSyncFrom1CResult>(`${PROCUREMENT_MANAGER_BASE}/sync-from-1c`)
+      .then((r) => r.data),
+  searchSuppliers: (caseId: string, payload?: SupplierSearchRequest) =>
+    longRunningApiClient
+      .post<SupplierSearchResult>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/supplier-search`,
+        payload
+      )
+      .then((r) => r.data),
+  getSuppliers: (caseId: string) =>
+    apiClient
+      .get<Supplier[]>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/suppliers`
+      )
+      .then((r) => r.data),
+  createRfqDraft: (caseId: string, payload: CreateRfqDraftPayload) =>
+    apiClient
+      .post<RfqDraft>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/rfqs/draft`,
+        payload
+      )
+      .then((r) => r.data),
+  captureQuote: (caseId: string, payload: CaptureQuotePayload) =>
+    apiClient
+      .post<SupplierQuote>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/quotes`,
+        payload
+      )
+      .then((r) => r.data),
+  getComparison: (caseId: string) =>
+    apiClient
+      .get<QuoteComparison>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/comparison`)
+      .then((r) => r.data),
+  createRecommendation: (caseId: string, payload: RecommendationPayload) =>
+    apiClient
+      .post<RecommendationRecord>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/recommendation`,
+        payload
+      )
+      .then((r) => r.data),
+  submitApproval: (caseId: string, payload: ApprovalPayload) =>
+    apiClient
+      .post<ApprovalRecord>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/approvals`,
+        payload
+      )
+      .then((r) => r.data),
+  addShipmentEvent: (caseId: string, payload: ShipmentEventPayload) =>
+    apiClient
+      .post<Record<string, unknown>>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/shipment-events`,
+        payload
+      )
+      .then((r) => r.data),
+  reportNonconformity: (caseId: string, payload: NonconformityPayload) =>
+    apiClient
+      .post<Record<string, unknown>>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/nonconformity`,
+        payload
+      )
+      .then((r) => r.data),
+  getOperation: (operationId: string) =>
+    apiClient
+      .get<OperationStatus>(`${PROCUREMENT_MANAGER_BASE}/operations/${operationId}`)
+      .then((r) => r.data),
+  runAgent: (caseId: string, payload?: AgentRunPayload) =>
+    longRunningApiClient
+      .post<AgentStatus>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/agent/run`, payload)
+      .then((r) => r.data),
+  resumeAgent: (caseId: string, payload: AgentResumePayload) =>
+    longRunningApiClient
+      .post<AgentStatus>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/agent/resume`, payload)
+      .then((r) => r.data),
+  getAgentStatus: (caseId: string) =>
+    apiClient
+      .get<AgentStatus>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/agent/status`)
+      .then((r) => r.data),
+  listPurchaseOrderDrafts: (caseId: string) =>
+    apiClient
+      .get<PurchaseOrderDraft[]>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/purchase-order-drafts`
+      )
+      .then((r) => r.data),
+  getPurchaseOrderDraft: (caseId: string, poId: string) =>
+    apiClient
+      .get<PurchaseOrderDraft>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/purchase-order-drafts/${poId}`
       )
       .then((r) => r.data)
 };

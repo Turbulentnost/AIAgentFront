@@ -27,18 +27,14 @@ function fromDateTimeLocalValue(value: string) {
   return date.toISOString();
 }
 
-type FieldTone = "default" | "sand";
-
 type FieldProps = {
   label: string;
-  tone?: FieldTone;
   children: ReactNode;
 };
 
-function Field({ label, tone = "default", children }: FieldProps) {
-  const toneClass = tone === "sand" ? styles.fieldSand : "";
+function Field({ label, children }: FieldProps) {
   return (
-    <label className={`${styles.field} ${toneClass}`.trim()} data-tone={tone}>
+    <label className={styles.field}>
       <span>{label}</span>
       {children}
     </label>
@@ -48,16 +44,14 @@ function Field({ label, tone = "default", children }: FieldProps) {
 function TextField({
   label,
   value,
-  tone,
   onChange
 }: {
   label: string;
   value: string;
-  tone?: FieldTone;
   onChange: (value: string) => void;
 }) {
   return (
-    <Field label={label} tone={tone}>
+    <Field label={label}>
       <input
         className={styles.fieldControl}
         type="text"
@@ -80,20 +74,29 @@ export function OtkPresentationCardView({ card, workers, onChange }: Props) {
         <TextField
           label="Заказ поставщику"
           value={card.purchaseOrder}
-          tone="sand"
           onChange={(purchaseOrder) => onChange({ purchaseOrder })}
         />
         <div className={styles.fieldGroup}>
           <TextField
+            label="Код проекта"
+            value={card.projectCode ?? ""}
+            onChange={(projectCode) => onChange({ projectCode })}
+          />
+          <TextField
+            label="Проект"
+            value={card.projectName ?? ""}
+            onChange={(projectName) => onChange({ projectName })}
+          />
+        </div>
+        <div className={styles.fieldGroup}>
+          <TextField
             label="Поставщик"
             value={card.supplier}
-            tone="sand"
             onChange={(supplier) => onChange({ supplier })}
           />
           <TextField
             label="Контрагент"
             value={card.counterparty}
-            tone="sand"
             onChange={(counterparty) => onChange({ counterparty })}
           />
           <TextField

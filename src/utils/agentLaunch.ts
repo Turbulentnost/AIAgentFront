@@ -10,7 +10,7 @@ export const TASKS_AGENT_PATH = "/agents/tasks";
 export const INCOMING_CORRESPONDENCE_AGENT_SLUG = "incoming_correspondence_agent";
 export const INCOMING_CORRESPONDENCE_AGENT_PATH = "/agents/incoming-mail";
 export const PROCUREMENT_AGENT_SLUG = "procurement_logistics_agent";
-export const PROCUREMENT_AGENT_PATH = "/agents/procurement";
+export const PROCUREMENT_AGENT_PATH = "/agents/procurement-manager";
 export const PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG =
   "production_preparation_engineer_agent";
 export const PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH =

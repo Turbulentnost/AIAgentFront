@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import MeetingAgent from "@/pages/MeetingAgent";
 import TasksAgent from "@/pages/TasksAgent";
 import ProcurementAgent from "@/pages/ProcurementAgent";
+import ProcurementManagerAgent from "@/pages/ProcurementManagerAgent";
 import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEngineerAgent";
 import OmtoSupportManagerAgent from "@/pages/OmtoSupportManagerAgent";
 import OtkHeadAgent from "@/pages/OtkHeadAgent";
@@ -56,6 +57,7 @@ export default function App() {
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/incoming-mail" element={<IncomingMailRoute />} />
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/procurement-manager" element={<ProtectedRoute><Layout title="Менеджер по закупкам"><ProcurementManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="Инженер по подготовке производства"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/otk-head" element={<ProtectedRoute><Layout title="Начальник ОТК"><OtkHeadAgent /></Layout></ProtectedRoute>} />
