@@ -11,61 +11,69 @@ import styles from "../ProcurementAgent.module.css";
 
 type Props = {
   detail: ProcurementCaseDetail;
+  mode?: "parallel" | "purchase_manager";
 };
 
-export function ParallelProcurementPanels({ detail }: Props) {
+export function ParallelProcurementPanels({ detail, mode = "parallel" }: Props) {
   const uncovered = uncoveredPickerPositions(detail);
   const orders = parallelSupplierOrderRows(detail);
+  const showPicker = mode === "parallel";
 
   return (
     <div className={styles.parallelPanels}>
-      <section className={styles.parallelPanel}>
-        <div className={styles.parallelPanelHeader}>
-          <div>
-            <PackageSearch size={16} />
-            <strong>Кладовщик-комплектовщик</strong>
+      {showPicker ? (
+        <section className={styles.parallelPanel}>
+          <div className={styles.parallelPanelHeader}>
+            <div>
+              <PackageSearch size={16} />
+              <strong>Кладовщик-комплектовщик</strong>
+            </div>
+            <span>{uncovered.length} без заказа поставщику</span>
           </div>
-          <span>{uncovered.length} без заказа поставщику</span>
-        </div>
-        <p className={styles.parallelPanelHint}>
-          Номенклатуры, по которым заказ поставщику ещё не создан: потребность, доступность и
-          дефицит из расчёта комплектовщика.
-        </p>
-        {uncovered.length ? (
-          <div className={styles.tableWrap}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Номенклатура</th>
-                  <th>Потребность</th>
-                  <th>Доступно</th>
-                  <th>Дефицит</th>
-                </tr>
-              </thead>
-              <tbody>
-                {uncovered.map((position) => (
-                  <tr key={position.line_id}>
-                    <td>
-                      <strong>{position.nomenclature_name}</strong>
-                    </td>
-                    <td>{withUnit(position.requested_quantity, position.unit)}</td>
-                    <td className={styles.metricCovered}>
-                      {withUnit(position.available_for_issue, position.unit)}
-                    </td>
-                    <td className={deficitTone(position.confirmed_deficit) ? styles.metricDeficit : ""}>
-                      {withUnit(position.confirmed_deficit, position.unit)}
-                    </td>
+          <p className={styles.parallelPanelHint}>
+            Номенклатуры, по которым заказ поставщику ещё не создан: потребность, доступность и
+            дефицит из расчёта комплектовщика.
+          </p>
+          {uncovered.length ? (
+            <div className={styles.tableWrap}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Номенклатура</th>
+                    <th>Потребность</th>
+                    <th>Доступно</th>
+                    <th>Дефицит</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className={styles.emptyState}>
-            Все позиции уже покрыты заказами поставщику.
-          </div>
-        )}
-      </section>
+                </thead>
+                <tbody>
+                  {uncovered.map((position) => (
+                    <tr key={position.line_id}>
+                      <td>
+                        <strong>{position.nomenclature_name}</strong>
+                      </td>
+                      <td>{withUnit(position.requested_quantity, position.unit)}</td>
+                      <td className={styles.metricCovered}>
+                        {withUnit(position.available_for_issue, position.unit)}
+                      </td>
+                      <td
+                        className={
+                          deficitTone(position.confirmed_deficit) ? styles.metricDeficit : ""
+                        }
+                      >
+                        {withUnit(position.confirmed_deficit, position.unit)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className={styles.emptyState}>
+              Все позиции уже покрыты заказами поставщику.
+            </div>
+          )}
+        </section>
+      ) : null}
 
       <section className={styles.parallelPanel}>
         <div className={styles.parallelPanelHeader}>

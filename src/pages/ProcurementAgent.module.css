@@ -591,105 +591,124 @@
   gap: 6px;
 }
 
-.routeBranchLayout {
-  display: grid;
-  gap: 10px;
+.routeGitScroll {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
 }
 
-.routeFork {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 18px;
-  gap: 8px;
-  align-items: stretch;
-  margin: 2px 8px 4px;
-}
-
-.routeForkRail,
-.routeMergeRail {
+.routeGitCanvas {
   position: relative;
-  border-left: 2px solid color-mix(in srgb, #15803d 55%, var(--color-border));
-  margin: 4px auto;
-  min-height: 100%;
+  min-height: 96px;
 }
 
-.routeForkRail::before,
-.routeMergeRail::before {
+.routeGitSvg {
   position: absolute;
-  top: 0;
-  left: -5px;
-  width: 8px;
-  height: 8px;
-  border-radius: 999px;
-  background: #15803d;
-  content: "";
+  inset: 0;
+  overflow: visible;
 }
 
-.routeMergeRail::before {
-  top: auto;
-  bottom: 0;
+.routeGitEdge {
+  stroke: color-mix(in srgb, var(--color-primary) 70%, var(--color-border));
+  stroke-width: 2.5;
+  stroke-linecap: round;
 }
 
-.routeBranchColumn {
+.routeGitEdgeBranch {
+  stroke: #15803d;
+}
+
+.routeGitNode {
+  position: absolute;
+  transform: translate(-14px, -14px);
   display: grid;
-  gap: 10px;
-}
-
-.routeBranchNode {
-  display: grid;
-  grid-template-columns: 28px minmax(0, 1fr);
-  column-gap: 10px;
-  row-gap: 2px;
-  align-items: center;
-  width: 100%;
-  padding: 10px 12px;
-  border: 1px solid color-mix(in srgb, #15803d 28%, var(--color-border));
-  border-radius: 12px;
-  background: color-mix(in srgb, #22c55e 8%, var(--color-surface));
-  text-align: left;
+  justify-items: start;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   font: inherit;
-  color: var(--color-text);
+  text-align: left;
   cursor: pointer;
+  z-index: 1;
 }
 
-.routeBranchNode span {
-  font-size: 13px;
-  font-weight: 700;
-}
-
-.routeBranchNode small {
-  grid-column: 2;
+.routeGitDot {
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
   color: var(--color-muted);
   font-size: 11px;
-  line-height: 1.35;
+  font-weight: 800;
+  box-shadow: 0 0 0 3px var(--color-surface);
 }
 
-.routeBranchNode .routeDot {
-  grid-row: 1 / span 2;
+.routeGitLabel {
+  max-width: 140px;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.routeGitSummary {
+  max-width: 148px;
+  color: var(--color-muted);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.routeGitNode[data-status="completed"] .routeGitDot,
+.routeGitNode[data-status="running"] .routeGitDot {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.routeGitNode[data-kind="branch"] .routeGitDot {
   border-color: #15803d;
   background: color-mix(in srgb, #22c55e 18%, var(--color-surface));
   color: #166534;
 }
 
-.routeBranchNode[data-status="running"] {
+.routeGitNode[data-kind="branch"] .routeGitLabel {
+  color: #166534;
+}
+
+.routeGitNode[data-status="running"][data-kind="branch"] .routeGitDot {
   animation: routeBranchPulse 2.4s ease-in-out infinite;
 }
 
-.routeBranchNode[data-selected="true"] {
-  box-shadow: 0 0 0 3px color-mix(in srgb, #22c55e 18%, transparent);
+.routeGitNode[data-selected="true"] .routeGitDot {
+  box-shadow:
+    0 0 0 3px var(--color-surface),
+    0 0 0 6px color-mix(in srgb, var(--color-primary) 18%, transparent);
+}
+
+.routeGitNode[data-selected="true"][data-kind="branch"] .routeGitDot {
+  box-shadow:
+    0 0 0 3px var(--color-surface),
+    0 0 0 6px color-mix(in srgb, #22c55e 22%, transparent);
 }
 
 @keyframes routeBranchPulse {
   0%,
   100% {
-    box-shadow: 0 0 0 0 color-mix(in srgb, #22c55e 0%, transparent);
+    box-shadow:
+      0 0 0 3px var(--color-surface),
+      0 0 0 3px color-mix(in srgb, #22c55e 0%, transparent);
   }
   50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, #22c55e 16%, transparent);
+    box-shadow:
+      0 0 0 3px var(--color-surface),
+      0 0 0 8px color-mix(in srgb, #22c55e 20%, transparent);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .routeBranchNode[data-status="running"] {
+  .routeGitNode[data-status="running"][data-kind="branch"] .routeGitDot {
     animation: none;
   }
 }
@@ -2354,15 +2373,11 @@
   }
 
   .orchestratorRoute {
-    overflow-x: auto;
+    overflow-x: visible;
   }
 
   .routeTrack {
-    min-width: 760px;
-  }
-
-  .routeBranchLayout {
-    min-width: 760px;
+    min-width: 0;
   }
 
   .parallelPanels {

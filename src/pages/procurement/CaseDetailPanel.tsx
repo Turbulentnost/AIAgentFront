@@ -149,7 +149,8 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
     setSelectedStage(
       parallelState.active
         ? parallelState.branches[0]?.id || "coverage"
-        : routeStages.find((stage) => stage.status === "running")?.stage_id ||
+        : parallelState.continuation?.id ||
+            routeStages.find((stage) => stage.status === "running")?.stage_id ||
             (engineerOutput(detail) ? "coverage" : routeStages[0]?.stage_id) ||
             "basis"
     );
@@ -182,9 +183,9 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
   const nextStage = routeStages.find(
     (stage) => stage.order === (selectedStageData?.order ?? 0) + 1
   );
-  const selectedParallelBranch = parallel.branches.find(
-    (branch) => branch.id === selectedStage
-  );
+  const selectedParallelBranch =
+    parallel.branches.find((branch) => branch.id === selectedStage) ||
+    (parallel.continuation?.id === selectedStage ? parallel.continuation : null);
 
   const toggleDataRow = (lineId: string) => {
     setExpandedDataRows((current) => {
@@ -307,6 +308,7 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
       {mode === "cases" ? (
         <>
           <RouteStagesBar
+            continuation={parallel.continuation}
             forkAfterStageId={parallel.forkAfterStageId}
             onSelect={setSelectedStage}
             parallelBranches={parallel.active ? parallel.branches : []}
@@ -314,7 +316,14 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
             stages={routeStages}
           />
 
-          {parallel.active ? <ParallelProcurementPanels detail={detail} /> : null}
+          {parallel.active ||
+          (parallel.continuation?.agentId === "purchase_manager_agent" &&
+            parallel.coverageStatus !== "none") ? (
+            <ParallelProcurementPanels
+              detail={detail}
+              mode={parallel.active ? "parallel" : "purchase_manager"}
+            />
+          ) : null}
 
           {selectedParallelBranch ? (
             <div className={styles.orchestratorStageSummary}>
@@ -324,15 +333,17 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
                   <p>{selectedParallelBranch.summary}</p>
                 </div>
                 <span className={styles.orchestratorStatusBadge} data-status="attention">
-                  Параллельная ветка
+                  {parallel.active ? "Параллельная ветка" : "Текущий этап"}
                 </span>
               </div>
               <div className={styles.stateCard}>
-                <span>Статус ветки</span>
+                <span>Статус</span>
                 <strong>
                   {selectedParallelBranch.status === "completed"
                     ? "Завершено"
-                    : "В работе одновременно с другой веткой"}
+                    : parallel.active
+                      ? "В работе одновременно с другой веткой"
+                      : "Ведется закупка у менеджера по закупкам"}
                 </strong>
               </div>
             </div>

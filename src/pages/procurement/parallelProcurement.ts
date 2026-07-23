@@ -53,15 +53,23 @@ export function isRoleWorkspaceActive(
 }
 
 export function detectParallelProcurement(detail: ProcurementCaseDetail): {
+  /** True only for partial coverage: picker and purchase manager work in parallel. */
   active: boolean;
   branches: ParallelBranch[];
+  /** Linear next stage when picker is closed and only purchase manager remains. */
+  continuation: ParallelBranch | null;
   forkAfterStageId: string;
+  coverageStatus: string;
 } {
   const assigned = detail.assigned_agents || [];
   const coverage = asRecord(detail.case_metadata?.supplier_order_coverage);
   const coverageStatus = text(coverage?.coverage_status);
   const pickerAssigned = assigned.includes(PICKER_AGENT_ID);
-  const managerAssigned = assigned.includes(PURCHASE_MANAGER_AGENT_ID);
+  const managerAssigned =
+    assigned.includes(PURCHASE_MANAGER_AGENT_ID) ||
+    Boolean(detail.purchase_manager_invoked_at) ||
+    coverageStatus === "full" ||
+    coverageStatus === "partial";
   const pickerActive =
     pickerAssigned &&
     isRoleWorkspaceActive(
@@ -74,32 +82,32 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
       detail.purchase_manager_work_status,
       detail.purchase_manager_workspace_archived_at
     );
-  const parallelByCoverage =
-    (coverageStatus === "partial" || coverageStatus === "full") &&
-    pickerActive &&
-    managerActive;
-  const active = Boolean((pickerActive && managerActive) || parallelByCoverage);
+
+  // Parallel only while uncovered deficit remains at the picker.
+  const active = coverageStatus === "partial" && pickerActive && managerActive;
 
   const branches: ParallelBranch[] = [];
-  if (pickerActive) {
+  if (active) {
     branches.push({
       id: "branch_picker",
       agentId: PICKER_AGENT_ID,
       label: "Кладовщик-комплектовщик",
+      status: detail.picker_work_status === "processing" ? "running" : "running",
+      summary: "Непокрытый дефицит остаётся у комплектовщика"
+    });
+    branches.push({
+      id: "branch_purchase_manager",
+      agentId: PURCHASE_MANAGER_AGENT_ID,
+      label: "Менеджер по закупкам",
       status:
-        detail.picker_work_status === "completed"
-          ? "completed"
-          : detail.picker_work_status === "processing"
-            ? "running"
-            : "running",
-      summary:
-        coverageStatus === "partial"
-          ? "Непокрытый дефицит остаётся у комплектовщика"
-          : "Проверка наличия и дефицита по складу кейса"
+        detail.purchase_manager_work_status === "completed" ? "completed" : "running",
+      summary: "Контроль заказов поставщику по покрытым позициям"
     });
   }
-  if (managerActive) {
-    branches.push({
+
+  let continuation: ParallelBranch | null = null;
+  if (!active && managerActive && (coverageStatus === "full" || !pickerActive)) {
+    continuation = {
       id: "branch_purchase_manager",
       agentId: PURCHASE_MANAGER_AGENT_ID,
       label: "Менеджер по закупкам",
@@ -110,14 +118,29 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
       summary:
         coverageStatus === "full"
           ? "Все позиции покрыты заказами поставщику"
-          : "Контроль заказов поставщику по покрытым позициям"
-    });
+          : "Контроль заказов поставщику"
+    };
+  } else if (!active && pickerActive) {
+    // Только комплектовщик: показываем его как текущий этап маршрута.
+    continuation = {
+      id: "branch_picker",
+      agentId: PICKER_AGENT_ID,
+      label: "Кладовщик-комплектовщик",
+      status:
+        detail.picker_work_status === "processing" ? "running" : "running",
+      summary:
+        detail.picker_decision_kind === "deficit_confirmation"
+          ? "Ожидает подтверждения дефицита / выдачи"
+          : "Проверка наличия и дефицита по складу кейса"
+    };
   }
 
   return {
-    active: active && branches.length >= 2,
+    active,
     branches,
-    forkAfterStageId: "coverage"
+    continuation,
+    forkAfterStageId: "coverage",
+    coverageStatus
   };
 }
 
