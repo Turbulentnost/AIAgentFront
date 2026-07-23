@@ -9,6 +9,8 @@ import {
 } from "@/auth/onecSession";
 import type { LoginPayload, User } from "@/types";
 import { AuthProfileError } from "@/auth/errors";
+import { isSkipAuth, SKIP_AUTH_MOCK_USER } from "@/auth/skipAuth";
+import { isStandaloneIncomingMail, STANDALONE_MOCK_USER } from "@/auth/standaloneIncomingMail";
 
 export type AuthMode = "platform" | "onec";
 
@@ -39,17 +41,22 @@ function detectAuthMode(): AuthMode | null {
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const skipAuth = isSkipAuth();
+  const standalone = isStandaloneIncomingMail();
   const queryClient = useQueryClient();
-  const [authMode, setAuthMode] = useState<AuthMode | null>(detectAuthMode);
+  const [authMode, setAuthMode] = useState<AuthMode | null>(() =>
+    skipAuth || standalone ? "platform" : detectAuthMode()
+  );
   const [onecCredentials, setOnecCredentials] = useState(() => getOneCCredentials());
   const onecLoginPromise = useRef<Promise<void> | null>(null);
 
-  const hasPlatformToken = Boolean(localStorage.getItem("access_token"));
+  const hasPlatformToken =
+    skipAuth || standalone || Boolean(localStorage.getItem("access_token"));
 
   const meQuery = useQuery({
     queryKey: ["auth", "me"],
     queryFn: authApi.me,
-    enabled: hasPlatformToken,
+    enabled: hasPlatformToken && !standalone && !skipAuth,
     retry: false
   });
 
@@ -107,6 +114,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   });
 
   const value = useMemo<AuthContextValue>(() => {
+    if (skipAuth) {
+      return {
+        user: SKIP_AUTH_MOCK_USER,
+        authMode: "platform",
+        hasOneCAccess: false,
+        needsOneCReauth: false,
+        isAuthenticated: true,
+        isLoading: false,
+        login: async () => undefined,
+        loginWith1C: async () => undefined,
+        logout: async () => undefined
+      };
+    }
+
+    if (standalone) {
+      return {
+        user: STANDALONE_MOCK_USER,
+        authMode: null,
+        hasOneCAccess: false,
+        needsOneCReauth: false,
+        isAuthenticated: false,
+        isLoading: false,
+        login: async () => undefined,
+        loginWith1C: async () => undefined,
+        logout: async () => undefined
+      };
+    }
+
     const platformAuthenticated = hasPlatformToken && Boolean(meQuery.data);
     const hasOneCAccess = hasPlatformToken && Boolean(onecCredentials);
     const needsOneCReauth =
@@ -173,7 +208,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     meQuery.isLoading,
     onecCredentials,
     meQuery.isSuccess,
-    queryClient
+    queryClient,
+    skipAuth,
+    standalone
   ]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

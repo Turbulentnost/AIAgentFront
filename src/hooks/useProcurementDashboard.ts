@@ -1,9 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
+  omtoSupportManagerApi,
+  otkHeadApi,
   procurementApi,
   purchaseManagerApi,
   productionDispatcherApi,
   productionPreparationEngineerApi,
+  qualityDeputyDirectorApi,
+  qualityEngineerApi,
+  qualityKpiApi,
   warehousePickerApi
 } from "@/api/endpoints";
 import type { ProcurementDashboardView } from "@/types/procurement";
@@ -274,5 +279,81 @@ export function usePurchaseManagerAction(
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }
+  });
+}
+
+export function useOmtoSupportManagerPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "omto-support-manager", "permissions"],
+    queryFn: () => omtoSupportManagerApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useOmtoSupportManagerDashboard(enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "omto-support-manager", "dashboard"],
+    queryFn: () => omtoSupportManagerApi.getDashboard(),
+    enabled
+  });
+}
+
+export function useOmtoSupportManagerCase(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "omto-support-manager", "case", caseId],
+    queryFn: () => omtoSupportManagerApi.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled
+  });
+}
+
+export function useQualityRolePermissions(agentId: string) {
+  return useQuery({
+    queryKey: ["procurement", agentId, "permissions"],
+    queryFn: () => procurementApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useQualityRoleDashboard(agentId: string, enabled: boolean) {
+  const api =
+    agentId === "otk_head_agent"
+      ? otkHeadApi
+      : agentId === "quality_engineer_agent"
+        ? qualityEngineerApi
+        : qualityDeputyDirectorApi;
+  return useQuery({
+    queryKey: ["procurement", agentId, "dashboard"],
+    queryFn: () => api.getDashboard(),
+    enabled
+  });
+}
+
+export function useQualityRoleCase(agentId: string, caseId: string | null, enabled: boolean) {
+  const api =
+    agentId === "otk_head_agent"
+      ? otkHeadApi
+      : agentId === "quality_engineer_agent"
+        ? qualityEngineerApi
+        : qualityDeputyDirectorApi;
+  return useQuery({
+    queryKey: ["procurement", agentId, "case", caseId],
+    queryFn: () => api.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled
+  });
+}
+
+export function useQualityKpiPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "quality-kpi", "permissions"],
+    queryFn: () => qualityKpiApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useQualityKpiDashboard(enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "quality-kpi", "dashboard"],
+    queryFn: () => qualityKpiApi.getDashboard(),
+    enabled
   });
 }

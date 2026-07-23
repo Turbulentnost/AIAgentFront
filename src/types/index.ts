@@ -1652,7 +1652,8 @@ export type EmailMessageStatus =
   | "done"
   | "spam"
   | "error"
-  | "awaiting_human";
+  | "awaiting_human"
+  | "dialog";
 
 export interface DocumentXmlService {
   name: string;
@@ -1679,6 +1680,17 @@ export interface DocumentXml {
   processing_notes?: string;
 }
 
+export interface EmailAttachment {
+  index: number;
+  filename: string;
+  mime_type: string | null;
+  size_bytes: number | null;
+  ocr_used?: boolean | null;
+  has_text?: boolean;
+  text_excerpt?: string | null;
+  extraction_error?: string | null;
+}
+
 export interface EmailMessage {
   id: string;
   message_id: string;
@@ -1693,9 +1705,12 @@ export interface EmailMessage {
   is_spam: boolean;
   spam_confidence: number | null;
   spam_reason: string | null;
+  hitl_reason?: string | null;
   department_id: string | null;
   department_name: string | null;
   dept_confidence: number | null;
+  route_confidence_level?: string | null;
+  route_confidence_score?: number | null;
   priority: string | null;
   summary_ru: string | null;
   erp_document_number: string | null;
@@ -1703,6 +1718,7 @@ export interface EmailMessage {
   human_review: Record<string, unknown> | null;
   erp_retry_count: number | null;
   attachments_count: number | null;
+  attachments?: EmailAttachment[];
   contractor_id?: string | null;
   is_new_contractor?: boolean;
   partner_name?: string | null;
@@ -1710,6 +1726,19 @@ export interface EmailMessage {
   routing_recipient?: string | null;
   xml_document?: string | null;
   document_xml?: DocumentXml | null;
+  operator_verified?: boolean;
+  operator_review_state?: "pending" | "verified" | "corrected";
+  attachments_summary?: Array<{ index: number; filename: string }>;
+  organization?: string;
+  organization_name?: string;
+  direction?: string;
+  payer_direction_label?: string;
+  is_dialog?: boolean;
+  document_category_label?: string | null;
+  dialog_mode?: string | null;
+  mail_date?: string;
+  access_label?: string;
+  responsible_label?: string;
 }
 
 export interface PochtaDepartment {
@@ -1756,4 +1785,15 @@ export interface EmailMessagesPage {
 export interface EmailMessagesStats {
   total: number;
   by_status: Partial<Record<EmailMessageStatus, number>>;
+  operator_review_counts?: {
+    all: number;
+    verified: number;
+    corrected: number;
+    pending: number;
+  };
+  operator_approvals?: {
+    saved: number;
+    changed: number;
+    rate: number | null;
+  };
 }

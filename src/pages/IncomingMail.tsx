@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  keepPreviousData,
   useInfiniteQuery,
   useMutation,
   useQuery,
@@ -13,6 +14,8 @@ import {
   ChevronRight,
   ChevronDown,
   ChevronUp,
+  Download,
+  Eye,
   LoaderCircle,
   Mail,
   RefreshCw,
@@ -22,19 +25,47 @@ import {
 } from "lucide-react";
 import { Link } from "react-router-dom";
 import { emailMessagesApi } from "@/api/endpoints";
-import { FormAutocomplete, FormCheckbox, FormSelect } from "@/components/form-controls";
+import { FormAutocomplete, FormSelect } from "@/components/form-controls";
 import controlStyles from "@/components/form-controls/form-controls.module.css";
 import LoadingPanel from "@/components/LoadingPanel";
-import type { DocumentXml, EmailMessage, EmailMessageStatus } from "@/types";
+import type { DocumentXml, EmailAttachment, EmailMessage, EmailMessageStatus } from "@/types";
 import styles from "./IncomingMail.module.css";
+import IncomingMailTable, {
+  normalizeOperatorReviewState,
+  type InlineFieldSavePayload,
+  type OperatorReviewStateFilter,
+  type TableDateSort
+} from "./IncomingMailTable";
 
 const AGENT_TITLE = "Входящая корреспонденция";
 const PAGE_SIZE = 50;
 const SEARCH_DEBOUNCE_MS = 450;
+const VIEW_MODE_STORAGE_KEY = "incoming-mail-view-mode";
 const AGENT_DESCRIPTION =
   "ИИ-агент обрабатывает входящую почту: фильтрует спам, определяет отправителя и отдел, формирует обзор и создаёт задачу в 1С:ERP.";
 
 type StatusFilter = "all" | EmailMessageStatus;
+type ViewMode = "cards" | "table";
+
+const REVIEW_STATE_TABS: Array<{
+  id: OperatorReviewStateFilter;
+  label: string;
+  tone: "all" | "verified" | "corrected" | "pending";
+}> = [
+  { id: "all", label: "Все", tone: "all" },
+  { id: "verified", label: "Одобренные", tone: "verified" },
+  { id: "corrected", label: "Доработанные", tone: "corrected" },
+  { id: "pending", label: "Непроверенные", tone: "pending" }
+];
+
+function readStoredViewMode(): ViewMode {
+  try {
+    const value = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
+    return value === "table" ? "table" : "cards";
+  } catch {
+    return "cards";
+  }
+}
 
 const STATUS_TABS: Array<{ id: StatusFilter; label: string }> = [
   { id: "all", label: "Все" },
@@ -50,7 +81,8 @@ const STATUS_LABELS: Record<EmailMessageStatus, string> = {
   done: "Обработано",
   spam: "Спам",
   error: "Ошибка",
-  awaiting_human: "На проверке"
+  awaiting_human: "На проверке",
+  dialog: "Диалог"
 };
 
 const PROCESS_OPTIONS = [
@@ -127,6 +159,74 @@ function extractError(error: unknown): string {
   return error instanceof Error ? error.message : "Не удалось выполнить операцию";
 }
 
+function formatMessagesLoadError(error: unknown): string {
+  if (isAxiosError(error)) {
+    if (!error.response) {
+      return (
+        "Не удалось связаться с API agent-pochta (порт 8080). " +
+        "Проверьте docker compose up или python scripts/run_api.py."
+      );
+    }
+    const status = error.response.status;
+    const detail = error.response.data?.detail;
+    if (status >= 500) {
+      const hint =
+        typeof detail === "string" && detail.trim()
+          ? ` ${detail.trim()}`
+          : " Ошибка на сервере — см. docker compose logs api.";
+      return `API agent-pochta вернул ${status}.${hint}`;
+    }
+    if (typeof detail === "string" && detail.trim()) return detail.trim();
+    return `API agent-pochta вернул ${status}.`;
+  }
+  return extractError(error);
+}
+
+async function extractBlobError(error: unknown): Promise<string> {
+  if (isAxiosError(error) && error.response?.data instanceof Blob) {
+    try {
+      const text = await error.response.data.text();
+      const parsed = JSON.parse(text) as { detail?: string };
+      if (typeof parsed.detail === "string") return parsed.detail;
+    } catch {
+      // fall through
+    }
+  }
+  return extractError(error);
+}
+
+function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function formatFileSize(bytes: number | null | undefined): string | null {
+  if (bytes == null || Number.isNaN(bytes) || bytes < 0) return null;
+  if (bytes < 1024) return `${bytes} Б`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} КБ`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} МБ`;
+}
+
+function attachmentIndex(att: EmailAttachment, fallback: number): number {
+  return typeof att.index === "number" ? att.index : fallback;
+}
+
+function attachmentPreviewKind(att: EmailAttachment): "image" | "pdf" | null {
+  const mime = String(att.mime_type || "").toLowerCase();
+  const name = String(att.filename || "").toLowerCase();
+  if (mime.startsWith("image/") || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(name)) {
+    return "image";
+  }
+  if (mime === "application/pdf" || name.endsWith(".pdf")) {
+    return "pdf";
+  }
+  return null;
+}
+
 function statusTone(status: EmailMessageStatus): string {
   if (status === "done") return styles.statusDone;
   if (status === "spam") return styles.statusSpam;
@@ -153,6 +253,27 @@ function formatConfidence(value: number | null | undefined) {
   return `${Math.round(value * 100)}%`;
 }
 
+function confidenceLevelFromRatio(value: number) {
+  const pct = Math.round(value * 100);
+  if (pct >= 80) return "ВЫСОКАЯ";
+  if (pct >= 50) return "СРЕДНЯЯ";
+  return "НИЗКАЯ";
+}
+
+function formatDeptConfidence(message: EmailMessage) {
+  const conf = message.dept_confidence;
+  if (conf != null && !Number.isNaN(conf) && conf > 0) {
+    const pct = formatConfidence(conf);
+    const level = confidenceLevelFromRatio(conf);
+    return `${pct} (${level})`;
+  }
+  const level = message.route_confidence_level?.trim();
+  const score = message.route_confidence_score;
+  if (level && score != null) return `${score}% (${level})`;
+  if (level) return level;
+  return "—";
+}
+
 function formatBool(value: boolean | null | undefined) {
   if (value == null) return "—";
   return value ? "Да" : "Нет";
@@ -175,7 +296,22 @@ function isSpamMessage(message: EmailMessage): boolean {
   );
 }
 
-function DocumentXmlSummary({ document }: { document: DocumentXml | null | undefined }) {
+function xmlDownloadFilename(messageId: string): string {
+  const short = messageId.replace(/-/g, "").slice(0, 8) || "document";
+  return `incoming_${short}.xml`;
+}
+
+function DocumentXmlSummary({
+  document,
+  onDownloadXml,
+  downloadingXml,
+  downloadDisabled
+}: {
+  document: DocumentXml | null | undefined;
+  onDownloadXml?: () => void;
+  downloadingXml?: boolean;
+  downloadDisabled?: boolean;
+}) {
   if (!document) {
     return (
       <div className={styles.summaryBlock}>
@@ -266,7 +402,112 @@ function DocumentXmlSummary({ document }: { document: DocumentXml | null | undef
           <span className={styles.summaryValue}>{documentXmlValue(document.process)}</span>
         </div>
       </div>
+      {onDownloadXml ? (
+        <button
+          type="button"
+          className={styles.secondaryButton}
+          disabled={downloadDisabled || downloadingXml}
+          onClick={onDownloadXml}
+        >
+          {downloadingXml ? (
+            <LoaderCircle size={16} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
+          ) : (
+            <Download size={16} strokeWidth={2.2} aria-hidden="true" />
+          )}
+          Скачать XML
+        </button>
+      ) : null}
     </div>
+  );
+}
+
+function MessageSummaryBody({
+  message,
+  onDownloadXml,
+  downloadingXml,
+  downloadDisabled
+}: {
+  message: EmailMessage;
+  onDownloadXml?: () => void;
+  downloadingXml?: boolean;
+  downloadDisabled?: boolean;
+}) {
+  return (
+    <>
+      <div className={styles.summaryBlock}>
+        <div className={styles.summaryRows}>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Статус</span>
+            <span className={`${styles.statusBadge} ${statusTone(message.status)}`}>
+              {STATUS_LABELS[message.status]}
+            </span>
+          </div>
+          {message.operator_verified ? (
+            <div className={styles.summaryRow}>
+              <span className={styles.summaryLabel}>Проверка</span>
+              <span className={styles.verifiedBadge}>
+                <CheckCircle2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                Проверено оператором
+              </span>
+            </div>
+          ) : null}
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>От кого</span>
+            <span className={styles.summaryValue}>{formatSenderLine(message)}</span>
+          </div>
+          {formatRecipientAddress(message) ? (
+            <div className={styles.summaryRow}>
+              <span className={styles.summaryLabel}>Кому</span>
+              <span className={styles.summaryValue}>{formatRecipientAddress(message)}</span>
+            </div>
+          ) : null}
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Наш ящик</span>
+            <span className={styles.summaryValue}>{message.mailbox}</span>
+          </div>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Получено</span>
+            <span className={styles.summaryValue}>{formatDate(message.received_at)}</span>
+          </div>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Обработано</span>
+            <span className={styles.summaryValue}>{formatDate(message.processed_at)}</span>
+          </div>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Вложения</span>
+            <span className={styles.summaryValue}>{message.attachments_count ?? 0}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.summaryBlock}>
+        <div className={styles.summaryRows}>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Отдел</span>
+            <span className={styles.summaryValue}>{message.department_name ?? "—"}</span>
+          </div>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Уверенность отдела</span>
+            <span className={styles.summaryValue}>{formatDeptConfidence(message)}</span>
+          </div>
+          <div className={styles.summaryRow}>
+            <span className={styles.summaryLabel}>Приоритет</span>
+            <span className={styles.summaryValue}>{message.priority ?? "—"}</span>
+          </div>
+        </div>
+      </div>
+
+      {!isSpamMessage(message) ? (
+        <DocumentXmlSummary
+          document={message.document_xml}
+          onDownloadXml={
+            message.document_xml || message.xml_document ? onDownloadXml : undefined
+          }
+          downloadingXml={downloadingXml}
+          downloadDisabled={downloadDisabled}
+        />
+      ) : null}
+    </>
   );
 }
 
@@ -320,7 +561,35 @@ function pipelineIndexForStatus(status: EmailMessageStatus): number {
 }
 
 function canChangeDepartment(status: EmailMessageStatus): boolean {
-  return status === "awaiting_human" || status === "done" || status === "error";
+  return (
+    status === "awaiting_human" ||
+    status === "done" ||
+    status === "error" ||
+    status === "dialog"
+  );
+}
+
+function resolveRoutingFromMessage(message: EmailMessage): {
+  department_id?: string;
+  department_name?: string;
+  partner_name?: string;
+  organization?: string;
+} {
+  const department_id =
+    message.department_id?.trim() ||
+    message.document_xml?.services?.[0]?.name?.trim() ||
+    undefined;
+  const department_name =
+    message.department_name?.trim() ||
+    message.document_xml?.services?.[0]?.title?.trim() ||
+    undefined;
+  const partner_name =
+    partnerDisplayValue(message.partner_name ?? message.document_xml?.partner) || undefined;
+  const organization =
+    message.organization?.trim() ||
+    message.document_xml?.organization?.trim() ||
+    undefined;
+  return { department_id, department_name, partner_name, organization };
 }
 
 function partnerDisplayValue(partner: string | null | undefined): string {
@@ -330,7 +599,7 @@ function partnerDisplayValue(partner: string | null | undefined): string {
 }
 
 function departmentActionLabel(status: EmailMessageStatus): string {
-  return status === "awaiting_human" ? "Подтвердить отдел" : "Изменить отдел";
+  return status === "awaiting_human" ? "Подтвердить отдел" : "Сохранить изменения";
 }
 
 function localDayKey(value: string | null | undefined): string {
@@ -379,6 +648,13 @@ function groupMessagesByDay(messages: EmailMessage[]) {
   }));
 }
 
+function messageTableDateTime(message: EmailMessage): number {
+  const raw = message.received_at ?? message.mail_date;
+  if (!raw) return 0;
+  const time = new Date(raw).getTime();
+  return Number.isNaN(time) ? 0 : time;
+}
+
 export default function IncomingMail() {
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -386,7 +662,10 @@ export default function IncomingMail() {
   const [dateTo, setDateTo] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [onlyInfoToTestIi, setOnlyInfoToTestIi] = useState(false);
+  const [infoRecipientOnly, setInfoRecipientOnly] = useState(false);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => readStoredViewMode());
+  const [reviewStateFilter, setReviewStateFilter] = useState<OperatorReviewStateFilter>("all");
+  const [tableDateSort, setTableDateSort] = useState<TableDateSort>("asc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [hitlDepartmentId, setHitlDepartmentId] = useState("");
   const [hitlPartnerName, setHitlPartnerName] = useState("");
@@ -395,19 +674,87 @@ export default function IncomingMail() {
   const [hitlOrganization, setHitlOrganization] = useState("НП");
   const [contractorSearchQuery, setContractorSearchQuery] = useState("");
   const [debouncedContractorSearch, setDebouncedContractorSearch] = useState("");
+  const [partnerSuggestionsOpen, setPartnerSuggestionsOpen] = useState(true);
   const [emailBodyExpanded, setEmailBodyExpanded] = useState(false);
   const [emailBodyText, setEmailBodyText] = useState<string | null>(null);
   const [emailBodyLoading, setEmailBodyLoading] = useState(false);
   const [emailBodyError, setEmailBodyError] = useState<string | null>(null);
+  const [downloadingAttachmentIndex, setDownloadingAttachmentIndex] = useState<number | null>(null);
+  const [downloadingXml, setDownloadingXml] = useState(false);
+  const [attachmentPreview, setAttachmentPreview] = useState<{
+    filename: string;
+    kind: "image" | "pdf";
+    blobUrl: string;
+  } | null>(null);
+  const [attachmentPreviewLoading, setAttachmentPreviewLoading] = useState(false);
+  const [attachmentPreviewError, setAttachmentPreviewError] = useState<string | null>(null);
+  const [previewFilename, setPreviewFilename] = useState("");
+  const [previewingAttachmentIndex, setPreviewingAttachmentIndex] = useState<number | null>(null);
+  const attachmentPreviewLoadIdRef = useRef(0);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const pipelineListRef = useRef<HTMLDivElement>(null);
   const listSentinelRef = useRef<HTMLDivElement>(null);
+  const tableScrollRef = useRef<HTMLDivElement>(null);
+  const tableScrollSnapshotRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
+  const tableScrollToBottomRef = useRef(true);
+  const tableScrollToTopRef = useRef(false);
+  const hitlFormRef = useRef<HTMLDivElement>(null);
+  const attachmentsSectionRef = useRef<HTMLDivElement>(null);
+  const attachmentsFocusRef = useRef<string | null>(null);
   const [pipelineMaxPerRow, setPipelineMaxPerRow] = useState<number>(estimateInitialPipelineMaxPerRow);
+
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
+    } catch {
+      /* ignore */
+    }
+  }, [viewMode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), SEARCH_DEBOUNCE_MS);
     return () => window.clearTimeout(timer);
   }, [searchQuery]);
+
+  useEffect(() => {
+    attachmentPreviewLoadIdRef.current += 1;
+    setAttachmentPreview((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+      return null;
+    });
+    setAttachmentPreviewLoading(false);
+    setAttachmentPreviewError(null);
+    setPreviewFilename("");
+    setPreviewingAttachmentIndex(null);
+  }, [selectedId]);
+
+  const attachmentPreviewVisible =
+    attachmentPreviewLoading || attachmentPreview != null || attachmentPreviewError != null;
+
+  useEffect(() => {
+    if (viewMode !== "table" || !selectedId || attachmentPreviewVisible) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setSelectedId(null);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [viewMode, selectedId, attachmentPreviewVisible]);
+
+  useEffect(() => {
+    if (!attachmentPreviewVisible) return;
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeAttachmentPreview();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [attachmentPreviewVisible]);
 
   const listFilters = useMemo(
     () => ({
@@ -415,9 +762,9 @@ export default function IncomingMail() {
       date_from: dateFrom || undefined,
       date_to: dateTo || undefined,
       q: debouncedSearch || undefined,
-      only_info_to_test_ii: onlyInfoToTestIi ? true : undefined
+      info_recipient_only: infoRecipientOnly || undefined
     }),
-    [statusFilter, dateFrom, dateTo, debouncedSearch, onlyInfoToTestIi]
+    [statusFilter, dateFrom, dateTo, debouncedSearch, infoRecipientOnly]
   );
 
   const messagesQuery = useInfiniteQuery({
@@ -429,19 +776,15 @@ export default function IncomingMail() {
       const nextOffset = lastPage.offset + lastPage.items.length;
       return nextOffset < lastPage.total ? nextOffset : undefined;
     },
+    placeholderData: keepPreviousData,
     refetchInterval: 30_000,
     staleTime: 10_000
   });
 
   const statsQuery = useQuery({
-    queryKey: ["email-messages", "stats", dateFrom, dateTo, debouncedSearch, onlyInfoToTestIi],
-    queryFn: () =>
-      emailMessagesApi.stats({
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-        q: debouncedSearch || undefined,
-        only_info_to_test_ii: onlyInfoToTestIi ? true : undefined
-      }),
+    queryKey: ["email-messages", "stats", listFilters],
+    queryFn: () => emailMessagesApi.stats(listFilters),
+    placeholderData: keepPreviousData,
     refetchInterval: 30_000,
     staleTime: 10_000
   });
@@ -451,20 +794,72 @@ export default function IncomingMail() {
     [messagesQuery.data]
   );
 
+  const tableMessages = useMemo(
+    () =>
+      [...messages].sort((a, b) => {
+        const delta = messageTableDateTime(a) - messageTableDateTime(b);
+        return tableDateSort === "asc" ? delta : -delta;
+      }),
+    [messages, tableDateSort]
+  );
+
+  const handleTableDateSortToggle = useCallback(() => {
+    setTableDateSort((prev) => {
+      const next = prev === "asc" ? "desc" : "asc";
+      tableScrollToBottomRef.current = next === "asc";
+      tableScrollToTopRef.current = next === "desc";
+      tableScrollSnapshotRef.current = null;
+      return next;
+    });
+  }, []);
+
   const totalCount = messagesQuery.data?.pages[0]?.total ?? 0;
   const loadedCount = messages.length;
   const hasMore = loadedCount < totalCount;
 
+  const operatorReviewCounts = useMemo(() => {
+    const counts = statsQuery.data?.operator_review_counts;
+    if (counts) {
+      return {
+        all: counts.all,
+        verified: counts.verified,
+        corrected: counts.corrected,
+        pending: counts.pending
+      };
+    }
+    return { all: totalCount, verified: 0, corrected: 0, pending: 0 };
+  }, [statsQuery.data?.operator_review_counts, totalCount]);
+
+  const filteredTableMessages = useMemo(() => {
+    if (reviewStateFilter === "all") return tableMessages;
+    return tableMessages.filter(
+      (message) =>
+        normalizeOperatorReviewState(message.operator_review_state) === reviewStateFilter
+    );
+  }, [tableMessages, reviewStateFilter]);
+
   const stats = useMemo(() => {
     const data = statsQuery.data;
     if (!data) {
-      return { total: 0, done: 0, spam: 0, review: 0 };
+      return {
+        total: 0,
+        done: 0,
+        spam: 0,
+        review: 0,
+        approvalsSaved: 0,
+        approvalsChanged: 0,
+        approvalsRate: null as number | null
+      };
     }
+    const approvals = data.operator_approvals;
     return {
       total: data.total,
       done: data.by_status.done ?? 0,
       spam: data.by_status.spam ?? 0,
-      review: data.by_status.awaiting_human ?? 0
+      review: data.by_status.awaiting_human ?? 0,
+      approvalsSaved: approvals?.saved ?? 0,
+      approvalsChanged: approvals?.changed ?? 0,
+      approvalsRate: approvals?.rate ?? null
     };
   }, [statsQuery.data]);
 
@@ -496,13 +891,63 @@ export default function IncomingMail() {
   });
 
   useEffect(() => {
-    if (!selectedId || messagesQuery.isFetching) return;
+    tableScrollToBottomRef.current = true;
+    tableScrollSnapshotRef.current = null;
+  }, [listFilters]);
+
+  useEffect(() => {
+    if (viewMode === "table") {
+      tableScrollToBottomRef.current = true;
+    }
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (!selectedId || messagesQuery.isFetching || messagesQuery.isPlaceholderData) return;
     if (!messages.some((item) => item.id === selectedId)) {
       setSelectedId(null);
     }
-  }, [messages, selectedId, messagesQuery.isFetching]);
+  }, [messages, selectedId, messagesQuery.isFetching, messagesQuery.isPlaceholderData]);
 
   useEffect(() => {
+    if (viewMode !== "table") return;
+
+    const scrollEl = tableScrollRef.current;
+    if (!scrollEl || messagesQuery.isLoading || messagesQuery.isPlaceholderData) return;
+
+    const snapshot = tableScrollSnapshotRef.current;
+    if (snapshot) {
+      if (!messagesQuery.isFetchingNextPage) {
+        const heightDelta = scrollEl.scrollHeight - snapshot.scrollHeight;
+        scrollEl.scrollTop = snapshot.scrollTop + heightDelta;
+        tableScrollSnapshotRef.current = null;
+      }
+      return;
+    }
+
+    if (tableScrollToBottomRef.current && !messagesQuery.isFetchingNextPage && tableMessages.length) {
+      requestAnimationFrame(() => {
+        scrollEl.scrollTop = scrollEl.scrollHeight;
+      });
+      tableScrollToBottomRef.current = false;
+    }
+
+    if (tableScrollToTopRef.current && tableMessages.length) {
+      requestAnimationFrame(() => {
+        scrollEl.scrollTop = 0;
+      });
+      tableScrollToTopRef.current = false;
+    }
+  }, [
+    viewMode,
+    tableMessages,
+    tableDateSort,
+    messagesQuery.isLoading,
+    messagesQuery.isPlaceholderData,
+    messagesQuery.isFetchingNextPage
+  ]);
+
+  useEffect(() => {
+    if (viewMode === "table") return;
     const sentinel = listSentinelRef.current;
     if (!sentinel || !hasMore) return;
 
@@ -527,7 +972,8 @@ export default function IncomingMail() {
     messagesQuery.hasNextPage,
     messagesQuery.isFetchingNextPage,
     messagesQuery.fetchNextPage,
-    loadedCount
+    loadedCount,
+    viewMode
   ]);
 
   const selectedDetailQuery = useQuery({
@@ -551,10 +997,12 @@ export default function IncomingMail() {
       return null;
     }
 
-    if (!messages.length) return null;
+    if (viewMode === "table" || !messages.length) return null;
     const first = messages[0];
     return detail && detail.id === first.id ? { ...first, ...detail } : first;
-  }, [messages, selectedId, selectedDetailQuery.data]);
+  }, [messages, selectedId, selectedDetailQuery.data, viewMode]);
+
+  const tableDrawerOpen = viewMode === "table" && selectedId != null;
 
   useEffect(() => {
     if (!selectedMessage) return;
@@ -568,11 +1016,33 @@ export default function IncomingMail() {
     setContractorSearchQuery(
       partnerDisplayValue(selectedMessage.partner_name ?? selectedMessage.document_xml?.partner)
     );
-    setEmailBodyExpanded(false);
+    setPartnerSuggestionsOpen(true);
+
+    const openAttachmentsView = attachmentsFocusRef.current === selectedMessage.id;
+    if (openAttachmentsView) {
+      setEmailBodyExpanded(true);
+    } else {
+      setEmailBodyExpanded(false);
+    }
     setEmailBodyText(null);
     setEmailBodyLoading(false);
     setEmailBodyError(null);
+    setDownloadingAttachmentIndex(null);
   }, [selectedMessage?.id, selectedMessage?.department_id, selectedMessage?.partner_name, selectedMessage?.contractor_id, selectedMessage?.document_xml?.partner, selectedMessage?.document_xml?.process, selectedMessage?.document_xml?.organization]);
+
+  useEffect(() => {
+    if (!selectedMessage || attachmentsFocusRef.current !== selectedMessage.id) return;
+    if (selectedDetailQuery.isFetching) return;
+
+    const message = selectedMessage;
+    attachmentsFocusRef.current = null;
+
+    void loadEmailBodyIfMissing(message);
+
+    window.setTimeout(() => {
+      attachmentsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }, [selectedMessage?.id, selectedDetailQuery.isFetching, selectedDetailQuery.dataUpdatedAt]);
 
   useEffect(() => {
     const element = pipelineListRef.current;
@@ -626,6 +1096,7 @@ export default function IncomingMail() {
     () =>
       (contractorsQuery.data ?? []).map((contractor) => ({
         value: contractor.contractor_id,
+        name: contractor.name,
         label: contractor.email ? `${contractor.name} · ${contractor.email}` : contractor.name
       })),
     [contractorsQuery.data]
@@ -661,10 +1132,24 @@ export default function IncomingMail() {
     onError: (error) => setFeedback({ type: "error", text: extractError(error) })
   });
 
+  const reanalyzeMutation = useMutation({
+    mutationFn: (id: string) => emailMessagesApi.reanalyze(id),
+    onSuccess: async (_data, id) => {
+      setFeedback({
+        type: "success",
+        text: "Письмо отправлено на повторный анализ партнёра, отдела и организации."
+      });
+      setStatusFilter("processing");
+      setSelectedId(id);
+      await invalidateMessages(id);
+    },
+    onError: (error) => setFeedback({ type: "error", text: extractError(error) })
+  });
+
   const resolveMutation = useMutation({
     mutationFn: (payload: {
       id: string;
-      decision: "approve_routing" | "mark_spam" | "mark_not_spam";
+      decision: "approve_routing" | "mark_verified" | "mark_spam" | "mark_not_spam";
       department_id?: string;
       department_name?: string;
       partner_name?: string;
@@ -684,13 +1169,15 @@ export default function IncomingMail() {
       }),
     onSuccess: async (_data, variables) => {
       const text =
-        variables.decision === "approve_routing"
-          ? variables.status === "awaiting_human"
-            ? "Отдел подтверждён. Коррекция сохранена для обучения маршрутизации."
-            : "Отдел изменён. Коррекция сохранена для обучения маршрутизации."
-          : variables.decision === "mark_spam"
-            ? "Письмо отмечено как спам. Паттерн сохранён для обучения фильтра."
-            : "Решение офис-менеджера сохранено.";
+        variables.decision === "mark_verified"
+          ? "Письмо отмечено как проверенное оператором."
+          : variables.decision === "approve_routing"
+            ? variables.status === "awaiting_human"
+              ? "Отдел подтверждён. Коррекция сохранена для обучения маршрутизации."
+              : "Отдел изменён. Коррекция сохранена для обучения маршрутизации."
+            : variables.decision === "mark_spam"
+              ? "Письмо отмечено как спам. Паттерн сохранён для обучения фильтра."
+              : "Решение офис-менеджера сохранено.";
       setFeedback({ type: "success", text });
       await invalidateMessages(variables.id);
     },
@@ -698,15 +1185,20 @@ export default function IncomingMail() {
   });
 
   const isBusy =
-    restoreMutation.isPending || retryErpMutation.isPending || resolveMutation.isPending;
+    restoreMutation.isPending ||
+    retryErpMutation.isPending ||
+    reanalyzeMutation.isPending ||
+    resolveMutation.isPending;
 
   const processingLabel = restoreMutation.isPending
     ? "Восстанавливаем письмо из спама…"
     : retryErpMutation.isPending
       ? "Планируем повтор отправки в 1С…"
-      : resolveMutation.isPending
-        ? "Сохраняем решение human-in-the-loop…"
-        : null;
+      : reanalyzeMutation.isPending
+        ? "Отправляем письмо на повторный анализ…"
+        : resolveMutation.isPending
+          ? "Сохраняем решение human-in-the-loop…"
+          : null;
 
   const pipelineProgress = selectedMessage
     ? pipelineIndexForStatus(selectedMessage.status)
@@ -723,31 +1215,35 @@ export default function IncomingMail() {
   }
 
   const isSearchDebouncing = searchQuery.trim() !== debouncedSearch;
-  const isListFilterFetching =
-    (messagesQuery.isFetching && !messagesQuery.isFetchingNextPage) || statsQuery.isFetching;
-  const isListBackgroundFetching = isListFilterFetching || isSearchDebouncing;
+  const isListQueryFetching =
+    messagesQuery.isFetching && !messagesQuery.isFetchingNextPage;
+  const isListBackgroundFetching =
+    isListQueryFetching || statsQuery.isFetching || isSearchDebouncing;
   const isListFetching = isListBackgroundFetching;
+  const isListDimmed = isListQueryFetching;
 
   function handleSelectMessage(message: EmailMessage) {
     setSelectedId(message.id);
     setFeedback(null);
   }
 
-  async function handleToggleEmailBody() {
-    const nextExpanded = !emailBodyExpanded;
-    setEmailBodyExpanded(nextExpanded);
-    if (!nextExpanded || !selectedMessage) return;
+  function scrollToAttachmentsSection() {
+    window.setTimeout(() => {
+      attachmentsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 120);
+  }
 
-    const currentBody = emailBodyText ?? selectedMessage.body_text;
+  async function loadEmailBodyIfMissing(message: EmailMessage) {
+    const currentBody = message.body_text;
     if (!isBodyMissing(currentBody)) return;
 
     setEmailBodyLoading(true);
     setEmailBodyError(null);
     try {
-      const result = await emailMessagesApi.fetchBody(selectedMessage.id);
+      const result = await emailMessagesApi.fetchBody(message.id);
       setEmailBodyText(result.body_text);
       queryClient.setQueryData(
-        ["email-messages", "detail", selectedMessage.id],
+        ["email-messages", "detail", message.id],
         (old: EmailMessage | undefined) =>
           old ? { ...old, body_text: result.body_text } : old
       );
@@ -755,6 +1251,214 @@ export default function IncomingMail() {
       setEmailBodyError(extractError(error));
     } finally {
       setEmailBodyLoading(false);
+    }
+  }
+
+  function handleOpenMessageAttachments(message: EmailMessage) {
+    const isSameMessage = selectedId === message.id;
+    attachmentsFocusRef.current = message.id;
+    setSelectedId(message.id);
+    setFeedback(null);
+
+    if (isSameMessage) {
+      attachmentsFocusRef.current = null;
+      setEmailBodyExpanded(true);
+      void loadEmailBodyIfMissing(message);
+      scrollToAttachmentsSection();
+    }
+  }
+
+  function handleTableLoadMore() {
+    const scrollEl = tableScrollRef.current;
+    if (scrollEl) {
+      tableScrollSnapshotRef.current = {
+        scrollTop: scrollEl.scrollTop,
+        scrollHeight: scrollEl.scrollHeight
+      };
+    }
+    void messagesQuery.fetchNextPage();
+  }
+
+  function handleCloseDrawer() {
+    setSelectedId(null);
+  }
+
+  function handleToggleViewMode() {
+    setViewMode((current) => (current === "cards" ? "table" : "cards"));
+  }
+
+  function handleTableOperatorApprove(message: EmailMessage) {
+    const routing = resolveRoutingFromMessage(message);
+    if (!routing.department_id) {
+      setSelectedId(message.id);
+      setFeedback({
+        type: "error",
+        text: "У письма не указан отдел для подтверждения. Выберите отдел в таблице или в форме справа."
+      });
+      return;
+    }
+    setSelectedId(message.id);
+    setFeedback(null);
+    const decision =
+      message.status === "done" || message.status === "error" || message.status === "dialog"
+        ? "mark_verified"
+        : "approve_routing";
+    resolveMutation.mutate({
+      id: message.id,
+      decision,
+      department_id: routing.department_id,
+      department_name: routing.department_name,
+      partner_name: routing.partner_name,
+      organization: routing.organization,
+      status: message.status
+    });
+  }
+
+  function handleTableOperatorCorrect(message: EmailMessage) {
+    setSelectedId(message.id);
+    setFeedback(null);
+    window.setTimeout(() => {
+      hitlFormRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 150);
+  }
+
+  function handleTableSpamConfirm(message: EmailMessage) {
+    setSelectedId(message.id);
+    setFeedback(null);
+    resolveMutation.mutate({ id: message.id, decision: "mark_spam" });
+  }
+
+  function handleTableSpamReject(message: EmailMessage) {
+    setSelectedId(message.id);
+    setFeedback(null);
+    if (message.status === "spam" || message.is_spam) {
+      restoreMutation.mutate(message.id);
+      return;
+    }
+    if (message.status === "awaiting_human") {
+      resolveMutation.mutate({ id: message.id, decision: "mark_not_spam" });
+    }
+  }
+
+  function handleTableInlineFieldSave(message: EmailMessage, payload: InlineFieldSavePayload) {
+    if (!canChangeDepartment(message.status)) return;
+
+    const routing = resolveRoutingFromMessage(message);
+    const departmentId =
+      payload.field === "department_id"
+        ? payload.department_id ?? payload.value
+        : routing.department_id;
+    const departmentName =
+      payload.field === "department_id"
+        ? payload.department_name ??
+          (departmentsQuery.data ?? []).find((item) => item.id === departmentId)?.name
+        : routing.department_name;
+    const partnerName =
+      payload.field === "partner" ? payload.value : routing.partner_name;
+    const organization =
+      payload.field === "organization" ? payload.value : routing.organization;
+
+    if (payload.field === "department_id" && !departmentId) {
+      setFeedback({ type: "error", text: "Выберите отдел для маршрутизации." });
+      return;
+    }
+
+    const decision =
+      message.status === "done" || message.status === "error" || message.status === "dialog"
+        ? "mark_verified"
+        : "approve_routing";
+
+    resolveMutation.mutate({
+      id: message.id,
+      decision,
+      department_id: departmentId,
+      department_name: departmentName,
+      partner_name: partnerName?.trim() || undefined,
+      organization,
+      status: message.status
+    });
+  }
+
+  async function handleToggleEmailBody() {
+    const nextExpanded = !emailBodyExpanded;
+    setEmailBodyExpanded(nextExpanded);
+    if (!nextExpanded || !selectedMessage) return;
+    await loadEmailBodyIfMissing(selectedMessage);
+  }
+
+  async function handleDownloadAttachment(att: EmailAttachment, fallbackIndex: number) {
+    if (!selectedMessage) return;
+    const index = attachmentIndex(att, fallbackIndex);
+    setDownloadingAttachmentIndex(index);
+    setFeedback(null);
+    try {
+      const blob = await emailMessagesApi.downloadAttachment(selectedMessage.id, index);
+      downloadBlob(blob, att.filename || `attachment-${index}`);
+    } catch (error) {
+      setFeedback({ type: "error", text: await extractBlobError(error) });
+    } finally {
+      setDownloadingAttachmentIndex(null);
+    }
+  }
+
+  function closeAttachmentPreview() {
+    attachmentPreviewLoadIdRef.current += 1;
+    setAttachmentPreview((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+      return null;
+    });
+    setAttachmentPreviewLoading(false);
+    setAttachmentPreviewError(null);
+    setPreviewFilename("");
+    setPreviewingAttachmentIndex(null);
+  }
+
+  async function handlePreviewAttachment(att: EmailAttachment, fallbackIndex: number) {
+    if (!selectedMessage) return;
+    const kind = attachmentPreviewKind(att);
+    if (!kind) return;
+
+    const index = attachmentIndex(att, fallbackIndex);
+    const filename = att.filename || `Файл ${index + 1}`;
+
+    setAttachmentPreview((prev) => {
+      if (prev?.blobUrl) URL.revokeObjectURL(prev.blobUrl);
+      return null;
+    });
+    const loadId = attachmentPreviewLoadIdRef.current + 1;
+    attachmentPreviewLoadIdRef.current = loadId;
+    setPreviewFilename(filename);
+    setAttachmentPreviewLoading(true);
+    setAttachmentPreviewError(null);
+    setPreviewingAttachmentIndex(index);
+
+    try {
+      const blob = await emailMessagesApi.downloadAttachment(selectedMessage.id, index);
+      if (loadId !== attachmentPreviewLoadIdRef.current) return;
+      const blobUrl = URL.createObjectURL(blob);
+      setAttachmentPreview({ filename, kind, blobUrl });
+    } catch (error) {
+      if (loadId !== attachmentPreviewLoadIdRef.current) return;
+      setAttachmentPreviewError(await extractBlobError(error));
+    } finally {
+      if (loadId === attachmentPreviewLoadIdRef.current) {
+        setAttachmentPreviewLoading(false);
+        setPreviewingAttachmentIndex(null);
+      }
+    }
+  }
+
+  async function handleDownloadXml() {
+    if (!selectedMessage) return;
+    setDownloadingXml(true);
+    setFeedback(null);
+    try {
+      const blob = await emailMessagesApi.downloadXml(selectedMessage.id);
+      downloadBlob(blob, xmlDownloadFilename(selectedMessage.id));
+    } catch (error) {
+      setFeedback({ type: "error", text: await extractBlobError(error) });
+    } finally {
+      setDownloadingXml(false);
     }
   }
 
@@ -778,7 +1482,28 @@ export default function IncomingMail() {
     });
   }
 
-  const isInitialLoading = messagesQuery.isLoading && !messagesQuery.isPlaceholderData;
+  function handleMarkVerified() {
+    if (!selectedMessage || !hitlDepartmentId) {
+      setFeedback({ type: "error", text: "Выберите отдел для маршрутизации." });
+      return;
+    }
+    const department = (departmentsQuery.data ?? []).find((item) => item.id === hitlDepartmentId);
+    const trimmedPartner = hitlPartnerName.trim();
+    resolveMutation.mutate({
+      id: selectedMessage.id,
+      decision: "mark_verified",
+      department_id: hitlDepartmentId,
+      department_name: department?.name,
+      partner_name: trimmedPartner || undefined,
+      contractor_id: hitlContractorId || undefined,
+      process: hitlProcess,
+      organization: hitlOrganization,
+      status: selectedMessage.status
+    });
+  }
+
+  const isInitialLoading =
+    messagesQuery.isPending && messagesQuery.data === undefined && !messagesQuery.isPlaceholderData;
 
   if (isInitialLoading) {
     return <LoadingPanel title="Загружаем входящую корреспонденцию" />;
@@ -796,10 +1521,7 @@ export default function IncomingMail() {
         </header>
         <div className={styles.errorCallout} role="alert">
           <AlertTriangle size={18} strokeWidth={2.1} aria-hidden="true" />
-          <p>
-            Не удалось загрузить письма. Запустите API agent-pochta:{" "}
-            <code>python scripts/run_api.py</code> (порт 8080).
-          </p>
+          <p>{formatMessagesLoadError(messagesQuery.error)}</p>
         </div>
         <div className={styles.actionsRow}>
           <button type="button" className={styles.primaryButton} onClick={() => void messagesQuery.refetch()}>
@@ -811,7 +1533,13 @@ export default function IncomingMail() {
   }
 
   return (
-    <div className={styles.page} data-incoming-mail-page>
+    <div
+      className={`${styles.page} ${viewMode === "table" ? styles.pageTableMode : ""} ${
+        tableDrawerOpen ? styles.pageDrawerOpen : ""
+      }`}
+      data-incoming-mail-page
+      data-table-mode={viewMode === "table" ? "true" : undefined}
+    >
       <header className={styles.header}>
         <Link to="/agents" className={styles.backLink}>
           <ArrowLeft size={14} strokeWidth={2.2} aria-hidden="true" />
@@ -820,15 +1548,27 @@ export default function IncomingMail() {
         <div className={styles.headerRow}>
           <div>
             <h1>{AGENT_TITLE}</h1>
-            <p>{AGENT_DESCRIPTION}</p>
+            {viewMode !== "table" ? <p>{AGENT_DESCRIPTION}</p> : null}
           </div>
-          <span className={styles.agentBadge}>
-            <Sparkles size={14} strokeWidth={2.2} aria-hidden="true" />
-            agent_pochta · v0.2
-          </span>
+          <div className={styles.headerActions}>
+            <button
+              type="button"
+              className={`${styles.secondaryButton} ${viewMode === "table" ? styles.viewModeActive : ""}`}
+              onClick={handleToggleViewMode}
+              aria-pressed={viewMode === "table"}
+              title="Переключить табличный вид «Таняфикация»"
+            >
+              Таняфикация
+            </button>
+            <span className={styles.agentBadge}>
+              <Sparkles size={14} strokeWidth={2.2} aria-hidden="true" />
+              agent_pochta · v0.2
+            </span>
+          </div>
         </div>
       </header>
 
+      {viewMode !== "table" ? (
       <section className={styles.statsRow} aria-label="Сводка по письмам">
         <article className={styles.statCard}>
           <span className={styles.statLabel}>Всего писем</span>
@@ -846,8 +1586,22 @@ export default function IncomingMail() {
           <span className={styles.statLabel}>На проверке</span>
           <strong className={styles.statValue}>{stats.review}</strong>
         </article>
+        <article
+          className={styles.statCard}
+          title="Доля сохранений без правок: Saved / (Saved + Changed). Saved — подтверждение без изменения отдела, партнёра или организации; Changed — хотя бы одно поле изменено."
+        >
+          <span className={styles.statLabel}>Доля без изменений</span>
+          <strong className={styles.statValue}>
+            {stats.approvalsRate == null ? "—" : `${Math.round(stats.approvalsRate * 100)}%`}
+          </strong>
+          <span className={styles.statHint}>
+            {stats.approvalsSaved} без правок · {stats.approvalsChanged} изменено
+          </span>
+        </article>
       </section>
+      ) : null}
 
+      {viewMode === "cards" ? (
       <section className={styles.pipelineCard} aria-label="Граф обработки">
         <h2>Граф агента</h2>
         <div className={styles.pipelineList} ref={pipelineListRef}>
@@ -892,40 +1646,38 @@ export default function IncomingMail() {
           </div>
         </div>
       </section>
+      ) : null}
 
-      <div className={styles.layout}>
-        <aside className={styles.requestsCard} aria-label="Список писем">
-          <div className={styles.requestsToolbar}>
-            <h2>Входящие письма</h2>
-            <button
-              type="button"
-              className={styles.iconButton}
-              disabled={isListFetching}
-              onClick={handleRefreshList}
-              aria-label="Обновить список писем"
-              title="Обновить"
-            >
-              {isListFetching ? (
-                <LoaderCircle size={16} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
-              ) : (
-                <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
-              )}
-            </button>
-          </div>
-
-          <div className={styles.filtersRow}>
-            <input
-              type="search"
-              className={styles.searchInput}
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Поиск по теме или отправителю"
-              aria-label="Поиск по теме или отправителю"
-            />
-            <div className={styles.dateFilters}>
+      <div
+        className={`${styles.layout} ${viewMode === "table" ? styles.layoutTableFull : ""}`}
+      >
+        <aside
+          className={`${styles.requestsCard} ${viewMode === "table" ? styles.requestsCardTable : ""}`}
+          aria-label={viewMode === "table" ? "Таблица писем" : "Список писем"}
+        >
+          {viewMode === "table" ? (
+            <div className={styles.tableToolbar}>
+              <h2 className={styles.tableToolbarTitle}>Таняфикация</h2>
+              <input
+                type="search"
+                className={styles.tableToolbarSearch}
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                placeholder="Поиск…"
+                aria-label="Поиск по теме или отправителю"
+              />
+              <button
+                type="button"
+                className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
+                aria-pressed={infoRecipientOnly}
+                onClick={() => setInfoRecipientOnly((value) => !value)}
+                title="Показать письма, где получатель содержит info"
+              >
+                Только info
+              </button>
               <input
                 type="date"
-                className={styles.dateInput}
+                className={styles.tableToolbarDate}
                 value={dateFrom}
                 onChange={(event) => setDateFrom(event.target.value)}
                 aria-label="Дата с"
@@ -934,7 +1686,7 @@ export default function IncomingMail() {
               <span className={styles.dateSeparator}>—</span>
               <input
                 type="date"
-                className={styles.dateInput}
+                className={styles.tableToolbarDate}
                 value={dateTo}
                 onChange={(event) => setDateTo(event.target.value)}
                 aria-label="Дата по"
@@ -946,32 +1698,124 @@ export default function IncomingMail() {
                   className={styles.clearFiltersButton}
                   onClick={handleClearDateFilters}
                 >
-                  Сбросить даты
+                  Сброс
                 </button>
               ) : null}
-            </div>
-            <FormCheckbox
-              className={styles.infoOnlyFilter}
-              checked={onlyInfoToTestIi}
-              onChange={setOnlyInfoToTestIi}
-              label="info@ → test_ii@"
-            />
-          </div>
-
-          <div className={styles.tabs} role="tablist" aria-label="Фильтр по статусу">
-            {STATUS_TABS.map((tab) => (
+              <div className={styles.tableToolbarTabs} role="tablist" aria-label="Фильтр по статусу">
+                {STATUS_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={statusFilter === tab.id}
+                    className={`${styles.tab} ${statusFilter === tab.id ? styles.tabActive : ""}`}
+                    onClick={() => setStatusFilter(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
               <button
-                key={tab.id}
                 type="button"
-                role="tab"
-                aria-selected={statusFilter === tab.id}
-                className={`${styles.tab} ${statusFilter === tab.id ? styles.tabActive : ""}`}
-                onClick={() => setStatusFilter(tab.id)}
+                className={styles.iconButton}
+                disabled={isListFetching}
+                onClick={handleRefreshList}
+                aria-label="Обновить список писем"
+                title="Обновить"
               >
-                {tab.label}
+                {isListFetching ? (
+                  <LoaderCircle size={16} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
+                ) : (
+                  <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
+                )}
               </button>
-            ))}
-          </div>
+            </div>
+          ) : (
+            <>
+              <div className={styles.requestsToolbar}>
+                <h2>Входящие письма</h2>
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  disabled={isListFetching}
+                  onClick={handleRefreshList}
+                  aria-label="Обновить список писем"
+                  title="Обновить"
+                >
+                  {isListFetching ? (
+                    <LoaderCircle size={16} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
+                  ) : (
+                    <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+
+              <div className={styles.filtersRow}>
+                <input
+                  type="search"
+                  className={styles.searchInput}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Поиск по теме или отправителю"
+                  aria-label="Поиск по теме или отправителю"
+                />
+                <div className={styles.recipientFilters}>
+                  <button
+                    type="button"
+                    className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
+                    aria-pressed={infoRecipientOnly}
+                    onClick={() => setInfoRecipientOnly((value) => !value)}
+                    title="Показать письма, где получатель содержит info (info@turbo-don.ru и т.п.)"
+                  >
+                    Только info
+                  </button>
+                </div>
+                <div className={styles.dateFilters}>
+                  <input
+                    type="date"
+                    className={styles.dateInput}
+                    value={dateFrom}
+                    onChange={(event) => setDateFrom(event.target.value)}
+                    aria-label="Дата с"
+                    title="Дата с"
+                  />
+                  <span className={styles.dateSeparator}>—</span>
+                  <input
+                    type="date"
+                    className={styles.dateInput}
+                    value={dateTo}
+                    onChange={(event) => setDateTo(event.target.value)}
+                    aria-label="Дата по"
+                    title="Дата по"
+                  />
+                  {dateFrom || dateTo ? (
+                    <button
+                      type="button"
+                      className={styles.clearFiltersButton}
+                      onClick={handleClearDateFilters}
+                    >
+                      Сбросить даты
+                    </button>
+                  ) : null}
+                </div>
+              </div>
+
+              <div className={styles.tabs} role="tablist" aria-label="Фильтр по статусу">
+                {STATUS_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={statusFilter === tab.id}
+                    className={`${styles.tab} ${statusFilter === tab.id ? styles.tabActive : ""}`}
+                    onClick={() => setStatusFilter(tab.id)}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           {isListBackgroundFetching ? (
             <div className={styles.listFetchingBar} role="status" aria-live="polite">
@@ -981,14 +1825,79 @@ export default function IncomingMail() {
           ) : null}
 
           {!messages.length ? (
-            isListBackgroundFetching ? (
+            isListBackgroundFetching || messagesQuery.isPlaceholderData ? (
               <div className={styles.emptyStateCompact}>Загружаем письма…</div>
             ) : (
               <div className={styles.emptyStateCompact}>Писем по выбранному фильтру пока нет.</div>
             )
+          ) : viewMode === "table" ? (
+            <div className={styles.tableHost}>
+            <div
+              className={styles.reviewHotbar}
+              role="tablist"
+              aria-label="Фильтр по проверке оператором"
+            >
+              {REVIEW_STATE_TABS.map((tab) => {
+                const count = operatorReviewCounts[tab.id];
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={reviewStateFilter === tab.id}
+                    className={`${styles.reviewHotbarTab} ${styles[`reviewHotbarTab_${tab.tone}`]} ${
+                      reviewStateFilter === tab.id ? styles.reviewHotbarTabActive : ""
+                    }`}
+                    onClick={() => setReviewStateFilter(tab.id)}
+                  >
+                    <span>{tab.label}</span>
+                    <span className={styles.reviewHotbarCount}>{count}</span>
+                  </button>
+                );
+              })}
+              {reviewStateFilter !== "all" ? (
+                <span className={styles.reviewHotbarHint}>
+                  В таблице {filteredTableMessages.length} из {loadedCount} загруженных · в базе{" "}
+                  {operatorReviewCounts[reviewStateFilter]}
+                </span>
+              ) : null}
+            </div>
+            {filteredTableMessages.length === 0 ? (
+              <div className={styles.emptyStateCompact}>
+                {messages.length
+                  ? "В выбранной категории нет писем среди загруженных."
+                  : "Писем по выбранному фильтру пока нет."}
+              </div>
+            ) : (
+            <IncomingMailTable
+              messages={filteredTableMessages}
+              selectedId={selectedId}
+              hasMore={hasMore}
+              isLoadingMore={messagesQuery.isFetchingNextPage}
+              loadedCount={loadedCount}
+              totalCount={totalCount}
+              tableScrollRef={tableScrollRef}
+              departmentOptions={departmentOptions}
+              organizationOptions={organizationOptions}
+              canEditRouting={canChangeDepartment}
+              onLoadMore={handleTableLoadMore}
+              onSelectMessage={handleSelectMessage}
+              onOpenMessageAttachments={handleOpenMessageAttachments}
+              onOperatorApprove={handleTableOperatorApprove}
+              onOperatorCorrect={handleTableOperatorCorrect}
+              onSpamConfirm={handleTableSpamConfirm}
+              onSpamReject={handleTableSpamReject}
+              onInlineFieldSave={handleTableInlineFieldSave}
+              onExportError={(text) => setFeedback({ type: "error", text })}
+              dateSortOrder={tableDateSort}
+              onDateSortToggle={handleTableDateSortToggle}
+              isBusy={isBusy}
+            />
+            )}
+            </div>
           ) : (
             <div
-              className={`${styles.requestList} ${isListBackgroundFetching ? styles.requestListFetching : ""}`}
+              className={`${styles.requestList} ${isListDimmed ? styles.requestListFetching : ""}`}
             >
               {groupedMessages.map((group) => (
                 <section key={group.dayKey} className={styles.dateGroup} aria-label={group.label}>
@@ -1050,7 +1959,27 @@ export default function IncomingMail() {
           )}
         </aside>
 
+        <div
+          className={
+            viewMode === "table"
+              ? `${styles.detailDrawer} ${tableDrawerOpen ? styles.detailDrawerVisible : ""}`
+              : styles.detailDrawerInline
+          }
+        >
         <main className={styles.contentCard}>
+          {tableDrawerOpen && selectedMessage ? (
+            <div className={styles.detailDrawerHeader}>
+              <h2 className={styles.detailDrawerTitle}>{messagePreview(selectedMessage)}</h2>
+              <button
+                type="button"
+                className={styles.detailDrawerClose}
+                onClick={handleCloseDrawer}
+                aria-label="Закрыть детали"
+              >
+                ×
+              </button>
+            </div>
+          ) : null}
           {processingLabel ? (
             <div className={styles.processingBanner} role="status" aria-live="polite">
               <LoaderCircle size={18} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
@@ -1073,13 +2002,19 @@ export default function IncomingMail() {
           ) : null}
 
           {!selectedMessage ? (
+            viewMode === "table" ? null : (
             <div className={styles.emptyState}>Выберите письмо из списка слева.</div>
+            )
           ) : (
             <>
+              {viewMode !== "table" ? (
               <div>
                 <h2>{messagePreview(selectedMessage)}</h2>
                 <p className={styles.contentIntro}>{formatMailHeaderLine(selectedMessage)}</p>
               </div>
+              ) : (
+              <p className={styles.contentIntro}>{formatMailHeaderLine(selectedMessage)}</p>
+              )}
 
               <div className={styles.detailSection}>
                 {selectedMessage.summary_ru ? (
@@ -1092,13 +2027,15 @@ export default function IncomingMail() {
                 <div className={styles.detailBlock}>
                   <span className={styles.detailBlockTitle}>Спам-анализ</span>
                   <p className={styles.detailText}>
-                    {selectedMessage.is_spam ? "Спам" : "Не спам"} · уверенность{" "}
+                    {selectedMessage.is_spam ? "Спам" : "Не спам"} · вероятность спама{" "}
                     <span className={styles.confidenceBadge}>
                       {formatConfidence(selectedMessage.spam_confidence)}
                     </span>
                     {selectedMessage.spam_reason ? `\nПричина: ${selectedMessage.spam_reason}` : ""}
                   </p>
-                  {(selectedMessage.status === "done" || selectedMessage.status === "error") ? (
+                  {(selectedMessage.status === "done" ||
+                    selectedMessage.status === "error" ||
+                    selectedMessage.status === "dialog") ? (
                     <div className={styles.actionsRow}>
                       <button
                         type="button"
@@ -1118,8 +2055,9 @@ export default function IncomingMail() {
                   <div className={styles.warningCallout}>
                     <ShieldAlert size={18} strokeWidth={2.1} aria-hidden="true" />
                     <p>
-                      Письмо в серой зоне или с низкой уверенностью маршрутизации. Подтвердите отдел
-                      или отметьте как спам.
+                      {selectedMessage.hitl_reason?.trim()
+                        ? selectedMessage.hitl_reason
+                        : "Письмо в серой зоне или с низкой уверенностью маршрутизации. Подтвердите отдел или отметьте как спам."}
                     </p>
                   </div>
                 ) : null}
@@ -1166,6 +2104,79 @@ export default function IncomingMail() {
                       </p>
                     )
                   ) : null}
+                </div>
+
+                <div ref={attachmentsSectionRef} className={styles.detailBlock}>
+                  <span className={styles.detailBlockTitle}>Вложенные файлы</span>
+                  {(selectedMessage.attachments?.length ?? 0) > 0 ? (
+                    <div className={styles.fileList}>
+                      {selectedMessage.attachments!.map((att, idx) => {
+                        const index = attachmentIndex(att, idx);
+                        const sizeLabel = formatFileSize(att.size_bytes);
+                        const previewKind = attachmentPreviewKind(att);
+                        const isDownloading = downloadingAttachmentIndex === index;
+                        const isPreviewing = previewingAttachmentIndex === index;
+                        return (
+                          <div key={`${index}-${att.filename}`} className={styles.fileRow}>
+                            <div>
+                              <div className={styles.fileName}>{att.filename || `Файл ${index + 1}`}</div>
+                              {sizeLabel || att.mime_type ? (
+                                <div className={styles.fileMeta}>
+                                  {[sizeLabel, att.mime_type].filter(Boolean).join(" · ")}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div className={styles.fileActions}>
+                              {previewKind ? (
+                                <button
+                                  type="button"
+                                  className={styles.primaryButton}
+                                  disabled={isBusy || isPreviewing}
+                                  onClick={() => void handlePreviewAttachment(att, idx)}
+                                >
+                                  {isPreviewing ? (
+                                    <LoaderCircle
+                                      size={16}
+                                      strokeWidth={2.2}
+                                      className={styles.spin}
+                                      aria-hidden="true"
+                                    />
+                                  ) : (
+                                    <Eye size={16} strokeWidth={2.2} aria-hidden="true" />
+                                  )}
+                                  Просмотр
+                                </button>
+                              ) : null}
+                              <button
+                                type="button"
+                                className={styles.secondaryButton}
+                                disabled={isBusy || downloadingAttachmentIndex != null || downloadingXml}
+                                onClick={() => void handleDownloadAttachment(att, idx)}
+                              >
+                                {isDownloading ? (
+                                  <LoaderCircle
+                                    size={16}
+                                    strokeWidth={2.2}
+                                    className={styles.spin}
+                                    aria-hidden="true"
+                                  />
+                                ) : (
+                                  <Download size={16} strokeWidth={2.2} aria-hidden="true" />
+                                )}
+                                Скачать
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (selectedMessage.attachments_count ?? 0) > 0 ? (
+                    <p className={styles.detailTextMuted}>
+                      Список вложений недоступен ({selectedMessage.attachments_count})
+                    </p>
+                  ) : (
+                    <p className={styles.detailTextMuted}>Нет вложений</p>
+                  )}
                 </div>
               </div>
 
@@ -1221,7 +2232,7 @@ export default function IncomingMail() {
               </div>
 
               {canChangeDepartment(selectedMessage.status) ? (
-                <div className={styles.hitlForm}>
+                <div className={styles.hitlForm} ref={hitlFormRef}>
                   <label className={styles.field}>
                     <span className={styles.fieldLabel}>Партнёр (контрагент)</span>
                     <input
@@ -1235,9 +2246,10 @@ export default function IncomingMail() {
                         setHitlPartnerName(value);
                         setHitlContractorId("");
                         setContractorSearchQuery(value);
+                        setPartnerSuggestionsOpen(true);
                       }}
                     />
-                    {debouncedContractorSearch.length >= 2 ? (
+                    {partnerSuggestionsOpen && debouncedContractorSearch.length >= 2 ? (
                       <ul className={styles.partnerSuggestions} aria-label="Подсказки из справочника">
                         {contractorsQuery.isFetching ? (
                           <li className={styles.partnerSuggestionHint}>Поиск в справочнике…</li>
@@ -1247,14 +2259,12 @@ export default function IncomingMail() {
                               <button
                                 type="button"
                                 className={styles.partnerSuggestionButton}
+                                onMouseDown={(event) => event.preventDefault()}
                                 onClick={() => {
-                                  const contractor = (contractorsQuery.data ?? []).find(
-                                    (item) => item.contractor_id === option.value
-                                  );
-                                  if (!contractor) return;
-                                  setHitlPartnerName(contractor.name);
-                                  setHitlContractorId(contractor.contractor_id);
-                                  setContractorSearchQuery(contractor.name);
+                                  setHitlPartnerName(option.name);
+                                  setHitlContractorId(option.value);
+                                  setContractorSearchQuery(option.name);
+                                  setPartnerSuggestionsOpen(false);
                                 }}
                               >
                                 {option.label}
@@ -1303,6 +2313,33 @@ export default function IncomingMail() {
                   <div className={styles.actionsRow}>
                     <button
                       type="button"
+                      className={styles.secondaryButton}
+                      disabled={isBusy}
+                      onClick={() => reanalyzeMutation.mutate(selectedMessage.id)}
+                    >
+                      <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
+                      ПЕРЕДЕЛАТЬ
+                    </button>
+                    {selectedMessage.status === "done" || selectedMessage.status === "error" ? (
+                      selectedMessage.operator_verified ? (
+                        <span className={styles.verifiedBadge} title="Письмо проверено оператором">
+                          <CheckCircle2 size={14} strokeWidth={2.2} aria-hidden="true" />
+                          Проверено оператором
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          className={styles.secondaryButton}
+                          disabled={isBusy || !hitlDepartmentId}
+                          onClick={handleMarkVerified}
+                        >
+                          <CheckCircle2 size={16} strokeWidth={2.2} aria-hidden="true" />
+                          Проверено
+                        </button>
+                      )
+                    ) : null}
+                    <button
+                      type="button"
                       className={styles.primaryButton}
                       disabled={isBusy || !hitlDepartmentId}
                       onClick={handleApproveRouting}
@@ -1317,79 +2354,82 @@ export default function IncomingMail() {
           )}
         </main>
 
+        {viewMode !== "table" ? (
         <aside className={styles.summaryCard} aria-label="Сводка письма">
           <h2>Сводка</h2>
           {!selectedMessage ? (
             <div className={styles.emptyState}>Нет выбранного письма.</div>
           ) : (
-            <>
-              <div className={styles.summaryBlock}>
-                <div className={styles.summaryRows}>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Статус</span>
-                    <span className={`${styles.statusBadge} ${statusTone(selectedMessage.status)}`}>
-                      {STATUS_LABELS[selectedMessage.status]}
-                    </span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>От кого</span>
-                    <span className={styles.summaryValue}>{formatSenderLine(selectedMessage)}</span>
-                  </div>
-                  {formatRecipientAddress(selectedMessage) ? (
-                    <div className={styles.summaryRow}>
-                      <span className={styles.summaryLabel}>Кому</span>
-                      <span className={styles.summaryValue}>
-                        {formatRecipientAddress(selectedMessage)}
-                      </span>
-                    </div>
-                  ) : null}
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Наш ящик</span>
-                    <span className={styles.summaryValue}>{selectedMessage.mailbox}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Получено</span>
-                    <span className={styles.summaryValue}>{formatDate(selectedMessage.received_at)}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Обработано</span>
-                    <span className={styles.summaryValue}>{formatDate(selectedMessage.processed_at)}</span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Вложения</span>
-                    <span className={styles.summaryValue}>{selectedMessage.attachments_count ?? 0}</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className={styles.summaryBlock}>
-                <div className={styles.summaryRows}>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Отдел</span>
-                    <span className={styles.summaryValue}>
-                      {selectedMessage.department_name ?? "—"}
-                    </span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Уверенность отдела</span>
-                    <span className={styles.summaryValue}>
-                      {formatConfidence(selectedMessage.dept_confidence)}
-                    </span>
-                  </div>
-                  <div className={styles.summaryRow}>
-                    <span className={styles.summaryLabel}>Приоритет</span>
-                    <span className={styles.summaryValue}>{selectedMessage.priority ?? "—"}</span>
-                  </div>
-                </div>
-              </div>
-
-              {!isSpamMessage(selectedMessage) ? (
-                <DocumentXmlSummary document={selectedMessage.document_xml} />
-              ) : null}
-            </>
+            <MessageSummaryBody
+              message={selectedMessage}
+              onDownloadXml={() => void handleDownloadXml()}
+              downloadingXml={downloadingXml}
+              downloadDisabled={isBusy || downloadingAttachmentIndex != null}
+            />
           )}
         </aside>
+        ) : null}
+        </div>
       </div>
+
+      {attachmentPreviewVisible ? (
+        <div
+          className={styles.attachmentModal}
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="attachmentPreviewTitle"
+        >
+          <button
+            type="button"
+            className={styles.attachmentModalBackdrop}
+            aria-label="Закрыть просмотр"
+            onClick={closeAttachmentPreview}
+          />
+          <div className={styles.attachmentModalPanel}>
+            <div className={styles.attachmentModalHeader}>
+              <div id="attachmentPreviewTitle" className={styles.attachmentModalTitle}>
+                {attachmentPreview?.filename || previewFilename || "Просмотр вложения"}
+              </div>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={closeAttachmentPreview}
+              >
+                Закрыть
+              </button>
+            </div>
+            <div className={styles.attachmentModalBody}>
+              {attachmentPreviewLoading ? (
+                <p className={styles.attachmentModalStatus}>
+                  <LoaderCircle
+                    size={18}
+                    strokeWidth={2.2}
+                    className={styles.spin}
+                    aria-hidden="true"
+                  />{" "}
+                  Загружаем из IMAP…
+                </p>
+              ) : attachmentPreviewError ? (
+                <p className={styles.attachmentModalError} role="alert">
+                  {attachmentPreviewError}
+                </p>
+              ) : attachmentPreview?.kind === "image" ? (
+                <img
+                  src={attachmentPreview.blobUrl}
+                  alt={attachmentPreview.filename}
+                  className={styles.attachmentPreviewImage}
+                />
+              ) : attachmentPreview?.kind === "pdf" ? (
+                <iframe
+                  src={attachmentPreview.blobUrl}
+                  title={attachmentPreview.filename}
+                  className={styles.attachmentPreviewPdf}
+                />
+              ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

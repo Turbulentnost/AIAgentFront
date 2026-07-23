@@ -31,6 +31,7 @@ type Props = {
   showDispatcherMeta?: boolean;
   showPickerMeta?: boolean;
   showPurchaseManagerMeta?: boolean;
+  showOmtoMeta?: boolean;
 };
 
 function positionsLabel(count: number): string {
@@ -76,7 +77,8 @@ export function CaseListPanel({
   showEngineerMeta = false,
   showDispatcherMeta = false,
   showPickerMeta = false,
-  showPurchaseManagerMeta = false
+  showPurchaseManagerMeta = false,
+  showOmtoMeta = false
 }: Props) {
   return (
     <section className={styles.queuePanel}>
@@ -104,7 +106,9 @@ export function CaseListPanel({
               ? item.dispatcher_bucket_reason
               : showEngineerMeta
                 ? item.engineer_bucket_reason
-                : null;
+                : showOmtoMeta
+                  ? item.omto_bucket_reason || item.summary
+                  : null;
           const coverageStatus =
             showPickerMeta &&
             item.picker_bucket === "success" &&

@@ -55,6 +55,105 @@ main { min-width: 0; flex: 1; }
   box-shadow: var(--shadow-xs);
 }
 
+/* Tanyafication: pastel pink topbar when Incoming Mail is in table mode */
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) {
+  --tanya-pink-page: #fdf2f8;
+  --tanya-pink-surface: #fce7f3;
+  --tanya-pink-surface-soft: #fff0f5;
+  --tanya-pink-border: #f9a8d4;
+  --tanya-pink-border-soft: #fbcfe8;
+  --tanya-pink-accent: #ec4899;
+  --tanya-pink-text: #be185d;
+  --tanya-pink-text-muted: #9d174d;
+
+  background: var(--tanya-pink-page);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar {
+  background: var(--tanya-pink-page);
+  border-bottom: 1px solid var(--tanya-pink-border-soft);
+  box-shadow: none;
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-brand {
+  color: var(--tanya-pink-text);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-brand img {
+  filter: sepia(0.35) saturate(1.8) hue-rotate(295deg) brightness(1.05);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-nav-link {
+  color: var(--tanya-pink-text-muted);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-nav-link:hover,
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-nav-link.active {
+  color: var(--tanya-pink-accent);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-search {
+  color: var(--tanya-pink-text-muted);
+  background: #fff;
+  border-color: var(--tanya-pink-border-soft);
+  box-shadow: none;
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-search input {
+  color: var(--tanya-pink-text);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-search input::placeholder {
+  color: var(--tanya-pink-text-muted);
+  opacity: 0.72;
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .header-search kbd {
+  color: var(--tanya-pink-accent);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .notification-button {
+  color: var(--tanya-pink-text-muted);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .notification-button:hover,
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .topbar-actions > button:not(.notification-button):not(.profile-button):hover {
+  background: var(--tanya-pink-surface);
+  color: var(--tanya-pink-accent);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .topbar-actions > button:not(.notification-button):not(.profile-button) {
+  color: var(--tanya-pink-text-muted);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .notification-badge {
+  color: #fff;
+  background: var(--tanya-pink-accent);
+  border-color: var(--tanya-pink-page);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .profile-button {
+  color: var(--tanya-pink-text);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .profile-button:hover {
+  background: var(--tanya-pink-surface);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .profile-avatar.fallback {
+  background: var(--tanya-pink-surface);
+  color: var(--tanya-pink-accent);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .profile-copy strong {
+  color: var(--tanya-pink-text);
+}
+
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .profile-copy small,
+.shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) .topbar .profile-chevron {
+  color: var(--tanya-pink-text-muted);
+}
+
 .header-brand {
   display: inline-flex;
   flex: 0 0 auto;

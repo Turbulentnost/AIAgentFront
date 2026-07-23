@@ -163,6 +163,8 @@ export interface ProcurementCaseSummary {
   purchase_manager_workspace_archived_at?: string | null;
   purchase_manager_action_at?: string | null;
   purchase_manager_critical_acknowledged_at?: string | null;
+  omto_bucket?: "success" | "attention" | "critical" | null;
+  omto_bucket_reason?: string | null;
 }
 
 export interface ProductionPreparationEngineerAction {
@@ -583,4 +585,146 @@ export interface ProductionDispatcherOutput {
   summary: string;
   recommended_next_step: string;
   decision_kind: "supply_confirmation" | "critical_acknowledgement" | "none";
+}
+
+export type OmtoQualityStatus = "ok" | "incomplete" | "critical";
+export type OmtoFindingSeverity = "info" | "warning" | "critical";
+
+export interface OmtoFinding {
+  field: string;
+  rule_id: string;
+  source_ref: string;
+  message: string;
+  severity: OmtoFindingSeverity;
+  suggested_fix?: string | null;
+  current_value?: unknown;
+}
+
+export interface OmtoSupportManagerOutput {
+  quality_status: OmtoQualityStatus;
+  findings: OmtoFinding[];
+  checked_fields: string[];
+  actions: string[];
+  clarification_draft?: string | null;
+  summary: string;
+  calculated_at?: string | null;
+}
+
+export interface OmtoSupportManagerResult
+  extends Omit<ProcurementRoleAgentResult, "output_data"> {
+  output_data: OmtoSupportManagerOutput;
+}
+
+export interface OmtoSupportManagerCaseDetail
+  extends Omit<ProcurementCaseDetail, "latest_result" | "case_metadata"> {
+  latest_result?: OmtoSupportManagerResult | null;
+  case_metadata?: {
+    omto_support_manager_output?: OmtoSupportManagerOutput | null;
+    omto_calculated_at?: string | null;
+  } | null;
+}
+
+export type OmtoSupportManagerDashboard = ProcurementDashboard;
+
+export interface QualitySampleRule {
+  rule_id: string;
+  category: string;
+  sample_size?: number | null;
+  sample_note: string;
+  scrap_threshold_pct?: number;
+  lot_qty?: number | null;
+  presentation_ref?: string | null;
+  nomenclature_ref?: string | null;
+  supplier_ref?: string | null;
+  supplier_quality_rating?: string | number | null;
+  sample_pct?: number | null;
+  sample_basis?: string | null;
+  require_second_sample?: boolean;
+  second_sample_size?: number | null;
+}
+
+export interface QualityFinding {
+  field: string;
+  rule_id: string;
+  source_ref: string;
+  message: string;
+  severity: OmtoFindingSeverity;
+  suggested_fix?: string | null;
+  current_value?: unknown;
+}
+
+export interface QualityRoleOutput {
+  actions?: string[];
+  findings?: QualityFinding[];
+  next_status?: string | null;
+  next_agent?: string | null;
+  summary: string;
+  calculated_at?: string | null;
+  sample_rule?: QualitySampleRule | null;
+  quality_control?: (Record<string, unknown> & {
+    sample_rule?: QualitySampleRule | null;
+    sample_size?: number | null;
+    presentation_ref?: string | null;
+    nomenclature_ref?: string | null;
+    supplier_ref?: string | null;
+    supplier_quality_rating?: string | number | null;
+  }) | null;
+  draft_artifacts?: (Record<string, unknown> & {
+    control_program?: QualitySampleRule | null;
+    scrap_decision?: Record<string, unknown> | null;
+    lot_qty?: number | null;
+    presentation_ref?: string | null;
+  }) | null;
+  assigned_engineer_id?: string | null;
+  assigned_engineer_name?: string | null;
+  act_ref?: string | null;
+  label_ref?: string | null;
+  disposition?: string | null;
+  disposition_label?: string | null;
+  execution_conditions?: string[];
+  fitness_status?: string | null;
+  category?: string | null;
+  stage?: string | null;
+  [key: string]: unknown;
+}
+
+export interface QualityRoleCaseDetail
+  extends Omit<ProcurementCaseDetail, "latest_result" | "case_metadata"> {
+  latest_result?: (Omit<ProcurementRoleAgentResult, "output_data"> & {
+    output_data: QualityRoleOutput;
+  }) | null;
+  case_metadata?: Record<string, unknown> | null;
+}
+
+export type QualityRoleDashboard = ProcurementDashboard;
+
+export interface KpiMetric {
+  id: string;
+  title: string;
+  formula: string;
+  value?: number | null;
+  target?: number | null;
+  target_label: string;
+  unit?: string;
+  tone: "ok" | "warn" | "bad" | "unknown";
+  sample_size?: number;
+  details?: Record<string, unknown>;
+}
+
+export interface AgentKpiBlock {
+  agent_id: string;
+  agent_label: string;
+  common: KpiMetric[];
+  special: KpiMetric[];
+  below_target: string[];
+}
+
+export interface QualityKpiReport {
+  period_from?: string | null;
+  period_to?: string | null;
+  agents: AgentKpiBlock[];
+  system: KpiMetric[];
+  summary: string;
+  calculated_at?: string | null;
+  actions?: string[];
 }

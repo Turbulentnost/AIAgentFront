@@ -16,6 +16,27 @@ export const STATUS_LABELS: Record<string, string> = {
   failed: "Ошибка"
 };
 
+export const OMTO_FIELD_LABELS: Record<string, string> = {
+  cfo: "ЦФО",
+  article: "Статья",
+  project: "Проект",
+  date: "Дата",
+  nomenclature: "Номенклатура",
+  quantity: "Количество"
+};
+
+export const OMTO_QUALITY_LABELS: Record<string, string> = {
+  ok: "Данные корректны",
+  incomplete: "Неполные данные",
+  critical: "Критические замечания"
+};
+
+export const OMTO_SEVERITY_LABELS: Record<string, string> = {
+  info: "Инфо",
+  warning: "Предупреждение",
+  critical: "Критично"
+};
+
 export const AGENT_WAIT_LABELS: Record<string, string> = {
   waiting_human: "Ожидается действие человека",
   waiting_external: "Ожидается внешнее событие или настройка",

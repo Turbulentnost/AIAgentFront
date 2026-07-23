@@ -6,8 +6,14 @@ import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEng
 import ProductionDispatcherAgent from "@/pages/ProductionDispatcherAgent";
 import WarehousePickerAgent from "@/pages/WarehousePickerAgent";
 import PurchaseManagerAgent from "@/pages/PurchaseManagerAgent";
+import OmtoSupportManagerAgent from "@/pages/OmtoSupportManagerAgent";
+import OtkHeadAgent from "@/pages/OtkHeadAgent";
+import QualityDeputyDirectorAgent from "@/pages/QualityDeputyDirectorAgent";
+import QualityEngineerAgent from "@/pages/QualityEngineerAgent";
+import QualityKpiAgent from "@/pages/QualityKpiAgent";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
+import { isIncomingMailPublic } from "./auth/standaloneIncomingMail";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
 import Agents from "./pages/Agents";
@@ -32,6 +38,16 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
+function IncomingMailRoute() {
+  const page = (
+    <Layout title="Входящая корреспонденция">
+      <IncomingMail />
+    </Layout>
+  );
+  if (isIncomingMailPublic()) return page;
+  return <ProtectedRoute>{page}</ProtectedRoute>;
+}
+
 export default function App() {
   return (
     <Routes>
@@ -41,12 +57,17 @@ export default function App() {
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
-      <Route path="/agents/incoming-mail" element={<ProtectedRoute><Layout title="Входящая корреспонденция"><IncomingMail /></Layout></ProtectedRoute>} />
+      <Route path="/agents/incoming-mail" element={<IncomingMailRoute />} />
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="ИИ-агент закупок и логистики"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-dispatcher" element={<ProtectedRoute><Layout title="ИИ-агент диспетчера производства"><ProductionDispatcherAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/warehouse-picker" element={<ProtectedRoute><Layout title="ИИ-агент по закупке"><WarehousePickerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/purchase-manager" element={<ProtectedRoute><Layout title="ИИ-агент менеджера по закупкам"><PurchaseManagerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/otk-head" element={<ProtectedRoute><Layout title="Начальник ОТК"><OtkHeadAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Инженер по качеству"><QualityEngineerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/quality-deputy-director" element={<ProtectedRoute><Layout title="ЗДК"><QualityDeputyDirectorAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/quality-kpi" element={<ProtectedRoute><Layout title="Агент качества (KPI)"><QualityKpiAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

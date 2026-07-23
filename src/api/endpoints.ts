@@ -135,11 +135,24 @@ import type {
   WarehousePickerAction,
   WarehousePickerCaseDetail,
   WarehousePickerDashboard,
+  OmtoSupportManagerCaseDetail,
+  OmtoSupportManagerDashboard,
+  QualityKpiReport,
+  QualityRoleCaseDetail,
+  QualityRoleDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
   ProcurementRoleAgentResume,
   ProcurementSyncStatus
 } from "@/types/procurement";
+import type {
+  OtkPresentationCardApi,
+  OtkPresentationListApi,
+  OtkPresentationUpdateApi,
+  OtkShipmentLineCreateApi,
+  OtkShipmentLineUpdateApi,
+  OtkWriteTo1CResultApi
+} from "@/types/otk";
 
 export const meetingsApi = {
   permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
@@ -331,6 +344,87 @@ export const purchaseManagerApi = {
       .post<PurchaseManagerAction>(
         `/procurement/role-agents/purchase_manager_agent/cases/${caseId}/acknowledge-critical`
       )
+      .then((r) => r.data)
+};
+
+export const omtoSupportManagerApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: () =>
+    apiClient
+      .get<OmtoSupportManagerDashboard>(
+        "/procurement/role-agents/omto_support_manager_agent/dashboard"
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<OmtoSupportManagerCaseDetail>(
+        `/procurement/role-agents/omto_support_manager_agent/cases/${caseId}`
+      )
+      .then((r) => r.data)
+};
+
+function roleAgentApi(agentId: string) {
+  return {
+    permissions: () =>
+      apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+    getDashboard: () =>
+      apiClient
+        .get<QualityRoleDashboard>(`/procurement/role-agents/${agentId}/dashboard`)
+        .then((r) => r.data),
+    getCase: (caseId: string) =>
+      apiClient
+        .get<QualityRoleCaseDetail>(`/procurement/role-agents/${agentId}/cases/${caseId}`)
+        .then((r) => r.data)
+  };
+}
+
+export const otkHeadApi = roleAgentApi("otk_head_agent");
+export const qualityEngineerApi = roleAgentApi("quality_engineer_agent");
+export const qualityDeputyDirectorApi = roleAgentApi("quality_deputy_director_agent");
+
+export const qualityKpiApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: (params?: { period_from?: string; period_to?: string }) =>
+    apiClient
+      .get<QualityKpiReport>("/procurement/quality-kpi/dashboard", { params })
+      .then((r) => r.data)
+};
+
+const OTK_BASE = "/procurement/role-agents/quality_engineer_agent/otk";
+
+export const otkApi = {
+  listPresentations: () =>
+    apiClient.get<OtkPresentationListApi>(`${OTK_BASE}/presentations`).then((r) => r.data),
+  getPresentation: (presentationId: string) =>
+    apiClient
+      .get<OtkPresentationCardApi>(`${OTK_BASE}/presentations/${presentationId}`)
+      .then((r) => r.data),
+  updatePresentation: (presentationId: string, payload: OtkPresentationUpdateApi) =>
+    apiClient
+      .patch<OtkPresentationCardApi>(`${OTK_BASE}/presentations/${presentationId}`, payload)
+      .then((r) => r.data),
+  addLine: (presentationId: string, payload: OtkShipmentLineCreateApi) =>
+    apiClient
+      .post<OtkPresentationCardApi>(`${OTK_BASE}/presentations/${presentationId}/lines`, payload)
+      .then((r) => r.data),
+  updateLine: (presentationId: string, lineId: string, payload: OtkShipmentLineUpdateApi) =>
+    apiClient
+      .patch<OtkPresentationCardApi>(
+        `${OTK_BASE}/presentations/${presentationId}/lines/${lineId}`,
+        payload
+      )
+      .then((r) => r.data),
+  deleteLine: (presentationId: string, lineId: string) =>
+    apiClient
+      .delete<OtkPresentationCardApi>(
+        `${OTK_BASE}/presentations/${presentationId}/lines/${lineId}`
+      )
+      .then((r) => r.data),
+  writeTo1C: (presentationId: string) =>
+    apiClient
+      .post<OtkWriteTo1CResultApi>(`${OTK_BASE}/presentations/${presentationId}/write-to-1c`)
       .then((r) => r.data)
 };
 
@@ -581,16 +675,38 @@ export const emailMessagesApi = {
     date_from?: string;
     date_to?: string;
     q?: string;
-    only_info_to_test_ii?: boolean;
+    recipient_q?: string;
+    info_recipient_only?: boolean;
   }) =>
     pochtaApiClient.get<EmailMessagesPage>("/api/v1/email-messages", { params }).then((r) => r.data),
-  stats: (params?: { date_from?: string; date_to?: string; q?: string; only_info_to_test_ii?: boolean }) =>
+  stats: (params?: {
+    status?: string;
+    date_from?: string;
+    date_to?: string;
+    q?: string;
+    recipient_q?: string;
+    info_recipient_only?: boolean;
+  }) =>
     pochtaApiClient.get<EmailMessagesStats>("/api/v1/email-messages/stats", { params }).then((r) => r.data),
   get: (messageRowId: string) =>
     pochtaApiClient.get<EmailMessage>(`/api/v1/email-messages/${messageRowId}`).then((r) => r.data),
   fetchBody: (messageRowId: string) =>
     pochtaApiClient
       .post<EmailMessageFetchBodyResponse>(`/api/v1/email-messages/${messageRowId}/fetch-body`, null, {
+        timeout: 90_000
+      })
+      .then((r) => r.data),
+  downloadAttachment: (messageRowId: string, index: number) =>
+    pochtaApiClient
+      .get<Blob>(`/api/v1/email-messages/${messageRowId}/attachments/${index}`, {
+        responseType: "blob",
+        timeout: 90_000
+      })
+      .then((r) => r.data),
+  downloadXml: (messageRowId: string) =>
+    pochtaApiClient
+      .get<Blob>(`/api/v1/email-messages/${messageRowId}/xml`, {
+        responseType: "blob",
         timeout: 90_000
       })
       .then((r) => r.data),
@@ -610,10 +726,14 @@ export const emailMessagesApi = {
     pochtaApiClient
       .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/retry-erp`)
       .then((r) => r.data),
+  reanalyze: (messageRowId: string) =>
+    pochtaApiClient
+      .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/reanalyze`)
+      .then((r) => r.data),
   resolveHuman: (
     messageRowId: string,
     body: {
-      decision: "approve_routing" | "mark_spam" | "mark_not_spam";
+      decision: "approve_routing" | "mark_verified" | "mark_spam" | "mark_not_spam";
       department_id?: string;
       department_name?: string;
       partner_name?: string;
@@ -624,7 +744,21 @@ export const emailMessagesApi = {
   ) =>
     pochtaApiClient
       .post<EmailMessageActionResponse>(`/api/v1/email-messages/${messageRowId}/resolve-human`, body)
-      .then((r) => r.data)
+      .then((r) => r.data),
+  exportReport: (period: "day" | "week" | "month") =>
+    pochtaApiClient
+      .get<Blob>("/api/v1/email-messages/export", {
+        params: { period },
+        responseType: "blob",
+        timeout: 120_000
+      })
+      .then((response) => ({
+        blob: response.data,
+        filename: parseContentDispositionFilename(
+          response.headers["content-disposition"],
+          `tanyafication_report_${period}.xlsx`
+        )
+      }))
 };
 
 export const ndControlApi = {
@@ -799,3 +933,19 @@ export const ndControlApi = {
       .get<ProcessUmlResponse>(`/nd-control/processes/${processId}/uml`, { params })
       .then((r) => r.data),
 };
+function parseContentDispositionFilename(
+  contentDisposition: string | undefined,
+  fallback: string
+): string {
+  if (contentDisposition) {
+    const utfMatch = /filename\*=UTF-8''([^;]+)/i.exec(contentDisposition);
+    if (utfMatch?.[1]) {
+      return decodeURIComponent(utfMatch[1]);
+    }
+    const plainMatch = /filename="([^"]+)"/i.exec(contentDisposition);
+    if (plainMatch?.[1]) {
+      return plainMatch[1];
+    }
+  }
+  return fallback;
+}

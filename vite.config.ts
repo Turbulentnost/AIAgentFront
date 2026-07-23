@@ -7,7 +7,7 @@ const DEFAULT_API_SERVER = "http://192.168.1.157:5454";
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxy = env.VITE_API_PROXY || env.VITE_API_SERVER || DEFAULT_API_SERVER;
-  const pochtaProxy = env.VITE_POCHTA_API_PROXY || "http://localhost:8080";
+  const pochtaProxy = env.VITE_POCHTA_API_PROXY || "http://127.0.0.1:8080";
   const onecProxy = env.VITE_ONEC_API_SERVER || "http://192.168.0.247:8000";
 
   return {
