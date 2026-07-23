@@ -1,5 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { procurementApi, productionPreparationEngineerApi } from "@/api/endpoints";
+import {
+  procurementApi,
+  productionDispatcherApi,
+  productionPreparationEngineerApi
+} from "@/api/endpoints";
 import type { ProcurementDashboardView } from "@/types/procurement";
 
 export function useProcurementPermissions() {
@@ -112,6 +116,57 @@ export function useProductionPreparationEngineerAction(
       action === "confirm_purchase"
         ? productionPreparationEngineerApi.confirmPurchase(caseId)
         : productionPreparationEngineerApi.acknowledgeCritical(caseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["procurement"] });
+    }
+  });
+}
+
+export function useProductionDispatcherPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "production-dispatcher", "permissions"],
+    queryFn: () => productionDispatcherApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useProductionDispatcherDashboard(
+  enabled: boolean,
+  view: "active" | "archive" = "active"
+) {
+  return useQuery({
+    queryKey: ["procurement", "production-dispatcher", "dashboard", view],
+    queryFn: () => productionDispatcherApi.getDashboard(view),
+    enabled,
+    refetchInterval: (query) => {
+      if (view === "archive") return 30000;
+      const cases = query.state.data?.groups.flatMap((group) => group.cases) ?? [];
+      return cases.some((item) => item.dispatcher_work_status === "processing")
+        ? 10000
+        : 30000;
+    }
+  });
+}
+
+export function useProductionDispatcherCase(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "production-dispatcher", "case", caseId],
+    queryFn: () => productionDispatcherApi.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled,
+    refetchInterval: (query) =>
+      query.state.data?.dispatcher_work_status === "processing" ? 8000 : false
+  });
+}
+
+export function useProductionDispatcherAction(
+  action: "confirm_supply" | "acknowledge_critical"
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { caseId: string; method?: string }) =>
+      action === "confirm_supply"
+        ? productionDispatcherApi.confirmSupply(payload.caseId, payload.method)
+        : productionDispatcherApi.acknowledgeCritical(payload.caseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }

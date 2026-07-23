@@ -122,13 +122,26 @@ export interface ProcurementCaseSummary {
   engineer_workspace_archived_at?: string | null;
   engineer_action_at?: string | null;
   engineer_critical_acknowledged_at?: string | null;
+  dispatcher_bucket?: "success" | "attention" | "critical" | null;
+  dispatcher_bucket_reason?: string | null;
+  dispatcher_work_status?: "processing" | "awaiting_action" | "completed" | "archived" | null;
+  dispatcher_decision_kind?: "none" | "supply_confirmation" | "critical_acknowledgement" | null;
+  dispatcher_invoked_at?: string | null;
+  dispatcher_workspace_archived_at?: string | null;
+  dispatcher_action_at?: string | null;
+  dispatcher_critical_acknowledged_at?: string | null;
+  dispatcher_stream?: "reorder_point" | "after_engineer" | null;
 }
 
 export interface ProductionPreparationEngineerAction {
   status: string;
-  action: "purchase_confirmed" | "critical_acknowledged";
+  action: "purchase_confirmed" | "critical_acknowledged" | "supply_confirmed";
   case_id: string;
 }
+
+export type ProductionDispatcherAction = ProductionPreparationEngineerAction;
+export type ProductionDispatcherCaseDetail = ProcurementCaseDetail;
+export type ProductionDispatcherDashboard = ProcurementDashboard;
 
 export interface ProcurementCaseDetail extends ProcurementCaseSummary {
   source_entity_set?: string | null;
@@ -355,3 +368,58 @@ export interface ProductionPreparationEngineerCaseDetail
 }
 
 export type ProductionPreparationEngineerDashboard = ProcurementDashboard;
+
+export interface ProductionDispatcherRecommendation {
+  method: "reserve_stock" | "transfer" | "link_incoming" | "procurement" | "none";
+  quantity: string | number;
+  label: string;
+  details?: string | null;
+  requires_confirmation?: boolean;
+}
+
+export interface ProductionDispatcherPosition {
+  line_id: string;
+  nomenclature_id: string;
+  nomenclature_name: string;
+  characteristic_name?: string | null;
+  unit: string;
+  minimum_stock: string | number;
+  maximum_stock: string | number;
+  reorder_point: string | number;
+  stock_growth_coefficient: string | number;
+  free_stock: string | number;
+  store_room_stock: string | number;
+  expected_in_transit: string | number;
+  expected_in_progress: string | number;
+  expected_total: string | number;
+  confirmed_arrivals: string | number;
+  available_other_warehouses: string | number;
+  production_demand: string | number;
+  stock_position: string | number;
+  forecast_stock: string | number;
+  below_minimum: boolean;
+  below_reorder_point: boolean;
+  net_deficit: string | number;
+  recommended_order_quantity: string | number;
+  required_date?: string | null;
+  urgency: "normal" | "high" | "critical";
+  wait_allowed: boolean;
+  outcome: string;
+  coverage_method: string;
+  recommendation: string;
+  recommendations: ProductionDispatcherRecommendation[];
+  formulas?: Record<string, string>;
+}
+
+export interface ProductionDispatcherOutput {
+  schema_version?: string;
+  calculated_at?: string;
+  evidence_fingerprint?: string;
+  positions: ProductionDispatcherPosition[];
+  validation_issues?: Array<{ code: string; message: string }>;
+  missing_data?: string[];
+  excluded_capabilities?: string[];
+  summary: string;
+  recommended_next_step: string;
+  decision_kind: "supply_confirmation" | "critical_acknowledgement" | "none";
+}

@@ -17,6 +17,7 @@ type Props = {
   emptyText: string;
   showArchiveMeta?: boolean;
   showEngineerMeta?: boolean;
+  showDispatcherMeta?: boolean;
 };
 
 export function CaseListPanel({
@@ -26,7 +27,8 @@ export function CaseListPanel({
   onSelect,
   emptyText,
   showArchiveMeta = false,
-  showEngineerMeta = false
+  showEngineerMeta = false,
+  showDispatcherMeta = false
 }: Props) {
   return (
     <section className={styles.queuePanel}>
@@ -36,7 +38,18 @@ export function CaseListPanel({
       </div>
       {cases.length === 0 ? <div className={styles.emptyState}>{emptyText}</div> : null}
       <div className={styles.caseList}>
-        {cases.map((item) => (
+        {cases.map((item) => {
+          const workStatus = showDispatcherMeta
+            ? item.dispatcher_work_status
+            : showEngineerMeta
+              ? item.engineer_work_status
+              : null;
+          const reason = showDispatcherMeta
+            ? item.dispatcher_bucket_reason
+            : showEngineerMeta
+              ? item.engineer_bucket_reason
+              : null;
+          return (
           <button
             className={item.id === selectedCaseId ? styles.caseItemActive : styles.caseItem}
             key={item.id}
@@ -46,23 +59,29 @@ export function CaseListPanel({
             <div className={styles.caseItemTop}>
               <strong>{caseTitle(item)}</strong>
               <span>
-                {showEngineerMeta && item.engineer_work_status
-                  ? ENGINEER_WORK_LABELS[item.engineer_work_status]
+                {workStatus
+                  ? ENGINEER_WORK_LABELS[workStatus]
                   : (STATUS_LABELS[item.status] ?? item.status)}
               </span>
             </div>
             <div className={styles.caseItemMeta}>
               <span>{item.positions_count} позиций</span>
               <span>{formatDateTime(item.source_date)}</span>
+              {showDispatcherMeta && item.dispatcher_stream ? (
+                <span>
+                  {item.dispatcher_stream === "reorder_point"
+                    ? "Точка заказа"
+                    : "После инженера"}
+                </span>
+              ) : null}
             </div>
             {showArchiveMeta && item.closed_reason_label ? (
               <div className={styles.caseItemNote}>{item.closed_reason_label}</div>
             ) : null}
-            {showEngineerMeta && item.engineer_bucket_reason ? (
-              <div className={styles.caseItemNote}>{item.engineer_bucket_reason}</div>
-            ) : null}
+            {reason ? <div className={styles.caseItemNote}>{reason}</div> : null}
           </button>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

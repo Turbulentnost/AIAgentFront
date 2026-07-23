@@ -126,6 +126,9 @@ import type {
   ProductionPreparationEngineerCaseDetail,
   ProductionPreparationEngineerAction,
   ProductionPreparationEngineerDashboard,
+  ProductionDispatcherAction,
+  ProductionDispatcherCaseDetail,
+  ProductionDispatcherDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
   ProcurementRoleAgentResume,
@@ -227,6 +230,38 @@ export const productionPreparationEngineerApi = {
     apiClient
       .post<ProductionPreparationEngineerAction>(
         `/procurement/role-agents/production_preparation_engineer_agent/cases/${caseId}/acknowledge-critical`
+      )
+      .then((r) => r.data)
+};
+
+export const productionDispatcherApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: (view: "active" | "archive" = "active") =>
+    apiClient
+      .get<ProductionDispatcherDashboard>(
+        "/procurement/role-agents/production_dispatcher_agent/dashboard",
+        { params: { view } }
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<ProductionDispatcherCaseDetail>(
+        `/procurement/role-agents/production_dispatcher_agent/cases/${caseId}`
+      )
+      .then((r) => r.data),
+  confirmSupply: (caseId: string, method?: string) =>
+    apiClient
+      .post<ProductionDispatcherAction>(
+        `/procurement/role-agents/production_dispatcher_agent/cases/${caseId}/confirm-supply`,
+        null,
+        { params: method ? { method } : undefined }
+      )
+      .then((r) => r.data),
+  acknowledgeCritical: (caseId: string) =>
+    apiClient
+      .post<ProductionDispatcherAction>(
+        `/procurement/role-agents/production_dispatcher_agent/cases/${caseId}/acknowledge-critical`
       )
       .then((r) => r.data)
 };

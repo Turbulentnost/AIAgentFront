@@ -15,6 +15,8 @@ export const PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG =
   "production_preparation_engineer_agent";
 export const PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH =
   "/agents/production-preparation-engineer";
+export const PRODUCTION_DISPATCHER_AGENT_SLUG = "production_dispatcher_agent";
+export const PRODUCTION_DISPATCHER_AGENT_PATH = "/agents/production-dispatcher";
 export const AGENT_LAUNCH_MORPH_MS = 520;
 
 function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
@@ -56,6 +58,12 @@ export function isProductionPreparationEngineerAgent(
   return agent.slug === PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG;
 }
 
+export function isProductionDispatcherAgent(
+  agent: Pick<AgentAccess, "slug">
+): boolean {
+  return agent.slug === PRODUCTION_DISPATCHER_AGENT_SLUG;
+}
+
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
   return (
     isNdControlAgent(agent) ||
@@ -63,6 +71,7 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isTasksAgent(agent) ||
     isIncomingCorrespondenceAgent(agent) ||
     isProductionPreparationEngineerAgent(agent) ||
+    isProductionDispatcherAgent(agent) ||
     isProcurementAgent(agent)
   );
 }
@@ -95,6 +104,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isProductionPreparationEngineerAgent(agent)) {
     return {
       path: PRODUCTION_PREPARATION_ENGINEER_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isProductionDispatcherAgent(agent)) {
+    return {
+      path: PRODUCTION_DISPATCHER_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }
