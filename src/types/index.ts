@@ -1734,6 +1734,7 @@ export interface EmailMessage {
   payer_direction_label?: string;
   is_dialog?: boolean;
   document_category_label?: string | null;
+  dialog_mode?: string | null;
   mail_date?: string;
   access_label?: string;
   responsible_label?: string;

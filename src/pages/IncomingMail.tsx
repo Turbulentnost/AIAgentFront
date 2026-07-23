@@ -1881,6 +1881,7 @@ export default function IncomingMail() {
               onExportError={(text) => setFeedback({ type: "error", text })}
               dateSortOrder={tableDateSort}
               onDateSortToggle={handleTableDateSortToggle}
+              isBusy={isBusy}
             />
             )}
             </div>

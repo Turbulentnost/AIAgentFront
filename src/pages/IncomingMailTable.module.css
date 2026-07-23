@@ -370,6 +370,150 @@
 
 
 
+.categoryDialog {
+
+  text-align: center;
+
+}
+
+
+
+.categoryDialogBadge {
+
+  display: inline-flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  min-width: 52px;
+
+  padding: 2px 8px;
+
+  border-radius: 999px;
+
+  border: 1px solid #f9a8d4;
+
+  background: linear-gradient(180deg, #fff5fa 0%, #fce7f3 100%);
+
+  color: #9d174d;
+
+  font-size: 11px;
+
+  font-weight: 700;
+
+  white-space: nowrap;
+
+}
+
+
+
+.markActions {
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: center;
+
+  gap: 2px;
+
+}
+
+
+
+.markButton {
+
+  flex: 0 0 auto;
+
+  width: 24px;
+
+  height: 22px;
+
+  padding: 0;
+
+  border: 1px solid #b0b0b0;
+
+  border-radius: 3px;
+
+  background: #fff;
+
+  font-size: 12px;
+
+  font-weight: 700;
+
+  line-height: 1;
+
+  cursor: pointer;
+
+}
+
+
+
+.markButtonOk {
+
+  color: #155724;
+
+}
+
+
+
+.markButtonReject {
+
+  color: #721c24;
+
+}
+
+
+
+.markButtonActive.markButtonOk {
+
+  background: #d4edda;
+
+  border-color: #a5d6a7;
+
+}
+
+
+
+.markButtonActive.markButtonReject {
+
+  background: #f8d7da;
+
+  border-color: #f5c6cb;
+
+}
+
+
+
+.markButtonDisabled {
+
+  opacity: 0.55;
+
+  cursor: not-allowed;
+
+  background: #ececec !important;
+
+  border-color: #c8c8c8 !important;
+
+  color: #888 !important;
+
+}
+
+
+
+.markPlaceholder {
+
+  color: #aaa;
+
+  font-size: 12px;
+
+  user-select: none;
+
+}
+
+
+
 .accessCell {
 
   min-width: 64px;
@@ -1002,6 +1146,52 @@
 :global([data-incoming-mail-page][data-table-mode="true"]) .sortableHeader:hover {
   color: #0066cc;
 }
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .markButton:not(.markButtonDisabled):hover {
+
+  border-color: #ec4899;
+
+  box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.25);
+
+}
+
+
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .markButtonActive.markButtonOk {
+
+  background: linear-gradient(180deg, #ecfdf5 0%, #bbf7d0 100%);
+
+  border-color: #86efac;
+
+  color: #166534;
+
+}
+
+
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .markButtonActive.markButtonReject {
+
+  background: linear-gradient(180deg, #fff1f2 0%, #fecdd3 100%);
+
+  border-color: #fda4af;
+
+  color: #9f1239;
+
+}
+
+
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .categoryDialogBadge {
+
+  border-color: #f472b6;
+
+  background: linear-gradient(180deg, #fff 0%, #fbcfe8 100%);
+
+  color: #831843;
+
+}
+
+
 
 :global([data-incoming-mail-page][data-table-mode="true"]) .markSelect:not(.markSelectOk):not(.markSelectReject):not(.markSelectDisabled) {
   color: var(--color-text);
