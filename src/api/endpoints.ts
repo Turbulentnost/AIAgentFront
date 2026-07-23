@@ -135,6 +135,14 @@ import type {
   ProcurementRoleAgentResume,
   ProcurementSyncStatus
 } from "@/types/procurement";
+import type {
+  OtkPresentationCardApi,
+  OtkPresentationListApi,
+  OtkPresentationUpdateApi,
+  OtkShipmentLineCreateApi,
+  OtkShipmentLineUpdateApi,
+  OtkWriteTo1CResultApi
+} from "@/types/otk";
 
 export const meetingsApi = {
   permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
@@ -264,6 +272,42 @@ export const qualityKpiApi = {
   getDashboard: (params?: { period_from?: string; period_to?: string }) =>
     apiClient
       .get<QualityKpiReport>("/procurement/quality-kpi/dashboard", { params })
+      .then((r) => r.data)
+};
+
+const OTK_BASE = "/procurement/role-agents/quality_engineer_agent/otk";
+
+export const otkApi = {
+  listPresentations: () =>
+    apiClient.get<OtkPresentationListApi>(`${OTK_BASE}/presentations`).then((r) => r.data),
+  getPresentation: (presentationId: string) =>
+    apiClient
+      .get<OtkPresentationCardApi>(`${OTK_BASE}/presentations/${presentationId}`)
+      .then((r) => r.data),
+  updatePresentation: (presentationId: string, payload: OtkPresentationUpdateApi) =>
+    apiClient
+      .patch<OtkPresentationCardApi>(`${OTK_BASE}/presentations/${presentationId}`, payload)
+      .then((r) => r.data),
+  addLine: (presentationId: string, payload: OtkShipmentLineCreateApi) =>
+    apiClient
+      .post<OtkPresentationCardApi>(`${OTK_BASE}/presentations/${presentationId}/lines`, payload)
+      .then((r) => r.data),
+  updateLine: (presentationId: string, lineId: string, payload: OtkShipmentLineUpdateApi) =>
+    apiClient
+      .patch<OtkPresentationCardApi>(
+        `${OTK_BASE}/presentations/${presentationId}/lines/${lineId}`,
+        payload
+      )
+      .then((r) => r.data),
+  deleteLine: (presentationId: string, lineId: string) =>
+    apiClient
+      .delete<OtkPresentationCardApi>(
+        `${OTK_BASE}/presentations/${presentationId}/lines/${lineId}`
+      )
+      .then((r) => r.data),
+  writeTo1C: (presentationId: string) =>
+    apiClient
+      .post<OtkWriteTo1CResultApi>(`${OTK_BASE}/presentations/${presentationId}/write-to-1c`)
       .then((r) => r.data)
 };
 
