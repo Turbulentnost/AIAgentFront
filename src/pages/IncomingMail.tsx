@@ -31,15 +31,11 @@ import LoadingPanel from "@/components/LoadingPanel";
 import type { DocumentXml, EmailAttachment, EmailMessage, EmailMessageStatus } from "@/types";
 import styles from "./IncomingMail.module.css";
 import IncomingMailTable, {
-  isSpamMarkDisabled,
   normalizeOperatorReviewState,
-  spamMarkAvailability,
-  spamSelectClass,
   type InlineFieldSavePayload,
   type OperatorReviewStateFilter,
   type TableDateSort
 } from "./IncomingMailTable";
-import tableStyles from "./IncomingMailTable.module.css";
 
 const AGENT_TITLE = "Входящая корреспонденция";
 const PAGE_SIZE = 50;
@@ -565,7 +561,12 @@ function pipelineIndexForStatus(status: EmailMessageStatus): number {
 }
 
 function canChangeDepartment(status: EmailMessageStatus): boolean {
-  return status === "awaiting_human" || status === "done" || status === "error";
+  return (
+    status === "awaiting_human" ||
+    status === "done" ||
+    status === "error" ||
+    status === "dialog"
+  );
 }
 
 function resolveRoutingFromMessage(message: EmailMessage): {
@@ -689,7 +690,6 @@ export default function IncomingMail() {
   const [attachmentPreviewError, setAttachmentPreviewError] = useState<string | null>(null);
   const [previewFilename, setPreviewFilename] = useState("");
   const [previewingAttachmentIndex, setPreviewingAttachmentIndex] = useState<number | null>(null);
-  const [drawerSpamValue, setDrawerSpamValue] = useState<"" | "confirm" | "reject">("");
   const attachmentPreviewLoadIdRef = useRef(0);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const pipelineListRef = useRef<HTMLDivElement>(null);
@@ -1031,10 +1031,6 @@ export default function IncomingMail() {
   }, [selectedMessage?.id, selectedMessage?.department_id, selectedMessage?.partner_name, selectedMessage?.contractor_id, selectedMessage?.document_xml?.partner, selectedMessage?.document_xml?.process, selectedMessage?.document_xml?.organization]);
 
   useEffect(() => {
-    setDrawerSpamValue("");
-  }, [selectedMessage?.id]);
-
-  useEffect(() => {
     if (!selectedMessage || attachmentsFocusRef.current !== selectedMessage.id) return;
     if (selectedDetailQuery.isFetching) return;
 
@@ -1208,11 +1204,6 @@ export default function IncomingMail() {
     ? pipelineIndexForStatus(selectedMessage.status)
     : -1;
 
-  const drawerSpamMarks = selectedMessage
-    ? spamMarkAvailability(selectedMessage.status, selectedMessage.is_spam)
-    : { confirm: false, reject: false };
-  const drawerSpamDisabled = isSpamMarkDisabled(drawerSpamMarks, isBusy);
-
   function handleRefreshList() {
     void messagesQuery.refetch();
     void statsQuery.refetch();
@@ -1309,7 +1300,9 @@ export default function IncomingMail() {
     setSelectedId(message.id);
     setFeedback(null);
     const decision =
-      message.status === "done" || message.status === "error" ? "mark_verified" : "approve_routing";
+      message.status === "done" || message.status === "error" || message.status === "dialog"
+        ? "mark_verified"
+        : "approve_routing";
     resolveMutation.mutate({
       id: message.id,
       decision,
@@ -1347,16 +1340,6 @@ export default function IncomingMail() {
     }
   }
 
-  function handleDrawerSpamChange(value: "" | "confirm" | "reject") {
-    if (!selectedMessage || !value) return;
-    setDrawerSpamValue("");
-    if (value === "confirm") {
-      handleTableSpamConfirm(selectedMessage);
-      return;
-    }
-    handleTableSpamReject(selectedMessage);
-  }
-
   function handleTableInlineFieldSave(message: EmailMessage, payload: InlineFieldSavePayload) {
     if (!canChangeDepartment(message.status)) return;
 
@@ -1381,7 +1364,9 @@ export default function IncomingMail() {
     }
 
     const decision =
-      message.status === "done" || message.status === "error" ? "mark_verified" : "approve_routing";
+      message.status === "done" || message.status === "error" || message.status === "dialog"
+        ? "mark_verified"
+        : "approve_routing";
 
     resolveMutation.mutate({
       id: message.id,
@@ -2048,40 +2033,20 @@ export default function IncomingMail() {
                     </span>
                     {selectedMessage.spam_reason ? `\nПричина: ${selectedMessage.spam_reason}` : ""}
                   </p>
-                  <div className={styles.spamMarkRow}>
-                    <label className={styles.spamMarkLabel} htmlFor="drawer-spam-mark">
-                      Отметка оператора
-                    </label>
-                    <select
-                      id="drawer-spam-mark"
-                      className={`${styles.detailSpamSelect} ${spamSelectClass(selectedMessage)} ${
-                        drawerSpamDisabled ? tableStyles.markSelectDisabled : ""
-                      }`}
-                      aria-label="Отметка спама"
-                      title={
-                        drawerSpamDisabled
-                          ? drawerSpamMarks.disabledReason
-                          : "Выберите «Спам» или «Не спам»"
-                      }
-                      value={drawerSpamValue}
-                      disabled={drawerSpamDisabled}
-                      onChange={(event) =>
-                        handleDrawerSpamChange(event.target.value as "" | "confirm" | "reject")
-                      }
-                    >
-                      <option value="">—</option>
-                      {drawerSpamMarks.confirm ? (
-                        <option value="confirm" className={tableStyles.markReject}>
-                          Спам
-                        </option>
-                      ) : null}
-                      {drawerSpamMarks.reject ? (
-                        <option value="reject" className={tableStyles.markOk}>
-                          Не спам
-                        </option>
-                      ) : null}
-                    </select>
-                  </div>
+                  {(selectedMessage.status === "done" || selectedMessage.status === "error") ? (
+                    <div className={styles.actionsRow}>
+                      <button
+                        type="button"
+                        className={styles.spamButton}
+                        disabled={isBusy}
+                        onClick={() =>
+                          resolveMutation.mutate({ id: selectedMessage.id, decision: "mark_spam" })
+                        }
+                      >
+                        Отметить спам
+                      </button>
+                    </div>
+                  ) : null}
                 </div>
 
                 {selectedMessage.status === "awaiting_human" ? (

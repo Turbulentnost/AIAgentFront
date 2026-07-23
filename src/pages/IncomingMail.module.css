@@ -1586,46 +1586,6 @@
   cursor: not-allowed;
 }
 
-.spamMarkRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px;
-}
-
-.spamMarkLabel {
-  color: var(--color-muted);
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.detailSpamSelect {
-  min-width: 132px;
-  max-width: 200px;
-  border-radius: 6px;
-  font-size: 13px;
-  padding: 6px 10px;
-}
-
-.page[data-incoming-mail-page]:not([data-table-mode="true"]) .detailSpamSelect:not(:disabled) {
-  color: var(--color-text);
-  border-color: #f9a8d4;
-  background: linear-gradient(180deg, #fff 0%, #fce7f3 100%);
-}
-
-.page[data-incoming-mail-page]:not([data-table-mode="true"]) .detailSpamSelect:not(:disabled):hover {
-  border-color: #ec4899;
-  box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.25);
-}
-
-.page[data-incoming-mail-page]:not([data-table-mode="true"]) .detailSpamSelect:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-  background: #ececec;
-  border-color: #c8c8c8;
-  color: #888;
-}
-
 .hitlForm {
   display: grid;
   gap: var(--form-grid-gap-y);
