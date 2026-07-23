@@ -1,5 +1,10 @@
 import { AlertTriangle, CheckCircle2, CircleAlert, OctagonAlert } from "lucide-react";
-import type { QualityFinding, QualityRoleCaseDetail, QualityRoleOutput } from "@/types/procurement";
+import type {
+  QualityFinding,
+  QualityRoleCaseDetail,
+  QualityRoleOutput,
+  QualitySampleRule
+} from "@/types/procurement";
 import { caseTitle, formatDateTime } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
@@ -15,6 +20,37 @@ function outputFrom(detail: QualityRoleCaseDetail, agentId: string): QualityRole
   if (latest) return latest;
   if (stored && typeof stored === "object") return stored as QualityRoleOutput;
   return null;
+}
+
+function asSampleRule(value: unknown): QualitySampleRule | null {
+  if (!value || typeof value !== "object") return null;
+  const item = value as Partial<QualitySampleRule>;
+  if (!item.rule_id && !item.sample_note && item.sample_size == null) return null;
+  return item as QualitySampleRule;
+}
+
+function resolveSampleRule(output: QualityRoleOutput | null): QualitySampleRule | null {
+  if (!output) return null;
+  return (
+    asSampleRule(output.sample_rule) ||
+    asSampleRule(output.quality_control?.sample_rule) ||
+    asSampleRule(output.draft_artifacts?.control_program)
+  );
+}
+
+function sampleBasisLabel(basis?: string | null) {
+  switch (basis) {
+    case "10pct":
+      return "10% партии";
+    case "1pct_rating":
+      return "1% (макс. рейтинг поставщика)";
+    case "per_package":
+      return "из каждой тары / коробки";
+    case "second_sample":
+      return "вторая выборка";
+    default:
+      return basis || "по категории";
+  }
 }
 
 function FindingRow({ finding }: { finding: QualityFinding }) {
@@ -38,6 +74,23 @@ export function QualityRoleResultPanel({ detail, agentId, subtitle }: Props) {
   const other = findings.filter((item) => item.severity !== "critical");
   const actions = output?.actions ?? [];
   const conditions = output?.execution_conditions ?? [];
+  const sample = resolveSampleRule(output);
+  const qc = output?.quality_control;
+  const scrap = output?.draft_artifacts?.scrap_decision;
+  const presentationRef =
+    sample?.presentation_ref ||
+    (typeof qc?.presentation_ref === "string" ? qc.presentation_ref : null) ||
+    (typeof output?.draft_artifacts?.presentation_ref === "string"
+      ? output.draft_artifacts.presentation_ref
+      : null);
+  const nomenclatureRef =
+    sample?.nomenclature_ref ||
+    (typeof qc?.nomenclature_ref === "string" ? qc.nomenclature_ref : null);
+  const supplierRef =
+    sample?.supplier_ref || (typeof qc?.supplier_ref === "string" ? qc.supplier_ref : null);
+  const lotQty =
+    sample?.lot_qty ??
+    (typeof output?.draft_artifacts?.lot_qty === "number" ? output.draft_artifacts.lot_qty : null);
 
   let StatusIcon = CircleAlert;
   if (output?.fitness_status === "fit" || actions.includes("QUALITY_RELEASED")) {
@@ -45,6 +98,13 @@ export function QualityRoleResultPanel({ detail, agentId, subtitle }: Props) {
   } else if (critical.length || output?.fitness_status === "unfit") {
     StatusIcon = OctagonAlert;
   }
+
+  const sampleVolumeLabel =
+    sample?.sample_basis === "per_package"
+      ? "из каждой тары"
+      : sample?.sample_size != null
+        ? `${sample.sample_size} шт.`
+        : "— (нужен объём партии)";
 
   return (
     <section className={styles.detailsPanel}>
@@ -87,8 +147,24 @@ export function QualityRoleResultPanel({ detail, agentId, subtitle }: Props) {
             <strong>{detail.status}</strong>
           </div>
           <div>
+            <span>Поставка / предъявление</span>
+            <strong>{presentationRef || "—"}</strong>
+          </div>
+          <div>
+            <span>Номенклатура</span>
+            <strong>{nomenclatureRef || "—"}</strong>
+          </div>
+          <div>
+            <span>Поставщик</span>
+            <strong>{supplierRef || "—"}</strong>
+          </div>
+          <div>
+            <span>Объём партии</span>
+            <strong>{lotQty != null ? `${lotQty} шт.` : "—"}</strong>
+          </div>
+          <div>
             <span>Категория ТМЦ</span>
-            <strong>{output?.category || "—"}</strong>
+            <strong>{output?.category || sample?.category || "—"}</strong>
           </div>
           <div>
             <span>Этап</span>
@@ -113,6 +189,74 @@ export function QualityRoleResultPanel({ detail, agentId, subtitle }: Props) {
             <strong>{formatDateTime(output?.calculated_at)}</strong>
           </div>
         </div>
+      </div>
+
+      <div>
+        <h4>Программа и выборка</h4>
+        {sample ? (
+          <div className={styles.detailGrid}>
+            <div>
+              <span>Правило</span>
+              <strong>{sample.rule_id || "—"}</strong>
+            </div>
+            <div>
+              <span>Алгоритм</span>
+              <strong>{sampleBasisLabel(sample.sample_basis)}</strong>
+            </div>
+            <div>
+              <span>Объём выборки</span>
+              <strong>{sampleVolumeLabel}</strong>
+            </div>
+            <div>
+              <span>Доля выборки</span>
+              <strong>{sample.sample_pct != null ? `${sample.sample_pct}%` : "—"}</strong>
+            </div>
+            <div>
+              <span>Порог брака</span>
+              <strong>
+                {sample.scrap_threshold_pct != null ? `${sample.scrap_threshold_pct}%` : "15%"}
+              </strong>
+            </div>
+            <div>
+              <span>Вторая выборка</span>
+              <strong>
+                {sample.require_second_sample
+                  ? sample.second_sample_size != null
+                    ? `да · ${sample.second_sample_size} шт.`
+                    : "да"
+                  : "нет"}
+              </strong>
+            </div>
+            <div>
+              <span>Рейтинг поставщика</span>
+              <strong>
+                {sample.supplier_quality_rating != null && sample.supplier_quality_rating !== ""
+                  ? String(sample.supplier_quality_rating)
+                  : "—"}
+              </strong>
+            </div>
+            <div>
+              <span>Решение по браку</span>
+              <strong>
+                {typeof scrap?.message === "string"
+                  ? scrap.message
+                  : typeof scrap?.rule_id === "string"
+                    ? scrap.rule_id
+                    : "—"}
+              </strong>
+            </div>
+          </div>
+        ) : (
+          <div className={styles.emptyState}>
+            Программа выборки ещё не рассчитана для этой поставки.
+          </div>
+        )}
+        {sample?.sample_note ? (
+          <div className={styles.warningBox} style={{ marginTop: 10 }}>
+            <AlertTriangle size={16} />
+            {sample.sample_note}
+          </div>
+        ) : null}
       </div>
 
       <div>

@@ -377,6 +377,23 @@ export interface OmtoSupportManagerCaseDetail
 
 export type OmtoSupportManagerDashboard = ProcurementDashboard;
 
+export interface QualitySampleRule {
+  rule_id: string;
+  category: string;
+  sample_size?: number | null;
+  sample_note: string;
+  scrap_threshold_pct?: number;
+  lot_qty?: number | null;
+  presentation_ref?: string | null;
+  nomenclature_ref?: string | null;
+  supplier_ref?: string | null;
+  supplier_quality_rating?: string | number | null;
+  sample_pct?: number | null;
+  sample_basis?: string | null;
+  require_second_sample?: boolean;
+  second_sample_size?: number | null;
+}
+
 export interface QualityFinding {
   field: string;
   rule_id: string;
@@ -394,8 +411,21 @@ export interface QualityRoleOutput {
   next_agent?: string | null;
   summary: string;
   calculated_at?: string | null;
-  quality_control?: Record<string, unknown> | null;
-  draft_artifacts?: Record<string, unknown> | null;
+  sample_rule?: QualitySampleRule | null;
+  quality_control?: (Record<string, unknown> & {
+    sample_rule?: QualitySampleRule | null;
+    sample_size?: number | null;
+    presentation_ref?: string | null;
+    nomenclature_ref?: string | null;
+    supplier_ref?: string | null;
+    supplier_quality_rating?: string | number | null;
+  }) | null;
+  draft_artifacts?: (Record<string, unknown> & {
+    control_program?: QualitySampleRule | null;
+    scrap_decision?: Record<string, unknown> | null;
+    lot_qty?: number | null;
+    presentation_ref?: string | null;
+  }) | null;
   assigned_engineer_id?: string | null;
   assigned_engineer_name?: string | null;
   act_ref?: string | null;
