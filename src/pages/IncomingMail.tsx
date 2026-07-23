@@ -2033,7 +2033,9 @@ export default function IncomingMail() {
                     </span>
                     {selectedMessage.spam_reason ? `\nПричина: ${selectedMessage.spam_reason}` : ""}
                   </p>
-                  {(selectedMessage.status === "done" || selectedMessage.status === "error") ? (
+                  {(selectedMessage.status === "done" ||
+                    selectedMessage.status === "error" ||
+                    selectedMessage.status === "dialog") ? (
                     <div className={styles.actionsRow}>
                       <button
                         type="button"
