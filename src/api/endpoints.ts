@@ -266,6 +266,113 @@ export const agentsApi = {
     const formData = new FormData();
     formData.append("file", file);
     return apiClient.post<Agent>(`/agents/${agentId}/icon`, formData).then((r) => r.data);
+  },
+  classifyAveonExcel: (files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    return longRunningApiClient
+      .post<{
+        source: string;
+        roles: Array<{ filename: string; role: string }>;
+      }>("/agents/document-analysis/classify-excel", formData, {
+        timeout: 120000
+      })
+      .then((r) => ({
+        source: r.data.source,
+        roles: r.data.roles ?? []
+      }));
+  },
+  analyzeAveonExcel: (files: File[]) => {
+    const formData = new FormData();
+    files.forEach((file) => formData.append("files", file));
+    return longRunningApiClient
+      .post<{
+        source: string;
+        roles: Array<{ filename: string; role: string }>;
+        production_schedule_files: string[];
+        production_schedule_products: string[];
+        production_schedule_plans: Array<{
+          product: string;
+          monthly_qty: Record<string, number>;
+        }>;
+        product_spec_links: Array<{
+          schedule_product: string;
+          nomenclature: string | null;
+          spec_sheet: string | null;
+          status: string;
+          reason: string;
+        }>;
+        material_usages_count: number;
+        merged_nomenclatures_count: number;
+        price_matched_count: number;
+        stock_files: string[];
+        stock_matched_count: number;
+        shipment_files: string[];
+        receipts_nonzero_count: number;
+        forecast_deficit_count: number;
+        logistics_risks: {
+          as_of: string | null;
+          stages: Array<{
+            key: string;
+            label: string;
+            items: Array<{
+              nomenclature: string;
+              supplier: string | null;
+              quantity: number;
+              moscow_date: string;
+              milestone_date: string;
+              sheet: string;
+              window_start: string;
+              window_end: string;
+              days_remaining: number;
+              risk_ratio: number;
+              risk_level: string;
+            }>;
+          }>;
+        };
+        file_name: string;
+        file_base64: string | null;
+      }>("/agents/document-analysis/analyze-excel", formData, {
+        timeout: 600000
+      })
+      .then((r) => ({
+        source: r.data.source,
+        roles: r.data.roles ?? [],
+        productionScheduleFiles: r.data.production_schedule_files ?? [],
+        productionScheduleProducts: r.data.production_schedule_products ?? [],
+        productionSchedulePlans: r.data.production_schedule_plans ?? [],
+        productSpecLinks: r.data.product_spec_links ?? [],
+        materialUsagesCount: r.data.material_usages_count ?? 0,
+        mergedNomenclaturesCount: r.data.merged_nomenclatures_count ?? 0,
+        priceMatchedCount: r.data.price_matched_count ?? 0,
+        stockFiles: r.data.stock_files ?? [],
+        stockMatchedCount: r.data.stock_matched_count ?? 0,
+        shipmentFiles: r.data.shipment_files ?? [],
+        receiptsNonzeroCount: r.data.receipts_nonzero_count ?? 0,
+        forecastDeficitCount: r.data.forecast_deficit_count ?? 0,
+        logisticsRisks: {
+          asOf: r.data.logistics_risks?.as_of ?? null,
+          stages: (r.data.logistics_risks?.stages ?? []).map((stage) => ({
+            key: stage.key,
+            label: stage.label,
+            items: (stage.items ?? []).map((item) => ({
+              nomenclature: item.nomenclature,
+              supplier: item.supplier,
+              quantity: item.quantity,
+              moscowDate: item.moscow_date,
+              milestoneDate: item.milestone_date,
+              sheet: item.sheet,
+              windowStart: item.window_start ?? "",
+              windowEnd: item.window_end ?? item.milestone_date ?? "",
+              daysRemaining: item.days_remaining ?? 0,
+              riskRatio: item.risk_ratio ?? 0,
+              riskLevel: item.risk_level ?? "critical"
+            }))
+          }))
+        },
+        fileName: r.data.file_name || "result.xlsx",
+        fileBase64: r.data.file_base64
+      }));
   }
 };
 export const rolesApi = {

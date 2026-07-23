@@ -1,0 +1,1709 @@
+.page {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.backLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: color 0.15s ease;
+}
+
+.backLink:hover {
+  color: var(--color-primary);
+}
+
+.backLink:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.hero {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.heroBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 12px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.hero h1 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.hero p {
+  margin: 0;
+  max-width: 760px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.85fr);
+  gap: 16px;
+  align-items: start;
+}
+
+/* Пока оверлей этапов открыт — workspace выше блока рисков, чтобы список не уходил под него */
+.pageStagesOverlayOpen .workspace {
+  position: relative;
+  z-index: 4;
+}
+
+.pageStagesOverlayOpen .riskBoard {
+  position: relative;
+  z-index: 1;
+  transition: opacity 0.25s ease, filter 0.25s ease;
+  opacity: 0.55;
+  filter: saturate(0.85);
+  pointer-events: none;
+}
+
+.panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px var(--color-shadow-06);
+}
+
+.panelTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.panelHint {
+  margin: -8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.dropZone {
+  position: relative;
+  min-height: 220px;
+  overflow: hidden;
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-elevated);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.dropZoneDragOver {
+  border-color: transparent;
+}
+
+.dropZoneDragOver .dropZoneInner {
+  opacity: 0.28;
+  pointer-events: none;
+}
+
+.dropZoneInner {
+  display: grid;
+  gap: 8px;
+  place-content: center;
+  justify-items: center;
+  min-height: 220px;
+  padding: 28px;
+  text-align: center;
+}
+
+.dropZoneIcon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: var(--color-primary-text);
+  background: var(--color-surface);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.dropZoneInner strong {
+  color: var(--color-text-strong);
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.dropZoneInner span {
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.dropOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  gap: 6px;
+  place-content: center;
+  justify-items: center;
+  padding: 24px;
+  color: var(--color-primary-text);
+  text-align: center;
+  background: var(--kb-drop-overlay-bg);
+  border: 2px dashed var(--kb-drop-overlay-border);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.dropOverlayIcon {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  color: var(--color-primary-text);
+  background: var(--kb-upload-icon-bg);
+  border-radius: 14px;
+}
+
+.dropOverlay strong {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.dropOverlay span {
+  font-size: 13px;
+}
+
+.uploadActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.fileButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--nav-button-min-height);
+  padding: 0 16px;
+  color: var(--nav-button-secondary-text);
+  background: var(--nav-button-secondary-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--nav-button-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.fileButton:hover {
+  background: var(--color-surface-elevated);
+}
+
+.fileButton input {
+  display: none;
+}
+
+.primaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--nav-button-min-height);
+  padding: 0 18px;
+  color: var(--nav-button-primary-text);
+  background: var(--nav-button-primary-bg);
+  border: 0;
+  border-radius: var(--nav-button-radius);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.primaryButton:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--nav-button-min-height);
+  padding: 0 16px;
+  color: var(--nav-button-secondary-text);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--nav-button-radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.fileList {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 16px 12px;
+}
+
+.fileListEmpty {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-elevated);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.fileCard {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  padding: 6px 4px 0;
+  text-align: center;
+}
+
+.fileIconWrap {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+
+.fileIcon {
+  display: grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  color: var(--color-success-text);
+  background: var(--color-green-soft);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.fileMeta {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  min-width: 0;
+}
+
+.fileMeta strong {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  word-break: break-word;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+.fileMeta span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.rolesHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.fileRoleBadge,
+.fileRoleBadgePending,
+.fileRoleBadgeError {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 20px;
+  margin: 4px auto 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.fileRoleBadge {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+}
+
+.fileRoleBadgePending {
+  color: var(--color-text-secondary);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  font-weight: 600;
+}
+
+.fileRoleBadgeError {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft, #fde8e8);
+}
+
+.removeButton {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  color: var(--color-danger-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-sm);
+  opacity: 0;
+  pointer-events: none;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.fileCard:hover .removeButton,
+.fileCard:focus-within .removeButton {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.removeButton:hover {
+  background: var(--color-danger-soft);
+  border-color: transparent;
+  transform: scale(1.05);
+}
+
+.removeButton:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.summaryBlock {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--summary-block-bg);
+  border-radius: 12px;
+}
+
+.summaryBlockTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.summaryRows {
+  display: grid;
+  gap: 8px;
+}
+
+.summaryRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.summaryLabel {
+  color: var(--summary-label-color);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.summaryValue {
+  color: var(--summary-value-color);
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.infoCallout {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  color: var(--form-callout-text);
+  background: var(--form-callout-bg);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.infoCallout p {
+  margin: 0;
+}
+
+.statusBadge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 28px;
+  padding: 4px 12px;
+  color: var(--form-status-badge-text);
+  background: var(--form-status-badge-bg);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.statusBadgeSuccess {
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+}
+
+.statusBadgeProgress {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+}
+
+.statusBadgeDanger {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft, #fde8e8);
+}
+
+.stagesSection {
+  position: relative;
+  z-index: 1;
+  min-height: 0;
+}
+
+.flipScene {
+  perspective: 1400px;
+  perspective-origin: 50% 40%;
+}
+
+.flipCard {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.72s cubic-bezier(0.4, 0.12, 0.2, 1);
+  will-change: transform;
+}
+
+.flipCardFlipped {
+  transform: rotateY(180deg);
+}
+
+.flipFace {
+  min-width: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Высота карточки = высота видимой стороны (не max из двух) */
+.flipFaceFront {
+  position: relative;
+  transform: rotateY(0deg);
+}
+
+.flipFaceBack {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  transform: rotateY(180deg);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.flipCardFlipped .flipFaceFront {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.flipCardFlipped .flipFaceBack {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.requiredFileRowText {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.requiredFileRowLabel {
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.requiredFileRowHint {
+  color: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.3;
+  opacity: 0.72;
+}
+
+.stageRowReady {
+  color: var(--color-success-text);
+}
+
+.stageRowReady .stageDot {
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+  border-color: transparent;
+}
+
+.stageRowMissing {
+  color: var(--color-danger-text);
+}
+
+.stageRowMissing .stageDot {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft, #fde8e8);
+  border-color: transparent;
+}
+
+.stageRowChecking {
+  color: var(--color-text-secondary);
+}
+
+.stageRowChecking .stageDot {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-color: var(--form-control-focus-border-color);
+  animation: requiredDotPulse 1.1s ease-in-out infinite;
+}
+
+@keyframes requiredDotPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flipCard,
+  .riskTileFlipCard,
+  .riskDoughnutSegment,
+  .riskDoughnutSegmentArc {
+    transition-duration: 0.01ms;
+  }
+
+  .stageRowChecking .stageDot {
+    animation: none;
+  }
+}
+
+.pageStagesOverlayOpen .stagesSection {
+  z-index: 6;
+}
+
+.stagePanelWrap {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows 0.32s ease,
+    opacity 0.32s ease,
+    margin 0.32s ease;
+}
+
+.stagePanelWrapCollapsing {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  margin-block: -4px;
+}
+
+.stagePanelWrapInner {
+  overflow: hidden;
+  min-height: 0;
+}
+
+.stagesCompactToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  color: inherit;
+  text-align: left;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.stagesCompactToggle:hover {
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-primary-text) 18%, var(--color-border));
+}
+
+.stagesCompactToggle:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.stagesCompactToggleMain {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stagesCompactToggleLabel {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.stagesCompactToggleMeta {
+  color: var(--color-success-text);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.stagesCompactToggleAction {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.stagesOverlayBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  padding: 0;
+  background: color-mix(in srgb, var(--color-surface) 35%, transparent);
+  border: 0;
+  cursor: pointer;
+  animation: stagesOverlayFadeIn 0.28s ease;
+}
+
+.stagesOverlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 20;
+  display: grid;
+  gap: 10px;
+  max-height: min(68vh, 480px);
+  padding: 12px;
+  overflow: hidden auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  box-shadow:
+    0 18px 48px var(--color-shadow-06),
+    0 0 0 1px color-mix(in srgb, var(--color-border) 70%, transparent);
+  animation: stagesOverlaySlideIn 0.3s ease;
+}
+
+.stagesOverlayHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.stagesOverlayHeader strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.stagesOverlayClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.stagesOverlayClose:hover {
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-primary-text) 18%, var(--color-border));
+}
+
+.stagesOverlayClose:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+@keyframes stagesOverlayFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes stagesOverlaySlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.stagePanel {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.stageRow {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.stageDot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.stageRowActive {
+  color: var(--color-text-strong);
+  font-weight: 600;
+}
+
+.stageRowActive .stageDot {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-color: var(--form-control-focus-border-color);
+}
+
+.stageRowDone {
+  color: var(--color-success-text);
+}
+
+.stageRowDone .stageDot {
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+  border-color: transparent;
+}
+
+
+.errorText {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.spin {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.riskBoard {
+  display: grid;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  box-shadow: 0 10px 24px var(--color-shadow-06);
+}
+
+.riskBoardHeader {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.riskBoardHeader .panelTitle {
+  margin: 0;
+}
+
+.riskBoardHeader .panelHint {
+  margin: 8px 0 0;
+}
+
+.riskTotalBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 4px 12px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.riskAnalyticsBlock {
+  display: grid;
+  gap: 8px;
+}
+
+.riskAnalyticsRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(220px, 0.85fr);
+  gap: 16px;
+  align-items: stretch;
+}
+
+.riskAnalyticsTiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-rows: auto auto;
+  gap: 10px;
+  align-self: stretch;
+  min-height: 0;
+}
+
+.riskTileFlipScene {
+  height: 100%;
+  min-height: 112px;
+  perspective: 1100px;
+  perspective-origin: 50% 40%;
+}
+
+.riskTileFlipCard {
+  display: grid;
+  width: 100%;
+  height: 100%;
+  min-height: 112px;
+  transform-style: preserve-3d;
+  transition: transform 0.62s cubic-bezier(0.4, 0.12, 0.2, 1);
+  will-change: transform;
+}
+
+.riskTileFlipCardFlipped {
+  transform: rotateY(180deg);
+}
+
+/* Обе стороны в одной ячейке → высота = max(лицо, оборот), контент не режется */
+.riskTileFace {
+  grid-area: 1 / 1;
+  align-self: stretch;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  min-height: 100%;
+  height: auto;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.riskTileFaceFront {
+  transform: rotateY(0deg);
+}
+
+.riskTileFaceBack {
+  transform: rotateY(180deg);
+  align-items: flex-start;
+  align-content: flex-start;
+  padding: 12px 14px;
+  overflow: visible;
+}
+
+.riskTileBackContent {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+
+.riskTileBackTitle {
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.riskTileBackRule {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
+.riskTileBackMeta {
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.riskTileBackHint {
+  color: var(--color-primary-text);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.riskAnalyticsTile {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 112px;
+  padding: 16px 18px;
+  color: inherit;
+  text-align: left;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.riskTileFaceFront.riskAnalyticsTile {
+  height: 100%;
+  gap: 16px;
+  padding: 18px 20px;
+}
+
+.riskTileFaceBack.riskAnalyticsTile {
+  height: auto;
+  gap: 12px;
+  padding: 12px 14px;
+  min-height: 0;
+}
+
+.riskAnalyticsTile:hover {
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-primary-text) 18%, var(--color-border));
+}
+
+.riskAnalyticsTile:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-primary-text) 35%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary-text) 20%, transparent);
+}
+
+.riskAnalyticsTileDanger.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-danger-text) 45%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger-text) 22%, transparent);
+}
+
+.riskAnalyticsTileSuccess.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-success-text) 45%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-success-text) 22%, transparent);
+}
+
+.riskAnalyticsTileCritical.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-danger-text) 55%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger-text) 30%, transparent);
+}
+
+.riskAnalyticsTileIcon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.riskTileFaceFront .riskAnalyticsTileIcon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+}
+
+.riskTileFaceBack .riskAnalyticsTileIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+
+.riskAnalyticsTileIconDanger {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
+  border-color: transparent;
+}
+
+.riskAnalyticsTileIconSuccess {
+  color: var(--color-success-text);
+  background: var(--color-success-soft);
+  border-color: transparent;
+}
+
+.riskAnalyticsTileIconCritical {
+  color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger-soft) 70%, var(--color-danger-text) 30%);
+  border-color: color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+}
+
+.riskAnalyticsTileBody {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.riskTileFaceFront .riskAnalyticsTileBody {
+  gap: 6px;
+}
+
+.riskAnalyticsTileLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.riskTileFaceFront .riskAnalyticsTileLabel {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.riskAnalyticsTileValue {
+  color: var(--color-text-strong);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.riskTileFaceFront .riskAnalyticsTileValue {
+  font-size: 30px;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.riskAnalyticsTileDanger .riskAnalyticsTileValue {
+  color: var(--color-danger-text);
+}
+
+.riskAnalyticsTileSuccess .riskAnalyticsTileValue {
+  color: var(--color-success-text);
+}
+
+.riskAnalyticsTileCritical .riskAnalyticsTileValue {
+  color: var(--color-danger-text);
+}
+
+.riskAnalyticsHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.riskDoughnutPanel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  align-self: stretch;
+  min-height: 220px;
+  height: 100%;
+  padding: 20px 22px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.riskDoughnutFigure {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+}
+
+.riskDoughnutSvg {
+  flex-shrink: 0;
+  width: 156px;
+  height: 156px;
+  overflow: visible;
+}
+
+.riskDoughnutSegment {
+  cursor: pointer;
+  outline: none;
+  transition: transform 0.18s ease;
+}
+
+.riskDoughnutSegment:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.riskDoughnutSegmentArc {
+  transition: stroke-width 0.18s ease;
+}
+
+.riskDoughnutCenterValue {
+  fill: var(--color-text-strong);
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  transition: fill 0.18s ease;
+}
+
+.riskDoughnutCenterValueSuccess {
+  fill: var(--color-success-text, var(--color-success));
+}
+
+.riskDoughnutCenterValueDanger {
+  fill: var(--color-danger-text, var(--color-danger));
+}
+
+.riskDoughnutCenterLabel {
+  fill: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.riskDoughnutLegend {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+}
+
+.riskDoughnutLegendItem {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+  min-width: 148px;
+  padding: 8px 10px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.riskDoughnutLegendItem:hover,
+.riskDoughnutLegendItemActive {
+  background: var(--color-surface);
+  border-color: var(--color-border);
+}
+
+.riskDoughnutLegendItem:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.riskDoughnutLegendItem strong {
+  margin-left: auto;
+  color: var(--color-text-strong);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.riskDoughnutSwatch {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+}
+
+.riskDoughnutSwatchSuccess {
+  background: var(--color-success);
+}
+
+.riskDoughnutSwatchDanger {
+  background: var(--color-danger);
+}
+
+.riskStageNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.riskStageNavVirtualWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.riskStageNavBadgeVirtual {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-primary-text) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface-elevated));
+}
+
+.riskStageNavDismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.riskStageNavDismiss:hover {
+  color: var(--color-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger-text) 30%, var(--color-border));
+  background: var(--color-danger-soft, #fde8e8);
+}
+
+.riskStageNavDismiss:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.riskStageContentVirtual {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-primary-text) 35%, var(--color-border));
+}
+
+.riskStageNavBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 6px 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.riskStageNavBadge:hover {
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-primary-text) 25%, var(--color-border));
+}
+
+.riskStageNavBadge:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.riskStageNavBadgeActive {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-color: transparent;
+}
+
+.riskStageNavBadgeMuted:not(.riskStageNavBadgeActive) {
+  opacity: 0.62;
+}
+
+.riskStageNavBadgeHasItems:not(.riskStageNavBadgeActive) {
+  color: var(--color-text-strong);
+}
+
+.riskStageNavBadgeHasItems:not(.riskStageNavBadgeActive) .riskStageNavCount {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft, #fde8e8);
+}
+
+.riskStageNavIndex {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.riskStageNavBadgeActive .riskStageNavIndex {
+  border-color: transparent;
+}
+
+.riskStageNavLabel {
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.riskStageNavCount {
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.riskStageContent {
+  display: grid;
+  gap: 12px;
+  padding: 14px 16px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.riskStageContentAlert {
+  border-color: color-mix(in srgb, var(--color-danger-text) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-soft, #fde8e8) 55%, var(--color-surface-elevated));
+}
+
+.riskStageSummary {
+  display: grid;
+  gap: 2px;
+}
+
+.riskStageSummary strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.riskStageSummary span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.riskEmptyState {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.riskSupplierList {
+  display: grid;
+  gap: 8px;
+}
+
+.riskSupplierGroup {
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.riskSupplierToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 14px;
+  color: var(--color-text-strong);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.riskSupplierToggle:hover {
+  background: var(--color-surface-elevated);
+}
+
+.riskSupplierToggle:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: -2px;
+}
+
+.riskSupplierChevron {
+  flex-shrink: 0;
+  color: var(--color-text-secondary);
+  transition: transform 0.15s ease;
+}
+
+.riskSupplierGroupOpen .riskSupplierChevron {
+  transform: rotate(180deg);
+}
+
+.riskSupplierName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.riskSupplierCount {
+  flex-shrink: 0;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.riskItemList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 12px 12px;
+  list-style: none;
+}
+
+.riskItem {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 10px 16px;
+  padding: 10px 12px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid hsl(var(--risk-hue, 0) 70% 46%);
+  border-radius: 10px;
+}
+
+.riskItemMain {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.riskItemMain strong {
+  overflow: hidden;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.riskItemCountdown {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.riskLevelCritical .riskItemCountdown {
+  color: var(--color-danger-text);
+  font-weight: 600;
+}
+
+.riskLevelHigh .riskItemCountdown {
+  color: color-mix(in srgb, var(--color-danger-text) 80%, #c98700);
+  font-weight: 600;
+}
+
+.riskLevelMedium .riskItemCountdown {
+  color: #c98700;
+}
+
+.riskLevelLow .riskItemCountdown {
+  color: var(--color-success-text, #2f9e64);
+}
+
+.riskMeter {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: hsl(var(--risk-hue, 0) 72% 48%);
+  box-shadow: 0 0 0 2px color-mix(in srgb, hsl(var(--risk-hue, 0) 72% 48%) 25%, transparent);
+}
+
+.riskItemMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: flex-end;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.riskItemMeta > span:not(.riskMeter) {
+  display: inline-flex;
+  gap: 5px;
+  align-items: baseline;
+  max-width: 220px;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.riskItemMetaLabel {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+@media (max-width: 960px) {
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .riskAnalyticsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .riskAnalyticsTiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: none;
+    height: auto;
+  }
+
+  .riskAnalyticsTile {
+    height: auto;
+  }
+
+  .riskDoughnutPanel {
+    min-height: 160px;
+    height: auto;
+  }
+
+  .riskStageNavBadge {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: flex-start;
+  }
+
+  .riskStageNavLabel {
+    max-width: none;
+    white-space: normal;
+  }
+
+  .riskItem {
+    grid-template-columns: 1fr;
+  }
+
+  .riskItemMeta {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 560px) {
+  .riskAnalyticsTiles {
+    grid-template-columns: 1fr;
+  }
+}
