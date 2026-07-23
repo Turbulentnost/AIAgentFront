@@ -19,6 +19,8 @@ export const PRODUCTION_DISPATCHER_AGENT_SLUG = "production_dispatcher_agent";
 export const PRODUCTION_DISPATCHER_AGENT_PATH = "/agents/production-dispatcher";
 export const WAREHOUSE_PICKER_AGENT_SLUG = "warehouse_picker_agent";
 export const WAREHOUSE_PICKER_AGENT_PATH = "/agents/warehouse-picker";
+export const PURCHASE_MANAGER_AGENT_SLUG = "purchase_manager_agent";
+export const PURCHASE_MANAGER_AGENT_PATH = "/agents/purchase-manager";
 export const AGENT_LAUNCH_MORPH_MS = 520;
 
 function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
@@ -72,6 +74,10 @@ export function isWarehousePickerAgent(
   return agent.slug === WAREHOUSE_PICKER_AGENT_SLUG;
 }
 
+export function isPurchaseManagerAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === PURCHASE_MANAGER_AGENT_SLUG;
+}
+
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
   return (
     isNdControlAgent(agent) ||
@@ -81,6 +87,7 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isProductionPreparationEngineerAgent(agent) ||
     isProductionDispatcherAgent(agent) ||
     isWarehousePickerAgent(agent) ||
+    isPurchaseManagerAgent(agent) ||
     isProcurementAgent(agent)
   );
 }
@@ -125,6 +132,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isWarehousePickerAgent(agent)) {
     return {
       path: WAREHOUSE_PICKER_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isPurchaseManagerAgent(agent)) {
+    return {
+      path: PURCHASE_MANAGER_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }

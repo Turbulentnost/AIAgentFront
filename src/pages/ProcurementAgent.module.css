@@ -585,6 +585,192 @@
   box-shadow: 0 0 0 4px color-mix(in srgb, var(--color-primary) 12%, transparent);
 }
 
+.routeHeader span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.routeBranchLayout {
+  display: grid;
+  gap: 10px;
+}
+
+.routeFork {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) 18px;
+  gap: 8px;
+  align-items: stretch;
+  margin: 2px 8px 4px;
+}
+
+.routeForkRail,
+.routeMergeRail {
+  position: relative;
+  border-left: 2px solid color-mix(in srgb, #15803d 55%, var(--color-border));
+  margin: 4px auto;
+  min-height: 100%;
+}
+
+.routeForkRail::before,
+.routeMergeRail::before {
+  position: absolute;
+  top: 0;
+  left: -5px;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #15803d;
+  content: "";
+}
+
+.routeMergeRail::before {
+  top: auto;
+  bottom: 0;
+}
+
+.routeBranchColumn {
+  display: grid;
+  gap: 10px;
+}
+
+.routeBranchNode {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #15803d 28%, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, #22c55e 8%, var(--color-surface));
+  text-align: left;
+  font: inherit;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.routeBranchNode span {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.routeBranchNode small {
+  grid-column: 2;
+  color: var(--color-muted);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.routeBranchNode .routeDot {
+  grid-row: 1 / span 2;
+  border-color: #15803d;
+  background: color-mix(in srgb, #22c55e 18%, var(--color-surface));
+  color: #166534;
+}
+
+.routeBranchNode[data-status="running"] {
+  animation: routeBranchPulse 2.4s ease-in-out infinite;
+}
+
+.routeBranchNode[data-selected="true"] {
+  box-shadow: 0 0 0 3px color-mix(in srgb, #22c55e 18%, transparent);
+}
+
+@keyframes routeBranchPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #22c55e 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, #22c55e 16%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .routeBranchNode[data-status="running"] {
+    animation: none;
+  }
+}
+
+.parallelPanels {
+  display: grid;
+  gap: 14px;
+  margin: 0 14px 14px;
+}
+
+.parallelPanel {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.parallelPanelHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.parallelPanelHeader > div {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #166534;
+}
+
+.parallelPanelHeader strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.parallelPanelHeader span,
+.parallelPanelHint {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.parallelPanelHint {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.parallelOrderNumber {
+  color: #166534;
+}
+
+.parallelPanel .tableWrap {
+  overflow-x: auto;
+}
+
+.parallelPanel table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.parallelPanel th,
+.parallelPanel td {
+  padding: 8px 10px;
+  border-top: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.parallelPanel th {
+  border-top: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .orchestratorResultCard,
 .orchestratorStageSummary {
   display: grid;
@@ -1396,6 +1582,40 @@
   color: var(--color-danger);
 }
 
+.alreadyPurchasingIndicator {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  margin-top: 4px;
+  padding: 3px 7px;
+  border: 1px solid color-mix(in srgb, #15803d 40%, var(--color-border));
+  border-radius: 999px;
+  background: color-mix(in srgb, #22c55e 14%, var(--color-surface));
+  color: #166534;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 800;
+  line-height: 1.3;
+  white-space: normal;
+  animation: alreadyPurchasingPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes alreadyPurchasingPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, #22c55e 0%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 5px color-mix(in srgb, #22c55e 22%, transparent);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alreadyPurchasingIndicator {
+    animation: none;
+  }
+}
+
 .engineerTabs {
   display: flex;
   gap: 18px;
@@ -1987,6 +2207,65 @@
   border-radius: 10px;
 }
 
+.purchaseManagerList {
+  display: grid;
+  gap: 12px;
+}
+
+.purchaseManagerPosition {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.purchaseManagerPositionHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.purchaseManagerPositionHeader > div {
+  display: grid;
+  gap: 4px;
+}
+
+.purchaseManagerPositionHeader small,
+.supplierOrderList small {
+  color: var(--color-muted);
+  font-size: 11px;
+}
+
+.supplierOrderList {
+  display: grid;
+  gap: 8px;
+}
+
+.supplierOrderList > div {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #2563eb 22%, var(--color-border));
+  border-radius: 9px;
+  background: color-mix(in srgb, #2563eb 5%, var(--color-surface));
+  color: #1d4ed8;
+}
+
+.supplierOrderList span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.supplierOrderList b {
+  white-space: nowrap;
+}
+
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -2080,6 +2359,14 @@
 
   .routeTrack {
     min-width: 760px;
+  }
+
+  .routeBranchLayout {
+    min-width: 760px;
+  }
+
+  .parallelPanels {
+    margin: 0 10px 12px;
   }
 
   .orchestratorResultMetrics {

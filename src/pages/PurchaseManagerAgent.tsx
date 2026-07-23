@@ -4,7 +4,6 @@ import {
   Archive,
   CheckCircle2,
   CircleAlert,
-  Clock3,
   ListChecks,
   Loader2,
   OctagonAlert,
@@ -13,17 +12,16 @@ import {
 } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import {
-  useWarehousePickerCase,
-  useWarehousePickerDashboard,
-  useWarehousePickerPermissions
+  usePurchaseManagerCase,
+  usePurchaseManagerDashboard,
+  usePurchaseManagerPermissions
 } from "@/hooks/useProcurementDashboard";
 import { CaseListPanel } from "./procurement/CaseListPanel";
-import { WarehousePickerResultPanel } from "./procurement/WarehousePickerResultPanel";
+import { PurchaseManagerResultPanel } from "./procurement/PurchaseManagerResultPanel";
 import styles from "./ProcurementAgent.module.css";
 
-const AGENT_ID = "warehouse_picker_agent";
+const AGENT_ID = "purchase_manager_agent";
 type Bucket = "success" | "attention" | "critical";
-type AttentionSection = "processing" | "awaiting";
 
 const BUCKETS: Array<{
   id: Bucket;
@@ -33,35 +31,36 @@ const BUCKETS: Array<{
 }> = [
   {
     id: "success",
-    label: "Успешные",
-    description: "Наличие подтверждено, кейс передан в ОМТО",
+    label: "Сверено",
+    description: "Потребность покрыта заказами поставщикам",
     icon: CheckCircle2
   },
   {
     id: "attention",
     label: "Требуют внимания",
-    description: "Нужно подтвердить выдачу, дефицит или расхождение",
+    description: "Нужно подтвердить сверку или создать заказ",
     icon: CircleAlert
   },
   {
     id: "critical",
     label: "Критические",
-    description: "Недостаточно данных для заключения по кладовой",
+    description: "Недостаточно данных для сопоставления",
     icon: OctagonAlert
   }
 ];
 
-export default function WarehousePickerAgent() {
+export default function PurchaseManagerAgent() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [documentSearch, setDocumentSearch] = useState("");
   const [searchMessage, setSearchMessage] = useState("");
-  const permissionsQuery = useWarehousePickerPermissions();
+  const permissionsQuery = usePurchaseManagerPermissions();
   const canAccess =
     permissionsQuery.data?.accessible_role_agents?.includes(AGENT_ID) ?? false;
   const activeView = searchParams.get("view") === "archive" ? "archive" : "active";
-  const activeDashboardQuery = useWarehousePickerDashboard(canAccess, "active");
-  const archiveDashboardQuery = useWarehousePickerDashboard(canAccess, "archive");
-  const dashboardQuery = activeView === "archive" ? archiveDashboardQuery : activeDashboardQuery;
+  const activeDashboardQuery = usePurchaseManagerDashboard(canAccess, "active");
+  const archiveDashboardQuery = usePurchaseManagerDashboard(canAccess, "archive");
+  const dashboardQuery =
+    activeView === "archive" ? archiveDashboardQuery : activeDashboardQuery;
   const cases = useMemo(
     () => dashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [],
     [dashboardQuery.data]
@@ -81,48 +80,28 @@ export default function WarehousePickerAgent() {
     requestedBucket === "critical"
       ? requestedBucket
       : "attention";
-  const attentionSection: AttentionSection =
-    searchParams.get("attention") === "awaiting" ? "awaiting" : "processing";
-
-  const bucketCases = useMemo(() => {
-    if (activeView === "archive") return cases;
-    const matching = cases.filter(
-      (item) => (item.picker_bucket || "attention") === activeBucket
-    );
-    if (activeBucket !== "attention") return matching;
-    return matching.filter((item) =>
-      attentionSection === "processing"
-        ? item.picker_work_status === "processing"
-        : item.picker_work_status !== "processing"
-    );
-  }, [activeBucket, activeView, attentionSection, cases]);
-
+  const bucketCases = useMemo(
+    () =>
+      activeView === "archive"
+        ? cases
+        : cases.filter(
+            (item) => (item.purchase_manager_bucket || "attention") === activeBucket
+          ),
+    [activeBucket, activeView, cases]
+  );
   const bucketCounts = useMemo(
     () =>
       cases.reduce<Record<Bucket, number>>(
         (counts, item) => {
-          counts[item.picker_bucket || "attention"] += 1;
+          counts[item.purchase_manager_bucket || "attention"] += 1;
           return counts;
         },
         { success: 0, attention: 0, critical: 0 }
       ),
     [cases]
   );
-  const attentionCounts = useMemo(
-    () =>
-      cases.reduce(
-        (counts, item) => {
-          if ((item.picker_bucket || "attention") !== "attention") return counts;
-          if (item.picker_work_status === "processing") counts.processing += 1;
-          else counts.awaiting += 1;
-          return counts;
-        },
-        { processing: 0, awaiting: 0 }
-      ),
-    [cases]
-  );
   const selectedCaseId = searchParams.get("case") || "";
-  const detailQuery = useWarehousePickerCase(selectedCaseId || null, canAccess);
+  const detailQuery = usePurchaseManagerCase(selectedCaseId || null, canAccess);
 
   useEffect(() => {
     if (!bucketCases.length) {
@@ -153,14 +132,6 @@ export default function WarehousePickerAgent() {
     setSearchParams(next);
   };
 
-  const selectAttentionSection = (section: AttentionSection) => {
-    const next = new URLSearchParams(searchParams);
-    if (section === "awaiting") next.set("attention", "awaiting");
-    else next.delete("attention");
-    next.delete("case");
-    setSearchParams(next);
-  };
-
   const selectView = (view: "active" | "archive") => {
     const next = new URLSearchParams(searchParams);
     if (view === "archive") next.set("view", "archive");
@@ -177,41 +148,19 @@ export default function WarehousePickerAgent() {
       return;
     }
     const matches = (value?: string | null) =>
-      value
-        ?.toLocaleLowerCase("ru-RU")
-        .replace(/[\s_-]+/g, "")
-        .includes(query.replace(/[\s_-]+/g, "")) ?? false;
+      value?.toLocaleLowerCase("ru-RU").replace(/\s+/g, "").includes(query) ?? false;
     const found =
-      activeCases.find(
-        (item) =>
-          matches(item.source_number) ||
-          matches(item.source_1c_ref) ||
-          matches(item.id)
-      ) ||
-      archiveCases.find(
-        (item) =>
-          matches(item.source_number) ||
-          matches(item.source_1c_ref) ||
-          matches(item.id)
-      );
+      activeCases.find((item) => matches(item.source_number) || matches(item.source_1c_ref)) ||
+      archiveCases.find((item) => matches(item.source_number) || matches(item.source_1c_ref));
     if (!found) {
       setSearchMessage(`Документ «${documentSearch.trim()}» не найден.`);
       return;
     }
     const next = new URLSearchParams(searchParams);
-    if (archiveCases.some((item) => item.id === found.id)) {
-      next.set("view", "archive");
-    } else {
+    if (archiveCases.some((item) => item.id === found.id)) next.set("view", "archive");
+    else {
       next.delete("view");
-      next.set("bucket", found.picker_bucket || "attention");
-      if (
-        (found.picker_bucket || "attention") === "attention" &&
-        found.picker_work_status !== "processing"
-      ) {
-        next.set("attention", "awaiting");
-      } else {
-        next.delete("attention");
-      }
+      next.set("bucket", found.purchase_manager_bucket || "attention");
     }
     next.set("case", found.id);
     setSearchParams(next);
@@ -233,7 +182,7 @@ export default function WarehousePickerAgent() {
       <div className={styles.page}>
         <div className={styles.forbidden}>
           <AlertTriangle size={18} />
-          Рабочее место доступно только кладовщику-комплектовщику.
+          Рабочее место менеджера по закупкам недоступно для вашей учётной записи.
         </div>
       </div>
     );
@@ -243,8 +192,8 @@ export default function WarehousePickerAgent() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h2>ИИ-агент по закупке</h2>
-          <p>Для кладовщика-комплектовщика · Монтажный участок №2</p>
+          <h2>ИИ-агент менеджера по закупкам</h2>
+          <p>Сверка потребности с открытыми заказами поставщикам</p>
         </div>
       </div>
 
@@ -279,79 +228,44 @@ export default function WarehousePickerAgent() {
           />
           {documentSearch ? (
             <button
-              aria-label="Очистить"
+              aria-label="Очистить поиск"
               className={styles.documentSearchClear}
-              onClick={() => setDocumentSearch("")}
+              onClick={() => {
+                setDocumentSearch("");
+                setSearchMessage("");
+              }}
               type="button"
             >
               <X size={14} />
             </button>
           ) : null}
-          <button className={styles.documentSearchSubmit} type="submit">
-            Найти
-          </button>
+          <button className={styles.documentSearchSubmit} type="submit">Найти</button>
         </form>
       </div>
       {searchMessage ? <div className={styles.documentSearchMessage}>{searchMessage}</div> : null}
 
       {activeView === "active" ? (
-        <div className={styles.engineerBucketArea}>
-          <div className={styles.engineerBuckets}>
-            {BUCKETS.map((bucket) => {
-              const Icon = bucket.icon;
-              return (
-                <button
-                  className={
-                    activeBucket === bucket.id
-                      ? `${styles.engineerBucket} ${styles.engineerBucketActive}`
-                      : styles.engineerBucket
-                  }
-                  data-bucket={bucket.id}
-                  key={bucket.id}
-                  onClick={() => selectBucket(bucket.id)}
-                  type="button"
-                >
-                  <Icon size={20} />
-                  <span>
-                    <strong>{bucket.label}</strong>
-                    <small>{bucket.description}</small>
-                  </span>
-                  <b>{bucketCounts[bucket.id]}</b>
-                </button>
-              );
-            })}
-          </div>
-          {activeBucket === "attention" ? (
-            <div className={styles.attentionSectionSwitch}>
+        <div className={styles.engineerBuckets}>
+          {BUCKETS.map((bucket) => {
+            const Icon = bucket.icon;
+            return (
               <button
                 className={
-                  attentionSection === "processing"
-                    ? styles.caseViewActive
-                    : styles.caseViewBtn
+                  activeBucket === bucket.id
+                    ? `${styles.engineerBucket} ${styles.engineerBucketActive}`
+                    : styles.engineerBucket
                 }
-                onClick={() => selectAttentionSection("processing")}
+                data-bucket={bucket.id}
+                key={bucket.id}
+                onClick={() => selectBucket(bucket.id)}
                 type="button"
               >
-                <Loader2
-                  className={attentionCounts.processing > 0 ? styles.spin : undefined}
-                  size={15}
-                />
-                Рассчитывается ({attentionCounts.processing})
+                <Icon size={20} />
+                <span><strong>{bucket.label}</strong><small>{bucket.description}</small></span>
+                <b>{bucketCounts[bucket.id]}</b>
               </button>
-              <button
-                className={
-                  attentionSection === "awaiting"
-                    ? styles.caseViewActive
-                    : styles.caseViewBtn
-                }
-                onClick={() => selectAttentionSection("awaiting")}
-                type="button"
-              >
-                <Clock3 size={15} />
-                Ожидает решения ({attentionCounts.awaiting})
-              </button>
-            </div>
-          ) : null}
+            );
+          })}
         </div>
       ) : null}
 
@@ -365,37 +279,33 @@ export default function WarehousePickerAgent() {
         ) : (
           <CaseListPanel
             cases={bucketCases}
-            emptyText={
-              activeView === "archive"
-                ? "Архивных кейсов нет."
-                : "В выбранном разделе кейсов нет."
-            }
+            emptyText={activeView === "archive" ? "Архивных кейсов нет." : "В выбранном разделе кейсов нет."}
             onSelect={selectCase}
             selectedCaseId={selectedCaseId}
             showArchiveMeta={activeView === "archive"}
-            showPickerMeta
-            title={activeView === "archive" ? "Архив" : "Заказы МУ №2"}
+            showPurchaseManagerMeta
+            title={activeView === "archive" ? "Архив" : "Сверка заказов"}
           />
         )}
 
         {!selectedCaseId ? (
           <section className={styles.detailsPanel}>
-            <div className={styles.emptyState}>Выберите кейс для просмотра заключения.</div>
+            <div className={styles.emptyState}>Выберите кейс для просмотра сверки.</div>
           </section>
         ) : detailQuery.isLoading ? (
           <section className={styles.detailsPanel}>
             <div className={styles.emptyState}>
-              <Loader2 className={styles.spin} size={16} /> Загрузка...
+              <Loader2 className={styles.spin} size={16} /> Загрузка сверки...
             </div>
           </section>
         ) : detailQuery.isError || !detailQuery.data ? (
           <section className={styles.detailsPanel}>
             <div className={styles.warningBox}>
-              <AlertTriangle size={16} /> Не удалось загрузить заключение.
+              <AlertTriangle size={16} /> Не удалось загрузить результат сверки.
             </div>
           </section>
         ) : (
-          <WarehousePickerResultPanel detail={detailQuery.data} />
+          <PurchaseManagerResultPanel detail={detailQuery.data} />
         )}
       </div>
     </div>

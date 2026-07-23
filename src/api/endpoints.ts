@@ -129,6 +129,9 @@ import type {
   ProductionDispatcherAction,
   ProductionDispatcherCaseDetail,
   ProductionDispatcherDashboard,
+  PurchaseManagerAction,
+  PurchaseManagerCaseDetail,
+  PurchaseManagerDashboard,
   WarehousePickerAction,
   WarehousePickerCaseDetail,
   WarehousePickerDashboard,
@@ -297,6 +300,36 @@ export const warehousePickerApi = {
     apiClient
       .post<WarehousePickerAction>(
         `/procurement/role-agents/warehouse_picker_agent/cases/${caseId}/acknowledge-critical`
+      )
+      .then((r) => r.data)
+};
+
+export const purchaseManagerApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: (view: "active" | "archive" = "active") =>
+    apiClient
+      .get<PurchaseManagerDashboard>(
+        "/procurement/role-agents/purchase_manager_agent/dashboard",
+        { params: { view } }
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<PurchaseManagerCaseDetail>(
+        `/procurement/role-agents/purchase_manager_agent/cases/${caseId}`
+      )
+      .then((r) => r.data),
+  confirmReconciliation: (caseId: string) =>
+    apiClient
+      .post<PurchaseManagerAction>(
+        `/procurement/role-agents/purchase_manager_agent/cases/${caseId}/confirm-reconciliation`
+      )
+      .then((r) => r.data),
+  acknowledgeCritical: (caseId: string) =>
+    apiClient
+      .post<PurchaseManagerAction>(
+        `/procurement/role-agents/purchase_manager_agent/cases/${caseId}/acknowledge-critical`
       )
       .then((r) => r.data)
 };

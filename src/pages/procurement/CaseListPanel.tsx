@@ -30,6 +30,7 @@ type Props = {
   showEngineerMeta?: boolean;
   showDispatcherMeta?: boolean;
   showPickerMeta?: boolean;
+  showPurchaseManagerMeta?: boolean;
 };
 
 function positionsLabel(count: number): string {
@@ -74,7 +75,8 @@ export function CaseListPanel({
   showArchiveMeta = false,
   showEngineerMeta = false,
   showDispatcherMeta = false,
-  showPickerMeta = false
+  showPickerMeta = false,
+  showPurchaseManagerMeta = false
 }: Props) {
   return (
     <section className={styles.queuePanel}>
@@ -85,23 +87,35 @@ export function CaseListPanel({
       {cases.length === 0 ? <div className={styles.emptyState}>{emptyText}</div> : null}
       <div className={styles.caseList}>
         {cases.map((item) => {
-          const workStatus = showPickerMeta
+          const workStatus = showPurchaseManagerMeta
+            ? item.purchase_manager_work_status
+            : showPickerMeta
             ? item.picker_work_status
             : showDispatcherMeta
               ? item.dispatcher_work_status
               : showEngineerMeta
                 ? item.engineer_work_status
                 : null;
-          const reason = showPickerMeta
+          const reason = showPurchaseManagerMeta
+            ? item.purchase_manager_bucket_reason
+            : showPickerMeta
             ? item.picker_bucket_reason
             : showDispatcherMeta
               ? item.dispatcher_bucket_reason
               : showEngineerMeta
                 ? item.engineer_bucket_reason
                 : null;
-          const statusText = workStatus
-            ? WORK_STATUS_LABELS[workStatus]
-            : (STATUS_LABELS[item.status] ?? item.status);
+          const coverageStatus =
+            showPickerMeta &&
+            item.picker_bucket === "success" &&
+            workStatus === "completed"
+              ? "Ведется закупка"
+              : null;
+          const statusText = coverageStatus
+            ? coverageStatus
+            : workStatus
+              ? WORK_STATUS_LABELS[workStatus]
+              : (STATUS_LABELS[item.status] ?? item.status);
           const decisionLabel =
             showPickerMeta && item.picker_decision_kind
               ? PICKER_DECISION_LABELS[item.picker_decision_kind]

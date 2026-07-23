@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   procurementApi,
+  purchaseManagerApi,
   productionDispatcherApi,
   productionPreparationEngineerApi,
   warehousePickerApi
@@ -219,6 +220,57 @@ export function useWarehousePickerAction(
       action === "confirm_conclusion"
         ? warehousePickerApi.confirmConclusion(payload.caseId, payload.action)
         : warehousePickerApi.acknowledgeCritical(payload.caseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["procurement"] });
+    }
+  });
+}
+
+export function usePurchaseManagerPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "purchase-manager", "permissions"],
+    queryFn: () => purchaseManagerApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function usePurchaseManagerDashboard(
+  enabled: boolean,
+  view: "active" | "archive" = "active"
+) {
+  return useQuery({
+    queryKey: ["procurement", "purchase-manager", "dashboard", view],
+    queryFn: () => purchaseManagerApi.getDashboard(view),
+    enabled,
+    refetchInterval: (query) => {
+      if (view === "archive") return 30000;
+      const cases = query.state.data?.groups.flatMap((group) => group.cases) ?? [];
+      return cases.some((item) => item.purchase_manager_work_status === "processing")
+        ? 10000
+        : 30000;
+    }
+  });
+}
+
+export function usePurchaseManagerCase(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "purchase-manager", "case", caseId],
+    queryFn: () => purchaseManagerApi.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled,
+    refetchInterval: (query) =>
+      query.state.data?.purchase_manager_work_status === "processing" ? 8000 : false
+  });
+}
+
+export function usePurchaseManagerAction(
+  action: "confirm_reconciliation" | "acknowledge_critical"
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (caseId: string) =>
+      action === "confirm_reconciliation"
+        ? purchaseManagerApi.confirmReconciliation(caseId)
+        : purchaseManagerApi.acknowledgeCritical(caseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }

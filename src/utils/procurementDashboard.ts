@@ -11,6 +11,7 @@ export const STATUS_LABELS: Record<string, string> = {
   coverage_check: "Проверка покрытия",
   human_required: "Нужен человек",
   blocked: "Заблокирован",
+  ordered: "Ведется закупка",
   closed: "Архив",
   failed: "Ошибка"
 };

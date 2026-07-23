@@ -146,6 +146,23 @@ export interface ProcurementCaseSummary {
   picker_workspace_archived_at?: string | null;
   picker_action_at?: string | null;
   picker_critical_acknowledged_at?: string | null;
+  purchase_manager_bucket?: "success" | "attention" | "critical" | null;
+  purchase_manager_bucket_reason?: string | null;
+  purchase_manager_work_status?:
+    | "processing"
+    | "awaiting_action"
+    | "completed"
+    | "archived"
+    | null;
+  purchase_manager_decision_kind?:
+    | "none"
+    | "reconciliation_confirmation"
+    | "critical_acknowledgement"
+    | null;
+  purchase_manager_invoked_at?: string | null;
+  purchase_manager_workspace_archived_at?: string | null;
+  purchase_manager_action_at?: string | null;
+  purchase_manager_critical_acknowledged_at?: string | null;
 }
 
 export interface ProductionPreparationEngineerAction {
@@ -185,6 +202,17 @@ export interface WarehousePickerPosition {
   assignment_id?: string | null;
   assignment_name?: string | null;
   formulas?: Record<string, string>;
+  already_being_purchased?: boolean;
+  supplier_order_numbers?: string[];
+  ordered_quantity?: string | number | null;
+  supplier_name?: string | null;
+  arrival_date?: string | null;
+  supplier_orders?: Array<{
+    supplier_order_number?: string | null;
+    quantity?: string | number | null;
+    supplier_name?: string | null;
+    arrival_date?: string | null;
+  }>;
   excluded_supply?: Array<{
     supply_id?: string;
     source_type?: string;
@@ -233,6 +261,48 @@ export interface WarehousePickerOutput {
 export type ProductionDispatcherAction = ProductionPreparationEngineerAction;
 export type ProductionDispatcherCaseDetail = ProcurementCaseDetail;
 export type ProductionDispatcherDashboard = ProcurementDashboard;
+
+export type PurchaseManagerAction = ProductionPreparationEngineerAction;
+export type PurchaseManagerCaseDetail = ProcurementCaseDetail;
+export type PurchaseManagerDashboard = ProcurementDashboard;
+
+export interface PurchaseManagerSupplierOrder {
+  order_id?: string | null;
+  order_number: string;
+  order_date?: string | null;
+  supplier_name?: string | null;
+  status?: string | null;
+  quantity: string | number;
+  expected_date?: string | null;
+  confirmed?: boolean;
+}
+
+export interface PurchaseManagerPosition {
+  line_id: string;
+  nomenclature_id?: string;
+  nomenclature_name: string;
+  characteristic_name?: string | null;
+  unit: string;
+  requested_quantity: string | number;
+  ordered_quantity: string | number;
+  remaining_quantity: string | number;
+  is_reconciled: boolean;
+  outcome: string;
+  recommendation?: string;
+  supplier_orders: PurchaseManagerSupplierOrder[];
+}
+
+export interface PurchaseManagerOutput {
+  schema_version?: string;
+  calculated_at?: string;
+  summary: string;
+  recommended_next_step: string;
+  decision_kind: "reconciliation_confirmation" | "critical_acknowledgement" | "none";
+  positions: PurchaseManagerPosition[];
+  missing_data?: string[];
+  validation_issues?: Array<{ code: string; message: string }>;
+  excluded_capabilities?: string[];
+}
 
 export interface ProcurementCaseDetail extends ProcurementCaseSummary {
   source_entity_set?: string | null;

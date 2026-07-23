@@ -37,6 +37,46 @@ function withUnit(value: string | number | null | undefined, unit?: string): str
   return `${quantity(value)}${unit ? ` ${unit}` : ""}`;
 }
 
+function purchasingBadgeText(position: WarehousePickerPosition): string {
+  const parts = ["Ведется закупка"];
+  if (
+    position.ordered_quantity !== null &&
+    position.ordered_quantity !== undefined &&
+    position.ordered_quantity !== ""
+  ) {
+    parts.push(withUnit(position.ordered_quantity, position.unit));
+  }
+  if (position.supplier_order_numbers?.length) {
+    parts.push(`№ ${position.supplier_order_numbers.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
+function formatArrivalDate(value?: string | null): string {
+  if (!value) return "—";
+  const stamp = value.slice(0, 10);
+  if (!stamp || stamp.startsWith("0001-01-01")) return "—";
+  return formatDate(stamp);
+}
+
+function primarySupplierOrder(position: WarehousePickerPosition) {
+  const first = position.supplier_orders?.find(
+    (item) => item.supplier_order_number || item.quantity != null
+  );
+  return {
+    number:
+      first?.supplier_order_number ||
+      position.supplier_order_numbers?.[0] ||
+      "—",
+    quantity:
+      first?.quantity ??
+      position.ordered_quantity ??
+      position.requested_quantity,
+    supplier: first?.supplier_name || position.supplier_name || "—",
+    arrival: formatArrivalDate(first?.arrival_date || position.arrival_date)
+  };
+}
+
 function pickQty(position: Record<string, unknown>, ...keys: string[]): string | number | null {
   for (const key of keys) {
     const value = position[key];
@@ -45,6 +85,11 @@ function pickQty(position: Record<string, unknown>, ...keys: string[]): string |
     }
   }
   return null;
+}
+
+function stringList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map(String).map((item) => item.trim()).filter(Boolean);
 }
 
 function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | null {
@@ -57,16 +102,93 @@ function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | 
     (latestAgent === "warehouse_picker_agent" && latest && typeof latest === "object"
       ? latest
       : null) ||
-    (latest && typeof latest === "object" && !("gross_requirement" in ((latest as { positions?: unknown[] }).positions?.[0] || {}))
+    (latest && typeof latest === "object" && !(
+      "gross_requirement" in
+      (((latest as { positions?: unknown[] }).positions?.[0] || {}) as Record<string, unknown>)
+    )
       ? latest
       : null);
   if (!candidate || typeof candidate !== "object") return null;
   const raw = candidate as Record<string, unknown>;
   if (!Array.isArray(raw.positions)) return null;
+  const coverage =
+    detail.case_metadata?.supplier_order_coverage &&
+    typeof detail.case_metadata.supplier_order_coverage === "object"
+      ? (detail.case_metadata.supplier_order_coverage as Record<string, unknown>)
+      : null;
+  const coveragePositions = Array.isArray(coverage?.positions)
+    ? (coverage.positions as Array<Record<string, unknown>>)
+    : [];
+  const coverageStatus = String(coverage?.coverage_status || "");
   const positions = raw.positions.map((value) => {
     const position = value as Record<string, unknown>;
+    const lineId = String(position.line_id || "");
+    const nomenclatureId = String(position.nomenclature_id || "");
+    const coveragePosition =
+      coveragePositions.find((item) => String(item.line_id || "") === lineId) ||
+      (nomenclatureId
+        ? coveragePositions.find(
+            (item) => String(item.nomenclature_id || "") === nomenclatureId
+          )
+        : undefined);
+    const coverageOrders = Array.isArray(coveragePosition?.supplier_orders)
+      ? (coveragePosition.supplier_orders as Array<Record<string, unknown>>)
+      : [];
+    const supplierOrderNumbers = Array.from(new Set([
+      ...stringList(
+      position.supplier_order_numbers ?? position.linked_supplier_order_numbers
+      ),
+      ...coverageOrders
+        .map((item) => String(item.supplier_order_number || "").trim())
+        .filter(Boolean)
+    ]));
+    const alreadyBeingPurchased = Boolean(
+      position.already_being_purchased ??
+        position.already_in_purchase ??
+        coveragePosition?.purchasing ??
+        supplierOrderNumbers.length
+    );
+    const orderedFromOrders = coverageOrders.reduce(
+      (sum, item) => sum + numeric(item.quantity as string | number | null | undefined),
+      0
+    );
+    const orderedQuantity = alreadyBeingPurchased
+      ? orderedFromOrders > 0
+        ? orderedFromOrders
+        : pickQty(
+            coveragePosition || {},
+            "ordered_quantity",
+            "requested_quantity"
+          ) ??
+          pickQty(position, "ordered_quantity", "requested_quantity", "gross_requirement") ??
+          null
+      : pickQty(position, "ordered_quantity") ?? null;
+    const supplierName =
+      String(
+        position.supplier_name ||
+          coverageOrders.map((item) => item.supplier_name || item.supplierName).find(Boolean) ||
+          ""
+      ).trim() || null;
+    const arrivalDate =
+      String(
+        position.arrival_date ||
+          coverageOrders.map((item) => item.arrival_date || item.arrivalDate).find(Boolean) ||
+          ""
+      ).trim() || null;
+    const supplierOrders = (
+      coverageOrders.length
+        ? coverageOrders
+        : Array.isArray(position.supplier_orders)
+          ? (position.supplier_orders as Array<Record<string, unknown>>)
+          : []
+    ).map((item) => ({
+      supplier_order_number: String(item.supplier_order_number || item.number || "").trim() || null,
+      quantity: (item.quantity as string | number | null | undefined) ?? null,
+      supplier_name: String(item.supplier_name || item.supplierName || "").trim() || null,
+      arrival_date: String(item.arrival_date || item.arrivalDate || "").trim() || null
+    }));
     return {
-      line_id: String(position.line_id || ""),
+      line_id: lineId,
       nomenclature_name: String(position.nomenclature_name || ""),
       characteristic_name: (position.characteristic_name as string | null) || null,
       unit: String(position.unit || "шт"),
@@ -77,13 +199,21 @@ function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | 
       factual_quantity: pickQty(position, "factual_quantity") ?? 0,
       available_for_issue: pickQty(position, "available_for_issue", "confirmed_available") ?? 0,
       confirmed_available: pickQty(position, "confirmed_available") ?? 0,
-      confirmed_deficit: pickQty(position, "confirmed_deficit", "net_requirement") ?? 0,
+      confirmed_deficit: alreadyBeingPurchased
+        ? 0
+        : pickQty(position, "confirmed_deficit", "net_requirement") ?? 0,
       quantity_to_issue: pickQty(position, "quantity_to_issue") ?? 0,
-      quantity_to_purchase: pickQty(position, "quantity_to_purchase") ?? 0,
+      quantity_to_purchase: alreadyBeingPurchased
+        ? 0
+        : pickQty(position, "quantity_to_purchase") ?? 0,
       reserved_other_quantity: pickQty(position, "reserved_other_quantity") ?? 0,
       has_discrepancy: Boolean(position.has_discrepancy),
-      outcome: String(position.outcome || ""),
-      recommendation: String(position.recommendation || ""),
+      outcome: alreadyBeingPurchased
+        ? "covered_by_supplier_order"
+        : String(position.outcome || ""),
+      recommendation: alreadyBeingPurchased
+        ? "Ведется закупка по заказу поставщику."
+        : String(position.recommendation || ""),
       warehouse_name: (position.warehouse_name as string | null) || null,
       assignment_name: (position.assignment_name as string | null) || null,
       assignment_id: (position.assignment_id as string | null) || null,
@@ -91,6 +221,12 @@ function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | 
         position.formulas && typeof position.formulas === "object"
           ? (position.formulas as Record<string, string>)
           : {},
+      already_being_purchased: alreadyBeingPurchased,
+      supplier_order_numbers: supplierOrderNumbers,
+      ordered_quantity: orderedQuantity,
+      supplier_name: supplierName,
+      arrival_date: arrivalDate,
+      supplier_orders: supplierOrders,
       excluded_supply: Array.isArray(position.excluded_supply)
         ? (position.excluded_supply as WarehousePickerPosition["excluded_supply"])
         : []
@@ -100,10 +236,26 @@ function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | 
     raw.conclusion && typeof raw.conclusion === "object"
       ? (raw.conclusion as Record<string, unknown>)
       : {};
+  const purchasingCount = positions.filter((item) => item.already_being_purchased).length;
+  const coverageSummary =
+    coverageStatus === "full"
+      ? "Закупка у комплектовщика не требуется: все позиции уже в заказах поставщику."
+      : coverageStatus === "partial" && purchasingCount
+        ? `Ведется закупка по ${purchasingCount} из ${positions.length} позиций. Непокрытый дефицит остаётся у комплектовщика.`
+        : "";
+  const coverageNextStep =
+    coverageStatus === "full"
+      ? "Контролировать исполнение заказов поставщику."
+      : coverageStatus === "partial"
+        ? "Подтвердить только непокрытый дефицит для передачи на закупку."
+        : "";
   return {
-    summary: String(raw.summary || ""),
-    recommended_next_step: String(raw.recommended_next_step || ""),
-    decision_kind: (raw.decision_kind as WarehousePickerOutput["decision_kind"]) || "none",
+    summary: coverageSummary || String(raw.summary || ""),
+    recommended_next_step: coverageNextStep || String(raw.recommended_next_step || ""),
+    decision_kind:
+      coverageStatus === "full"
+        ? "none"
+        : (raw.decision_kind as WarehousePickerOutput["decision_kind"]) || "none",
     calculated_at: raw.calculated_at as string | undefined,
     positions,
     case: (raw.case as WarehousePickerOutput["case"]) || undefined,
@@ -129,6 +281,7 @@ const OUTCOME_LABELS: Record<string, string> = {
   issue_from_stock: "Выдача из остатка",
   partial_issue: "Обеспечено частично",
   deficit_confirmed: "Требуется закупка",
+  covered_by_supplier_order: "Ведется закупка",
   discrepancy_return: "Возврат из-за расхождений",
   fully_available: "Полностью обеспечено",
   clarification_required: "Требуется уточнение"
@@ -145,6 +298,9 @@ const EXCLUSION_LABELS: Record<string, string> = {
 };
 
 function outcomeTone(position: WarehousePickerPosition): "success" | "warning" | "danger" {
+  if (position.already_being_purchased || position.outcome === "covered_by_supplier_order") {
+    return "success";
+  }
   if (position.outcome === "discrepancy_return") return "danger";
   if (numeric(position.confirmed_deficit) > 0) return "warning";
   return "success";
@@ -359,21 +515,35 @@ export function WarehousePickerResultPanel({ detail }: Props) {
     const header = [
       "Номенклатура",
       "Назначение",
-      "Потребность",
-      "На складе",
-      "К выдаче",
-      "Дефицит",
+      "Документ / потребность",
+      "Заказано / склад",
+      "Поставщик / дефицит",
+      "Прибытие / к выдаче",
       "Решение"
     ];
-    const rows = positions.map((position) => [
-      position.nomenclature_name,
-      position.assignment_name || "",
-      quantity(position.requested_quantity),
-      quantity(position.warehouse_stock ?? position.available_for_issue),
-      quantity(position.quantity_to_issue),
-      quantity(position.confirmed_deficit),
-      OUTCOME_LABELS[position.outcome] || position.outcome
-    ]);
+    const rows = positions.map((position) => {
+      if (position.already_being_purchased) {
+        const purchase = primarySupplierOrder(position);
+        return [
+          position.nomenclature_name,
+          position.assignment_name || "",
+          purchase.number,
+          withUnit(purchase.quantity, position.unit),
+          purchase.supplier,
+          purchase.arrival,
+          OUTCOME_LABELS[position.outcome] || position.outcome
+        ];
+      }
+      return [
+        position.nomenclature_name,
+        position.assignment_name || "",
+        quantity(position.requested_quantity),
+        quantity(position.warehouse_stock ?? position.available_for_issue),
+        quantity(position.confirmed_deficit),
+        quantity(position.quantity_to_issue),
+        OUTCOME_LABELS[position.outcome] || position.outcome
+      ];
+    });
     const csv = [header, ...rows]
       .map((row) => row.map((cell) => `"${String(cell).replaceAll('"', '""')}"`).join(";"))
       .join("\n");
@@ -386,14 +556,38 @@ export function WarehousePickerResultPanel({ detail }: Props) {
     URL.revokeObjectURL(url);
   };
 
+  const coverageMeta =
+    detail.case_metadata?.supplier_order_coverage &&
+    typeof detail.case_metadata.supplier_order_coverage === "object"
+      ? (detail.case_metadata.supplier_order_coverage as Record<string, unknown>)
+      : null;
+  const coverageStatusLabel = String(coverageMeta?.coverage_status || "");
+  const purchasingInProgress =
+    coverageStatusLabel === "full" ||
+    coverageStatusLabel === "partial" ||
+    detail.picker_work_status === "completed";
+  const headerBadge = purchasingInProgress
+    ? coverageStatusLabel === "full"
+      ? { ok: true, text: "Ведется закупка" }
+      : coverageStatusLabel === "partial"
+        ? { ok: true, text: "Закупка частично" }
+        : {
+            ok: detail.source_active !== false,
+            text: detail.source_active ? "Основание актуально" : "Основание неактуально"
+          }
+    : {
+        ok: detail.source_active !== false,
+        text: detail.source_active ? "Основание актуально" : "Основание неактуально"
+      };
+
   return (
     <section className={`${styles.detailsPanel} ${styles.engineerDetailsPanel}`}>
       <div className={styles.engineerPanelHeader}>
         <div>
           <div className={styles.engineerTitleRow}>
             <h3>{caseTitle(detail)}</h3>
-            <span className={detail.source_active ? styles.syncBadgeOk : styles.syncBadge}>
-              {detail.source_active ? "Основание актуально" : "Основание неактуально"}
+            <span className={headerBadge.ok ? styles.syncBadgeOk : styles.syncBadge}>
+              {headerBadge.text}
             </span>
           </div>
           <p>Заключение по складскому наличию · Монтажный участок №2</p>
@@ -429,9 +623,19 @@ export function WarehousePickerResultPanel({ detail }: Props) {
         )
       ) : (
         <div
-          className={`${styles.resultStatus} ${missingData.length ? styles.resultStatusWarning : ""}`}
+          className={`${styles.resultStatus} ${
+            coverageStatusLabel !== "full" &&
+            (missingData.length || output.decision_kind === "deficit_confirmation")
+              ? styles.resultStatusWarning
+              : ""
+          }`}
         >
-          {missingData.length ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />}
+          {coverageStatusLabel === "full" ||
+          (!missingData.length && output.decision_kind !== "deficit_confirmation") ? (
+            <CheckCircle2 size={16} />
+          ) : (
+            <AlertTriangle size={16} />
+          )}
           <div>
             <strong>{output.summary}</strong>
             <span>{output.recommended_next_step}</span>
@@ -646,6 +850,11 @@ export function WarehousePickerResultPanel({ detail }: Props) {
                         position.characteristic_name ||
                         "Без назначения / характеристики"}
                     </small>
+                    {position.already_being_purchased ? (
+                      <span className={styles.alreadyPurchasingIndicator}>
+                        {purchasingBadgeText(position)}
+                      </span>
+                    ) : null}
                   </div>
                   <div>
                     <span>Потребность</span>
@@ -723,14 +932,17 @@ export function WarehousePickerResultPanel({ detail }: Props) {
               <div className={styles.calculationHeader}>
                 <span>Номенклатура</span>
                 <span>Назначение</span>
-                <span>Потребность</span>
-                <span>На складе</span>
-                <span>Дефицит</span>
-                <span>К выдаче</span>
+                <span>Документ / потребность</span>
+                <span>Заказано / склад</span>
+                <span>Поставщик / дефицит</span>
+                <span>Прибытие / к выдаче</span>
                 <span>Решение</span>
               </div>
               {positions.map((position) => {
                 const expanded = expandedRows.has(position.line_id);
+                const purchase = position.already_being_purchased
+                  ? primarySupplierOrder(position)
+                  : null;
                 return (
                   <div className={styles.calculationItem} key={position.line_id}>
                     <button
@@ -746,44 +958,75 @@ export function WarehousePickerResultPanel({ detail }: Props) {
                         <span>
                           <strong>{position.nomenclature_name}</strong>
                           <small>{position.characteristic_name || "Без характеристики"}</small>
+                          {position.already_being_purchased ? (
+                            <em className={styles.alreadyPurchasingIndicator}>Ведется закупка</em>
+                          ) : null}
                         </span>
                       </span>
                       <span>
                         <strong>{position.assignment_name || "Без назначения"}</strong>
                         <small>{position.warehouse_name || detail.warehouse_name || "Склад кейса"}</small>
                       </span>
-                      <span>
-                        <strong>{withUnit(position.requested_quantity, position.unit)}</strong>
-                        <small>по заказу</small>
-                      </span>
-                      <span>
-                        <strong className={styles.metricCovered}>
-                          {withUnit(
-                            position.warehouse_stock ?? position.available_for_issue,
-                            position.unit
-                          )}
-                        </strong>
-                        <small>
-                          учёт/факт: {quantity(position.accounting_quantity)} /{" "}
-                          {quantity(position.factual_quantity)}
-                        </small>
-                      </span>
-                      <span>
-                        <strong
-                          className={
-                            numeric(position.confirmed_deficit) > 0 ? styles.metricDeficit : ""
-                          }
-                        >
-                          {withUnit(position.confirmed_deficit, position.unit)}
-                        </strong>
-                        <small>
-                          чужое назн.: {withUnit(position.reserved_other_quantity, position.unit)}
-                        </small>
-                      </span>
-                      <span>
-                        <strong>{withUnit(position.quantity_to_issue, position.unit)}</strong>
-                        <small>к выдаче</small>
-                      </span>
+                      {purchase ? (
+                        <>
+                          <span>
+                            <strong>{purchase.number}</strong>
+                            <small>заказ поставщику</small>
+                          </span>
+                          <span>
+                            <strong className={styles.metricCovered}>
+                              {withUnit(purchase.quantity, position.unit)}
+                            </strong>
+                            <small>заказано</small>
+                          </span>
+                          <span>
+                            <strong>{purchase.supplier}</strong>
+                            <small>поставщик</small>
+                          </span>
+                          <span>
+                            <strong>{purchase.arrival}</strong>
+                            <small>дата прибытия</small>
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <span>
+                            <strong>{withUnit(position.requested_quantity, position.unit)}</strong>
+                            <small>по заказу</small>
+                          </span>
+                          <span>
+                            <strong className={styles.metricCovered}>
+                              {withUnit(
+                                position.warehouse_stock ?? position.available_for_issue,
+                                position.unit
+                              )}
+                            </strong>
+                            <small>
+                              учёт/факт: {quantity(position.accounting_quantity)} /{" "}
+                              {quantity(position.factual_quantity)}
+                            </small>
+                          </span>
+                          <span>
+                            <strong
+                              className={
+                                numeric(position.confirmed_deficit) > 0
+                                  ? styles.metricDeficit
+                                  : ""
+                              }
+                            >
+                              {withUnit(position.confirmed_deficit, position.unit)}
+                            </strong>
+                            <small>
+                              чужое назн.:{" "}
+                              {withUnit(position.reserved_other_quantity, position.unit)}
+                            </small>
+                          </span>
+                          <span>
+                            <strong>{withUnit(position.quantity_to_issue, position.unit)}</strong>
+                            <small>к выдаче</small>
+                          </span>
+                        </>
+                      )}
                       <span
                         className={styles.outcomeBadge}
                         data-tone={outcomeTone(position)}
@@ -792,6 +1035,45 @@ export function WarehousePickerResultPanel({ detail }: Props) {
                       </span>
                     </button>
                     {expanded ? (
+                      purchase ? (
+                        <div className={styles.calculationDetails}>
+                          <div className={styles.calculationDetailsHeader}>
+                            <div>
+                              <span>Закупка по позиции</span>
+                              <strong>Ведется закупка по заказу поставщику</strong>
+                              <small>
+                                Складской расчёт для этой строки не требуется — позиция уже в
+                                заказе поставщику.
+                              </small>
+                            </div>
+                            <span className={styles.confirmedBadge}>
+                              <CheckCircle2 size={14} /> В закупке
+                            </span>
+                          </div>
+                          <div className={styles.calculationExplanation}>
+                            <div>
+                              <span>Документ</span>
+                              <strong>{purchase.number}</strong>
+                              <small>заказ поставщику</small>
+                            </div>
+                            <div>
+                              <span>Количество</span>
+                              <strong>{withUnit(purchase.quantity, position.unit)}</strong>
+                              <small>ед. изм. {position.unit}</small>
+                            </div>
+                            <div>
+                              <span>Поставщик</span>
+                              <strong>{purchase.supplier}</strong>
+                              <small>из заказа поставщику</small>
+                            </div>
+                            <div>
+                              <span>Дата прибытия</span>
+                              <strong>{purchase.arrival}</strong>
+                              <small>плановая / фактическая дата поступления</small>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
                       <div className={styles.calculationDetails}>
                         <div className={styles.calculationDetailsHeader}>
                           <div>
@@ -862,6 +1144,7 @@ export function WarehousePickerResultPanel({ detail }: Props) {
                           </div>
                         </div>
                       </div>
+                      )
                     ) : null}
                   </div>
                 );

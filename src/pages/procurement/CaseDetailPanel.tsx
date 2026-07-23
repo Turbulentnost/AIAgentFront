@@ -25,6 +25,8 @@ import {
   STATUS_LABELS
 } from "@/utils/procurementDashboard";
 import { AgentTimeline } from "./AgentTimeline";
+import { ParallelProcurementPanels } from "./ParallelProcurementPanels";
+import { detectParallelProcurement } from "./parallelProcurement";
 import { RouteStagesBar } from "./RouteStagesBar";
 import styles from "../ProcurementAgent.module.css";
 
@@ -143,10 +145,13 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
   const [selectedStage, setSelectedStage] = useState(defaultStage);
 
   useEffect(() => {
+    const parallelState = detectParallelProcurement(detail);
     setSelectedStage(
-      routeStages.find((stage) => stage.status === "running")?.stage_id ||
-        (engineerOutput(detail) ? "coverage" : routeStages[0]?.stage_id) ||
-        "basis"
+      parallelState.active
+        ? parallelState.branches[0]?.id || "coverage"
+        : routeStages.find((stage) => stage.status === "running")?.stage_id ||
+            (engineerOutput(detail) ? "coverage" : routeStages[0]?.stage_id) ||
+            "basis"
     );
     setShowExplanation(false);
     setExpandedDataRows(new Set());
@@ -172,9 +177,13 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
   const needsPurchase =
     detail.engineer_decision_kind === "purchase_confirmation" && detail.engineer_work_status !== "archived";
   const resultSuccessful = Boolean(output) && totals.deficit === 0;
+  const parallel = useMemo(() => detectParallelProcurement(detail), [detail]);
   const selectedStageData = routeStages.find((stage) => stage.stage_id === selectedStage);
   const nextStage = routeStages.find(
     (stage) => stage.order === (selectedStageData?.order ?? 0) + 1
+  );
+  const selectedParallelBranch = parallel.branches.find(
+    (branch) => branch.id === selectedStage
   );
 
   const toggleDataRow = (lineId: string) => {
@@ -298,12 +307,38 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
       {mode === "cases" ? (
         <>
           <RouteStagesBar
+            forkAfterStageId={parallel.forkAfterStageId}
             onSelect={setSelectedStage}
+            parallelBranches={parallel.active ? parallel.branches : []}
             selectedStageId={selectedStage}
             stages={routeStages}
           />
 
-          {selectedStage === "data" ? (
+          {parallel.active ? <ParallelProcurementPanels detail={detail} /> : null}
+
+          {selectedParallelBranch ? (
+            <div className={styles.orchestratorStageSummary}>
+              <div className={styles.sectionHeading}>
+                <div>
+                  <h4>{selectedParallelBranch.label}</h4>
+                  <p>{selectedParallelBranch.summary}</p>
+                </div>
+                <span className={styles.orchestratorStatusBadge} data-status="attention">
+                  Параллельная ветка
+                </span>
+              </div>
+              <div className={styles.stateCard}>
+                <span>Статус ветки</span>
+                <strong>
+                  {selectedParallelBranch.status === "completed"
+                    ? "Завершено"
+                    : "В работе одновременно с другой веткой"}
+                </strong>
+              </div>
+            </div>
+          ) : null}
+
+          {selectedParallelBranch ? null : selectedStage === "data" ? (
             <div className={styles.orchestratorDataTable}>
               <div className={styles.sectionHeading}>
                 <div>
