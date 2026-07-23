@@ -4,6 +4,7 @@ import TasksAgent from "@/pages/TasksAgent";
 import ProcurementAgent from "@/pages/ProcurementAgent";
 import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEngineerAgent";
 import ProductionDispatcherAgent from "@/pages/ProductionDispatcherAgent";
+import WarehousePickerAgent from "@/pages/WarehousePickerAgent";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
@@ -43,6 +44,7 @@ export default function App() {
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="ИИ-агент закупок и логистики"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-dispatcher" element={<ProtectedRoute><Layout title="ИИ-агент диспетчера производства"><ProductionDispatcherAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/warehouse-picker" element={<ProtectedRoute><Layout title="ИИ-агент по закупке"><WarehousePickerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

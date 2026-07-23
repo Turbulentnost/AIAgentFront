@@ -44,10 +44,7 @@ export default function ProcurementAgent() {
     countsQuery.data?.counts ?? { active: 0, processing: 0, archive: 0 };
   const activeGroup: ProcurementSourceGroup | null =
     groups.find((group) => group.source_type === selectedSource) ?? groups[0] ?? null;
-  const flatCases = useMemo(
-    () => (mode === "bases" ? activeGroup?.cases ?? [] : groups.flatMap((group) => group.cases)),
-    [activeGroup, groups, mode]
-  );
+  const flatCases = useMemo(() => activeGroup?.cases ?? [], [activeGroup]);
 
   useEffect(() => {
     if (!selectedSource && groups[0]) {
@@ -119,12 +116,22 @@ export default function ProcurementAgent() {
     const archiveCases = archiveDashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [];
     const processingCase = findCase(processingCases);
     if (processingCase) {
-      updateParams({ mode: "cases", view: "processing", case: processingCase.id });
+      updateParams({
+        mode: "cases",
+        view: "processing",
+        source: processingCase.source_type,
+        case: processingCase.id
+      });
       return true;
     }
     const archiveCase = findCase(archiveCases);
     if (archiveCase) {
-      updateParams({ mode: "cases", view: "archive", case: archiveCase.id });
+      updateParams({
+        mode: "cases",
+        view: "archive",
+        source: archiveCase.source_type,
+        case: archiveCase.id
+      });
       return true;
     }
     return false;
@@ -188,7 +195,8 @@ export default function ProcurementAgent() {
           updateParams({
             mode: nextMode === "cases" ? "cases" : null,
             view: nextMode === "cases" ? "processing" : null,
-            case: null
+            case: null,
+            source: selectedSource || null
           })
         }
         onSearch={searchCaseByNumber}
@@ -205,26 +213,24 @@ export default function ProcurementAgent() {
         ))}
       </div>
 
-      {mode === "bases" ? (
-        <div className={styles.sourceTabs}>
-          {groups.map((group) => (
-            <button
-              className={
-                group.source_type === activeGroup?.source_type
-                  ? styles.sourceTabActive
-                  : styles.sourceTab
-              }
-              key={group.source_type}
-              onClick={() => updateParams({ source: group.source_type, case: null })}
-              type="button"
-            >
-              <span>{group.label_ru}</span>
-              <strong>{group.cases_count}</strong>
-              {!group.available ? <em>недоступно</em> : null}
-            </button>
-          ))}
-        </div>
-      ) : null}
+      <div className={styles.sourceTabs}>
+        {groups.map((group) => (
+          <button
+            className={
+              group.source_type === activeGroup?.source_type
+                ? styles.sourceTabActive
+                : styles.sourceTab
+            }
+            key={group.source_type}
+            onClick={() => updateParams({ source: group.source_type, case: null })}
+            type="button"
+          >
+            <span>{group.label_ru}</span>
+            <strong>{group.cases_count}</strong>
+            {mode === "bases" && !group.available ? <em>недоступно</em> : null}
+          </button>
+        ))}
+      </div>
 
       <div className={styles.workspace}>
         {mode === "bases" ? (
@@ -289,13 +295,17 @@ export default function ProcurementAgent() {
             cases={flatCases}
             emptyText={
               caseView === "archive"
-                ? "Архив пока пуст."
-                : "Нет кейсов в обработке. Они появятся вместе с актуальными основаниями."
+                ? "В архиве нет кейсов этого основания."
+                : "Нет кейсов в обработке по этому основанию."
             }
             onSelect={(caseId) => updateParams({ case: caseId })}
             selectedCaseId={selectedCaseId}
             showArchiveMeta={caseView === "archive"}
-            title={caseView === "archive" ? "Архив кейсов" : "Кейсы в обработке"}
+            title={
+              caseView === "archive"
+                ? `Архив · ${activeGroup?.label_ru ?? "основание"}`
+                : `В работе · ${activeGroup?.label_ru ?? "основание"}`
+            }
           />
         )}
 

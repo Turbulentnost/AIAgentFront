@@ -2,7 +2,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   procurementApi,
   productionDispatcherApi,
-  productionPreparationEngineerApi
+  productionPreparationEngineerApi,
+  warehousePickerApi
 } from "@/api/endpoints";
 import type { ProcurementDashboardView } from "@/types/procurement";
 
@@ -167,6 +168,57 @@ export function useProductionDispatcherAction(
       action === "confirm_supply"
         ? productionDispatcherApi.confirmSupply(payload.caseId, payload.method)
         : productionDispatcherApi.acknowledgeCritical(payload.caseId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ["procurement"] });
+    }
+  });
+}
+
+export function useWarehousePickerPermissions() {
+  return useQuery({
+    queryKey: ["procurement", "warehouse-picker", "permissions"],
+    queryFn: () => warehousePickerApi.permissions(),
+    staleTime: 60_000
+  });
+}
+
+export function useWarehousePickerDashboard(
+  enabled: boolean,
+  view: "active" | "archive" = "active"
+) {
+  return useQuery({
+    queryKey: ["procurement", "warehouse-picker", "dashboard", view],
+    queryFn: () => warehousePickerApi.getDashboard(view),
+    enabled,
+    refetchInterval: (query) => {
+      if (view === "archive") return 30000;
+      const cases = query.state.data?.groups.flatMap((group) => group.cases) ?? [];
+      return cases.some((item) => item.picker_work_status === "processing")
+        ? 10000
+        : 30000;
+    }
+  });
+}
+
+export function useWarehousePickerCase(caseId: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ["procurement", "warehouse-picker", "case", caseId],
+    queryFn: () => warehousePickerApi.getCase(caseId!),
+    enabled: Boolean(caseId) && enabled,
+    refetchInterval: (query) =>
+      query.state.data?.picker_work_status === "processing" ? 8000 : false
+  });
+}
+
+export function useWarehousePickerAction(
+  action: "confirm_conclusion" | "acknowledge_critical"
+) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { caseId: string; action?: string }) =>
+      action === "confirm_conclusion"
+        ? warehousePickerApi.confirmConclusion(payload.caseId, payload.action)
+        : warehousePickerApi.acknowledgeCritical(payload.caseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }

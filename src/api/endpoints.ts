@@ -129,6 +129,9 @@ import type {
   ProductionDispatcherAction,
   ProductionDispatcherCaseDetail,
   ProductionDispatcherDashboard,
+  WarehousePickerAction,
+  WarehousePickerCaseDetail,
+  WarehousePickerDashboard,
   ProcurementRefreshResult,
   ProcurementRoleAgentResult,
   ProcurementRoleAgentResume,
@@ -262,6 +265,38 @@ export const productionDispatcherApi = {
     apiClient
       .post<ProductionDispatcherAction>(
         `/procurement/role-agents/production_dispatcher_agent/cases/${caseId}/acknowledge-critical`
+      )
+      .then((r) => r.data)
+};
+
+export const warehousePickerApi = {
+  permissions: () =>
+    apiClient.get<ProcurementPermissions>("/procurement/me/permissions").then((r) => r.data),
+  getDashboard: (view: "active" | "archive" = "active") =>
+    apiClient
+      .get<WarehousePickerDashboard>(
+        "/procurement/role-agents/warehouse_picker_agent/dashboard",
+        { params: { view } }
+      )
+      .then((r) => r.data),
+  getCase: (caseId: string) =>
+    apiClient
+      .get<WarehousePickerCaseDetail>(
+        `/procurement/role-agents/warehouse_picker_agent/cases/${caseId}`
+      )
+      .then((r) => r.data),
+  confirmConclusion: (caseId: string, action?: string) =>
+    apiClient
+      .post<WarehousePickerAction>(
+        `/procurement/role-agents/warehouse_picker_agent/cases/${caseId}/confirm-conclusion`,
+        null,
+        { params: action ? { action } : undefined }
+      )
+      .then((r) => r.data),
+  acknowledgeCritical: (caseId: string) =>
+    apiClient
+      .post<WarehousePickerAction>(
+        `/procurement/role-agents/warehouse_picker_agent/cases/${caseId}/acknowledge-critical`
       )
       .then((r) => r.data)
 };

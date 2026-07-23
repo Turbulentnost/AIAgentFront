@@ -423,7 +423,7 @@ export function ProductionPreparationEngineerResultPanel({ detail }: Props) {
                           </div>
                           <div><span>01</span><small>Валовая потребность</small><strong>{withUnit(position.gross_requirement, position.unit)}</strong></div>
                           <div><span>02</span><small>Доступное покрытие</small><strong>− {withUnit(position.total_available_supply, position.unit)}</strong></div>
-                          <div className={styles.netFormula}><span>03</span><small>Чистая потребность</small><strong>{withUnit(position.net_requirement, position.unit)}</strong></div>
+                          <div className={numeric(position.net_requirement) > 0 ? styles.netFormula : styles.netFormulaOk}><span>03</span><small>Чистая потребность</small><strong>{withUnit(position.net_requirement, position.unit)}</strong></div>
                         </div>
                         <div className={styles.calculationExplanation}>
                           <div>

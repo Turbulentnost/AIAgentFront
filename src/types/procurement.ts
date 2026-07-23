@@ -131,12 +131,103 @@ export interface ProcurementCaseSummary {
   dispatcher_action_at?: string | null;
   dispatcher_critical_acknowledged_at?: string | null;
   dispatcher_stream?: "reorder_point" | "after_engineer" | null;
+  department_name?: string | null;
+  picker_bucket?: "success" | "attention" | "critical" | null;
+  picker_bucket_reason?: string | null;
+  picker_work_status?: "processing" | "awaiting_action" | "completed" | "archived" | null;
+  picker_decision_kind?:
+    | "none"
+    | "stock_confirmation"
+    | "deficit_confirmation"
+    | "discrepancy_return"
+    | "critical_acknowledgement"
+    | null;
+  picker_invoked_at?: string | null;
+  picker_workspace_archived_at?: string | null;
+  picker_action_at?: string | null;
+  picker_critical_acknowledged_at?: string | null;
 }
 
 export interface ProductionPreparationEngineerAction {
   status: string;
-  action: "purchase_confirmed" | "critical_acknowledged" | "supply_confirmed";
+  action:
+    | "purchase_confirmed"
+    | "critical_acknowledged"
+    | "supply_confirmed"
+    | "picker_confirmed";
   case_id: string;
+}
+
+export type WarehousePickerAction = ProductionPreparationEngineerAction;
+export type WarehousePickerCaseDetail = ProcurementCaseDetail;
+export type WarehousePickerDashboard = ProcurementDashboard;
+
+export interface WarehousePickerPosition {
+  line_id: string;
+  nomenclature_name: string;
+  characteristic_name?: string | null;
+  unit: string;
+  requested_quantity: string | number;
+  store_room_stock: string | number;
+  warehouse_stock?: string | number;
+  accounting_quantity: string | number;
+  factual_quantity: string | number;
+  available_for_issue: string | number;
+  confirmed_available: string | number;
+  confirmed_deficit: string | number;
+  quantity_to_issue: string | number;
+  quantity_to_purchase: string | number;
+  reserved_other_quantity?: string | number;
+  has_discrepancy: boolean;
+  outcome: string;
+  recommendation: string;
+  warehouse_name?: string | null;
+  assignment_id?: string | null;
+  assignment_name?: string | null;
+  formulas?: Record<string, string>;
+  excluded_supply?: Array<{
+    supply_id?: string;
+    source_type?: string;
+    quantity?: string | number;
+    warehouse_id?: string | null;
+    assignment_id?: string | null;
+    assignment_name?: string | null;
+    reason?: string;
+  }>;
+}
+
+export interface WarehousePickerOutput {
+  summary: string;
+  recommended_next_step: string;
+  decision_kind:
+    | "stock_confirmation"
+    | "deficit_confirmation"
+    | "discrepancy_return"
+    | "critical_acknowledgement"
+    | "none";
+  calculated_at?: string;
+  positions: WarehousePickerPosition[];
+  case?: {
+    source_number?: string | null;
+    source_date?: string | null;
+    source_status?: string | null;
+    department_name?: string | null;
+    warehouse_name?: string | null;
+    production_order_number?: string | null;
+    production_order_1c_ref?: string | null;
+    required_date?: string | null;
+  };
+  conclusion?: {
+    requested_quantity?: string;
+    available_quantity?: string;
+    confirmed_deficit?: string;
+    quantity_to_issue?: string;
+    quantity_to_purchase?: string;
+    warehouse_name?: string;
+  };
+  missing_data?: string[];
+  validation_issues?: Array<{ code: string; message: string }>;
+  excluded_capabilities?: string[];
 }
 
 export type ProductionDispatcherAction = ProductionPreparationEngineerAction;
