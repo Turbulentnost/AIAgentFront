@@ -248,7 +248,7 @@ function isOperatorMarkDisabled(status: EmailMessageStatus, isBusy: boolean): bo
   return isBusy || status === "processing" || status === "spam";
 }
 
-function isSpamMarkDisabled(
+export function isSpamMarkDisabled(
   spamMarks: SpamMarkAvailability,
   isBusy: boolean
 ): boolean {
@@ -273,7 +273,7 @@ function operatorMarkAvailability(status: EmailMessageStatus): OperatorMarkAvail
   return { approve: true, correct: true };
 }
 
-function spamMarkAvailability(
+export function spamMarkAvailability(
   status: EmailMessageStatus,
   isSpam: boolean
 ): SpamMarkAvailability {
@@ -314,7 +314,7 @@ function operatorSelectClass(state: EmailMessage["operator_review_state"]): stri
   return styles.markSelect;
 }
 
-function spamSelectClass(message: EmailMessage): string {
+export function spamSelectClass(message: EmailMessage): string {
   if (message.status === "spam" || message.is_spam) {
     return `${styles.markSelect} ${styles.markSelectReject}`;
   }

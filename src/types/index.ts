@@ -1652,7 +1652,8 @@ export type EmailMessageStatus =
   | "done"
   | "spam"
   | "error"
-  | "awaiting_human";
+  | "awaiting_human"
+  | "dialog";
 
 export interface DocumentXmlService {
   name: string;
