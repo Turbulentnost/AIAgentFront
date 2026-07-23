@@ -15,6 +15,10 @@ export type TableDateSort = "asc" | "desc";
 
 export type ExportReportPeriod = "day" | "week" | "month";
 
+type OperatorMarkAction = "" | "approve" | "correct";
+
+type SpamMarkAction = "" | "confirm" | "reject";
+
 const STICKY_H_SCROLL_HEIGHT = 14;
 
 
@@ -302,6 +306,22 @@ function spamCellClass(message: EmailMessage): string {
 
   return "";
 
+}
+
+function operatorSelectClass(state: EmailMessage["operator_review_state"]): string {
+  if (state === "verified") return `${styles.markSelect} ${styles.markSelectOk}`;
+  if (state === "corrected") return `${styles.markSelect} ${styles.markSelectReject}`;
+  return styles.markSelect;
+}
+
+function spamSelectClass(message: EmailMessage): string {
+  if (message.status === "spam" || message.is_spam) {
+    return `${styles.markSelect} ${styles.markSelectReject}`;
+  }
+  if (message.status === "done" && !message.is_spam) {
+    return `${styles.markSelect} ${styles.markSelectOk}`;
+  }
+  return styles.markSelect;
 }
 
 
@@ -666,6 +686,8 @@ export default function IncomingMailTable({
 
 }: IncomingMailTableProps) {
 
+  const [markValues, setMarkValues] = useState<Record<string, OperatorMarkAction>>({});
+  const [spamValues, setSpamValues] = useState<Record<string, SpamMarkAction>>({});
   const [departmentEditRequestId, setDepartmentEditRequestId] = useState<string | null>(null);
   const [exportPeriod, setExportPeriod] = useState<ExportReportPeriod>("day");
   const [isExporting, setIsExporting] = useState(false);
@@ -860,30 +882,30 @@ export default function IncomingMailTable({
 
 
 
-  function handleOperatorApproveClick(message: EmailMessage) {
-    if (!hasDepartmentForApprove(message)) {
-      setDepartmentEditRequestId(message.id);
+  function handleMarkChange(message: EmailMessage, value: OperatorMarkAction) {
+    setMarkValues((prev) => ({ ...prev, [message.id]: "" }));
+    if (value === "approve") {
+      if (!hasDepartmentForApprove(message)) {
+        setDepartmentEditRequestId(message.id);
+        return;
+      }
+      onOperatorApprove(message);
       return;
     }
-    onOperatorApprove(message);
+    if (value === "correct") {
+      onOperatorCorrect(message);
+    }
   }
 
-
-
-  function handleOperatorCorrectClick(message: EmailMessage) {
-    onOperatorCorrect(message);
-  }
-
-
-
-  function handleSpamConfirmClick(message: EmailMessage) {
-    onSpamConfirm(message);
-  }
-
-
-
-  function handleSpamRejectClick(message: EmailMessage) {
-    onSpamReject(message);
+  function handleSpamChange(message: EmailMessage, value: SpamMarkAction) {
+    setSpamValues((prev) => ({ ...prev, [message.id]: "" }));
+    if (value === "confirm") {
+      onSpamConfirm(message);
+      return;
+    }
+    if (value === "reject") {
+      onSpamReject(message);
+    }
   }
 
 
@@ -1049,6 +1071,10 @@ export default function IncomingMailTable({
 
               const isSelected = selectedId === message.id;
 
+              const markValue = markValues[message.id] ?? "";
+
+              const spamValue = spamValues[message.id] ?? "";
+
               const operatorMarks = operatorMarkAvailability(message.status);
 
               const spamMarks = spamMarkAvailability(message.status, message.is_spam);
@@ -1095,48 +1121,36 @@ export default function IncomingMailTable({
 
                   <td className={styles.markCell} onClick={(event) => event.stopPropagation()}>
 
-                    <div
-                      className={styles.markActions}
+                    <select
+                      className={`${operatorSelectClass(message.operator_review_state)} ${
+                        operatorDisabled ? styles.markSelectDisabled : ""
+                      }`}
+                      aria-label="Отметка оператора"
                       title={
                         operatorDisabled
                           ? operatorMarks.disabledReason
                           : !hasDepartmentForApprove(message)
-                            ? "Для подтверждения выберите [✓] — откроется выбор отдела"
+                            ? "Для подтверждения выберите «Подтвердить» — откроется выбор отдела"
                             : undefined
                       }
+                      value={markValue}
+                      disabled={operatorDisabled}
+                      onChange={(event) =>
+                        handleMarkChange(message, event.target.value as OperatorMarkAction)
+                      }
                     >
+                      <option value="">—</option>
                       {operatorMarks.approve ? (
-                        <button
-                          type="button"
-                          className={`${styles.markButton} ${styles.markButtonOk} ${
-                            message.operator_review_state === "verified" ? styles.markButtonActive : ""
-                          } ${operatorDisabled ? styles.markButtonDisabled : ""}`}
-                          aria-label="Подтвердить маршрутизацию"
-                          disabled={operatorDisabled}
-                          onClick={() => handleOperatorApproveClick(message)}
-                        >
-                          ✓
-                        </button>
+                        <option value="approve" className={styles.markOk}>
+                          Подтвердить
+                        </option>
                       ) : null}
                       {operatorMarks.correct ? (
-                        <button
-                          type="button"
-                          className={`${styles.markButton} ${styles.markButtonReject} ${
-                            message.operator_review_state === "corrected" ? styles.markButtonActive : ""
-                          } ${operatorDisabled ? styles.markButtonDisabled : ""}`}
-                          aria-label="Исправить маршрутизацию"
-                          disabled={operatorDisabled}
-                          onClick={() => handleOperatorCorrectClick(message)}
-                        >
-                          ✗
-                        </button>
+                        <option value="correct" className={styles.markReject}>
+                          Исправить
+                        </option>
                       ) : null}
-                      {!operatorMarks.approve && !operatorMarks.correct ? (
-                        <span className={styles.markPlaceholder} aria-hidden="true">
-                          —
-                        </span>
-                      ) : null}
-                    </div>
+                    </select>
 
                   </td>
 
@@ -1148,42 +1162,34 @@ export default function IncomingMailTable({
 
                   >
 
-                    <div
-                      className={styles.markActions}
-                      title={spamDisabled ? spamMarks.disabledReason : "Отметить как спам или снять отметку"}
+                    <select
+                      className={`${spamSelectClass(message)} ${
+                        spamDisabled ? styles.markSelectDisabled : ""
+                      }`}
+                      aria-label="Отметка спама"
+                      title={
+                        spamDisabled
+                          ? spamMarks.disabledReason
+                          : "Выберите «Спам» или «Не спам»"
+                      }
+                      value={spamValue}
+                      disabled={spamDisabled}
+                      onChange={(event) =>
+                        handleSpamChange(message, event.target.value as SpamMarkAction)
+                      }
                     >
+                      <option value="">—</option>
                       {spamMarks.confirm ? (
-                        <button
-                          type="button"
-                          className={`${styles.markButton} ${styles.markButtonOk} ${
-                            message.status === "spam" || message.is_spam ? "" : styles.markButtonActive
-                          } ${spamDisabled ? styles.markButtonDisabled : ""}`}
-                          aria-label="Отметить как спам"
-                          disabled={spamDisabled}
-                          onClick={() => handleSpamConfirmClick(message)}
-                        >
-                          ✓
-                        </button>
+                        <option value="confirm" className={styles.markReject}>
+                          Спам
+                        </option>
                       ) : null}
                       {spamMarks.reject ? (
-                        <button
-                          type="button"
-                          className={`${styles.markButton} ${styles.markButtonReject} ${
-                            message.status === "spam" || message.is_spam ? styles.markButtonActive : ""
-                          } ${spamDisabled ? styles.markButtonDisabled : ""}`}
-                          aria-label="Не спам / восстановить"
-                          disabled={spamDisabled}
-                          onClick={() => handleSpamRejectClick(message)}
-                        >
-                          ✗
-                        </button>
+                        <option value="reject" className={styles.markOk}>
+                          Не спам
+                        </option>
                       ) : null}
-                      {!spamMarks.confirm && !spamMarks.reject ? (
-                        <span className={styles.markPlaceholder} aria-hidden="true">
-                          —
-                        </span>
-                      ) : null}
-                    </div>
+                    </select>
 
                   </td>
 

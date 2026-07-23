@@ -88,7 +88,7 @@
 
 .colFixedMark {
 
-  width: 56px;
+  width: 92px;
 
 }
 
@@ -230,11 +230,11 @@
 
 .markCell {
 
-  width: 56px;
+  width: 92px;
 
-  min-width: 56px;
+  min-width: 92px;
 
-  max-width: 56px;
+  max-width: 92px;
 
   padding: 2px !important;
 
@@ -534,11 +534,15 @@
 
   width: 100%;
 
+  min-width: 0;
+
   border: 1px solid #b0b0b0;
 
   border-radius: 2px;
 
-  font-size: 12px;
+  font-size: 11px;
+
+  line-height: 1.25;
 
   padding: 2px 0;
 
@@ -1195,6 +1199,25 @@
 
 :global([data-incoming-mail-page][data-table-mode="true"]) .markSelect:not(.markSelectOk):not(.markSelectReject):not(.markSelectDisabled) {
   color: var(--color-text);
+  border-color: #f9a8d4;
+  background: linear-gradient(180deg, #fff 0%, #fce7f3 100%);
+}
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .markSelect:not(.markSelectDisabled):hover {
+  border-color: #ec4899;
+  box-shadow: 0 0 0 1px rgba(236, 72, 153, 0.25);
+}
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .markSelectOk {
+  background: linear-gradient(180deg, #ecfdf5 0%, #bbf7d0 100%);
+  border-color: #86efac;
+  color: #166534;
+}
+
+:global([data-incoming-mail-page][data-table-mode="true"]) .markSelectReject {
+  background: linear-gradient(180deg, #fff1f2 0%, #fecdd3 100%);
+  border-color: #fda4af;
+  color: #9f1239;
 }
 
 :global([data-incoming-mail-page][data-table-mode="true"]) .popoverItem {
