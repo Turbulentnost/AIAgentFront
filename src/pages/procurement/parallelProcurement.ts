@@ -2,6 +2,7 @@ import type { ProcurementCaseDetail, WarehousePickerPosition } from "@/types/pro
 
 export const PICKER_AGENT_ID = "warehouse_picker_agent";
 export const PURCHASE_MANAGER_AGENT_ID = "purchase_manager_agent";
+export const QUALITY_ENGINEER_AGENT_ID = "quality_engineer_agent";
 
 export type ParallelBranch = {
   id: string;
@@ -64,12 +65,20 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
   const assigned = detail.assigned_agents || [];
   const coverage = asRecord(detail.case_metadata?.supplier_order_coverage);
   const coverageStatus = text(coverage?.coverage_status);
+  const tmcCoverage = asRecord(detail.case_metadata?.tmc_presentation_coverage);
+  const tmcStatus = text(tmcCoverage?.status);
+  const otkHandedOff = Boolean(detail.case_metadata?.otk_handed_off_at);
+  const otkStarted = Boolean(detail.case_metadata?.otk_started_at) || otkHandedOff;
   const pickerAssigned = assigned.includes(PICKER_AGENT_ID);
   const managerAssigned =
     assigned.includes(PURCHASE_MANAGER_AGENT_ID) ||
     Boolean(detail.purchase_manager_invoked_at) ||
     coverageStatus === "full" ||
     coverageStatus === "partial";
+  const otkAssigned =
+    assigned.includes(QUALITY_ENGINEER_AGENT_ID) ||
+    detail.current_agent_id === QUALITY_ENGINEER_AGENT_ID ||
+    otkStarted;
   const pickerActive =
     pickerAssigned &&
     isRoleWorkspaceActive(
@@ -78,35 +87,67 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
     );
   const managerActive =
     managerAssigned &&
+    !otkHandedOff &&
     isRoleWorkspaceActive(
       detail.purchase_manager_work_status,
       detail.purchase_manager_workspace_archived_at
     );
+  // OTK appears as soon as there is at least one TMC journal row (partial or full).
+  const otkActive =
+    otkAssigned && (tmcStatus === "partial" || tmcStatus === "full" || otkStarted);
 
-  // Parallel only while uncovered deficit remains at the picker.
-  const active = coverageStatus === "partial" && pickerActive && managerActive;
+  // Parallel fork whenever 2+ role agents are active together.
+  const parallelAgents = [pickerActive, managerActive, otkActive].filter(Boolean).length;
+  const active = parallelAgents >= 2;
 
   const branches: ParallelBranch[] = [];
   if (active) {
-    branches.push({
-      id: "branch_picker",
-      agentId: PICKER_AGENT_ID,
-      label: "Кладовщик-комплектовщик",
-      status: detail.picker_work_status === "processing" ? "running" : "running",
-      summary: "Непокрытый дефицит остаётся у комплектовщика"
-    });
-    branches.push({
-      id: "branch_purchase_manager",
-      agentId: PURCHASE_MANAGER_AGENT_ID,
-      label: "Менеджер по закупкам",
-      status:
-        detail.purchase_manager_work_status === "completed" ? "completed" : "running",
-      summary: "Контроль заказов поставщику по покрытым позициям"
-    });
+    if (pickerActive) {
+      branches.push({
+        id: "branch_picker",
+        agentId: PICKER_AGENT_ID,
+        label: "Кладовщик-комплектовщик",
+        status: detail.picker_work_status === "processing" ? "running" : "running",
+        summary: "Непокрытый дефицит остаётся у комплектовщика"
+      });
+    }
+    if (managerActive) {
+      branches.push({
+        id: "branch_purchase_manager",
+        agentId: PURCHASE_MANAGER_AGENT_ID,
+        label: "Менеджер по закупкам",
+        status:
+          detail.purchase_manager_work_status === "completed" ? "completed" : "running",
+        summary:
+          tmcStatus === "partial"
+            ? "Ждёт журнал ТМЦ по оставшимся заказам поставщику"
+            : "Контроль заказов поставщику по покрытым позициям"
+      });
+    }
+    if (otkActive) {
+      branches.push({
+        id: "branch_otk",
+        agentId: QUALITY_ENGINEER_AGENT_ID,
+        label: "Работник ОТК",
+        status: "running",
+        summary:
+          tmcStatus === "partial"
+            ? "Входной контроль по ЗП, уже есть в журнале ТМЦ"
+            : "Входной контроль по журналу предъявления ТМЦ"
+      });
+    }
   }
 
   let continuation: ParallelBranch | null = null;
-  if (!active && managerActive && (coverageStatus === "full" || !pickerActive)) {
+  if (!active && otkActive) {
+    continuation = {
+      id: "branch_otk",
+      agentId: QUALITY_ENGINEER_AGENT_ID,
+      label: "Работник ОТК",
+      status: "running",
+      summary: "Входной контроль по журналу предъявления ТМЦ"
+    };
+  } else if (!active && managerActive && (coverageStatus === "full" || !pickerActive)) {
     continuation = {
       id: "branch_purchase_manager",
       agentId: PURCHASE_MANAGER_AGENT_ID,
@@ -135,11 +176,18 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
     };
   }
 
+  // Точка ветвления: дефицит комплектовщика — от Обеспечения; иначе PM+ОТК от Закупки.
+  const forkAfterStageId = pickerActive
+    ? "coverage"
+    : managerActive || otkActive
+      ? "purchase"
+      : "coverage";
+
   return {
     active,
     branches,
     continuation,
-    forkAfterStageId: "coverage",
+    forkAfterStageId,
     coverageStatus
   };
 }

@@ -118,10 +118,37 @@ function getAgentLaunchIcon(agent: AgentAccess): QuickLaunchAgent["icon"] {
   return "clipboard";
 }
 
+/** Ролевые агенты закупок/ОТК — выше общих, иначе на дашборде их «съедают» первые 3. */
+const QUICK_LAUNCH_PRIORITY_SLUGS = [
+  "quality_engineer_agent",
+  "otk_head_agent",
+  "quality_deputy_director_agent",
+  "warehouse_picker_agent",
+  "purchase_manager_agent",
+  "production_preparation_engineer_agent",
+  "production_dispatcher_agent",
+  "omto_support_manager_agent",
+  "nd_control_agent",
+  "incoming_correspondence_agent",
+  "tasks_agent",
+  "meeting_agent"
+];
+
 function pickLaunchAgents(agents: AgentAccess[]) {
   const runnable = agents.filter((agent) => agent.can_run);
   const source = runnable.length ? runnable : agents;
-  return source.slice(0, 3);
+  return [...source]
+    .sort((left, right) => {
+      const leftIdx = QUICK_LAUNCH_PRIORITY_SLUGS.indexOf(left.slug);
+      const rightIdx = QUICK_LAUNCH_PRIORITY_SLUGS.indexOf(right.slug);
+      const leftRank = leftIdx === -1 ? 999 : leftIdx;
+      const rightRank = rightIdx === -1 ? 999 : rightIdx;
+      if (leftRank !== rightRank) return leftRank - rightRank;
+      const leftDedicated = hasDedicatedLaunchPage(left) ? 0 : 1;
+      const rightDedicated = hasDedicatedLaunchPage(right) ? 0 : 1;
+      return leftDedicated - rightDedicated;
+    })
+    .slice(0, 3);
 }
 
 export default function Dashboard() {

@@ -317,11 +317,18 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
           />
 
           {parallel.active ||
+          parallel.continuation?.agentId === "quality_engineer_agent" ||
           (parallel.continuation?.agentId === "purchase_manager_agent" &&
             parallel.coverageStatus !== "none") ? (
             <ParallelProcurementPanels
               detail={detail}
-              mode={parallel.active ? "parallel" : "purchase_manager"}
+              mode={
+                parallel.active
+                  ? "parallel"
+                  : parallel.continuation?.agentId === "quality_engineer_agent"
+                    ? "otk"
+                    : "purchase_manager"
+              }
             />
           ) : null}
 
@@ -343,7 +350,9 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
                     ? "Завершено"
                     : parallel.active
                       ? "В работе одновременно с другой веткой"
-                      : "Ведется закупка у менеджера по закупкам"}
+                      : selectedParallelBranch.agentId === "quality_engineer_agent"
+                        ? "Ведется входной контроль ОТК"
+                        : "Ведется закупка у менеджера по закупкам"}
                 </strong>
               </div>
             </div>

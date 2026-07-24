@@ -62,14 +62,16 @@ function buildGraph(
   const forkIndex = stages.findIndex((stage) => stage.stage_id === forkAfterStageId);
 
   if (hasParallel && forkIndex >= 0) {
-    // Параллель: ствол до точки ветвления, дальше две ветки. Будущие этапы не рисуем.
+    // Параллель: ствол до точки ветвления, дальше N веток (picker / PM / ОТК).
     const trunk = trunkToFork(stages, forkAfterStageId);
+    const branchCount = parallelBranches.length;
+    const midLane = Math.floor((branchCount - 1) / 2);
     const nodes: GraphNode[] = trunk.map((stage, column) => ({
       id: stage.stage_id,
       label: stage.label,
       status: stage.status,
       column,
-      lane: 1,
+      lane: midLane,
       kind: "stage",
       summary: stage.summary || undefined
     }));
@@ -80,12 +82,12 @@ function buildGraph(
         label: branch.label,
         status: branch.status,
         column: branchColumn,
-        lane: index === 0 ? 0 : 2,
+        lane: index,
         kind: "branch",
         summary: branch.summary
       });
     });
-    return { nodes, laneCount: 3 };
+    return { nodes, laneCount: Math.max(branchCount, 1) };
   }
 
   if (continuation && forkIndex >= 0) {
@@ -171,7 +173,7 @@ export function RouteStagesBar({
             </>
           ) : continuation ? (
             <>
-              <GitBranch size={13} /> Комплектовщик закрыт · этап менеджера по закупкам
+              <GitBranch size={13} /> Следующий этап: {continuation.label}
             </>
           ) : (
             <>

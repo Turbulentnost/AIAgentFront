@@ -65,7 +65,7 @@ export default function App() {
       <Route path="/agents/purchase-manager" element={<ProtectedRoute><Layout title="ИИ-агент менеджера по закупкам"><PurchaseManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/otk-head" element={<ProtectedRoute><Layout title="Начальник ОТК"><OtkHeadAgent /></Layout></ProtectedRoute>} />
-      <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Инженер по качеству"><QualityEngineerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Работник ОТК"><QualityEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-deputy-director" element={<ProtectedRoute><Layout title="ЗДК"><QualityDeputyDirectorAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-kpi" element={<ProtectedRoute><Layout title="Агент качества (KPI)"><QualityKpiAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
