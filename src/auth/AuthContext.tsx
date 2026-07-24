@@ -30,6 +30,8 @@ interface AuthContextValue {
   isLoading: boolean;
   login: (payload: LoginPayload) => Promise<void>;
   loginWith1C: (payload: { fio: string; password: string }) => Promise<void>;
+  /** Local/dev: POST /auth/dev-auto-login → JWT without password form. */
+  devAutoLogin: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -82,17 +84,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("onec-session-invalidated", handleOneCSessionInvalidated);
   }, [queryClient]);
 
+  async function applyPlatformToken(token: { access_token: string; expires_at?: string | null }) {
+    clearOneCSession();
+    localStorage.setItem("access_token", token.access_token);
+    if (token.expires_at) localStorage.setItem("token_expires_at", token.expires_at);
+    setOnecCredentials(null);
+    setAuthMode("platform");
+    await queryClient.invalidateQueries({ queryKey: ["auth"] });
+    await queryClient.invalidateQueries({ queryKey: ["meetings"] });
+    await queryClient.invalidateQueries({ queryKey: ["porucheniya"] });
+  }
+
   const loginMutation = useMutation({
     mutationFn: authApi.login,
     onSuccess: async (token) => {
-      clearOneCSession();
-      localStorage.setItem("access_token", token.access_token);
-      if (token.expires_at) localStorage.setItem("token_expires_at", token.expires_at);
-      setOnecCredentials(null);
-      setAuthMode("platform");
-      await queryClient.invalidateQueries({ queryKey: ["auth"] });
-      await queryClient.invalidateQueries({ queryKey: ["meetings"] });
-      await queryClient.invalidateQueries({ queryKey: ["porucheniya"] });
+      await applyPlatformToken(token);
+    }
+  });
+
+  const devAutoLoginMutation = useMutation({
+    mutationFn: authApi.devAutoLogin,
+    onSuccess: async (token) => {
+      await applyPlatformToken(token);
     }
   });
 
@@ -124,6 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading: false,
         login: async () => undefined,
         loginWith1C: async () => undefined,
+        devAutoLogin: async () => undefined,
         logout: async () => undefined
       };
     }
@@ -138,6 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLoading: false,
         login: async () => undefined,
         loginWith1C: async () => undefined,
+        devAutoLogin: async () => undefined,
         logout: async () => undefined
       };
     }
@@ -159,6 +174,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: hasPlatformToken && meQuery.isLoading,
       login: async (payload) => {
         await loginMutation.mutateAsync(payload);
+        try {
+          await queryClient.fetchQuery({ queryKey: ["auth", "me"], queryFn: authApi.me });
+        } catch (error) {
+          localStorage.removeItem("access_token");
+          localStorage.removeItem("token_expires_at");
+          queryClient.removeQueries({ queryKey: ["auth"] });
+          if (error instanceof Error && (error.message.includes("timeout") || error.message.includes("Timeout"))) {
+            throw new AuthProfileError("Сервер не ответил на запрос профиля за 30 секунд. Проверьте бэкенд /auth/me");
+          }
+          throw new AuthProfileError("Ошибка сервера при загрузке профиля (GET /auth/me). Обратитесь к разработчику бэкенда");
+        }
+      },
+      devAutoLogin: async () => {
+        await devAutoLoginMutation.mutateAsync();
         try {
           await queryClient.fetchQuery({ queryKey: ["auth", "me"], queryFn: authApi.me });
         } catch (error) {
@@ -204,6 +233,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     hasPlatformToken,
     login1CMutation,
     loginMutation,
+    devAutoLoginMutation,
     meQuery.data,
     meQuery.isLoading,
     onecCredentials,

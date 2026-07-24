@@ -152,6 +152,7 @@ const PRIORITY_RECOMMENDED_SLUGS = new Set([
   "quality_deputy_director_agent",
   "quality_kpi_agent",
   "procurement_logistics_agent",
+  "purchase_manager_agent",
   "nd_control_agent",
   "incoming_correspondence_agent"
 ]);

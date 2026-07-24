@@ -24,6 +24,7 @@ import KnowledgeBaseCreate from "./pages/KnowledgeBaseCreate";
 import Documents from "./pages/Documents";
 import Monitoring from "./pages/Monitoring";
 import Login from "./pages/Login";
+import DevLogin from "./pages/DevLogin";
 import Profile from "./pages/Profile";
 import ProfileEdit from "./pages/ProfileEdit";
 import Users from "./pages/Users";
@@ -50,6 +51,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/dev-login" element={<DevLogin />} />
       <Route path="/" element={<ProtectedRoute><Layout title="Дашборд"><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/agents" element={<ProtectedRoute><Layout title="Агенты"><Agents /></Layout></ProtectedRoute>} />
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />

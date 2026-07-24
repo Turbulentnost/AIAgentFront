@@ -10,6 +10,8 @@ export const TASKS_AGENT_PATH = "/agents/tasks";
 export const INCOMING_CORRESPONDENCE_AGENT_SLUG = "incoming_correspondence_agent";
 export const INCOMING_CORRESPONDENCE_AGENT_PATH = "/agents/incoming-mail";
 export const PROCUREMENT_AGENT_SLUG = "procurement_logistics_agent";
+/** Catalog role card shown as «ИИ-агент менеджера по закупкам» (same workspace). */
+export const PURCHASE_MANAGER_AGENT_SLUG = "purchase_manager_agent";
 export const PROCUREMENT_AGENT_PATH = "/agents/procurement-manager";
 export const PRODUCTION_PREPARATION_ENGINEER_AGENT_SLUG =
   "production_preparation_engineer_agent";
@@ -56,8 +58,17 @@ export function isIncomingCorrespondenceAgent(
   );
 }
 
-export function isProcurementAgent(agent: Pick<AgentAccess, "slug">): boolean {
-  return agent.slug === PROCUREMENT_AGENT_SLUG;
+export function isProcurementAgent(
+  agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>
+): boolean {
+  const key = agentKey(agent);
+  return (
+    agent.slug === PROCUREMENT_AGENT_SLUG ||
+    agent.slug === PURCHASE_MANAGER_AGENT_SLUG ||
+    agent.slug === "procurement-manager" ||
+    agent.slug === "procurement_manager_agent" ||
+    /менеджер(?:а)? по закупкам|purchase.?manager|procurement.?manager/.test(key)
+  );
 }
 
 export function isProductionPreparationEngineerAgent(
@@ -86,7 +97,9 @@ export function isQualityKpiAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === QUALITY_KPI_AGENT_SLUG;
 }
 
-export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
+export function hasDedicatedLaunchPage(
+  agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>
+): boolean {
   return (
     isNdControlAgent(agent) ||
     isMeetingAgent(agent) ||
@@ -102,7 +115,9 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
   );
 }
 
-export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "name">) {
+export function getAgentLaunchTarget(
+  agent: Pick<AgentAccess, "slug" | "id" | "name"> & Partial<Pick<AgentAccess, "purpose">>
+) {
   if (isNdControlAgent(agent)) {
     return {
       path: ND_CONTROL_AGENT_PATH,
@@ -177,7 +192,7 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
 
 export function navigateToAgentLaunch(
   navigate: NavigateFunction,
-  agent: Pick<AgentAccess, "slug" | "id" | "name">
+  agent: Pick<AgentAccess, "slug" | "id" | "name"> & Partial<Pick<AgentAccess, "purpose">>
 ) {
   const target = getAgentLaunchTarget(agent);
   if (isIncomingCorrespondenceAgent(agent)) {

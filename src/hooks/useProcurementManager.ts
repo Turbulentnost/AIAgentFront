@@ -16,6 +16,9 @@ import type {
   RecommendationPayload,
   RfqDraft,
   ShipmentEventPayload,
+  StrategyResumePayload,
+  StrategyRunPayload,
+  StrategyStatus,
   SupplierQuote,
   SupplierSearchRequest
 } from "@/types/procurementManager";
@@ -208,17 +211,73 @@ export function useSyncProcurementFrom1C() {
   });
 }
 
+function triggerBrowserDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.style.display = "none";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  // Revoke after the browser has a chance to start the download.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
+}
+
+async function blobErrorMessage(error: unknown): Promise<string | null> {
+  const data = (error as { response?: { data?: unknown } })?.response?.data;
+  if (!(data instanceof Blob)) return null;
+  try {
+    const text = await data.text();
+    const parsed = JSON.parse(text) as { detail?: string | Array<{ msg?: string }> };
+    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+      return parsed.detail.trim();
+    }
+    if (Array.isArray(parsed.detail)) {
+      const messages = parsed.detail.map((item) => item?.msg).filter(Boolean);
+      if (messages.length) return messages.join("; ");
+    }
+  } catch {
+    /* ignore parse errors */
+  }
+  return null;
+}
+
 export function useDownloadProcurementEstimate() {
   return useMutation({
     mutationFn: async (caseId: string) => {
-      const { blob, filename } = await procurementManagerApi.downloadEstimateReport(caseId);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.click();
-      URL.revokeObjectURL(url);
-      return filename;
+      if (!caseId.trim()) {
+        throw new Error("Не выбран заказ для выгрузки сметы");
+      }
+      try {
+        const { blob, filename } = await procurementManagerApi.downloadEstimateReport(caseId);
+        if (!blob || blob.size === 0) {
+          throw new Error("Сервер вернул пустой файл сметы");
+        }
+        // Gateways sometimes return JSON errors with a 2xx + blob body.
+        if (
+          blob.type.includes("application/json") ||
+          blob.type.startsWith("text/")
+        ) {
+          const text = await blob.text();
+          let detail = text.trim() || "Не удалось скачать смету";
+          try {
+            const parsed = JSON.parse(text) as { detail?: string };
+            if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+              detail = parsed.detail.trim();
+            }
+          } catch {
+            /* keep text */
+          }
+          throw new Error(detail);
+        }
+        triggerBrowserDownload(blob, filename);
+        return filename;
+      } catch (error) {
+        const fromBlob = await blobErrorMessage(error);
+        if (fromBlob) throw new Error(fromBlob);
+        throw error;
+      }
     }
   });
 }
@@ -274,6 +333,44 @@ export function useResumeProcurementAgent() {
       procurementManagerApi.resumeAgent(caseId, payload),
     onSuccess: async (_data, { caseId }) => {
       await invalidateAgentQueries(queryClient, caseId);
+    }
+  });
+}
+
+function invalidateStrategyQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  return Promise.all([
+    queryClient.invalidateQueries({ queryKey: [...rootKey, "strategy-status"] }),
+    queryClient.invalidateQueries({ queryKey: [...rootKey, "dashboard"] }),
+    queryClient.invalidateQueries({ queryKey: [...rootKey, "all-positions"] }),
+    queryClient.invalidateQueries({ queryKey: [...rootKey, "coverage"] })
+  ]);
+}
+
+export function useProcurementManagerStrategyStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: [...rootKey, "strategy-status"],
+    queryFn: () => procurementManagerApi.getStrategyStatus(),
+    enabled,
+    refetchInterval: (query) => (query.state.data?.paused_for_human ? 5_000 : 20_000)
+  });
+}
+
+export function useRunProcurementStrategy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload?: StrategyRunPayload) => procurementManagerApi.runStrategy(payload),
+    onSuccess: async () => {
+      await invalidateStrategyQueries(queryClient);
+    }
+  });
+}
+
+export function useResumeProcurementStrategy() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: StrategyResumePayload) => procurementManagerApi.resumeStrategy(payload),
+    onSuccess: async () => {
+      await invalidateStrategyQueries(queryClient);
     }
   });
 }

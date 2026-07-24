@@ -19,6 +19,27 @@ export interface Supplier {
   is_active: boolean;
   contacts: Record<string, string>;
   evidence: string[];
+  url?: string | null;
+  city?: string | null;
+  unit_price?: number | string | null;
+  approx_cost?: number | string | null;
+  rating?: number | string | null;
+}
+
+export interface NomenclatureSearchItem {
+  nomenclature_id?: string | null;
+  nomenclature_name?: string | null;
+  query?: string | null;
+  existing_suppliers?: Supplier[];
+}
+
+export interface NomenclatureSupplierResult {
+  nomenclature_id?: string | null;
+  nomenclature_name?: string | null;
+  query: string;
+  suppliers: Supplier[];
+  sources_used: string[];
+  web_fallback_used: boolean;
 }
 
 export interface SupplierSearchRequest {
@@ -26,7 +47,11 @@ export interface SupplierSearchRequest {
   category?: string;
   limit?: number;
   allow_web_fallback?: boolean;
+  /** Manual «Найти поставщиков»: bank seeds must not block live web search. */
+  force_web?: boolean;
+  mode?: "auto" | "manual_web";
   idempotency_key?: string;
+  nomenclatures?: NomenclatureSearchItem[];
 }
 
 export interface SupplierSearchResult {
@@ -34,6 +59,10 @@ export interface SupplierSearchResult {
   suppliers: Supplier[];
   sources_used: string[];
   web_fallback_used: boolean;
+  nomenclature_results?: NomenclatureSupplierResult[];
+  operation_id?: string | null;
+  pending?: boolean;
+  status?: "completed" | "running" | "failed";
 }
 
 export interface RfqLine {
@@ -155,6 +184,12 @@ export interface Nonconformity {
 export type OrderCoverageTone = "ready" | "attention" | "uncovered";
 export type CoverageSource = "warehouse" | "supplier" | "mixed" | "none";
 
+export interface UsedSupplierPart {
+  supplier_id: string;
+  supplier_name: string;
+  quantity: string | number;
+}
+
 export interface OrderCoverageLine {
   case_id: string;
   line_id: string;
@@ -171,6 +206,15 @@ export interface OrderCoverageLine {
   coverage_source_label: string;
   tone: OrderCoverageTone;
   label: string;
+  /** Suppliers that allocation actually used for this line's remainder. */
+  supplier_parts?: UsedSupplierPart[];
+  used_suppliers?: UsedSupplierPart[];
+  warehouse_parts?: Array<{
+    stock_id?: string;
+    warehouse_id?: string;
+    warehouse_name?: string | null;
+    quantity: string | number;
+  }>;
 }
 
 export interface OrderCoverageStatus {
@@ -255,6 +299,7 @@ export interface TopSupplierOffer {
   rank: number;
   supplier_id: string;
   supplier_name: string;
+  source?: string | null;
   nomenclature_id?: string | null;
   nomenclature_name?: string | null;
   unit_price: string | number;
@@ -262,12 +307,19 @@ export interface TopSupplierOffer {
   coverable_qty: string | number;
   coverage_ratio: string | number;
   coverage_cost: string | number;
+  total_cost?: string | number | null;
+  overpay?: string | number | null;
   price_score?: string | number | null;
   coverage_score?: string | number | null;
   score: string | number;
   reason?: string;
   unit?: string;
   lead_time_days?: number | null;
+  meets_deadline?: boolean | null;
+  deadline_status?: "ok" | "miss" | "unknown" | null;
+  deadline_risk?: boolean;
+  optimization_rank?: number | null;
+  optimization_reason?: string | null;
 }
 
 export interface SupplierOffersResponse {
@@ -297,9 +349,16 @@ export interface AllPositionsRow {
   currency?: string;
   coverage_source?: CoverageSource | null;
   coverage_source_label?: string | null;
+  from_warehouse?: string | number | null;
+  from_supplier?: string | number | null;
   positions_count?: number;
   has_manual_override?: boolean;
   top_suppliers?: TopSupplierOffer[];
+  /** Suppliers actually used by allocation (empty when fully warehouse). */
+  used_suppliers?: UsedSupplierPart[];
+  supplier_parts?: UsedSupplierPart[];
+  /** Earliest required delivery date among aggregated open lines. */
+  required_date?: string | null;
 }
 
 export interface AllPositionsResponse {
@@ -367,6 +426,7 @@ export interface ProcurementManagerCaseDetail
   currency?: string | null;
   suppliers: Supplier[];
   supplier_searches: SupplierSearchResult[];
+  nomenclature_results?: NomenclatureSupplierResult[];
   quotes: SupplierQuote[];
   comparison: QuoteComparison | null;
   rfq_drafts: RfqDraft[];
@@ -490,6 +550,13 @@ export type AgentResumeAction =
   | "approve_order_draft"
   | "reject";
 
+export type StrategyResumeAction =
+  | "approve_shortlist"
+  | "approve_policy"
+  | "approve_rfq_draft"
+  | "approve_order_draft"
+  | "reject";
+
 export interface AgentRunPayload {
   idempotency_key?: string;
   allow_web_fallback?: boolean;
@@ -500,6 +567,82 @@ export interface AgentResumePayload {
   action: AgentResumeAction;
   comment?: string;
   idempotency_key?: string;
+}
+
+export interface StrategyRunPayload {
+  idempotency_key?: string;
+  allow_web_fallback?: boolean;
+  query?: string;
+  case_ids?: string[];
+}
+
+export interface StrategyResumePayload {
+  action: StrategyResumeAction;
+  comment?: string;
+  idempotency_key?: string;
+}
+
+export interface StrategyStatus {
+  run_id?: string | null;
+  stage?: string | null;
+  status?: string | null;
+  paused_for_human: boolean;
+  interrupt_type?: string | null;
+  case_ids?: string[];
+  waves?: {
+    waves?: Array<{
+      wave_id?: string;
+      label?: string;
+      mode?: string;
+      case_ids?: string[];
+      reason?: string;
+    }>;
+    case_wave?: Record<string, string>;
+    explanation?: string;
+  } | null;
+  supply_policy?: Record<string, unknown> | null;
+  explanation?: {
+    summary?: string;
+    tradeoffs?: string[];
+    text?: string;
+    [key: string]: unknown;
+  } | null;
+  cost_estimate?: AgentCostEstimate | null;
+  purchase_order_drafts?: PurchaseOrderDraft[];
+  queue_plan_summary?: Record<string, unknown> | null;
+  supplier_diversity?: Array<{
+    case_id?: string;
+    line_id?: string;
+    nomenclature_id?: string;
+    nomenclature_name?: string;
+    urgent_supplier_id?: string;
+    economy_supplier_id?: string;
+    reason?: string;
+  }>;
+  kpi_flags?: Record<string, unknown>;
+  candidates_count?: number;
+  payment_execution_allowed?: boolean;
+}
+
+export interface AgentCostEstimate {
+  lines?: Array<{
+    line_id?: string;
+    nomenclature_id?: string;
+    nomenclature_name?: string;
+    need_qty?: string | number;
+    estimated_amount?: string | number | null;
+    avg_unit_price?: string | number | null;
+    top_suppliers?: TopSupplierOffer[];
+    recommended_supplier_id?: string | null;
+    estimate_sources?: string[];
+  }>;
+  total_estimated_amount?: string | number | null;
+  web_approved?: boolean;
+  trusted_supplier_ids?: string[];
+  approved_web_supplier_ids?: string[];
+  excluded_unapproved_web?: boolean;
+  amount_formula?: string;
+  kpi_flags?: Record<string, unknown>;
 }
 
 export interface AgentStatus {
@@ -528,7 +671,9 @@ export interface AgentStatus {
     recommended_supplier_ids?: string[];
     amount_formula?: string;
     kpi_flags?: Record<string, unknown>;
+    cost_estimate?: AgentCostEstimate;
   } | null;
+  cost_estimate?: AgentCostEstimate | null;
   rfq_draft?: RfqDraft | null;
   purchase_order_draft?: PurchaseOrderDraft | null;
   comparison?: QuoteComparison | null;

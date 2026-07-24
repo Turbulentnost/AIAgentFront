@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
-import { useQueries } from "@tanstack/react-query";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -32,39 +31,56 @@ import {
   useProcurementManagerSuppliers,
   useProcurementManagerWorkspaceSummary,
   useReportProcurementNonconformity,
+  useProcurementManagerStrategyStatus,
   useResumeProcurementAgent,
+  useResumeProcurementStrategy,
   useRunProcurementAgent,
+  useRunProcurementStrategy,
   useSearchProcurementSuppliers,
   useSubmitProcurementApproval,
   useSyncProcurementFrom1C,
   useUpdateProcurementLineAmounts
 } from "@/hooks/useProcurementManager";
+import { exportTableToExcel } from "@/utils/exportTableToExcel";
 import type {
   AgentResumeAction,
   AgentStatus,
   ApprovalOperation,
   ApprovalRecord,
   LineAmountEntry,
+  NomenclatureSupplierResult,
   OrderCoverageStatus,
   OrderCoverageTone,
   ProcurementManagerCaseDetail,
   ProcurementManagerCaseSummary,
   PurchaseOrderDraft,
   QuoteScore,
+  StrategyResumeAction,
+  StrategyStatus,
   Supplier,
   SupplierQuote,
-  TopSupplierOffer
+  SupplierSearchResult,
+  UsedSupplierPart
 } from "@/types/procurementManager";
 import type { ProcurementCasePosition } from "@/types/procurement";
 import {
   caseTitle,
+  formatDate,
   formatDateTime,
   formatQuantity
 } from "@/utils/procurementDashboard";
 import styles from "./ProcurementManagerAgent.module.css";
 
 const AGENT_ID = "procurement_logistics_agent";
-type Tab = "suppliers" | "quotes" | "rfq" | "order" | "delivery" | "audit";
+type Tab =
+  | "suppliers"
+  | "policy"
+  | "estimate"
+  | "quotes"
+  | "rfq"
+  | "order"
+  | "delivery"
+  | "audit";
 type ConfirmAction =
   | { type: "supplier"; supplier: Supplier }
   | { type: "price"; score: QuoteScore }
@@ -72,12 +88,34 @@ type ConfirmAction =
 
 const TABS: Array<{ id: Tab; label: string }> = [
   { id: "suppliers", label: "Поставщики" },
+  { id: "policy", label: "Политика поставок" },
+  { id: "estimate", label: "Смета" },
   { id: "quotes", label: "Сравнение КП" },
-  { id: "rfq", label: "RFQ" },
+  { id: "rfq", label: "ЗКП" },
   { id: "order", label: "Заказ" },
   { id: "delivery", label: "Поставка" },
   { id: "audit", label: "HITL / Аудит" }
 ];
+
+const WAVE_LABEL_RU: Record<string, string> = {
+  critical: "критично",
+  medium: "средне",
+  late: "поздно",
+  urgent: "срочно",
+  economy: "экономия"
+};
+
+const SOURCE_BADGE_LABEL: Record<string, string> = {
+  existing: "existing (банк)",
+  internal: "internal",
+  "1c": "1c",
+  web: "web",
+  procurement_supplier_mcp: "1c/mcp"
+};
+
+function sourceBadgeLabel(source: string): string {
+  return SOURCE_BADGE_LABEL[source] || source;
+}
 
 function unwrapPurchaseOrderDrafts(
   raw: ProcurementManagerCaseDetail["purchase_order_drafts"] | PurchaseOrderDraft[] | undefined
@@ -140,12 +178,12 @@ function AgentHitlModal({
         <h3>
           {isOrder
             ? "Подтвердить черновик заказа?"
-            : "Подтвердить shortlist / RFQ?"}
+            : "Подтвердить shortlist / ЗКП?"}
         </h3>
         <p>
           {isOrder
             ? "Агент подготовил черновик заказа поставщику. Оплата и отправка в 1С запрещены."
-            : "Агент ранжировал поставщиков и подготовил RFQ. Подтвердите shortlist для продолжения."}
+            : "Агент собрал 1C/internal и web-кандидатов. Подтвердите shortlist — смета строится из доверенных + одобренного web."}
         </p>
         {isOrder && status.purchase_order_draft ? (
           <div className={styles.notice}>
@@ -187,6 +225,81 @@ function AgentHitlModal({
   );
 }
 
+function StrategyHitlModal({
+  status,
+  pending,
+  onClose,
+  onResume
+}: {
+  status: StrategyStatus | null | undefined;
+  pending: boolean;
+  onClose: () => void;
+  onResume: (action: StrategyResumeAction) => void;
+}) {
+  if (!status?.paused_for_human || !status.interrupt_type) return null;
+  const interrupt = status.interrupt_type;
+  const isPolicy =
+    interrupt === "procurement_policy_approval" ||
+    interrupt.includes("policy") ||
+    interrupt.includes("shortlist");
+  const isOrder =
+    interrupt === "procurement_order_approval" || interrupt.includes("order");
+  if (!isPolicy && !isOrder) return null;
+  const approveAction: StrategyResumeAction = isOrder
+    ? "approve_order_draft"
+    : "approve_policy";
+  const drafts = status.purchase_order_drafts ?? [];
+  return (
+    <div className={styles.modalOverlay} onClick={onClose} role="presentation">
+      <div
+        aria-modal="true"
+        className={styles.modal}
+        onClick={(event) => event.stopPropagation()}
+        role="dialog"
+      >
+        <h3>
+          {isOrder
+            ? "Подтвердить черновики заказов стратегии?"
+            : "Подтвердить политику поставок?"}
+        </h3>
+        <p>
+          {isOrder
+            ? "Очередная стратегия подготовила черновики PO по поставщикам. Оплата и 1С запрещены."
+            : "Подтвердите волны срочности и shortlist. Смета и PO строятся из доверенных + одобренного web."}
+        </p>
+        {isOrder && drafts.length ? (
+          <div className={styles.notice}>
+            Черновиков: {drafts.length}
+            {drafts[0]?.subject ? ` · ${drafts[0].subject}` : ""}
+          </div>
+        ) : null}
+        {!isOrder && status.explanation?.summary ? (
+          <div className={styles.notice}>{String(status.explanation.summary)}</div>
+        ) : null}
+        <div className={styles.modalActions}>
+          <button
+            className={styles.secondary}
+            disabled={pending}
+            onClick={() => onResume("reject")}
+            type="button"
+          >
+            Отклонить
+          </button>
+          <button
+            className={styles.primary}
+            disabled={pending}
+            onClick={() => onResume(approveAction)}
+            type="button"
+          >
+            {pending ? <Loader2 className={styles.spin} size={15} /> : <CheckCircle2 size={15} />}
+            Подтвердить
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const COVERAGE_CASE_CLASS: Record<OrderCoverageTone, string> = {
   ready: styles.caseCoverageReady,
   attention: styles.caseCoverageAttention,
@@ -201,6 +314,13 @@ const COVERAGE_BADGE_CLASS: Record<OrderCoverageTone, string> = {
 
 const key = (prefix: string) => `${prefix}-${crypto.randomUUID()}`;
 
+function normalizeQuote(quote: SupplierQuote): SupplierQuote {
+  return {
+    ...quote,
+    lines: Array.isArray(quote.lines) ? quote.lines : []
+  };
+}
+
 function unwrapQuotes(
   raw: ProcurementManagerCaseSummary["quotes"] | SupplierQuote[] | undefined
 ): SupplierQuote[] {
@@ -208,12 +328,12 @@ function unwrapQuotes(
   const out: SupplierQuote[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") continue;
-    if ("lines" in item && Array.isArray((item as SupplierQuote).lines)) {
-      out.push(item as SupplierQuote);
+    if ("quote_id" in item) {
+      out.push(normalizeQuote(item as SupplierQuote));
       continue;
     }
     const nested = (item as { quote?: SupplierQuote | null }).quote;
-    if (nested && Array.isArray(nested.lines)) out.push(nested);
+    if (nested?.quote_id) out.push(normalizeQuote(nested));
   }
   return out;
 }
@@ -224,6 +344,37 @@ function activeSuppliersFromCase(item: ProcurementManagerCaseSummary): Supplier[
   return list.filter(
     (supplier) => Boolean(supplier?.supplier_id) && supplier.is_active !== false
   );
+}
+
+/** Earliest delivery deadline for an order (case-level or line-level). */
+function orderRequiredDate(
+  item: ProcurementManagerCaseSummary | ProcurementManagerCaseDetail
+): string | null {
+  const direct = item.required_date || item.deadline_at || null;
+  const lineDates = (item.order_coverage?.lines ?? item.coverage?.lines ?? [])
+    .map((line) => line.required_date)
+    .filter((value): value is string => Boolean(value));
+  if (!lineDates.length) return direct;
+  const earliestLine = [...lineDates].sort((a, b) => a.localeCompare(b))[0] ?? null;
+  if (!direct) return earliestLine;
+  return earliestLine && earliestLine < direct ? earliestLine : direct;
+}
+
+function compareRequiredDateAsc(
+  left: string | null | undefined,
+  right: string | null | undefined
+): number {
+  if (!left && !right) return 0;
+  if (!left) return 1; // nulls last
+  if (!right) return -1;
+  return left.localeCompare(right);
+}
+
+function positionRequiredDate(
+  position: ProcurementCasePosition,
+  caseRequired?: string | null
+): string | null {
+  return position.required_date || caseRequired || null;
 }
 
 /** Покрытие из банка/аллокации по срокам; fallback — КП/поставщики кейса. */
@@ -380,18 +531,86 @@ function parseDraftNumber(raw: string | undefined | null): number | null {
   return Number.isFinite(value) && value >= 0 ? value : null;
 }
 
+/** Positive finite price only — 0/empty must not block PO/quote fallbacks. */
+function positiveUnitPrice(value: unknown): number | null {
+  const num = toFiniteNumber(value as string | number | null | undefined);
+  return num != null && num > 0 ? num : null;
+}
+
 function storedUnitPrice(
   position: ProcurementCasePosition,
   stored: LineAmountEntry | undefined
 ): number | null {
-  if (stored?.unit_price != null && Number.isFinite(stored.unit_price)) {
-    return stored.unit_price;
-  }
-  if (stored?.amount != null && Number.isFinite(stored.amount)) {
+  const fromUnit = positiveUnitPrice(stored?.unit_price);
+  if (fromUnit != null) return fromUnit;
+  const amount = toFiniteNumber(stored?.amount);
+  if (amount != null && amount > 0) {
     const qty = Number(position.quantity);
-    if (Number.isFinite(qty) && qty > 0) return stored.amount / qty;
+    if (Number.isFinite(qty) && qty > 0) return amount / qty;
   }
   return null;
+}
+
+function poUnitPricesByLine(drafts: PurchaseOrderDraft[]): Map<string, number> {
+  const prices = new Map<string, number>();
+  for (const draft of drafts) {
+    for (const line of draft.lines ?? []) {
+      const price = positiveUnitPrice(line.unit_price);
+      if (price == null || !line.line_id || prices.has(line.line_id)) continue;
+      prices.set(line.line_id, price);
+    }
+  }
+  return prices;
+}
+
+function poSuppliersByLine(drafts: PurchaseOrderDraft[]): Map<string, UsedSupplierPart[]> {
+  const map = new Map<string, UsedSupplierPart[]>();
+  for (const draft of drafts) {
+    const supplierId = draft.supplier_id?.trim();
+    if (!supplierId) continue;
+    for (const line of draft.lines ?? []) {
+      const qty = toFiniteNumber(line.quantity) ?? 0;
+      if (!line.line_id || qty <= 0) continue;
+      const parts = map.get(line.line_id) ?? [];
+      if (!parts.some((part) => part.supplier_id === supplierId)) {
+        parts.push({
+          supplier_id: supplierId,
+          supplier_name: draft.supplier_name || supplierId,
+          quantity: line.quantity
+        });
+      }
+      map.set(line.line_id, parts);
+    }
+  }
+  return map;
+}
+
+function quoteSuppliersByLine(
+  quotes: SupplierQuote[],
+  supplierById: Map<string, Supplier>
+): Map<string, UsedSupplierPart[]> {
+  const map = new Map<string, UsedSupplierPart[]>();
+  for (const quote of quotes) {
+    const supplierId = quote.supplier_id?.trim();
+    if (!supplierId) continue;
+    const supplierName =
+      supplierById.get(supplierId)?.name || quote.supplier_id || supplierId;
+    for (const line of quote.lines ?? []) {
+      const qty = toFiniteNumber(line.quantity) ?? 0;
+      const price = positiveUnitPrice(line.unit_price);
+      if (!line.line_id || qty <= 0 || price == null) continue;
+      const parts = map.get(line.line_id) ?? [];
+      if (!parts.some((part) => part.supplier_id === supplierId)) {
+        parts.push({
+          supplier_id: supplierId,
+          supplier_name: supplierName,
+          quantity: line.quantity
+        });
+      }
+      map.set(line.line_id, parts);
+    }
+  }
+  return map;
 }
 
 function mutationError(mutations: Array<{ error: unknown }>) {
@@ -409,7 +628,18 @@ function mutationError(mutations: Array<{ error: unknown }>) {
   const detail = error.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) {
     if (error.response?.status === 404 && /not found/i.test(detail)) {
-      return "Маршрут запуска агента недоступен (404). Перезапустите backend на порту из VITE_API_SERVER.";
+      return (
+        "Маршрут агента поиска/оценки недоступен (404). Нужен локальный AIAgentBack " +
+        "с /cases/{id}/agent/run (сейчас: VITE_API_PROXY / VITE_API_SERVER). " +
+        "Офисный :5454 и чужой фронт на :5173 этих маршрутов не имеют — откройте AIAgentFront на :5174."
+      );
+    }
+    // Legacy backend mapped KeyError('request') → 404 detail "'request'" after MemorySaver loss.
+    if (/^'request'$/.test(detail.trim())) {
+      return (
+        "Состояние HITL агента потеряно после перезапуска сервера. " +
+        "Обновите страницу и подтвердите снова (или перезапустите агента)."
+      );
     }
     return detail;
   }
@@ -424,6 +654,16 @@ function mutationError(mutations: Array<{ error: unknown }>) {
     return "Нет доступа к рабочему месту менеджера по закупкам.";
   }
   return error.message || "Не удалось выполнить операцию";
+}
+
+function averageRating(supplier: Supplier): number | null {
+  const parts = [
+    Number(supplier.quality_rating),
+    Number(supplier.delivery_rating),
+    Number(supplier.commercial_rating)
+  ].filter((value) => Number.isFinite(value) && value > 0);
+  if (!parts.length) return null;
+  return Math.round((parts.reduce((sum, value) => sum + value, 0) / parts.length) * 100) / 100;
 }
 
 function formatMoney(value: number | null | undefined, currency = "RUB") {
@@ -459,46 +699,103 @@ function formatPriceRange(
     : single.toLocaleString("ru-RU", { maximumFractionDigits: 2 });
 }
 
-function TopSuppliersBlock({
-  offers,
-  currency = "RUB"
+/** Allocation-used suppliers only (warehouse → empty; no bank top-N fallback). */
+function usedSuppliersFromCoverage(
+  cov:
+    | Pick<
+        NonNullable<OrderCoverageStatus["lines"]>[number],
+        "coverage_source" | "from_supplier" | "supplier_parts" | "used_suppliers"
+      >
+    | null
+    | undefined
+): UsedSupplierPart[] {
+  if (!cov) return [];
+  if (cov.coverage_source === "warehouse") return [];
+  const fromSupplier = toFiniteNumber(cov.from_supplier) ?? 0;
+  if (fromSupplier <= 0) return [];
+  const raw = cov.used_suppliers?.length ? cov.used_suppliers : cov.supplier_parts ?? [];
+  return raw
+    .filter((part) => {
+      const qty = toFiniteNumber(part.quantity) ?? 0;
+      return Boolean(part.supplier_id) && qty > 0;
+    })
+    .map((part) => ({
+      supplier_id: part.supplier_id,
+      supplier_name: part.supplier_name || part.supplier_id,
+      quantity: part.quantity
+    }));
+}
+
+type CoverageSourceDisplay = {
+  coverage_source?: string | null;
+  coverage_source_label?: string | null;
+  from_warehouse?: string | number | null;
+  from_supplier?: string | number | null;
+};
+
+const COVERAGE_SOURCE_LABEL_RU: Record<string, string> = {
+  warehouse: "склад",
+  supplier: "поставщик",
+  mixed: "смешанный",
+  none: "нет"
+};
+
+/** Mixed: «смешанный · Склад: 25 · Закупка: 75»; other sources keep short label. */
+function formatCoverageSourceText(
+  cov: CoverageSourceDisplay | null | undefined,
+  fallback = "—"
+): string {
+  if (!cov) return fallback;
+  const base =
+    cov.coverage_source_label ||
+    COVERAGE_SOURCE_LABEL_RU[cov.coverage_source ?? ""] ||
+    fallback;
+  if (cov.coverage_source !== "mixed") return base || fallback;
+  const fromWh = toFiniteNumber(cov.from_warehouse) ?? 0;
+  const fromSp = toFiniteNumber(cov.from_supplier) ?? 0;
+  return `${base} · Склад: ${formatQuantity(String(fromWh))} · Закупка: ${formatQuantity(String(fromSp))}`;
+}
+
+function CoverageSourceCell({
+  cov,
+  fallback = "—"
 }: {
-  offers: TopSupplierOffer[];
-  currency?: string;
+  cov: CoverageSourceDisplay | null | undefined;
+  fallback?: string;
 }) {
-  if (!offers.length) {
-    return <span className={styles.muted}>Нет предложений</span>;
-  }
+  if (!cov) return <>{fallback}</>;
+  const base =
+    cov.coverage_source_label ||
+    COVERAGE_SOURCE_LABEL_RU[cov.coverage_source ?? ""] ||
+    fallback;
+  if (cov.coverage_source !== "mixed") return <>{base || fallback}</>;
+  const fromWh = toFiniteNumber(cov.from_warehouse) ?? 0;
+  const fromSp = toFiniteNumber(cov.from_supplier) ?? 0;
   return (
-    <ol className={styles.topSuppliers}>
-      {offers.map((offer) => {
-        const price = toFiniteNumber(offer.unit_price);
-        const available = toFiniteNumber(offer.available_qty);
-        const coverable = toFiniteNumber(offer.coverable_qty);
-        const cost = toFiniteNumber(offer.coverage_cost);
-        const score = toFiniteNumber(offer.score);
-        return (
-          <li key={`${offer.rank}-${offer.supplier_id}`}>
-            <strong>
-              #{offer.rank} {offer.supplier_name}
-            </strong>
-            <span>
-              {price == null
-                ? "—"
-                : price.toLocaleString("ru-RU", { maximumFractionDigits: 2 })}{" "}
-              · дост. {available ?? "—"} · покр. {coverable ?? "—"} ·{" "}
-              {formatMoney(cost, currency)}
-              {score != null
-                ? ` · score ${score.toLocaleString("ru-RU", { maximumFractionDigits: 4 })}`
-                : ""}
-            </span>
-            {offer.reason ? (
-              <small className={styles.muted}>{offer.reason}</small>
-            ) : null}
-          </li>
-        );
-      })}
-    </ol>
+    <>
+      {base || "смешанный"}
+      <br />
+      <small className={styles.muted}>
+        Склад: {formatQuantity(String(fromWh))} · Закупка:{" "}
+        {formatQuantity(String(fromSp))}
+      </small>
+    </>
+  );
+}
+
+function UsedSuppliersBlock({ parts }: { parts: UsedSupplierPart[] }) {
+  if (!parts.length) return null;
+  return (
+    <ul className={styles.usedSuppliers}>
+      {parts.map((part) => (
+        <li key={part.supplier_id}>
+          <strong>{part.supplier_name}</strong>
+          <span className={styles.muted}>
+            {formatQuantity(String(part.quantity))}
+          </span>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -521,7 +818,7 @@ function ConfirmDialog({
       ? `выбор поставщика «${action.supplier.name}»`
       : action.type === "price"
         ? `цену предложения ${action.score.quote_id}`
-        : `передачу черновика ${action.rfqId} в контур отправки`;
+        : `передачу черновика ЗКП ${action.rfqId} в контур отправки`;
   return (
     <div className={styles.modalOverlay} onClick={onCancel} role="presentation">
       <div
@@ -569,6 +866,7 @@ export default function ProcurementManagerAgent() {
     query: string;
     sources: string[];
     web: boolean;
+    nomenclatureResults?: NomenclatureSupplierResult[];
   } | null>(null);
   const [draftPrices, setDraftPrices] = useState<Record<string, string>>({});
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
@@ -579,18 +877,21 @@ export default function ProcurementManagerAgent() {
   const dashboard = useProcurementManagerDashboard(canAccess);
   const summary = useProcurementManagerWorkspaceSummary(canAccess);
   const allPositions = useProcurementManagerAllPositions(canAccess && showAllPositions);
-  const cases = useMemo(
-    () =>
-      (dashboard.data?.groups.flatMap((group) => group.cases) ??
-        []) as ProcurementManagerCaseSummary[],
-    [dashboard.data]
-  );
+  const cases = useMemo(() => {
+    const list = (dashboard.data?.groups.flatMap((group) => group.cases) ??
+      []) as ProcurementManagerCaseSummary[];
+    // Urgency: earliest required_date first; missing dates last.
+    return [...list].sort((a, b) =>
+      compareRequiredDateAsc(orderRequiredDate(a), orderRequiredDate(b))
+    );
+  }, [dashboard.data]);
   const caseId = params.get("case") || "";
   const detail = useProcurementManagerCase(caseId || null, canAccess);
   const suppliersQuery = useProcurementManagerSuppliers(caseId || null, canAccess);
   const comparisonQuery = useProcurementManagerComparison(caseId || null, canAccess);
   const agentStatusQuery = useProcurementManagerAgentStatus(caseId || null, canAccess);
   const poDraftsQuery = useProcurementManagerPurchaseOrderDrafts(caseId || null, canAccess);
+  const strategyStatusQuery = useProcurementManagerStrategyStatus(canAccess);
 
   const searchSuppliers = useSearchProcurementSuppliers();
   const createRfq = useCreateProcurementRfqDraft();
@@ -604,7 +905,10 @@ export default function ProcurementManagerAgent() {
   const downloadEstimate = useDownloadProcurementEstimate();
   const runAgent = useRunProcurementAgent();
   const resumeAgent = useResumeProcurementAgent();
+  const runStrategy = useRunProcurementStrategy();
+  const resumeStrategy = useResumeProcurementStrategy();
   const [hitlOpen, setHitlOpen] = useState(true);
+  const [strategyHitlOpen, setStrategyHitlOpen] = useState(true);
 
   useEffect(() => {
     if (cases.length && !cases.some((item) => item.id === caseId)) {
@@ -623,43 +927,91 @@ export default function ProcurementManagerAgent() {
 
   const workspace = detail.data;
   const suppliers = suppliersQuery.data ?? workspace?.suppliers ?? [];
+  const nomenclatureResults = useMemo(() => {
+    const fromSearch = searchInfo?.nomenclatureResults;
+    if (fromSearch?.length) return fromSearch;
+    const fromWorkspace = workspace?.nomenclature_results;
+    if (fromWorkspace?.length) return fromWorkspace;
+    const latestSearch = workspace?.supplier_searches?.length
+      ? workspace.supplier_searches[workspace.supplier_searches.length - 1]
+      : null;
+    if (latestSearch?.nomenclature_results?.length) {
+      return latestSearch.nomenclature_results;
+    }
+    return [] as NomenclatureSupplierResult[];
+  }, [searchInfo?.nomenclatureResults, workspace?.nomenclature_results, workspace?.supplier_searches]);
   const comparison = comparisonQuery.data ?? workspace?.comparison;
-  const quotes = workspace?.quotes ?? [];
-  const quoteById = new Map(quotes.map((quote) => [quote.quote_id, quote]));
-  const supplierById = new Map(suppliers.map((supplier) => [supplier.supplier_id, supplier]));
+  // Backend/summary payloads sometimes omit quote.lines — unwrap before render.
+  const quotes = useMemo(() => unwrapQuotes(workspace?.quotes), [workspace?.quotes]);
+  const quoteById = useMemo(
+    () => new Map(quotes.map((quote) => [quote.quote_id, quote])),
+    [quotes]
+  );
+  const supplierById = useMemo(
+    () => new Map(suppliers.map((supplier) => [supplier.supplier_id, supplier])),
+    [suppliers]
+  );
   const agentStatus = agentStatusQuery.data;
-  const poDrafts = unwrapPurchaseOrderDrafts(
-    poDraftsQuery.data ?? workspace?.purchase_order_drafts
+  const strategyStatus = strategyStatusQuery.data;
+  useEffect(() => {
+    if (strategyStatus?.paused_for_human) setStrategyHitlOpen(true);
+  }, [strategyStatus?.paused_for_human, strategyStatus?.interrupt_type]);
+  const poDrafts = useMemo(
+    () => unwrapPurchaseOrderDrafts(poDraftsQuery.data ?? workspace?.purchase_order_drafts),
+    [poDraftsQuery.data, workspace?.purchase_order_drafts]
   );
   const topSuppliersPreview =
     agentStatus?.evaluation?.lines?.[0]?.top_suppliers?.slice(0, 3) ??
     workspace?.evaluation?.lines?.[0]?.top_suppliers?.slice(0, 3) ??
     [];
 
-  useEffect(() => {
-    if (!workspace) return;
-    const next: Record<string, string> = {};
-    for (const position of workspace.positions) {
-      const price = storedUnitPrice(position, workspace.line_amounts?.[position.line_id]);
-      if (price != null) next[position.line_id] = String(price);
-    }
-    setDraftPrices(next);
-  }, [workspace]);
-
   const quoteUnitPrices = useMemo(() => {
     const prices = new Map<string, number>();
     for (const quote of quotes) {
-      for (const line of quote.lines) {
-        if (!prices.has(line.line_id)) prices.set(line.line_id, line.unit_price);
+      for (const line of quote.lines ?? []) {
+        const price = positiveUnitPrice(line.unit_price);
+        if (price != null && !prices.has(line.line_id)) {
+          prices.set(line.line_id, price);
+        }
       }
     }
     return prices;
   }, [quotes]);
 
-  const positions = useMemo(
-    () => (workspace?.positions ?? []).filter((item) => !item.cancelled),
-    [workspace]
+  const poUnitPrices = useMemo(() => poUnitPricesByLine(poDrafts), [poDrafts]);
+  const poSuppliers = useMemo(() => poSuppliersByLine(poDrafts), [poDrafts]);
+  const quoteSuppliers = useMemo(
+    () => quoteSuppliersByLine(quotes, supplierById),
+    [quotes, supplierById]
   );
+
+  const positions = useMemo(() => {
+    // Only the selected case's lines — never reuse another case's workspace payload.
+    if (!workspace || !caseId || workspace.id !== caseId) return [];
+    return (workspace.positions ?? []).filter((item) => !item.cancelled);
+  }, [caseId, workspace]);
+
+  useEffect(() => {
+    if (!workspace || workspace.id !== caseId) return;
+    const coverageByLine = new Map(
+      (workspace.order_coverage?.lines ?? []).map((line) => [line.line_id, line])
+    );
+    const next: Record<string, string> = {};
+    for (const position of workspace.positions ?? []) {
+      if (position.cancelled) continue;
+      // Warehouse lines are not purchased — keep price empty, sum stays 0.
+      if (coverageByLine.get(position.line_id)?.coverage_source === "warehouse") {
+        continue;
+      }
+      const price =
+        storedUnitPrice(position, workspace.line_amounts?.[position.line_id]) ??
+        poUnitPrices.get(position.line_id) ??
+        quoteUnitPrices.get(position.line_id) ??
+        null;
+      if (price != null) next[position.line_id] = String(price);
+    }
+    setDraftPrices(next);
+  }, [caseId, poUnitPrices, quoteUnitPrices, workspace]);
 
   const lineRows = useMemo(() => {
     const coverageByLine = new Map(
@@ -669,43 +1021,56 @@ export default function ProcurementManagerAgent() {
       const qty = Number(position.quantity);
       const hasDraft = Object.prototype.hasOwnProperty.call(draftPrices, position.line_id);
       const manualPrice = hasDraft ? parseDraftNumber(draftPrices[position.line_id]) : null;
+      const poPrice = poUnitPrices.get(position.line_id) ?? null;
       const quotePrice = quoteUnitPrices.get(position.line_id) ?? null;
-      const unitPrice = hasDraft ? manualPrice : quotePrice;
+      // Manual input wins; otherwise prefer PO draft mapping, then КП.
+      const unitPrice = hasDraft
+        ? manualPrice
+        : (poPrice ?? quotePrice);
       const cov = coverageByLine.get(position.line_id);
       const coverageSource = cov?.coverage_source ?? null;
       const fromSupplier = toFiniteNumber(cov?.from_supplier) ?? 0;
+      const billablePrice = positiveUnitPrice(unitPrice);
       let amount: number | null =
-        unitPrice != null && Number.isFinite(qty) ? unitPrice * qty : null;
+        billablePrice != null && Number.isFinite(qty) ? billablePrice * qty : null;
       // Warehouse stock is not purchased; mixed bills only supplier-covered qty.
       if (coverageSource === "warehouse") {
         amount = 0;
       } else if (
         coverageSource === "mixed" &&
-        unitPrice != null &&
+        billablePrice != null &&
         Number.isFinite(fromSupplier)
       ) {
-        amount = unitPrice * fromSupplier;
+        amount = billablePrice * fromSupplier;
       }
       const source =
         coverageSource === "warehouse"
           ? "склад"
-          : hasDraft
-            ? manualPrice != null
-              ? "вручную"
-              : "—"
-            : quotePrice != null
-              ? "КП"
-              : "—";
+          : hasDraft && manualPrice != null
+            ? "вручную"
+            : poPrice != null
+              ? "PO"
+              : quotePrice != null
+                ? "КП"
+                : "—";
       return {
         position,
         qty,
         amount,
-        unitPrice,
+        unitPrice: coverageSource === "warehouse" ? null : unitPrice,
         source,
         currency: workspace?.line_amounts?.[position.line_id]?.currency || workspace?.currency || "RUB"
       };
     });
-  }, [draftPrices, positions, quoteUnitPrices, workspace?.currency, workspace?.line_amounts, workspace?.order_coverage?.lines]);
+  }, [
+    draftPrices,
+    poUnitPrices,
+    positions,
+    quoteUnitPrices,
+    workspace?.currency,
+    workspace?.line_amounts,
+    workspace?.order_coverage?.lines
+  ]);
 
   const totalAmount = useMemo(
     () => lineRows.reduce((sum, row) => sum + (row.amount ?? 0), 0),
@@ -735,61 +1100,28 @@ export default function ProcurementManagerAgent() {
         overpay,
         currency: row.currency || "RUB",
         source: row.amount_source || "—",
-        coverageSource: row.coverage_source_label || row.coverage_source || "—",
+        coverageSource: formatCoverageSourceText(row),
+        coverageSourceMeta: {
+          coverage_source: row.coverage_source,
+          coverage_source_label: row.coverage_source_label,
+          from_warehouse: row.from_warehouse,
+          from_supplier: row.from_supplier
+        },
         amountFormula: row.amount_formula || allPositions.data?.amount_formula || "",
         hasManualOverride: Boolean(row.has_manual_override),
-        topSuppliers: row.top_suppliers ?? []
+        usedSuppliers:
+          row.coverage_source === "warehouse"
+            ? []
+            : (row.used_suppliers?.length
+                ? row.used_suppliers
+                : row.supplier_parts ?? []
+              ).filter((part) => (toFiniteNumber(part.quantity) ?? 0) > 0),
+        requiredDate: row.required_date
+          ? String(row.required_date).slice(0, 10)
+          : null
       };
     });
   }, [allPositions.data, showAllPositions]);
-
-  const orderOfferNeeds = useMemo(() => {
-    if (showAllPositions || !caseId) return [] as Array<{ nomenclature: string; need_qty: number }>;
-    const map = new Map<string, number>();
-    for (const position of positions) {
-      const nom = String(position.nomenclature_id || "").trim();
-      if (!nom) continue;
-      const qty = toFiniteNumber(position.quantity) ?? 0;
-      if (qty <= 0) continue;
-      map.set(nom, (map.get(nom) ?? 0) + qty);
-    }
-    return Array.from(map.entries()).map(([nomenclature, need_qty]) => ({
-      nomenclature,
-      need_qty
-    }));
-  }, [caseId, positions, showAllPositions]);
-
-  const orderOfferQueries = useQueries({
-    queries: orderOfferNeeds.map((item) => ({
-      queryKey: [
-        "procurement",
-        "procurement-manager",
-        "supplier-offers",
-        caseId,
-        item.nomenclature,
-        item.need_qty
-      ] as const,
-      queryFn: () =>
-        procurementManagerApi.getSupplierOffers(caseId!, {
-          nomenclature: item.nomenclature,
-          need_qty: item.need_qty,
-          top_n: 3
-        }),
-      enabled: Boolean(canAccess && caseId && !showAllPositions),
-      staleTime: 30_000
-    }))
-  });
-
-  const orderTopByNom = useMemo(() => {
-    const map = new Map<string, TopSupplierOffer[]>();
-    orderOfferNeeds.forEach((item, index) => {
-      const data = orderOfferQueries[index]?.data;
-      if (data?.top_suppliers?.length) {
-        map.set(item.nomenclature, data.top_suppliers);
-      }
-    });
-    return map;
-  }, [orderOfferNeeds, orderOfferQueries]);
 
   const aggregatedTotal = useMemo(() => {
     const fromApi = toFiniteNumber(allPositions.data?.total_estimated_amount);
@@ -845,7 +1177,9 @@ export default function ProcurementManagerAgent() {
     syncFrom1C,
     downloadEstimate,
     runAgent,
-    resumeAgent
+    resumeAgent,
+    runStrategy,
+    resumeStrategy
   ]);
 
   const toggleSupplier = (supplierId: string) =>
@@ -893,7 +1227,7 @@ export default function ProcurementManagerAgent() {
     if (confirmAction.type === "rfq") {
       recordApproval(
         "send_rfq",
-        `Черновик RFQ: ${confirmAction.rfqId}. Только согласование, без отправки.`,
+        `Черновик ЗКП: ${confirmAction.rfqId}. Только согласование, без отправки.`,
         () => setConfirmAction(null)
       );
       return;
@@ -1001,6 +1335,81 @@ export default function ProcurementManagerAgent() {
     });
   };
 
+  const handleExcelDownload = () => {
+    if (showAllPositions) {
+      if (!aggregatedRows.length) {
+        window.alert("Нет позиций для выгрузки в Excel.");
+        return;
+      }
+      try {
+        exportTableToExcel(
+          "all_positions_estimate",
+          [
+            { key: "nomenclature_name", title: "Номенклатура" },
+            { key: "nomenclature_id", title: "Код" },
+            { key: "quantity", title: "Количество" },
+            { key: "unit", title: "Ед." },
+            { key: "requiredDate", title: "Срок" },
+            { key: "priceMin", title: "Цена min" },
+            { key: "priceMax", title: "Цена max" },
+            { key: "avgUnitPrice", title: "Ср. цена" },
+            { key: "amount", title: "Сумма" },
+            { key: "overpay", title: "Переплата" },
+            { key: "currency", title: "Валюта" },
+            { key: "coverageSource", title: "Покрытие" },
+            { key: "suppliers", title: "Поставщики" }
+          ],
+          aggregatedRows.map((row) => ({
+            nomenclature_name: row.nomenclature_name,
+            nomenclature_id: row.nomenclature_id,
+            quantity: row.quantity,
+            unit: row.unit,
+            requiredDate: row.requiredDate || "",
+            priceMin: row.priceMin ?? "",
+            priceMax: row.priceMax ?? "",
+            avgUnitPrice: row.avgUnitPrice ?? "",
+            amount: row.amount ?? "",
+            overpay: row.overpay ?? "",
+            currency: row.currency,
+            coverageSource: row.coverageSource,
+            suppliers: row.usedSuppliers
+              .map(
+                (part) =>
+                  `${part.supplier_name || part.supplier_id}${
+                    part.quantity != null
+                      ? ` (${formatQuantity(String(part.quantity))})`
+                      : ""
+                  }`
+              )
+              .join("; ")
+          }))
+        );
+      } catch (exportError) {
+        const message =
+          exportError instanceof Error
+            ? exportError.message
+            : "Не удалось выгрузить Excel";
+        window.alert(message);
+      }
+      return;
+    }
+    if (!caseId) {
+      window.alert("Выберите заказ слева, чтобы скачать смету.");
+      return;
+    }
+    if (!positions.length) {
+      window.alert("Нет активных позиций для выгрузки сметы.");
+      return;
+    }
+    downloadEstimate.mutate(caseId, {
+      onError: (err) => {
+        const message =
+          err instanceof Error ? err.message : "Не удалось скачать Excel-смету";
+        window.alert(message);
+      }
+    });
+  };
+
   if (permissions.isPending) {
     return (
       <div className={styles.empty}>
@@ -1045,7 +1454,7 @@ export default function ProcurementManagerAgent() {
       <div className={styles.header}>
         <div>
           <h2>Менеджер по закупкам</h2>
-          <p>Заказы, номенклатура, поставщики, RFQ и согласования</p>
+          <p>Заказы, номенклатура, поставщики, ЗКП и согласования</p>
         </div>
         <div className={styles.hitl}>
           <ShieldCheck size={16} /> Отправка и оплата не выполняются автоматически
@@ -1118,12 +1527,18 @@ export default function ProcurementManagerAgent() {
           <div className={styles.caseList}>
             {cases.map((item) => {
               const coverage = deriveOrderCoverage(item);
-              const baseClass = item.id === caseId ? styles.caseActive : styles.case;
+              const requiredDate = orderRequiredDate(item);
+              const baseClass =
+                !showAllPositions && item.id === caseId ? styles.caseActive : styles.case;
               return (
                 <button
                   className={`${baseClass} ${COVERAGE_CASE_CLASS[coverage.tone]}`}
                   key={item.id}
-                  onClick={() => setParams({ case: item.id })}
+                  onClick={() => {
+                    // Per-order mode: leave «Все позиции» so table/total scope to this case.
+                    setShowAllPositions(false);
+                    setParams({ case: item.id });
+                  }}
                   type="button"
                   title={`${coverage.label}: ${coverage.covered_count}/${coverage.positions_count} поз. покрыто`}
                 >
@@ -1134,7 +1549,10 @@ export default function ProcurementManagerAgent() {
                     </span>
                   </div>
                   <small>
-                    {item.positions_count} поз. · требуется {formatDateTime(item.required_date)}
+                    {item.positions_count} поз.
+                  </small>
+                  <small className={styles.requiredDate}>
+                    Срок поставки: {formatDate(requiredDate)}
                   </small>
                   {item.summary ? <small>{item.summary}</small> : null}
                 </button>
@@ -1222,10 +1640,19 @@ export default function ProcurementManagerAgent() {
                   </button>
                   <button
                     className={styles.primary}
-                    disabled={downloadEstimate.isPending || !positions.length}
-                    onClick={() => downloadEstimate.mutate(caseId)}
+                    disabled={
+                      downloadEstimate.isPending ||
+                      (showAllPositions
+                        ? !aggregatedRows.length
+                        : !caseId || !positions.length)
+                    }
+                    onClick={handleExcelDownload}
                     type="button"
-                    title="Скачать Excel для сметы"
+                    title={
+                      showAllPositions
+                        ? "Скачать видимую сводную таблицу (CSV для Excel)"
+                        : "Скачать Excel для сметы выбранного заказа"
+                    }
                   >
                     {downloadEstimate.isPending ? (
                       <Loader2 className={styles.spin} size={13} />
@@ -1244,6 +1671,7 @@ export default function ProcurementManagerAgent() {
                       <tr>
                         <th>Номенклатура</th>
                         <th>Кол-во</th>
+                        <th title="Требуемая дата поставки">Срок</th>
                         <th
                           title={
                             showAllPositions
@@ -1257,13 +1685,8 @@ export default function ProcurementManagerAgent() {
                           Сумма
                         </th>
                         <th>Источник покрытия</th>
-                        <th
-                          title={
-                            allPositions.data?.score_formula ||
-                            "Топ-3: 0.55×price_score + 0.45×coverage_score"
-                          }
-                        >
-                          Топ-3 поставщика
+                        <th title="Только поставщики, фактически использованные аллокацией для покрытия остатка (склад → пусто)">
+                          Поставщики
                         </th>
                       </tr>
                     </thead>
@@ -1271,14 +1694,14 @@ export default function ProcurementManagerAgent() {
                       {showAllPositions ? (
                         allPositions.isLoading || allPositions.isPending ? (
                           <tr>
-                            <td colSpan={6}>
+                            <td colSpan={7}>
                               <Loader2 className={styles.spin} size={14} /> Загрузка позиций
                               очереди...
                             </td>
                           </tr>
                         ) : !aggregatedRows.length ? (
                           <tr>
-                            <td colSpan={6}>Нет активных позиций в очереди.</td>
+                            <td colSpan={7}>Нет активных позиций в очереди.</td>
                           </tr>
                         ) : (
                           aggregatedRows.map((row) => (
@@ -1297,6 +1720,7 @@ export default function ProcurementManagerAgent() {
                               <td>
                                 {formatQuantity(String(row.quantity))} {row.unit}
                               </td>
+                              <td>{formatDate(row.requiredDate)}</td>
                               <td>
                                 <span
                                   aria-label={`Цена ${row.nomenclature_name}`}
@@ -1340,31 +1764,38 @@ export default function ProcurementManagerAgent() {
                                   </>
                                 ) : null}
                               </td>
-                              <td>{row.coverageSource}</td>
                               <td>
-                                <TopSuppliersBlock
-                                  currency={row.currency}
-                                  offers={row.topSuppliers}
-                                />
+                                <CoverageSourceCell cov={row.coverageSourceMeta} />
+                              </td>
+                              <td>
+                                <UsedSuppliersBlock parts={row.usedSuppliers} />
                               </td>
                             </tr>
                           ))
                         )
                       ) : !lineRows.length ? (
                         <tr>
-                          <td colSpan={6}>Нет активных позиций.</td>
+                          <td colSpan={7}>Нет активных позиций.</td>
                         </tr>
                       ) : (
                         lineRows.map((row) => {
                           const cov = coverageByLineId.get(
                             `${workspace?.id}:${row.position.line_id}`
                           );
-                          const coverageSource =
-                            cov?.coverage_source_label || row.source;
-                          const nomId = String(row.position.nomenclature_id || "").trim();
-                          const topOffers = nomId
-                            ? orderTopByNom.get(nomId) ?? []
-                            : [];
+                          const usedParts = (() => {
+                            const fromCoverage = usedSuppliersFromCoverage(cov);
+                            if (fromCoverage.length) return fromCoverage;
+                            if (cov?.coverage_source === "warehouse") return [];
+                            return (
+                              poSuppliers.get(row.position.line_id) ??
+                              quoteSuppliers.get(row.position.line_id) ??
+                              []
+                            );
+                          })();
+                          const lineRequired = positionRequiredDate(
+                            row.position,
+                            cov?.required_date || workspace?.required_date
+                          );
                           return (
                             <tr key={row.position.id}>
                               <td>
@@ -1378,6 +1809,7 @@ export default function ProcurementManagerAgent() {
                                 {formatQuantity(row.position.quantity)}{" "}
                                 {row.position.unit || "шт"}
                               </td>
+                              <td>{formatDate(lineRequired)}</td>
                               <td>
                                 <input
                                   aria-label={`Цена ${row.position.nomenclature_name || row.position.line_id}`}
@@ -1389,19 +1821,21 @@ export default function ProcurementManagerAgent() {
                                       [row.position.line_id]: event.target.value
                                     }))
                                   }
-                                  placeholder="0"
+                                  placeholder="—"
                                   step="0.01"
                                   type="number"
                                   value={draftPrices[row.position.line_id] ?? ""}
                                 />
                               </td>
                               <td>{formatMoney(row.amount, row.currency)}</td>
-                              <td>{coverageSource}</td>
                               <td>
-                                <TopSuppliersBlock
-                                  currency={row.currency}
-                                  offers={topOffers}
+                                <CoverageSourceCell
+                                  cov={cov}
+                                  fallback={row.source}
                                 />
+                              </td>
+                              <td>
+                                <UsedSuppliersBlock parts={usedParts} />
                               </td>
                             </tr>
                           );
@@ -1430,7 +1864,7 @@ export default function ProcurementManagerAgent() {
           <div>
             <h3>Рабочие действия менеджера</h3>
             <p className={styles.muted}>
-              Поиск поставщиков, RFQ, сравнение КП, HITL и поставка
+              Поиск поставщиков, ЗКП, сравнение КП, HITL и поставка
             </p>
           </div>
         </div>
@@ -1472,7 +1906,7 @@ export default function ProcurementManagerAgent() {
               )}
               {(agentStatus?.rfq_draft || workspace.rfq_drafts?.[0]) && (
                 <p className={styles.muted}>
-                  RFQ:{" "}
+                  ЗКП:{" "}
                   {agentStatus?.rfq_draft?.subject ||
                     workspace.rfq_drafts?.[0]?.subject ||
                     "черновик"}
@@ -1492,10 +1926,20 @@ export default function ProcurementManagerAgent() {
                   disabled={runAgent.isPending || !caseId}
                   onClick={() => {
                     if (!caseId) return;
-                    runAgent.mutate({
-                      caseId,
-                      payload: { idempotency_key: key("agent-run") }
-                    });
+                    runAgent.mutate(
+                      {
+                        caseId,
+                        payload: {
+                          idempotency_key: key("agent-run"),
+                          allow_web_fallback: true
+                        }
+                      },
+                      {
+                        onSuccess: (status) => {
+                          if (status.paused_for_human) setHitlOpen(true);
+                        }
+                      }
+                    );
                   }}
                   type="button"
                 >
@@ -1515,6 +1959,43 @@ export default function ProcurementManagerAgent() {
                     <ShieldCheck size={15} /> Открыть HITL
                   </button>
                 )}
+                <button
+                  className={styles.secondary}
+                  disabled={runStrategy.isPending}
+                  onClick={() => {
+                    runStrategy.mutate(
+                      {
+                        idempotency_key: key("strategy-run"),
+                        allow_web_fallback: true,
+                        case_ids: cases.map((item) => item.id)
+                      },
+                      {
+                        onSuccess: (status) => {
+                          setTab("policy");
+                          if (status.paused_for_human) setStrategyHitlOpen(true);
+                        }
+                      }
+                    );
+                  }}
+                  type="button"
+                >
+                  {runStrategy.isPending ? (
+                    <Loader2 className={styles.spin} size={15} />
+                  ) : (
+                    <Layers size={15} />
+                  )}{" "}
+                  Политика очереди
+                </button>
+                {(strategyStatus?.paused_for_human || strategyHitlOpen) &&
+                strategyStatus?.paused_for_human ? (
+                  <button
+                    className={styles.secondary}
+                    onClick={() => setStrategyHitlOpen(true)}
+                    type="button"
+                  >
+                    <ShieldCheck size={15} /> HITL политики
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -1531,24 +2012,142 @@ export default function ProcurementManagerAgent() {
               ))}
             </div>
 
+            {tab === "policy" ? (
+              <>
+                <div className={styles.sectionHeader}>
+                  <h4>Политика поставок (очередь)</h4>
+                  <span className={styles.badge}>
+                    {strategyStatus?.stage || "не запущена"} ·{" "}
+                    {strategyStatus?.status || "—"}
+                  </span>
+                </div>
+                <p className={styles.muted}>
+                  Срочные заказы закрываются первыми (склад/банк), затем менее срочные — с
+                  возможностью других, более дешёвых поставщиков на остатке.
+                </p>
+                {!strategyStatus?.waves?.waves?.length ? (
+                  <div className={styles.empty}>
+                    Запустите «Политика очереди», чтобы построить волны срочности и назначения.
+                  </div>
+                ) : (
+                  <>
+                    <div className={styles.notice}>
+                      {strategyStatus.explanation?.summary ||
+                        strategyStatus.explanation?.text ||
+                        "Волны построены."}
+                    </div>
+                    <div className={styles.tableWrap}>
+                      <table className={styles.table}>
+                        <thead>
+                          <tr>
+                            <th>Волна</th>
+                            <th>Режим</th>
+                            <th>Заказы</th>
+                            <th>Комментарий</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {(strategyStatus.waves?.waves ?? []).map((wave) => (
+                            <tr key={wave.wave_id || wave.label}>
+                              <td>
+                                {WAVE_LABEL_RU[wave.label || ""] ||
+                                  wave.label ||
+                                  wave.wave_id ||
+                                  "—"}
+                              </td>
+                              <td>
+                                {WAVE_LABEL_RU[wave.mode || ""] || wave.mode || "—"}
+                              </td>
+                              <td>{(wave.case_ids || []).length}</td>
+                              <td className={styles.muted}>{wave.reason || "—"}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {(strategyStatus.supplier_diversity?.length ?? 0) > 0 ? (
+                      <>
+                        <h4>Альтернативы для поздних заказов</h4>
+                        <div className={styles.tableWrap}>
+                          <table className={styles.table}>
+                            <thead>
+                              <tr>
+                                <th>Номенклатура</th>
+                                <th>Срочный поставщик</th>
+                                <th>Экономичный</th>
+                                <th>Причина</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {(strategyStatus.supplier_diversity ?? []).map((row, index) => (
+                                <tr
+                                  key={`${row.case_id}-${row.line_id}-${index}`}
+                                >
+                                  <td>
+                                    {row.nomenclature_name || row.nomenclature_id || "—"}
+                                  </td>
+                                  <td>{row.urgent_supplier_id || "—"}</td>
+                                  <td>{row.economy_supplier_id || "—"}</td>
+                                  <td className={styles.muted}>{row.reason || "—"}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    ) : null}
+                    {(strategyStatus.cost_estimate?.lines?.length ?? 0) > 0 ? (
+                      <div className={styles.notice}>
+                        Смета стратегии: итого{" "}
+                        {strategyStatus.cost_estimate?.total_estimated_amount != null
+                          ? `${Number(
+                              strategyStatus.cost_estimate.total_estimated_amount
+                            ).toLocaleString("ru-RU")} ₽`
+                          : "—"}
+                        {" · "}
+                        PO-черновиков:{" "}
+                        {(strategyStatus.purchase_order_drafts ?? []).length}
+                      </div>
+                    ) : null}
+                    {(strategyStatus.explanation?.tradeoffs as string[] | undefined)
+                      ?.length ? (
+                      <ul className={styles.muted}>
+                        {(strategyStatus.explanation?.tradeoffs as string[]).map(
+                          (item) => (
+                            <li key={item}>{item}</li>
+                          )
+                        )}
+                      </ul>
+                    ) : null}
+                  </>
+                )}
+              </>
+            ) : null}
+
             {tab === "suppliers" ? (
               <>
                 <div className={styles.actions}>
-                  <p className={styles.muted}>
-                    Кандидаты с рейтингами и доказательствами происхождения.
-                  </p>
                   <button
                     className={styles.primary}
                     disabled={searchSuppliers.isPending}
                     onClick={() =>
                       searchSuppliers.mutate(
-                        { caseId, payload: { idempotency_key: key("supplier-search") } },
                         {
-                          onSuccess: (result) =>
+                          caseId,
+                          payload: {
+                            idempotency_key: key("supplier-search-manual"),
+                            allow_web_fallback: true,
+                            force_web: true,
+                            mode: "manual_web"
+                          }
+                        },
+                        {
+                          onSuccess: (result: SupplierSearchResult) =>
                             setSearchInfo({
                               query: result.query,
                               sources: result.sources_used,
-                              web: result.web_fallback_used
+                              web: result.web_fallback_used,
+                              nomenclatureResults: result.nomenclature_results ?? []
                             })
                         }
                       )
@@ -1568,6 +2167,9 @@ export default function ProcurementManagerAgent() {
                     Запрос: {searchInfo.query} · источники:{" "}
                     {searchInfo.sources.join(", ") || "нет"} · web fallback:{" "}
                     {searchInfo.web ? "да" : "нет"}
+                    {nomenclatureResults.length
+                      ? ` · позиций: ${nomenclatureResults.length}`
+                      : ""}
                   </div>
                 ) : null}
                 {suppliersQuery.isLoading ? (
@@ -1575,59 +2177,275 @@ export default function ProcurementManagerAgent() {
                     <Loader2 className={styles.spin} size={16} /> Загрузка...
                   </div>
                 ) : null}
-                {!suppliersQuery.isLoading && !suppliers.length ? (
+                {!suppliersQuery.isLoading &&
+                !nomenclatureResults.length &&
+                !suppliers.length ? (
                   <div className={styles.empty}>Кандидаты не найдены.</div>
                 ) : null}
-                <div className={styles.supplierGrid}>
-                  {suppliers.map((supplier) => (
-                    <div
-                      className={`${styles.card} ${
-                        selectedSupplierIds.includes(supplier.supplier_id)
-                          ? styles.cardSelected
-                          : ""
-                      }`}
-                      key={supplier.supplier_id}
-                    >
-                      <div className={styles.row}>
-                        <strong>{supplier.name}</strong>
-                        <span className={styles.badge}>{supplier.source}</span>
+                {nomenclatureResults.length ? (
+                  <div className={styles.nomenclatureStack}>
+                    {nomenclatureResults.map((nom) => {
+                      const nomKey =
+                        nom.nomenclature_id || nom.nomenclature_name || nom.query;
+                      return (
+                        <section className={styles.nomenclatureCard} key={nomKey}>
+                          <div className={styles.nomenclatureHeader}>
+                            <div>
+                              <h4>
+                                {nom.nomenclature_name ||
+                                  nom.nomenclature_id ||
+                                  nom.query}
+                              </h4>
+                              {nom.nomenclature_id &&
+                              nom.nomenclature_name &&
+                              nom.nomenclature_id !== nom.nomenclature_name ? (
+                                <p className={styles.muted}>{nom.nomenclature_id}</p>
+                              ) : null}
+                            </div>
+                            <span className={styles.badge}>
+                              {(nom.sources_used || [])
+                                .map(sourceBadgeLabel)
+                                .join(", ") || "нет источников"}
+                              {nom.web_fallback_used &&
+                              !(nom.sources_used || []).includes("web")
+                                ? " · web"
+                                : ""}
+                            </span>
+                          </div>
+                          {(() => {
+                            // Manual «Найти поставщиков»: show only live web cards.
+                            const webSuppliers = (nom.suppliers || []).filter(
+                              (item) => item.source === "web"
+                            );
+                            if (!webSuppliers.length) {
+                              return (
+                                <div className={styles.empty}>
+                                  Веб-поставщики по этой позиции не найдены.
+                                </div>
+                              );
+                            }
+                            return (
+                            <div className={styles.supplierGrid}>
+                              {webSuppliers.map((supplier) => {
+                                const link =
+                                  supplier.url ||
+                                  supplier.contacts?.website ||
+                                  null;
+                                const cost =
+                                  supplier.approx_cost ?? supplier.unit_price ?? null;
+                                const rating =
+                                  supplier.rating ??
+                                  averageRating(supplier) ??
+                                  null;
+                                return (
+                                  <div
+                                    className={`${styles.card} ${
+                                      selectedSupplierIds.includes(supplier.supplier_id)
+                                        ? styles.cardSelected
+                                        : ""
+                                    }`}
+                                    key={`${nomKey}:${supplier.supplier_id}`}
+                                  >
+                                    <div className={styles.row}>
+                                      <strong>{supplier.name}</strong>
+                                      <span className={styles.badge}>
+                                        {sourceBadgeLabel(supplier.source)}
+                                      </span>
+                                    </div>
+                                    {link ? (
+                                      <p>
+                                        <a
+                                          className={styles.supplierLink}
+                                          href={link}
+                                          rel="noopener noreferrer"
+                                          target="_blank"
+                                        >
+                                          ссылка
+                                        </a>
+                                      </p>
+                                    ) : (
+                                      <p className={styles.muted}>Ссылка не указана</p>
+                                    )}
+                                    <p>
+                                      Город: {supplier.city || "—"} · оценка:{" "}
+                                      {rating != null ? String(rating) : "—"} · примерная
+                                      стоимость:{" "}
+                                      {cost != null
+                                        ? `${Number(cost).toLocaleString("ru-RU")} ₽`
+                                        : "—"}
+                                    </p>
+                                    <p className={styles.muted}>
+                                      Качество {supplier.quality_rating} · доставка{" "}
+                                      {supplier.delivery_rating} · коммерческий{" "}
+                                      {supplier.commercial_rating}
+                                    </p>
+                                    <div className={styles.actions}>
+                                      <label>
+                                        <input
+                                          checked={selectedSupplierIds.includes(
+                                            supplier.supplier_id
+                                          )}
+                                          onChange={() =>
+                                            toggleSupplier(supplier.supplier_id)
+                                          }
+                                          type="checkbox"
+                                        />{" "}
+                                        В ЗКП
+                                      </label>
+                                      <button
+                                        className={styles.secondary}
+                                        onClick={() =>
+                                          setConfirmAction({ type: "supplier", supplier })
+                                        }
+                                        type="button"
+                                      >
+                                        Согласовать выбор
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                            );
+                          })()}
+                        </section>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className={styles.supplierGrid}>
+                    {suppliers.map((supplier) => (
+                      <div
+                        className={`${styles.card} ${
+                          selectedSupplierIds.includes(supplier.supplier_id)
+                            ? styles.cardSelected
+                            : ""
+                        }`}
+                        key={supplier.supplier_id}
+                      >
+                        <div className={styles.row}>
+                          <strong>{supplier.name}</strong>
+                          <span className={styles.badge}>
+                            {sourceBadgeLabel(supplier.source)}
+                          </span>
+                        </div>
+                        <p>ИНН: {supplier.tax_id || "—"}</p>
+                        <p>
+                          Качество {supplier.quality_rating} · доставка{" "}
+                          {supplier.delivery_rating} · коммерческий{" "}
+                          {supplier.commercial_rating}
+                        </p>
+                        <div className={styles.actions}>
+                          <label>
+                            <input
+                              checked={selectedSupplierIds.includes(supplier.supplier_id)}
+                              onChange={() => toggleSupplier(supplier.supplier_id)}
+                              type="checkbox"
+                            />{" "}
+                            В ЗКП
+                          </label>
+                          <button
+                            className={styles.secondary}
+                            onClick={() => setConfirmAction({ type: "supplier", supplier })}
+                            type="button"
+                          >
+                            Согласовать выбор
+                          </button>
+                        </div>
                       </div>
-                      <p>ИНН: {supplier.tax_id || "—"}</p>
-                      <p>
-                        Качество {supplier.quality_rating} · доставка {supplier.delivery_rating} ·
-                        коммерческий {supplier.commercial_rating}
-                      </p>
-                      <p className={styles.muted}>
-                        {supplier.categories.join(", ") || "Категории не указаны"} ·{" "}
-                        {supplier.is_active ? "активен" : "неактивен"}
-                      </p>
-                      <div className={styles.provenance}>
-                        <strong>Evidence:</strong>
-                        <br />
-                        {supplier.evidence.length
-                          ? supplier.evidence.join(" · ")
-                          : "Нет подтверждений"}
-                      </div>
-                      <div className={styles.actions}>
-                        <label>
-                          <input
-                            checked={selectedSupplierIds.includes(supplier.supplier_id)}
-                            onChange={() => toggleSupplier(supplier.supplier_id)}
-                            type="checkbox"
-                          />{" "}
-                          В RFQ
-                        </label>
-                        <button
-                          className={styles.secondary}
-                          onClick={() => setConfirmAction({ type: "supplier", supplier })}
-                          type="button"
-                        >
-                          Согласовать выбор
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
+                )}
+              </>
+            ) : null}
+
+            {tab === "estimate" ? (
+              <>
+                <div className={styles.sectionHeader}>
+                  <h4>Смета агента</h4>
+                  <span className={styles.badge}>
+                    1C / internal + web только после HITL
+                  </span>
                 </div>
+                {(() => {
+                  const estimate =
+                    agentStatus?.cost_estimate ||
+                    agentStatus?.evaluation?.cost_estimate ||
+                    null;
+                  const lines = estimate?.lines ?? [];
+                  if (!estimate || !lines.length) {
+                    return (
+                      <div className={styles.empty}>
+                        Смета появится после «Запустить агента» и подтверждения shortlist
+                        (HITL). Неодобренный web в смету не входит.
+                      </div>
+                    );
+                  }
+                  return (
+                    <>
+                      <div className={styles.notice}>
+                        Итого:{" "}
+                        {estimate.total_estimated_amount != null
+                          ? `${Number(estimate.total_estimated_amount).toLocaleString("ru-RU")} ₽`
+                          : "—"}
+                        {" · "}
+                        web в смете:{" "}
+                        {estimate.web_approved || estimate.kpi_flags?.web_included
+                          ? "да (одобрен HITL)"
+                          : "нет"}
+                        {estimate.excluded_unapproved_web
+                          ? " · неодобренный web исключён"
+                          : ""}
+                      </div>
+                      <div className={styles.tableWrap}>
+                        <table className={styles.table}>
+                          <thead>
+                            <tr>
+                              <th>Номенклатура</th>
+                              <th>Кол-во</th>
+                              <th>Сумма</th>
+                              <th>Поставщики</th>
+                              <th>Источники</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {lines.map((line) => (
+                              <tr key={line.line_id || line.nomenclature_id}>
+                                <td>
+                                  {line.nomenclature_name ||
+                                    line.nomenclature_id ||
+                                    "—"}
+                                </td>
+                                <td>{line.need_qty ?? "—"}</td>
+                                <td>
+                                  {line.estimated_amount != null
+                                    ? `${Number(line.estimated_amount).toLocaleString("ru-RU")} ₽`
+                                    : "—"}
+                                </td>
+                                <td>
+                                  {(line.top_suppliers || [])
+                                    .slice(0, 3)
+                                    .map(
+                                      (offer) =>
+                                        `${offer.supplier_name || offer.supplier_id}${
+                                          offer.source ? ` [${offer.source}]` : ""
+                                        }`
+                                    )
+                                    .join(", ") || "—"}
+                                </td>
+                                <td>
+                                  {(line.estimate_sources || [])
+                                    .map(sourceBadgeLabel)
+                                    .join(", ") || "—"}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </>
+                  );
+                })()}
               </>
             ) : null}
 
@@ -1767,9 +2585,9 @@ export default function ProcurementManagerAgent() {
                     <input defaultValue="RUB" maxLength={3} minLength={3} name="currency" required />
                   </label>
                   <label className={styles.field}>
-                    RFQ
+                    ЗКП
                     <select name="rfq_id">
-                      <option value="">Без RFQ</option>
+                      <option value="">Без ЗКП</option>
                       {workspace.rfq_drafts?.map((item) => (
                         <option key={item.rfq_id} value={item.rfq_id}>
                           {item.rfq_id}
@@ -1844,7 +2662,7 @@ export default function ProcurementManagerAgent() {
                 </div>
                 {!rfqLines.length ? (
                   <div className={styles.error}>
-                    Нельзя создать RFQ: в кейсе нет активных позиций с положительным количеством.
+                    Нельзя создать ЗКП: в кейсе нет активных позиций с положительным количеством.
                   </div>
                 ) : null}
                 {!workspace.rfq_drafts?.length ? (
@@ -1947,7 +2765,7 @@ export default function ProcurementManagerAgent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {workspace.shipment_events.map((item) => (
+                      {(workspace.shipment_events ?? []).map((item) => (
                         <tr key={item.event_id}>
                           <td>{item.event_type}</td>
                           <td>{formatDateTime(item.occurred_at)}</td>
@@ -2080,7 +2898,7 @@ export default function ProcurementManagerAgent() {
                     Событие поставки
                     <select name="shipment_event_id">
                       <option value="">Не указано</option>
-                      {workspace.shipment_events.map((item) => (
+                      {(workspace.shipment_events ?? []).map((item) => (
                         <option key={item.event_id} value={item.event_id}>
                           {item.event_type} · {formatDateTime(item.occurred_at)}
                         </option>
@@ -2106,10 +2924,10 @@ export default function ProcurementManagerAgent() {
 
             {tab === "audit" ? (
               <div className={styles.timeline}>
-                {!workspace.timeline.length ? (
+                {!(workspace.timeline ?? []).length ? (
                   <div className={styles.empty}>Событий нет.</div>
                 ) : (
-                  workspace.timeline.map((entry) => (
+                  (workspace.timeline ?? []).map((entry) => (
                     <div
                       className={styles.timelineItem}
                       key={entry.id || `${entry.at}-${entry.title}`}
@@ -2128,7 +2946,7 @@ export default function ProcurementManagerAgent() {
                     </div>
                   ))
                 )}
-                {workspace.approvals.map((item) => (
+                {(workspace.approvals ?? []).map((item) => (
                   <div className={styles.timelineItem} key={item.approval_id}>
                     <span className={styles.dot} />
                     <div>
@@ -2174,6 +2992,24 @@ export default function ProcurementManagerAgent() {
           }}
           pending={resumeAgent.isPending}
           status={agentStatus}
+        />
+      ) : null}
+      {strategyHitlOpen ? (
+        <StrategyHitlModal
+          onClose={() => setStrategyHitlOpen(false)}
+          onResume={(action) => {
+            resumeStrategy.mutate(
+              {
+                action,
+                idempotency_key: key(`strategy-resume-${action}`)
+              },
+              {
+                onSuccess: () => setStrategyHitlOpen(false)
+              }
+            );
+          }}
+          pending={resumeStrategy.isPending}
+          status={strategyStatus}
         />
       ) : null}
     </div>

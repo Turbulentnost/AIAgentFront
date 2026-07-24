@@ -140,6 +140,9 @@ import type {
   AgentResumePayload,
   AgentRunPayload,
   AgentStatus,
+  StrategyResumePayload,
+  StrategyRunPayload,
+  StrategyStatus,
   CaptureQuotePayload,
   CreateRfqDraftPayload,
   LineAmountsUpdatePayload,
@@ -420,6 +423,18 @@ export const procurementManagerApi = {
     apiClient
       .get<AgentStatus>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/agent/status`)
       .then((r) => r.data),
+  runStrategy: (payload?: StrategyRunPayload) =>
+    longRunningApiClient
+      .post<StrategyStatus>(`${PROCUREMENT_MANAGER_BASE}/strategy/run`, payload)
+      .then((r) => r.data),
+  resumeStrategy: (payload: StrategyResumePayload) =>
+    longRunningApiClient
+      .post<StrategyStatus>(`${PROCUREMENT_MANAGER_BASE}/strategy/resume`, payload)
+      .then((r) => r.data),
+  getStrategyStatus: () =>
+    apiClient
+      .get<StrategyStatus>(`${PROCUREMENT_MANAGER_BASE}/strategy/status`)
+      .then((r) => r.data),
   listPurchaseOrderDrafts: (caseId: string) =>
     apiClient
       .get<PurchaseOrderDraft[]>(
@@ -504,6 +519,8 @@ export const healthApi = {
 };
 export const authApi = {
   login: (payload: LoginPayload) => apiClient.post<TokenResponse>("/auth/login", payload).then((r) => r.data),
+  /** Local/dev only: JWT without password (requires DEV_AUTO_LOGIN on backend). */
+  devAutoLogin: () => apiClient.post<TokenResponse>("/auth/dev-auto-login").then((r) => r.data),
   loginWith1C: (payload: { fio: string; password: string }) =>
     longRunningApiClient.post<OneCLoginResponse>("/auth/onec/login", payload).then((r) => r.data),
   getOneCSession: () => apiClient.get<OneCSession>("/auth/onec/session").then((r) => r.data),

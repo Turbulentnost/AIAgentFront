@@ -10,6 +10,8 @@ interface ImportMetaEnv {
   readonly VITE_INCOMING_MAIL_PUBLIC?: string;
   /** Local/dev: UI без логина (mock superuser). Требует AUTH_DISABLED на бэке для API. */
   readonly VITE_SKIP_AUTH?: string;
+  /** Local/dev: /auth/dev-login выдаёт JWT через POST /auth/dev-auto-login. */
+  readonly VITE_DEV_AUTO_LOGIN?: string;
   readonly VITE_ONEC_API_SERVER?: string;
   readonly VITE_ONEC_API_URL?: string;
 }
