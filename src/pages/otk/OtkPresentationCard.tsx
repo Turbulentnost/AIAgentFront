@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { OtkPresentationCard, OtkWorker } from "./mockData";
+import { isEffectivelyCompleted, urgencyColor } from "./otkPresentationUi";
 import styles from "./OtkWorker.module.css";
 
 type Props = {
@@ -88,23 +89,6 @@ export function OtkPresentationCardView({ card, workers, onChange }: Props) {
             onChange={(projectName) => onChange({ projectName })}
           />
         </div>
-        <div className={styles.fieldGroup}>
-          <TextField
-            label="Поставщик"
-            value={card.supplier}
-            onChange={(supplier) => onChange({ supplier })}
-          />
-          <TextField
-            label="Контрагент"
-            value={card.counterparty}
-            onChange={(counterparty) => onChange({ counterparty })}
-          />
-          <TextField
-            label="Склад"
-            value={card.warehouse}
-            onChange={(warehouse) => onChange({ warehouse })}
-          />
-        </div>
       </div>
 
       <div className={`${styles.headerColumn} ${styles.fieldGroup}`}>
@@ -152,14 +136,42 @@ export function OtkPresentationCardView({ card, workers, onChange }: Props) {
             ))}
           </select>
         </Field>
-        <Field label="Срок исполнения">
+        <label
+          className={`${styles.field} ${styles.fieldDue}`}
+          style={
+            {
+              "--otk-due-color": urgencyColor(card.dueAt, {
+                muted: isEffectivelyCompleted(card)
+              })
+            } as CSSProperties
+          }
+        >
+          <span>Срок исполнения</span>
           <input
             className={styles.fieldControl}
             type="datetime-local"
             value={toDateTimeLocalValue(card.dueAt)}
             onChange={(e) => onChange({ dueAt: fromDateTimeLocalValue(e.target.value) })}
           />
-        </Field>
+        </label>
+      </div>
+
+      <div className={`${styles.fieldGroup} ${styles.headerSupplierRow}`}>
+        <TextField
+          label="Поставщик"
+          value={card.supplier}
+          onChange={(supplier) => onChange({ supplier })}
+        />
+        <TextField
+          label="Контрагент"
+          value={card.counterparty}
+          onChange={(counterparty) => onChange({ counterparty })}
+        />
+        <TextField
+          label="Склад"
+          value={card.warehouse}
+          onChange={(warehouse) => onChange({ warehouse })}
+        />
       </div>
     </div>
   );

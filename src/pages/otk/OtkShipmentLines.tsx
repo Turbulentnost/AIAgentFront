@@ -1,11 +1,12 @@
 import { Plus, Trash2 } from "lucide-react";
 import type { OtkShipmentLine, OtkTmcCategory } from "./mockData";
 import {
+  buildSampleRuleForLine,
   formatSampleCompact,
-  normalizeTmcCategory,
-  resolveSampleForLine
+  normalizeTmcCategory
 } from "./sampleRule";
 import type { OtkShipmentLineUi } from "./otkMappers";
+import { lineCheckMark } from "./otkPresentationUi";
 import styles from "./OtkWorker.module.css";
 
 /** Select values are English keys; labels are RU. Never swap value↔label. */
@@ -35,6 +36,7 @@ function createEmptyLine(): OtkShipmentLineUi {
     qtyUpd: 0,
     qtyFact: 1,
     category: "other",
+    accepted: false,
     sampleRule: null
   };
 }
@@ -53,10 +55,16 @@ export function OtkShipmentLines({ lines, onChange }: Props) {
         const next: OtkShipmentLineUi = { ...line, ...patch };
         if (patch.category !== undefined) {
           next.category = normalizeTmcCategory(patch.category);
-          next.sampleRule = null;
         }
-        if (patch.qtyFact !== undefined || patch.qtyUpd !== undefined) {
-          next.sampleRule = null;
+        // Keep sampleRule in sync with category/qty so a later server merge
+        // cannot flash an old % while category is already updated locally.
+        if (
+          patch.category !== undefined ||
+          patch.qtyFact !== undefined ||
+          patch.qtyUpd !== undefined ||
+          patch.supplierQualityRating !== undefined
+        ) {
+          next.sampleRule = buildSampleRuleForLine(next);
         }
         return next;
       })
@@ -86,13 +94,14 @@ export function OtkShipmentLines({ lines, onChange }: Props) {
         <div className={styles.linesScroll}>
           <table className={styles.linesTable}>
             <colgroup>
-              <col style={{ width: "12%" }} />
-              <col style={{ width: "22%" }} />
+              <col style={{ width: "11%" }} />
+              <col style={{ width: "20%" }} />
               <col style={{ width: "7%" }} />
               <col style={{ width: "8%" }} />
               <col style={{ width: "8%" }} />
-              <col style={{ width: "14%" }} />
-              <col style={{ width: "22%" }} />
+              <col style={{ width: "13%" }} />
+              <col style={{ width: "20%" }} />
+              <col style={{ width: "56px" }} />
               <col style={{ width: "40px" }} />
             </colgroup>
             <thead>
@@ -104,15 +113,25 @@ export function OtkShipmentLines({ lines, onChange }: Props) {
                 <th>Кол-во факт</th>
                 <th>Категория</th>
                 <th>Выборка приёмки (СТО)</th>
+                <th className={styles.acceptedHead}>Приёмка</th>
                 <th aria-label="Действия" />
               </tr>
             </thead>
             <tbody>
               {lines.map((line) => {
                 const category = normalizeTmcCategory(line.category);
-                const sample = resolveSampleForLine({ ...line, category });
+                // Single source of truth: always derive % from category/qty/rating.
+                // Do not prefer cached sampleRule from a stale server merge.
+                const sample = buildSampleRuleForLine({ ...line, category });
+                const check = lineCheckMark(line.accepted);
+                const rowClass =
+                  check === "passed" ? styles.lineRowPassed : styles.lineRowNeed;
+                const acceptedClass =
+                  check === "passed"
+                    ? `${styles.acceptedCell} ${styles.acceptedCellPassed}`
+                    : `${styles.acceptedCell} ${styles.acceptedCellNeed}`;
                 return (
-                  <tr key={line.id}>
+                  <tr key={line.id} className={rowClass}>
                     <td>
                       <input
                         className={styles.lineInput}
@@ -122,12 +141,12 @@ export function OtkShipmentLines({ lines, onChange }: Props) {
                         onChange={(e) => updateLine(line.id, { code: e.target.value })}
                       />
                     </td>
-                    <td>
-                      <input
-                        className={styles.lineInput}
-                        type="text"
+                    <td className={styles.nomenclatureCell}>
+                      <textarea
+                        className={`${styles.lineInput} ${styles.lineInputNomenclature}`}
                         value={line.nomenclature}
                         placeholder="Номенклатура"
+                        rows={2}
                         onChange={(e) =>
                           updateLine(line.id, { nomenclature: e.target.value })
                         }
@@ -190,6 +209,21 @@ export function OtkShipmentLines({ lines, onChange }: Props) {
                           {formatSampleCompact(sample, line.storageUnit || "шт")}
                         </strong>
                       </div>
+                    </td>
+                    <td className={acceptedClass}>
+                      <label className={styles.acceptedToggle} title="Принято">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(line.accepted)}
+                          aria-label="Принято"
+                          onChange={(e) =>
+                            updateLine(line.id, { accepted: e.target.checked })
+                          }
+                        />
+                        <span className={styles.acceptedLabel}>
+                          {line.accepted ? "Да" : "—"}
+                        </span>
+                      </label>
                     </td>
                     <td className={styles.lineActionsCell}>
                       <button

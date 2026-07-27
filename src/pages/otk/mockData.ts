@@ -31,6 +31,8 @@ export type OtkShipmentLine = {
   qtyFact: number;
   category: OtkTmcCategory;
   supplierQualityRating?: number | string | null;
+  /** Отметка приёмки позиции (локальная; seed может вывести из 1C). */
+  accepted?: boolean;
 };
 
 export type OtkPresentationCard = {
@@ -62,6 +64,7 @@ type SeedLine = {
   qty_fact: number;
   category: string;
   supplier_quality_rating?: number | string | null;
+  accepted?: boolean;
 };
 
 type SeedCard = {
@@ -100,7 +103,8 @@ function mapSeedLine(line: SeedLine): OtkShipmentLine {
     qtyUpd: line.qty_upd,
     qtyFact: line.qty_fact,
     category: line.category as OtkTmcCategory,
-    supplierQualityRating: line.supplier_quality_rating ?? null
+    supplierQualityRating: line.supplier_quality_rating ?? null,
+    accepted: Boolean(line.accepted)
   };
 }
 

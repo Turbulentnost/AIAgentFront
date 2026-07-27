@@ -145,7 +145,9 @@ import type {
   StrategyStatus,
   CaptureQuotePayload,
   CreateRfqDraftPayload,
+  FulfillmentStatusUpdatePayload,
   LineAmountsUpdatePayload,
+  LineScheduleUpdatePayload,
   NonconformityPayload,
   OperationStatus,
   ApprovalRecord,
@@ -329,6 +331,27 @@ export const procurementManagerApi = {
     apiClient
       .put<{ line_amounts: Record<string, LineAmountsUpdatePayload["lines"][number]> }>(
         `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/line-amounts`,
+        payload
+      )
+      .then((r) => r.data),
+  createOtkPresentation: (caseId: string) =>
+    apiClient
+      .post<{ presentation_id: string }>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/otk-presentation`
+      )
+      .then((r) => r.data),
+  updateFulfillmentStatus: (caseId: string, payload: FulfillmentStatusUpdatePayload) =>
+    apiClient
+      .patch(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/fulfillment-status`, payload)
+      .then((r) => r.data),
+  updateLineSchedule: (
+    caseId: string,
+    lineId: string,
+    payload: LineScheduleUpdatePayload
+  ) =>
+    apiClient
+      .patch(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/lines/${encodeURIComponent(lineId)}/schedule`,
         payload
       )
       .then((r) => r.data),

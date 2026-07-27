@@ -1,10 +1,21 @@
 .page {
+  --otk-check-pass: #15803d;
+  --otk-check-pass-bg: color-mix(in srgb, #16a34a 14%, var(--color-surface));
+  --otk-check-need: #b45309;
+  --otk-check-need-bg: color-mix(in srgb, #f59e0b 18%, var(--color-surface));
+  --otk-check-done: #4d7c0f;
+  --otk-check-done-bg: color-mix(in srgb, #65a30d 10%, var(--color-surface));
+  --otk-urgency-ok: #c2410c;
+  --otk-urgency-mid: #ea580c;
+  --otk-urgency-crit: #b91c1c;
+
   display: grid;
   gap: 16px;
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
   color: var(--color-text);
+  min-height: 0;
 }
 
 .header h2 {
@@ -46,7 +57,12 @@
   display: grid;
   grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
+  /* header + summary stats + gaps ≈ 240px */
+  height: calc(100vh - 240px);
+  max-height: calc(100vh - 240px);
+  overflow: hidden;
 }
 
 .listPanel,
@@ -57,6 +73,60 @@
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background: var(--color-surface);
+  color: var(--color-text);
+  min-height: 0;
+}
+
+.listPanel {
+  display: flex;
+  flex-direction: column;
+  align-content: start;
+  height: 100%;
+  overflow: hidden;
+}
+
+.listPanel > .panelTitle,
+.listPanel > .listControls {
+  flex-shrink: 0;
+}
+
+.listControls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.listControl {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.listControl label {
+  color: var(--color-text);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.listControlSelect {
+  width: 100%;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.detailPanel {
+  height: 100%;
+  overflow: auto;
 }
 
 .panelTitle {
@@ -83,6 +153,10 @@
 .cardList {
   display: grid;
   gap: 8px;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .cardItem,
@@ -90,16 +164,19 @@
   display: grid;
   gap: 4px;
   width: 100%;
-  padding: 12px;
+  padding: 12px 12px 12px 10px;
   border-radius: 10px;
   background: var(--color-bg);
   color: inherit;
   text-align: left;
   cursor: pointer;
+  border-left-width: 4px;
+  border-left-style: solid;
 }
 
 .cardItem {
   border: 1px solid var(--color-border);
+  border-left-width: 4px;
 }
 
 .cardItem:hover {
@@ -108,79 +185,171 @@
 
 .cardItemActive {
   border: 1px solid var(--color-primary);
+  border-left-width: 4px;
   box-shadow: inset 0 0 0 1px var(--color-primary);
+}
+
+.cardCheckNeed {
+  border-left-color: var(--otk-check-need);
+  background: var(--otk-check-need-bg);
+}
+
+.cardCheckNeed:hover,
+.cardItemActive.cardCheckNeed {
+  border-left-color: var(--otk-check-need);
+}
+
+.cardCheckPassed,
+.cardCheckDone {
+  border-left-color: var(--otk-check-done);
+  background: var(--otk-check-done-bg);
+}
+
+.cardCheckPassed:hover,
+.cardCheckDone:hover,
+.cardItemActive.cardCheckPassed,
+.cardItemActive.cardCheckDone {
+  border-left-color: var(--otk-check-done);
 }
 
 .cardItem strong,
 .cardItemActive strong {
   font-size: 13px;
+  color: var(--color-text);
 }
 
 .cardItem span,
 .cardItemActive span {
-  color: var(--color-muted);
+  color: var(--color-text-secondary, var(--color-muted));
   font-size: 12px;
+}
+
+.cardMetaRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin-top: 2px;
+}
+
+.cardDue {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
 }
 
 .statusChip {
   display: inline-flex;
   width: fit-content;
-  margin-top: 4px;
   padding: 2px 8px;
   border-radius: 999px;
   font-size: 11px;
+  font-weight: 650;
   background: color-mix(in srgb, var(--color-primary) 12%, var(--color-surface));
   color: var(--color-primary-text, var(--color-text));
+}
+
+.statusChipNeed {
+  background: var(--otk-check-need-bg);
+  color: var(--otk-check-need);
+}
+
+.statusChipPassed,
+.statusChipDone {
+  background: var(--otk-check-done-bg);
+  color: var(--otk-check-done);
 }
 
 .headerColumns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
+  align-items: start;
 }
 
 .headerColumn {
   display: grid;
-  gap: 8px;
+  gap: 3px;
   align-content: start;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.headerSupplierRow {
+  grid-column: 1 / -1;
+  min-width: 0;
 }
 
 .fieldGroup {
   display: grid;
-  gap: 8px;
+  gap: 3px;
+  min-width: 0;
+  max-width: 100%;
   padding-left: 10px;
   border-left: 3px solid color-mix(in srgb, #16a34a 70%, var(--color-border));
 }
 
 .field {
   display: grid;
-  gap: 3px;
-  padding: 8px 10px;
+  gap: 0;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 3px 10px;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-bg);
+  box-sizing: border-box;
 }
 
 .field span {
-  color: var(--color-muted);
-  font-size: 11px;
+  margin: 0;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  line-height: 1.15;
   text-transform: uppercase;
   letter-spacing: 0.02em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .fieldControl {
   width: 100%;
+  max-width: 100%;
+  min-width: 0;
   margin: 0;
-  padding: 4px 0;
+  padding: 0;
   border: none;
   background: transparent;
-  color: inherit;
+  color: var(--color-text);
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  line-height: 1.35;
+  line-height: 1.25;
   outline: none;
   box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.fieldDue {
+  border-left: 3px solid var(--otk-due-color, var(--otk-urgency-mid));
+  background: color-mix(in srgb, var(--otk-due-color, var(--otk-urgency-mid)) 10%, var(--color-bg));
+}
+
+.fieldDue .fieldControl {
+  color: var(--otk-due-color, var(--otk-urgency-mid));
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+select.fieldControl {
+  width: 100%;
+  max-width: 100%;
 }
 
 .sectionTitle {
@@ -220,10 +389,30 @@
 }
 
 .linesTable th {
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
+}
+
+.linesTable td {
+  color: var(--color-text);
+}
+
+.lineRowNeed td:first-child {
+  box-shadow: inset 3px 0 0 var(--otk-check-need);
+}
+
+.lineRowPassed td:first-child {
+  box-shadow: inset 3px 0 0 var(--otk-check-pass);
+}
+
+.lineRowPassed {
+  background: var(--otk-check-pass-bg);
+}
+
+.lineRowNeed {
+  background: color-mix(in srgb, #f59e0b 6%, transparent);
 }
 
 .lineInput {
@@ -260,10 +449,85 @@
   cursor: pointer;
 }
 
+.nomenclatureCell {
+  min-width: 120px;
+  max-width: 280px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.lineInputNomenclature {
+  display: block;
+  min-height: 2.7em;
+  resize: vertical;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  field-sizing: content;
+}
+
 .lineActionsCell {
   width: 40px;
   white-space: nowrap;
   vertical-align: middle;
+}
+
+.acceptedHead {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.acceptedCell {
+  text-align: center;
+  vertical-align: middle;
+  width: 56px;
+}
+
+.acceptedToggle {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  margin: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.acceptedToggle input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--otk-check-pass);
+  cursor: pointer;
+}
+
+.acceptedLabel {
+  font-size: 10px;
+  line-height: 1.1;
+  color: var(--color-text-secondary);
+  text-transform: none;
+  font-weight: 650;
+}
+
+.acceptedCellPassed {
+  background: var(--otk-check-pass-bg);
+}
+
+.acceptedCellPassed .acceptedLabel {
+  color: var(--otk-check-pass);
+}
+
+.acceptedCellNeed {
+  background: var(--otk-check-need-bg);
+}
+
+.acceptedCellNeed .acceptedLabel {
+  color: var(--otk-check-need);
+}
+
+.acceptedCellNeed .acceptedToggle input {
+  accent-color: var(--otk-check-need);
 }
 
 .sampleCell {
@@ -363,6 +627,12 @@
 @media (max-width: 980px) {
   .workspace {
     grid-template-columns: 1fr;
+    height: auto;
+    max-height: none;
+  }
+
+  .listPanel {
+    max-height: min(42vh, 360px);
   }
 
   .summaryStats {

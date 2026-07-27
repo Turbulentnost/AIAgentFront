@@ -24,6 +24,8 @@ export interface Supplier {
   unit_price?: number | string | null;
   approx_cost?: number | string | null;
   rating?: number | string | null;
+  abc_class?: "A" | "B" | "C" | null;
+  abc_spend_share?: number | string | null;
 }
 
 export interface NomenclatureSearchItem {
@@ -63,6 +65,8 @@ export interface SupplierSearchResult {
   operation_id?: string | null;
   pending?: boolean;
   status?: "completed" | "running" | "failed";
+  message?: string | null;
+  diagnostics?: Record<string, unknown>;
 }
 
 export interface RfqLine {
@@ -182,6 +186,59 @@ export interface Nonconformity {
 }
 
 export type OrderCoverageTone = "ready" | "attention" | "uncovered";
+
+export type FulfillmentStatus =
+  | "no_supplier"
+  | "payment"
+  | "delivery"
+  | "otk_presentation"
+  | "posting"
+  | "completed";
+
+export type FulfillmentTone = "yellow_blink" | "blue" | "yellow" | "green" | "muted";
+
+export interface PurchaseBatch {
+  batch_no: number;
+  line_id: string;
+  quantity: number;
+  required_date?: string | null;
+  supplier_id?: string | null;
+  supplier_name?: string | null;
+  coverage_source: "warehouse" | "supplier" | "mixed" | "none" | string;
+  unit_price?: number | null;
+  planned_arrival?: string | null;
+  supplier_lead_days?: number | null;
+  supplier_ship_date?: string | null;
+  meets_deadline?: boolean | null;
+  unit?: string | null;
+  piece_index?: number | null;
+  piece_label?: string | null;
+  is_meter_piece?: boolean;
+}
+
+export interface LineSchedule {
+  supplier_lead_days?: number | null;
+  supplier_ship_date?: string | null;
+  planned_arrival?: string | null;
+  required_date?: string | null;
+  meets_deadline?: boolean | null;
+  deadline_risk?: boolean;
+  formula?: string;
+  batch_no?: number | null;
+}
+
+export interface LineScheduleUpdatePayload {
+  lead_days?: number | null;
+  ship_date?: string | null;
+  required_date?: string | null;
+  batch_no?: number | null;
+  idempotency_key?: string;
+}
+
+export interface FulfillmentStatusUpdatePayload {
+  fulfillment_status: FulfillmentStatus;
+  idempotency_key?: string;
+}
 export type CoverageSource = "warehouse" | "supplier" | "mixed" | "none";
 
 export interface UsedSupplierPart {
@@ -380,6 +437,11 @@ export interface ProcurementManagerCaseSummary extends ProcurementCaseSummary {
   recommendation?: RecommendationRecord | null;
   order_coverage?: OrderCoverageStatus | null;
   coverage?: OrderCoverageStatus | null;
+  fulfillment_status?: FulfillmentStatus | null;
+  fulfillment_label?: string | null;
+  fulfillment_tone?: FulfillmentTone | string | null;
+  show_otk_button?: boolean;
+  is_completed?: boolean;
 }
 
 export interface LineAmountEntry {
@@ -448,6 +510,14 @@ export interface ProcurementManagerCaseDetail
   agent_interrupt?: { type?: string; [key: string]: unknown } | null;
   evaluation?: AgentStatus["evaluation"];
   kpi_flags?: Record<string, unknown>;
+  batches?: PurchaseBatch[];
+  line_schedules?: Record<string, LineSchedule>;
+  fulfillment_status?: FulfillmentStatus | null;
+  fulfillment_label?: string | null;
+  fulfillment_tone?: FulfillmentTone | string | null;
+  show_otk_button?: boolean;
+  is_completed?: boolean;
+  otk_presentation_id?: string | null;
 }
 
 export interface OperationStatus {

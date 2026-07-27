@@ -2,6 +2,9 @@
   --coverage-green: #22c55e;
   --coverage-yellow: #eab308;
   --coverage-red: #ef4444;
+  --status-blue: #2563eb;
+  --status-green: #16a34a;
+  --status-yellow: #ca8a04;
   display: grid;
   gap: 14px;
   width: 100%;
@@ -84,6 +87,8 @@
   /* header + KPI + gaps ≈ 220px; leave room for workbench below */
   height: calc(100vh - 240px);
   max-height: calc(100vh - 240px);
+  /* Prevent overflow from covering workbench buttons (pointer-events bleed). */
+  overflow: hidden;
 }
 
 .panel,
@@ -95,19 +100,37 @@
   border: 1px solid var(--color-border);
   border-radius: 14px;
   background: var(--color-surface);
+  color: var(--color-text);
   min-height: 0;
 }
 
+/* Secondary hints in the center panel / workbench: readable, not pale gray */
+.panel .muted,
+.workbench .muted,
+.panel small,
+.workbench small {
+  color: var(--color-text-secondary);
+}
+
 .queue {
+  display: flex;
+  flex-direction: column;
   align-content: start;
   height: 100%;
+  min-height: 0;
   overflow: hidden;
-  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.queue > .sectionHeader,
+.queue > .queueTabs,
+.queue > .empty {
+  flex-shrink: 0;
 }
 
 .caseList {
   display: grid;
   gap: 8px;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
   padding-right: 2px;
@@ -185,6 +208,170 @@
   color: #991b1b;
   border-color: color-mix(in srgb, var(--coverage-red) 45%, var(--color-border));
   background: color-mix(in srgb, var(--coverage-red) 12%, var(--color-surface));
+}
+
+.badgeStatusBlue {
+  color: #1e3a8a;
+  border-color: color-mix(in srgb, var(--status-blue) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--status-blue) 14%, var(--color-surface));
+}
+
+.badgeStatusGreen {
+  color: #14532d;
+  border-color: color-mix(in srgb, var(--status-green) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--status-green) 14%, var(--color-surface));
+}
+
+.badgeStatusYellow {
+  color: #713f12;
+  border-color: color-mix(in srgb, var(--status-yellow) 50%, var(--color-border));
+  background: color-mix(in srgb, var(--status-yellow) 16%, var(--color-surface));
+}
+
+.badgeStatusYellowBlink {
+  color: #713f12;
+  border-color: color-mix(in srgb, var(--status-yellow) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--status-yellow) 18%, var(--color-surface));
+  animation: statusBlink 1.6s ease-in-out infinite;
+}
+
+.badgeStatusMuted {
+  color: var(--color-muted);
+  opacity: 0.85;
+}
+
+.badgeAbcA {
+  color: #14532d;
+  border-color: color-mix(in srgb, #16a34a 50%, var(--color-border));
+  background: color-mix(in srgb, #16a34a 16%, var(--color-surface));
+}
+
+.badgeAbcB {
+  color: #1e3a8a;
+  border-color: color-mix(in srgb, #2563eb 45%, var(--color-border));
+  background: color-mix(in srgb, #2563eb 14%, var(--color-surface));
+}
+
+.badgeAbcC {
+  color: #713f12;
+  border-color: color-mix(in srgb, #ca8a04 50%, var(--color-border));
+  background: color-mix(in srgb, #ca8a04 16%, var(--color-surface));
+}
+
+.caseStatusBlue,
+.caseActive.caseStatusBlue {
+  border-left-color: var(--status-blue);
+}
+
+.caseStatusGreen,
+.caseActive.caseStatusGreen {
+  border-left-color: var(--status-green);
+}
+
+.caseStatusYellow,
+.caseActive.caseStatusYellow {
+  border-left-color: var(--status-yellow);
+}
+
+.caseStatusYellowBlink,
+.caseActive.caseStatusYellowBlink {
+  border-left-color: var(--status-yellow);
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--status-yellow) 55%, transparent);
+  animation: statusBlink 1.6s ease-in-out infinite;
+}
+
+.caseStatusMuted {
+  opacity: 0.72;
+}
+
+.queueTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  flex-shrink: 0;
+  margin: 0;
+}
+
+.queueTab,
+.queueTabActive {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  line-height: 1.25;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+
+.queueTab .queueTabCount,
+.queueTabActive .queueTabCount {
+  color: inherit;
+  opacity: 0.75;
+  font-weight: 700;
+}
+
+.queueTabActive {
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  color: var(--color-primary);
+}
+
+.deadlineButton {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  padding: 0;
+  text-align: left;
+}
+
+.schedulePopover {
+  display: grid;
+  gap: 8px;
+  min-width: 220px;
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 12%);
+  position: absolute;
+  z-index: 20;
+}
+
+.schedulePopover label {
+  display: grid;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedulePopover input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.dateCell {
+  position: relative;
+}
+
+@keyframes statusBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.72;
+  }
 }
 
 .positionsPanel {
@@ -294,6 +481,7 @@
   min-width: 640px;
   border-collapse: collapse;
   font-size: 12px;
+  color: var(--color-text);
 }
 
 .table th,
@@ -309,6 +497,11 @@
   top: 0;
   z-index: 1;
   background: var(--color-surface);
+  color: var(--color-text-secondary);
+}
+
+.table td {
+  color: var(--color-text);
 }
 
 .amountInput {
@@ -472,11 +665,17 @@
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-bg);
+  color: var(--color-text);
 }
 
 .card p {
   margin: 0;
   font-size: 13px;
+  color: var(--color-text);
+}
+
+.card .muted {
+  color: var(--color-text-secondary);
 }
 
 .cardSelected {
@@ -495,7 +694,7 @@
 .field {
   display: grid;
   gap: 5px;
-  color: var(--color-muted);
+  color: var(--color-text-secondary);
   font-size: 12px;
 }
 

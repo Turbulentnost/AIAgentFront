@@ -8,7 +8,9 @@ import type {
   ApprovalRecord,
   CaptureQuotePayload,
   CreateRfqDraftPayload,
+  FulfillmentStatusUpdatePayload,
   LineAmountsUpdatePayload,
+  LineScheduleUpdatePayload,
   NonconformityPayload,
   ProcurementManagerCaseDetail,
   PurchaseOrderDraft,
@@ -201,6 +203,34 @@ export function useUpdateProcurementLineAmounts() {
   >(procurementManagerApi.updateLineAmounts);
 }
 
+export function useUpdateProcurementFulfillmentStatus() {
+  return useCaseMutation<FulfillmentStatusUpdatePayload, Record<string, unknown>>(
+    procurementManagerApi.updateFulfillmentStatus
+  );
+}
+
+export function useUpdateProcurementLineSchedule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      caseId,
+      lineId,
+      payload
+    }: {
+      caseId: string;
+      lineId: string;
+      payload: LineScheduleUpdatePayload;
+    }) => procurementManagerApi.updateLineSchedule(caseId, lineId, payload),
+    onSuccess: async (_data, variables) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: [...rootKey, "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: [...rootKey, "case", variables.caseId] }),
+        queryClient.invalidateQueries({ queryKey: [...rootKey, "all-positions"] })
+      ]);
+    }
+  });
+}
+
 export function useSyncProcurementFrom1C() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -224,23 +254,75 @@ function triggerBrowserDownload(blob: Blob, filename: string) {
   window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }
 
-async function blobErrorMessage(error: unknown): Promise<string | null> {
-  const data = (error as { response?: { data?: unknown } })?.response?.data;
-  if (!(data instanceof Blob)) return null;
-  try {
-    const text = await data.text();
-    const parsed = JSON.parse(text) as { detail?: string | Array<{ msg?: string }> };
-    if (typeof parsed.detail === "string" && parsed.detail.trim()) {
-      return parsed.detail.trim();
-    }
-    if (Array.isArray(parsed.detail)) {
-      const messages = parsed.detail.map((item) => item?.msg).filter(Boolean);
-      if (messages.length) return messages.join("; ");
-    }
-  } catch {
-    /* ignore parse errors */
+function russianHttpStatusMessage(status: number | undefined): string | null {
+  if (status == null) return null;
+  if (status === 400) return "Некорректный запрос на выгрузку сметы.";
+  if (status === 401 || status === 403) {
+    return "Нет доступа к выгрузке сметы.";
+  }
+  if (status === 404) return "Заказ для выгрузки сметы не найден.";
+  if (status >= 500) {
+    return `Ошибка сервера при выгрузке сметы (код ${status}).`;
+  }
+  if (status >= 400) {
+    return `Не удалось скачать смету (код ${status}).`;
   }
   return null;
+}
+
+async function estimateDownloadErrorMessage(error: unknown): Promise<string> {
+  const axiosLike = error as {
+    response?: { status?: number; data?: unknown };
+    message?: string;
+    code?: string;
+  };
+  const status = axiosLike.response?.status;
+  const data = axiosLike.response?.data;
+
+  if (data instanceof Blob) {
+    try {
+      const text = (await data.text()).trim();
+      if (text) {
+        try {
+          const parsed = JSON.parse(text) as {
+            detail?: string | Array<{ msg?: string }>;
+          };
+          if (typeof parsed.detail === "string" && parsed.detail.trim()) {
+            return parsed.detail.trim();
+          }
+          if (Array.isArray(parsed.detail)) {
+            const messages = parsed.detail.map((item) => item?.msg).filter(Boolean);
+            if (messages.length) return messages.join("; ");
+          }
+        } catch {
+          if (!/^internal server error$/i.test(text)) {
+            return text;
+          }
+        }
+      }
+    } catch {
+      /* ignore blob read errors */
+    }
+  } else if (data && typeof data === "object") {
+    const detail = (data as { detail?: unknown }).detail;
+    if (typeof detail === "string" && detail.trim()) return detail.trim();
+  }
+
+  const byStatus = russianHttpStatusMessage(status);
+  if (byStatus) return byStatus;
+  if (axiosLike.code === "ECONNABORTED") {
+    return "Превышено время ожидания при скачивании сметы.";
+  }
+  const raw = typeof axiosLike.message === "string" ? axiosLike.message.trim() : "";
+  const statusMatch = raw.match(/status code\s+(\d+)/i);
+  if (statusMatch) {
+    return (
+      russianHttpStatusMessage(Number(statusMatch[1])) ||
+      `Не удалось скачать смету (код ${statusMatch[1]}).`
+    );
+  }
+  if (raw && !/^request failed/i.test(raw)) return raw;
+  return "Не удалось скачать Excel-смету.";
 }
 
 export function useDownloadProcurementEstimate() {
@@ -269,14 +351,15 @@ export function useDownloadProcurementEstimate() {
           } catch {
             /* keep text */
           }
+          if (/^internal server error$/i.test(detail)) {
+            detail = "Ошибка сервера при выгрузке сметы (код 500).";
+          }
           throw new Error(detail);
         }
         triggerBrowserDownload(blob, filename);
         return filename;
       } catch (error) {
-        const fromBlob = await blobErrorMessage(error);
-        if (fromBlob) throw new Error(fromBlob);
-        throw error;
+        throw new Error(await estimateDownloadErrorMessage(error));
       }
     }
   });
