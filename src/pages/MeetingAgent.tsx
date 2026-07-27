@@ -238,6 +238,9 @@ function MeetingAgentPage() {
     setIsRefreshing(true);
     try {
       await refreshDashboard();
+      // Карточка СЗ читается из Redis-снимка; после refresh очереди
+      // принудительно перечитываем выбранную СЗ из 1С.
+      setForceMemoRefresh(true);
     } catch (error) {
       setRefreshError(getMeetingRequestError(error));
     } finally {

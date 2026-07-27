@@ -18,7 +18,11 @@ export type MeetingRegistryStepStage = MeetingRegistryStage | "approved";
 export interface MeetingRegistryViewItem {
   id: string;
   refKey: string;
-  memoNumber: string;
+  memoNumber: string | null;
+  memoTopic: string | null;
+  meetingTopic: string;
+  displayTitle: string;
+  /** @deprecated use meetingTopic or displayTitle */
   title: string;
   meetingAtLabel: string;
   slotStart: string | null;
@@ -69,17 +73,48 @@ export function meetingRegistryCanCancel(stage: MeetingRegistryStage): boolean {
   return !isMeetingRegistryActionsLocked(stage);
 }
 
+export function normalizeRegistryMemoNumber(value: string | null | undefined): string | null {
+  if (value == null) return null;
+  const trimmed = value.trim();
+  if (!trimmed || trimmed === "—") return null;
+  return trimmed;
+}
+
+export function buildMeetingRegistryDisplayTitle(input: {
+  memoNumber: string | null;
+  memoTopic: string | null;
+  meetingTopic: string;
+}): string {
+  if (input.memoNumber) {
+    const memoTopic = input.memoTopic?.trim();
+    return memoTopic ? `СЗ №${input.memoNumber} · ${memoTopic}` : `СЗ №${input.memoNumber}`;
+  }
+  return input.meetingTopic;
+}
+
 export function mapMeetingRegistryItem(item: MeetingRegistryItem): MeetingRegistryViewItem {
   const meetingAtLabel =
     item.slot_start && item.slot_end
       ? formatMeetingTime(item.slot_start, item.slot_end)
       : "—";
 
+  const memoNumber = normalizeRegistryMemoNumber(item.memo_number);
+  const meetingTopic = item.subject?.trim() || item.title?.trim() || "Заявка на совещание";
+  const memoTopic = memoNumber ? item.title?.trim() || item.subject?.trim() || null : null;
+  const displayTitle = buildMeetingRegistryDisplayTitle({
+    memoNumber,
+    memoTopic,
+    meetingTopic
+  });
+
   return {
     id: item.ref_key,
     refKey: item.ref_key,
-    memoNumber: item.memo_number ?? "—",
-    title: item.subject ?? item.title ?? "Заявка на совещание",
+    memoNumber,
+    memoTopic,
+    meetingTopic,
+    displayTitle,
+    title: meetingTopic,
     meetingAtLabel,
     slotStart: item.slot_start,
     slotEnd: item.slot_end,

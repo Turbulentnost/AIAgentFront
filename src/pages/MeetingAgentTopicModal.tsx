@@ -13,44 +13,33 @@ import {
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 
 import type {
-
   MeetingDashboardItem,
-
   MeetingMemoDetail,
-
   MeetingTopicCheckSimilarRead,
-
+  MeetingTopicParticipant,
   MeetingTopicResolveRead,
-
+  MeetingTopicSimilarityBreakdown,
   MeetingTopicSummary
-
 } from "@/types/meetings";
 
 import {
-
   MEETING_TOPIC_TYPES,
-
   buildMeetingTopicCheckPayload,
-
+  buildResolveTopicParticipantFios,
   buildScheduleMeetingTopicCheckPayload,
-
+  formatMeetingTopicParticipantScore,
   formatMeetingTopicSimilarityBreakdown,
-
   formatMeetingTopicSimilarityScore,
-
   mapScheduleTypeToMeetingTopicType,
-
   normalizeMeetingTopicType,
-
   type ScheduleTopicFormSnapshot
-
 } from "@/utils/meetingTopic";
 
 import styles from "./MeetingAgent.module.css";
 
 
 
-type ModalStep = "checking" | "similar" | "create";
+type ModalStep = "checking" | "similar" | "create" | "resolved";
 
 
 
@@ -206,46 +195,37 @@ function modalHint(props: Props, checkResult: MeetingTopicCheckSimilarRead | nul
 
 
 
-function SimilarTopicCard({ topic }: { topic: MeetingTopicSummary }) {
-
+function SimilarTopicCard({
+  topic,
+  similarityBreakdown
+}: {
+  topic: MeetingTopicSummary;
+  similarityBreakdown?: MeetingTopicSimilarityBreakdown | null;
+}) {
   const participants = topic.participants ?? [];
-
-
+  const breakdown = similarityBreakdown ?? topic.similarity_breakdown;
+  const participantsScore = formatMeetingTopicParticipantScore(breakdown?.participants);
 
   return (
-
     <div className={styles.topicSimilarCard}>
-
       <div className={styles.topicSimilarHeader}>
-
         <CheckCircle2 size={18} aria-hidden="true" />
-
         <div>
-
           <strong>
-
             Тема №{topic.code ?? "?"}{topic.description ? `: ${topic.description}` : ""}
-
           </strong>
-
           {topic.similarity_score != null ? (
-
             <p className={styles.topicSimilarScore}>
-
               Сходство: {formatMeetingTopicSimilarityScore(topic.similarity_score)}
-
-              {topic.similarity_breakdown
-
-                ? ` · ${formatMeetingTopicSimilarityBreakdown(topic.similarity_breakdown)}`
-
-                : ""}
-
+              {breakdown ? ` · ${formatMeetingTopicSimilarityBreakdown(breakdown)}` : ""}
             </p>
-
           ) : null}
-
+          {participantsScore ? (
+            <p className={styles.topicSimilarParticipantsScore}>
+              Совпадение участников: {participantsScore}
+            </p>
+          ) : null}
         </div>
-
       </div>
 
 
@@ -342,6 +322,78 @@ function SimilarTopicCard({ topic }: { topic: MeetingTopicSummary }) {
 
 
 
+function MissingParticipantsBlock({
+  participants,
+  unresolvedParticipants = [],
+  message
+}: {
+  participants: MeetingTopicParticipant[];
+  unresolvedParticipants?: MeetingTopicParticipant[];
+  message?: string | null;
+}) {
+  if (!participants.length && !unresolvedParticipants.length && !message) return null;
+
+  const unresolvedNames = new Set(
+    unresolvedParticipants
+      .map((item) => item.fio?.trim().toLocaleLowerCase("ru-RU"))
+      .filter((value): value is string => Boolean(value))
+  );
+
+  return (
+    <div className={styles.topicMissingParticipants}>
+      {message ? <p className={styles.topicMissingParticipantsMessage}>{message}</p> : null}
+      {participants.length ? (
+        <>
+          <strong className={styles.topicMissingParticipantsTitle}>
+            Добавить в тему из СЗ ({participants.length})
+          </strong>
+          <p className={styles.topicMissingParticipantsMessage}>
+            При выборе «Использовать эту тему» эти участники будут добавлены в тему в 1С.
+          </p>
+          <ul className={styles.topicMissingParticipantsList}>
+            {participants.map((participant) => {
+              const fio = participant.fio ?? "Без ФИО";
+              const unresolved = unresolvedNames.has(fio.trim().toLocaleLowerCase("ru-RU"));
+              return (
+                <li key={participant.participant_ref_key ?? fio}>
+                  {fio}
+                  {unresolved ? " — не найден в 1С, добавить автоматически нельзя" : ""}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+function TopicResolveResultBlock({ result }: { result: MeetingTopicResolveRead }) {
+  const addedParticipants = result.added_participants ?? [];
+
+  return (
+    <div className={styles.topicResolveResult}>
+      {result.message ? <p className={styles.topicResolveResultMessage}>{result.message}</p> : null}
+      {addedParticipants.length ? (
+        <>
+          <strong className={styles.topicResolveResultTitle}>
+            Добавлены в тему 1С ({addedParticipants.length})
+          </strong>
+          <ul className={styles.topicResolveResultList}>
+            {addedParticipants.map((participant) => (
+              <li key={participant.participant_ref_key ?? participant.fio ?? "unknown"}>
+                {participant.fio ?? "Без ФИО"}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : (
+        <p className={styles.topicResolveResultEmpty}>Новых участников в 1С не добавлено.</p>
+      )}
+    </div>
+  );
+}
+
 function ExistingTopicUsageHint() {
 
   return (
@@ -371,7 +423,7 @@ export default function MeetingAgentTopicModal(props: Props) {
   const [step, setStep] = useState<ModalStep>("checking");
 
   const [checkResult, setCheckResult] = useState<MeetingTopicCheckSimilarRead | null>(null);
-
+  const [resolveResult, setResolveResult] = useState<MeetingTopicResolveRead | null>(null);
   const [form, setForm] = useState<CreateFormState>(() => buildCreateFormState(props));
 
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -401,9 +453,8 @@ export default function MeetingAgentTopicModal(props: Props) {
     if (!open) return;
 
     setStep("checking");
-
     setCheckResult(null);
-
+    setResolveResult(null);
     setValidationError(null);
 
     setForm(buildCreateFormState(props));
@@ -540,52 +591,45 @@ export default function MeetingAgentTopicModal(props: Props) {
 
 
 
+  function buildResolveParticipantFios(): string[] {
+    return buildResolveTopicParticipantFios({
+      participantFios: parseParticipantFios(form.participantFios),
+      initiatorFio: initiatorFio,
+      managerFio: form.managerFio,
+      checkParticipantFios: checkPayload?.participant_fios
+    });
+  }
+
   async function handleUseExisting() {
-
     const refKey = checkResult?.similar_topic?.ref_key?.trim();
-
-    const participants = checkResult?.similar_topic?.participants ?? [];
+    const participantFios = buildResolveParticipantFios();
+    const managerFio = form.managerFio.trim();
 
     if (!refKey) {
-
       setValidationError("У похожей темы нет ref_key");
-
       return;
-
     }
 
-    if (!participants.length) {
-
-      setValidationError(
-
-        "У выбранной темы нет участников. Создайте новую тему с участниками или дополните тему в 1С."
-
-      );
-
+    if (!participantFios.length && !(checkResult?.missing_participants?.length ?? 0)) {
+      setValidationError("Укажите участников совещания для добавления в тему 1С.");
       return;
-
     }
 
     setValidationError(null);
 
     try {
-
       const result = await resolveMutation.mutateAsync({
-
         decision: "use_existing",
-
-        existing_topic_ref_key: refKey
-
+        existing_topic_ref_key: refKey,
+        manager_fio: managerFio || null,
+        initiator_fio: initiatorFio,
+        participant_fios: participantFios
       });
-
-      onResolved(result);
-
+      setResolveResult(result);
+      setStep("resolved");
     } catch {
-
       // surfaced below
-
     }
-
   }
 
 
@@ -607,24 +651,16 @@ export default function MeetingAgentTopicModal(props: Props) {
     try {
 
       const result = await resolveMutation.mutateAsync({
-
         decision: "create_new",
-
         description: form.description.trim(),
-
         manager_fio: form.managerFio.trim(),
-
         meeting_type: form.meetingType.trim(),
-
         topic_details: form.topicDetails.trim() || null,
-
         initiator_fio: initiatorFio,
-
         participant_fios: buildMergedParticipantFios()
-
       });
-
-      onResolved(result);
+      setResolveResult(result);
+      setStep("resolved");
 
     } catch {
 
@@ -686,7 +722,13 @@ export default function MeetingAgentTopicModal(props: Props) {
 
 
 
-        <p className={styles.modalHint}>{modalHint(props, checkResult)}</p>
+        <p className={styles.modalHint}>
+          {step === "similar" && checkResult?.message
+            ? checkResult.message
+            : step === "resolved" && resolveResult?.message
+              ? resolveResult.message
+              : modalHint(props, checkResult)}
+        </p>
 
 
 
@@ -705,25 +747,23 @@ export default function MeetingAgentTopicModal(props: Props) {
 
 
         {step === "similar" && checkResult?.similar_topic ? (
-
           <div className={styles.modalSection}>
-
-            <SimilarTopicCard topic={checkResult.similar_topic} />
-
+            <SimilarTopicCard
+              topic={checkResult.similar_topic}
+              similarityBreakdown={checkResult.similarity_breakdown}
+            />
+            <MissingParticipantsBlock
+              participants={checkResult.missing_participants ?? []}
+              unresolvedParticipants={checkResult.unresolved_participants ?? []}
+            />
             <ExistingTopicUsageHint />
-
-            {!(checkResult.similar_topic.participants?.length ?? 0) ? (
-
-              <p className={styles.runError} role="alert">
-
-                У этой темы нет участников в 1С. Создайте новую тему с участниками или дополните тему в 1С.
-
-              </p>
-
-            ) : null}
-
           </div>
+        ) : null}
 
+        {step === "resolved" && resolveResult ? (
+          <div className={styles.modalSection}>
+            <TopicResolveResultBlock result={resolveResult} />
+          </div>
         ) : null}
 
 
@@ -922,64 +962,46 @@ export default function MeetingAgentTopicModal(props: Props) {
 
           <div className={styles.modalActionsEnd}>
 
+            {step === "resolved" ? (
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={() => resolveResult && onResolved(resolveResult)}
+                disabled={loading || !resolveResult}
+              >
+                Продолжить
+              </button>
+            ) : null}
+
             {step === "similar" ? (
-
               <>
-
                 <button
-
                   type="button"
-
                   className={styles.secondaryButton}
-
                   onClick={() => {
-
                     setValidationError(null);
-
                     setStep("create");
-
                   }}
-
                   disabled={loading}
-
                 >
-
                   Создать новую
-
                 </button>
-
                 <button
-
                   type="button"
-
                   className={styles.primaryButton}
-
                   onClick={() => void handleUseExisting()}
-
-                  disabled={loading || !(checkResult?.similar_topic?.participants?.length ?? 0)}
-
+                  disabled={loading}
                 >
-
                   {resolveMutation.isPending ? (
-
                     <>
-
                       <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-
                       Сохраняем…
-
                     </>
-
                   ) : (
-
                     "Использовать эту тему"
-
                   )}
-
                 </button>
-
               </>
-
             ) : null}
 
 

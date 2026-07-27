@@ -2426,6 +2426,68 @@
   font-size: 13px;
 }
 
+.topicSimilarParticipantsScore {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.topicMissingParticipants {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warning-dark) 24%, transparent);
+  border-radius: 12px;
+  background: var(--color-amber-soft);
+}
+
+.topicMissingParticipantsMessage {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-strong);
+}
+
+.topicMissingParticipantsTitle,
+.topicResolveResultTitle {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.topicMissingParticipantsList,
+.topicResolveResultList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.topicResolveResult {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-success-soft, #ecfdf3);
+}
+
+.topicResolveResultMessage {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-strong);
+}
+
+.topicResolveResultEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
 .topicCreateForm {
   display: grid;
   gap: 12px;

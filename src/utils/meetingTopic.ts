@@ -7,6 +7,7 @@ import type {
   MeetingTopicResolveRead
 } from "@/types/meetings";
 import { meetingsApi } from "@/api/endpoints";
+import { getMeetingParticipantNames } from "@/utils/meetingDashboard";
 
 const MEETING_TOPIC_RESOLUTION_STORAGE_PREFIX = "meeting-topic-resolved:v2:";
 
@@ -220,23 +221,16 @@ export function buildMeetingTopicCheckPayload(
     return null;
   }
 
+  // Те же участники, что на карточке СЗ: очередь после refresh приоритетнее Redis-снимка.
   const participantNames = [
     ...new Set(
       [
         detail.application.initiator?.full_name?.trim(),
         managerFio,
-        ...(detail.application.participants ?? []).map((participant) =>
-          participant.full_name?.trim()
-        )
+        ...getMeetingParticipantNames(detail.application, queueItem)
       ].filter((name): name is string => Boolean(name))
     )
   ];
-
-  if (!participantNames.length && queueItem?.participant_names?.length) {
-    participantNames.push(
-      ...queueItem.participant_names.map((name) => name.trim()).filter(Boolean)
-    );
-  }
 
   return {
     description,
@@ -244,8 +238,32 @@ export function buildMeetingTopicCheckPayload(
     meeting_type: normalizeMeetingTopicType(detail.application.meeting_type),
     topic_details: detail.application.agenda?.trim() || null,
     initiator_fio: detail.application.initiator?.full_name?.trim() || null,
-    participant_fios: [...new Set(participantNames)]
+    participant_fios: participantNames
   };
+}
+
+export function formatMeetingTopicParticipantScore(score: number | null | undefined): string | null {
+  if (score == null || Number.isNaN(score)) return null;
+  return formatMeetingTopicSimilarityScore(score);
+}
+
+export function buildResolveTopicParticipantFios(input: {
+  participantFios: string[];
+  initiatorFio?: string | null;
+  managerFio?: string | null;
+  checkParticipantFios?: string[];
+}): string[] {
+  const initiator = input.initiatorFio?.trim() || null;
+  const manager = input.managerFio?.trim() || null;
+  const merged = [
+    ...new Set(
+      [...input.participantFios, ...(input.checkParticipantFios ?? [])]
+        .map((name) => name.trim())
+        .filter(Boolean)
+    )
+  ];
+
+  return merged.filter((name) => name !== initiator && name !== manager);
 }
 
 export function formatMeetingTopicSimilarityScore(score: number | null | undefined): string {

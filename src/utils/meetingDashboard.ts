@@ -341,19 +341,23 @@ export function getMeetingParticipantNames(
   application: MeetingApplication,
   queueItem?: MeetingDashboardItem | null
 ): string[] {
-  const names = (application.participants ?? [])
-    .map((participant) => participant.full_name?.trim())
-    .filter((name): name is string => Boolean(name));
-
-  if (names.length) {
-    return [...new Set(names)];
-  }
-
-  return [
+  const queueNames = [
     ...new Set(
       (queueItem?.participant_names ?? [])
         .map((name) => name.trim())
         .filter(Boolean)
+    )
+  ];
+  // Очередь после refresh актуальнее Redis-снимка детали СЗ.
+  if (queueNames.length) {
+    return queueNames;
+  }
+
+  return [
+    ...new Set(
+      (application.participants ?? [])
+        .map((participant) => participant.full_name?.trim())
+        .filter((name): name is string => Boolean(name))
     )
   ];
 }

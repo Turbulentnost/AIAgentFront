@@ -834,11 +834,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
 
 
-  const cancelMeetingLabel = selectedItem
-
-    ? `СЗ №${selectedItem.memoNumber} · ${selectedItem.title}`
-
-    : "";
+  const cancelMeetingLabel = selectedItem?.displayTitle ?? "";
 
 
 
@@ -1206,7 +1202,9 @@ function RegistryCard({
 
       <div className={styles.queueCardHeader}>
 
-        <strong className={styles.queueCardCode}>СЗ №{item.memoNumber}</strong>
+        <strong className={styles.queueCardCode}>
+          {item.memoNumber ? `СЗ №${item.memoNumber}` : item.meetingTopic}
+        </strong>
 
         <span
 
@@ -1224,7 +1222,9 @@ function RegistryCard({
 
       </div>
 
-      <p className={styles.queueCardTheme}>{item.title}</p>
+      {item.memoNumber && item.memoTopic ? (
+        <p className={styles.queueCardTheme}>{item.memoTopic}</p>
+      ) : null}
 
       <div className={styles.registryProgressDots} aria-hidden="true">
 
@@ -1365,7 +1365,7 @@ function RegistryDetails({
 
           <h2 id="meeting-registry-details-title">
 
-            СЗ №{item.memoNumber} · {item.title}
+            {item.displayTitle}
 
           </h2>
 

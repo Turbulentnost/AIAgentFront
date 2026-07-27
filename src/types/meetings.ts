@@ -1063,6 +1063,8 @@ export interface MeetingTopicCheckSimilarRead {
   similarity_score?: number | null;
   similarity_method?: string | null;
   similarity_breakdown?: MeetingTopicSimilarityBreakdown | null;
+  missing_participants?: MeetingTopicParticipant[];
+  unresolved_participants?: MeetingTopicParticipant[];
   required_fields: string[];
   message: string;
 }
@@ -1097,6 +1099,7 @@ export interface MeetingTopicResolveRead {
   dry_run?: boolean;
   topic: MeetingTopicSummary;
   participants_count: number;
+  added_participants?: MeetingTopicParticipant[];
   message: string;
 }
 
