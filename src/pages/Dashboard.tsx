@@ -121,11 +121,8 @@ function getAgentLaunchIcon(agent: AgentAccess): QuickLaunchAgent["icon"] {
 /** Ролевые агенты закупок/ОТК — выше общих, иначе на дашборде их «съедают» первые 3. */
 const QUICK_LAUNCH_PRIORITY_SLUGS = [
   "quality_engineer_agent",
-  "otk_head_agent",
-  "quality_deputy_director_agent",
   "warehouse_picker_agent",
   "purchase_manager_agent",
-  "production_preparation_engineer_agent",
   "production_dispatcher_agent",
   "omto_support_manager_agent",
   "nd_control_agent",
