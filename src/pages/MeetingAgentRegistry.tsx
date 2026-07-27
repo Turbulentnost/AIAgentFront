@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isRequestAborted } from "@/utils/requestAbort";
 
 import {
 
@@ -151,6 +152,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const [cancelModalOpen, setCancelModalOpen] = useState(false);
 
   const [rescheduleModalOpen, setRescheduleModalOpen] = useState(false);
+  const reschedulePreviewAbortRef = useRef<AbortController | null>(null);
+  const rescheduleDetailsAbortRef = useRef<AbortController | null>(null);
 
   const [cancelSuccessMessage, setCancelSuccessMessage] = useState<string | null>(null);
 
@@ -215,11 +218,12 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
     : null;
 
-  const rescheduleRequestError = reschedulePreviewMutation.isError
-
-    ? getMeetingMemoActionError(reschedulePreviewMutation.error)
-
-    : null;
+  const rescheduleRequestError =
+    rescheduleModalOpen &&
+    reschedulePreviewMutation.isError &&
+    !isRequestAborted(reschedulePreviewMutation.error)
+      ? getMeetingMemoActionError(reschedulePreviewMutation.error)
+      : null;
 
   const reschedulePreview = reschedulePreviewMutation.data ?? null;
 
@@ -383,6 +387,12 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
       }
 
+      rescheduleDetailsAbortRef.current?.abort();
+
+      const controller = new AbortController();
+
+      rescheduleDetailsAbortRef.current = controller;
+
       const durationMinutes = reschedulePreview?.slot_preview.duration_minutes ?? undefined;
 
       return slotPreviewDetailsMutation.mutateAsync({
@@ -397,7 +407,9 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
           ...(durationMinutes ? { duration_minutes: durationMinutes } : {})
 
-        }
+        },
+
+        signal: controller.signal
 
       });
 
@@ -411,15 +423,31 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   function handleOpenRescheduleModal() {
 
-    if (!selectedItem || reschedulePreviewMutation.isPending) return;
+    if (!selectedItem) return;
+
+    if (rescheduleModalOpen && reschedulePreviewMutation.isPending) return;
 
     if (!isMeetingRegistryReschedulable(selectedItem.stage)) return;
+
+    reschedulePreviewAbortRef.current?.abort();
+
+    const controller = new AbortController();
+
+    reschedulePreviewAbortRef.current = controller;
 
     reschedulePreviewMutation.reset();
 
     setRescheduleModalOpen(true);
 
-    void reschedulePreviewMutation.mutateAsync({ refKey: selectedItem.refKey });
+    void reschedulePreviewMutation
+
+      .mutateAsync({ refKey: selectedItem.refKey, signal: controller.signal })
+
+      .catch((error) => {
+
+        if (isRequestAborted(error, controller.signal)) return;
+
+      });
 
   }
 
@@ -427,11 +455,17 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   function handleCloseRescheduleModal() {
 
-    if (reschedulePreviewMutation.isPending || rescheduleApproveMutation.isPending) return;
+    if (rescheduleApproveMutation.isPending) return;
+
+    reschedulePreviewAbortRef.current?.abort();
+
+    rescheduleDetailsAbortRef.current?.abort();
 
     setRescheduleModalOpen(false);
 
     reschedulePreviewMutation.reset();
+
+    slotPreviewDetailsMutation.reset();
 
     rescheduleApproveMutation.reset();
 
@@ -918,7 +952,7 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
         open={rescheduleModalOpen}
 
-        loading={reschedulePreviewMutation.isPending}
+        loading={rescheduleModalOpen && reschedulePreviewMutation.isPending}
 
         preview={reschedulePreview?.slot_preview ?? null}
 
@@ -1120,7 +1154,10 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
               isCancelling={cancelMeetingMutation.isPending}
 
-              isRescheduling={reschedulePreviewMutation.isPending || rescheduleApproveMutation.isPending}
+              isRescheduling={
+                (rescheduleModalOpen && reschedulePreviewMutation.isPending) ||
+                rescheduleApproveMutation.isPending
+              }
 
               rescheduleSuccessMessage={rescheduleSuccessMessage}
 

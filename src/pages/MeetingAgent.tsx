@@ -1,4 +1,4 @@
-import { Component, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Component, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -88,6 +88,7 @@ import {
   type MeetingTopicPendingAction
 } from "@/utils/meetingTopic";
 import { meetingsApi } from "@/api/endpoints";
+import { isRequestAborted } from "@/utils/requestAbort";
 import styles from "./MeetingAgent.module.css";
 
 type MeetingPageTab = "queue" | "registry" | "schedule";
@@ -140,6 +141,8 @@ function MeetingAgentPage() {
   const [forceMemoRefresh, setForceMemoRefresh] = useState(false);
   const [slotPreviewOpen, setSlotPreviewOpen] = useState(false);
   const [topicModalOpen, setTopicModalOpen] = useState(false);
+  const slotPreviewAbortRef = useRef<AbortController | null>(null);
+  const slotDetailsAbortRef = useRef<AbortController | null>(null);
   const [topicPendingAction, setTopicPendingAction] = useState<MeetingTopicPendingAction | null>(null);
   const [resolvedTopic, setResolvedTopic] = useState<MeetingTopicResolveRead | null>(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
@@ -393,21 +396,27 @@ function MeetingAgentPage() {
   }
 
   async function startSlotPreview() {
-    if (!detail?.ref_key || slotPreviewMutation.isPending) return;
+    if (!detail?.ref_key) return;
+    slotPreviewAbortRef.current?.abort();
+    const controller = new AbortController();
+    slotPreviewAbortRef.current = controller;
     setSlotPreviewOpen(true);
     slotPreviewMutation.reset();
     try {
       await slotPreviewMutation.mutateAsync({
         memoRefKey: detail.ref_key,
-        durationMinutes: detail.application.duration_minutes
+        durationMinutes: detail.application.duration_minutes,
+        signal: controller.signal
       });
-    } catch {
+    } catch (error) {
+      if (isRequestAborted(error, controller.signal)) return;
       // mutation error surfaced in modal
     }
   }
 
   function handleLaunchAgent() {
-    if (!detail?.ref_key || slotPreviewMutation.isPending || topicModalOpen) return;
+    if (!detail?.ref_key || topicModalOpen) return;
+    if (slotPreviewOpen && slotPreviewMutation.isPending) return;
     approveSlotMutation.reset();
     approveMemoMutation.reset();
     slotPreviewMutation.reset();
@@ -415,7 +424,7 @@ function MeetingAgentPage() {
   }
 
   function handleCloseTopicModal() {
-    if (slotPreviewMutation.isPending || approveMemoMutation.isPending) return;
+    if (approveMemoMutation.isPending) return;
     setTopicModalOpen(false);
     setTopicPendingAction(null);
   }
@@ -453,8 +462,11 @@ function MeetingAgentPage() {
 
   function handleCloseSlotPreview() {
     if (approveSlotMutation.isPending || approveMemoMutation.isPending) return;
+    slotPreviewAbortRef.current?.abort();
+    slotDetailsAbortRef.current?.abort();
     setSlotPreviewOpen(false);
     slotPreviewMutation.reset();
+    slotPreviewDetailsMutation.reset();
     approveSlotMutation.reset();
     approveMemoMutation.reset();
   }
@@ -464,6 +476,9 @@ function MeetingAgentPage() {
       if (!detail?.ref_key) {
         throw new Error("У заявки нет ref_key для загрузки деталей слота.");
       }
+      slotDetailsAbortRef.current?.abort();
+      const controller = new AbortController();
+      slotDetailsAbortRef.current = controller;
       const durationMinutes = slotPreviewMutation.data?.duration_minutes ?? undefined;
       const availabilityCacheId = slotPreviewMutation.data?.availability_cache_id ?? undefined;
       return slotPreviewDetailsMutation.mutateAsync({
@@ -473,7 +488,8 @@ function MeetingAgentPage() {
           slot_end: slotEnd,
           ...(durationMinutes ? { duration_minutes: durationMinutes } : {}),
           ...(availabilityCacheId ? { availability_cache_id: availabilityCacheId } : {})
-        }
+        },
+        signal: controller.signal
       });
     },
     [
@@ -609,7 +625,10 @@ function MeetingAgentPage() {
     }
   }
 
-  const slotPreviewRequestError = slotPreviewMutation.isError
+  const slotPreviewRequestError =
+    slotPreviewOpen &&
+    slotPreviewMutation.isError &&
+    !isRequestAborted(slotPreviewMutation.error)
     ? getMeetingRequestError(slotPreviewMutation.error)
     : null;
 
@@ -650,7 +669,7 @@ function MeetingAgentPage() {
       ) : null}
       <MeetingAgentSlotPreviewModal
         open={slotPreviewOpen}
-        loading={slotPreviewMutation.isPending}
+        loading={slotPreviewOpen && slotPreviewMutation.isPending}
         preview={slotPreviewMutation.data ?? null}
         requestError={slotPreviewRequestError}
         approveError={approveRequestError}
@@ -854,7 +873,7 @@ function MeetingAgentPage() {
                 createRun.isPending ||
                 isMeetingRunActive(runQuery.data?.status) ||
                 topicModalOpen ||
-                slotPreviewMutation.isPending ||
+                (slotPreviewOpen && slotPreviewMutation.isPending) ||
                 rejectMemoMutation.isPending ||
                 approveMemoMutation.isPending ||
                 seriesChoiceMutation.isPending ||

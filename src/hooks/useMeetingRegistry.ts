@@ -75,14 +75,17 @@ export function useMeetingRegistryRescheduleSlotPreview() {
   return useMutation({
     mutationFn: ({
       refKey,
-      durationMinutes
+      durationMinutes,
+      signal
     }: {
       refKey: string;
       durationMinutes?: number;
+      signal?: AbortSignal;
     }) =>
       meetingsApi.rescheduleSlotPreview(
         refKey,
-        durationMinutes ? { duration_minutes: durationMinutes } : undefined
+        durationMinutes ? { duration_minutes: durationMinutes } : undefined,
+        { signal }
       )
   });
 }

@@ -209,11 +209,15 @@ export const meetingsApi = {
     longRunningApiClient
       .get<MeetingRegistryParticipantsResponse>(`/meetings/registry/${memoRefKey}/participants`)
       .then((r) => r.data),
-  searchRegistryParticipants: (memoRefKey: string, fio: string) =>
+  searchRegistryParticipants: (
+    memoRefKey: string,
+    fio: string,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
       .get<MeetingRegistryParticipantSearchResponse>(
         `/meetings/registry/${memoRefKey}/participants/search`,
-        { params: { fio } }
+        { params: { fio }, signal: options?.signal }
       )
       .then((r) => r.data),
   applyRegistryParticipants: (memoRefKey: string, payload: MeetingRegistryParticipantsApplyRequest) =>
@@ -253,11 +257,16 @@ export const meetingsApi = {
     longRunningApiClient
       .post<MeetingRegistryCancelResponse>(`/meetings/registry/${memoRefKey}/cancel`, payload ?? {})
       .then((r) => r.data),
-  rescheduleSlotPreview: (memoRefKey: string, payload?: MeetingRegistryRescheduleSlotPreviewRequest) =>
+  rescheduleSlotPreview: (
+    memoRefKey: string,
+    payload?: MeetingRegistryRescheduleSlotPreviewRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
       .post<MeetingRegistryRescheduleSlotPreviewResponse>(
         `/meetings/registry/${memoRefKey}/reschedule/slot-preview`,
-        payload ?? {}
+        payload ?? {},
+        { signal: options?.signal }
       )
       .then((r) => r.data),
   approveRegistryReschedule: (
@@ -295,15 +304,28 @@ export const meetingsApi = {
       .then((r) => r.data),
   findSlots: (payload: MeetingSlotsRequest) =>
     apiClient.post<MeetingSlot[]>("/meetings/slots", payload).then((r) => r.data),
-  slotPreview: (memoRefKey: string, payload?: MeetingAgentSlotPreviewRequest) =>
+  slotPreview: (
+    memoRefKey: string,
+    payload?: MeetingAgentSlotPreviewRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
-      .post<MeetingAgentSlotPreview>(`/meetings/memos/${memoRefKey}/agent/slot-preview`, payload ?? {})
+      .post<MeetingAgentSlotPreview>(
+        `/meetings/memos/${memoRefKey}/agent/slot-preview`,
+        payload ?? {},
+        { signal: options?.signal }
+      )
       .then((r) => r.data),
-  slotPreviewDetails: (memoRefKey: string, payload: MeetingAgentSlotPreviewDetailsRequest) =>
+  slotPreviewDetails: (
+    memoRefKey: string,
+    payload: MeetingAgentSlotPreviewDetailsRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
       .post<MeetingAgentSlotPreviewDetails>(
         `/meetings/memos/${memoRefKey}/agent/slot-preview/details`,
-        payload
+        payload,
+        { signal: options?.signal }
       )
       .then((r) => r.data),
   approveSlot: (memoRefKey: string, payload: MeetingAgentSlotApproveRequest) =>
@@ -379,13 +401,23 @@ export const meetingsApi = {
     longRunningApiClient
       .post<ScheduledMeetingCancelRead>(`/meetings/scheduled/${meetingId}/cancel`, payload ?? {})
       .then((r) => r.data),
-  checkSimilarTopic: (payload: MeetingTopicCheckSimilarRequest) =>
+  checkSimilarTopic: (
+    payload: MeetingTopicCheckSimilarRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
-      .post<MeetingTopicCheckSimilarRead>("/meetings/topics/check-similar", payload)
+      .post<MeetingTopicCheckSimilarRead>("/meetings/topics/check-similar", payload, {
+        signal: options?.signal
+      })
       .then((r) => r.data),
-  resolveTopic: (payload: MeetingTopicResolveRequest) =>
+  resolveTopic: (
+    payload: MeetingTopicResolveRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
-      .post<MeetingTopicResolveRead>("/meetings/topics/resolve", payload)
+      .post<MeetingTopicResolveRead>("/meetings/topics/resolve", payload, {
+        signal: options?.signal
+      })
       .then((r) => r.data),
   validateTopicRef: (topicRefKey: string) =>
     apiClient

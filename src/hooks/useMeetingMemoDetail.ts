@@ -64,14 +64,17 @@ export function useMeetingAgentSlotPreview() {
   return useMutation({
     mutationFn: ({
       memoRefKey,
-      durationMinutes
+      durationMinutes,
+      signal
     }: {
       memoRefKey: string;
       durationMinutes?: number | null;
+      signal?: AbortSignal;
     }) =>
       meetingsApi.slotPreview(
         memoRefKey,
-        durationMinutes ? { duration_minutes: durationMinutes } : undefined
+        durationMinutes ? { duration_minutes: durationMinutes } : undefined,
+        { signal }
       )
   });
 }
@@ -92,11 +95,13 @@ export function useMeetingAgentSlotPreviewDetails() {
   return useMutation({
     mutationFn: ({
       memoRefKey,
-      payload
+      payload,
+      signal
     }: {
       memoRefKey: string;
       payload: MeetingAgentSlotPreviewDetailsRequest;
-    }) => meetingsApi.slotPreviewDetails(memoRefKey, payload)
+      signal?: AbortSignal;
+    }) => meetingsApi.slotPreviewDetails(memoRefKey, payload, { signal })
   });
 }
 
@@ -126,13 +131,25 @@ export function useMeetingMemoApprove() {
 
 export function useMeetingTopicCheckSimilar() {
   return useMutation({
-    mutationFn: (payload: MeetingTopicCheckSimilarRequest) => meetingsApi.checkSimilarTopic(payload)
+    mutationFn: ({
+      payload,
+      signal
+    }: {
+      payload: MeetingTopicCheckSimilarRequest;
+      signal?: AbortSignal;
+    }) => meetingsApi.checkSimilarTopic(payload, { signal })
   });
 }
 
 export function useMeetingTopicResolve() {
   return useMutation({
-    mutationFn: (payload: MeetingTopicResolveRequest) => meetingsApi.resolveTopic(payload)
+    mutationFn: ({
+      payload,
+      signal
+    }: {
+      payload: MeetingTopicResolveRequest;
+      signal?: AbortSignal;
+    }) => meetingsApi.resolveTopic(payload, { signal })
   });
 }
 

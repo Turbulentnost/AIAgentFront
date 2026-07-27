@@ -18,6 +18,7 @@ import {
   formatMeetingConflictMovability,
   formatMeetingSlotParticipantStatus
 } from "@/utils/meetingDashboard";
+import { isRequestAborted } from "@/utils/requestAbort";
 import styles from "./MeetingAgent.module.css";
 
 function normalizeParticipantName(name: string): string {
@@ -355,27 +356,28 @@ export default function MeetingAgentRegistryParticipantsModal({
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const result = await meetingsApi.searchRegistryParticipants(refKey, query);
-        if (!cancelled) {
+        const result = await meetingsApi.searchRegistryParticipants(refKey, query, {
+          signal: controller.signal
+        });
+        if (!controller.signal.aborted) {
           setSearchResult(result);
         }
-      } catch {
-        if (!cancelled) {
-          setSearchResult(null);
-        }
+      } catch (error) {
+        if (isRequestAborted(error, controller.signal)) return;
+        setSearchResult(null);
       } finally {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setIsSearching(false);
         }
       }
     }, 400);
 
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(timer);
     };
   }, [searchQuery, refKey, open, showConfirmation]);

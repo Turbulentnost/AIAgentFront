@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { AlertTriangle, CheckCircle2, Loader2, Users, X } from "lucide-react";
 
@@ -34,6 +34,7 @@ import {
   normalizeMeetingTopicType,
   type ScheduleTopicFormSnapshot
 } from "@/utils/meetingTopic";
+import { isRequestAborted } from "@/utils/requestAbort";
 
 import styles from "./MeetingAgent.module.css";
 
@@ -427,6 +428,8 @@ export default function MeetingAgentTopicModal(props: Props) {
   const [form, setForm] = useState<CreateFormState>(() => buildCreateFormState(props));
 
   const [validationError, setValidationError] = useState<string | null>(null);
+  const checkAbortRef = useRef<AbortController | null>(null);
+  const resolveAbortRef = useRef<AbortController | null>(null);
 
 
 
@@ -446,11 +449,28 @@ export default function MeetingAgentTopicModal(props: Props) {
 
   }, [props]);
 
+  function abortInFlightTopicRequests() {
+    checkAbortRef.current?.abort();
+    resolveAbortRef.current?.abort();
+    checkAbortRef.current = null;
+    resolveAbortRef.current = null;
+    checkSimilarMutation.reset();
+    resolveMutation.reset();
+  }
+
+  function handleClose() {
+    abortInFlightTopicRequests();
+    onClose();
+  }
+
 
 
   useEffect(() => {
 
-    if (!open) return;
+    if (!open) {
+      abortInFlightTopicRequests();
+      return;
+    }
 
     setStep("checking");
     setCheckResult(null);
@@ -483,25 +503,31 @@ export default function MeetingAgentTopicModal(props: Props) {
 
     }
 
-
+    checkAbortRef.current?.abort();
+    const controller = new AbortController();
+    checkAbortRef.current = controller;
 
     void checkSimilarMutation
 
-      .mutateAsync(checkPayload)
+      .mutateAsync({ payload: checkPayload, signal: controller.signal })
 
       .then((result) => {
-
+        if (controller.signal.aborted) return;
         setCheckResult(result);
 
         setStep(result.similar_found ? "similar" : "create");
 
       })
 
-      .catch(() => {
-
+      .catch((error) => {
+        if (isRequestAborted(error, controller.signal)) return;
         setStep("create");
 
       });
+
+    return () => {
+      controller.abort();
+    };
 
   }, [open, checkPayload, props.mode]);
 
@@ -513,15 +539,12 @@ export default function MeetingAgentTopicModal(props: Props) {
 
   const loading = checkSimilarMutation.isPending || resolveMutation.isPending;
 
-  const requestError = checkSimilarMutation.isError
-
-    ? getMeetingRequestError(checkSimilarMutation.error)
-
-    : resolveMutation.isError
-
-      ? getMeetingRequestError(resolveMutation.error)
-
-      : null;
+  const requestError =
+    checkSimilarMutation.isError && !isRequestAborted(checkSimilarMutation.error)
+      ? getMeetingRequestError(checkSimilarMutation.error)
+      : resolveMutation.isError && !isRequestAborted(resolveMutation.error)
+        ? getMeetingRequestError(resolveMutation.error)
+        : null;
 
 
 
@@ -617,17 +640,26 @@ export default function MeetingAgentTopicModal(props: Props) {
 
     setValidationError(null);
 
+    resolveAbortRef.current?.abort();
+    const controller = new AbortController();
+    resolveAbortRef.current = controller;
+
     try {
       const result = await resolveMutation.mutateAsync({
-        decision: "use_existing",
-        existing_topic_ref_key: refKey,
-        manager_fio: managerFio || null,
-        initiator_fio: initiatorFio,
-        participant_fios: participantFios
+        payload: {
+          decision: "use_existing",
+          existing_topic_ref_key: refKey,
+          manager_fio: managerFio || null,
+          initiator_fio: initiatorFio,
+          participant_fios: participantFios
+        },
+        signal: controller.signal
       });
+      if (controller.signal.aborted) return;
       setResolveResult(result);
       setStep("resolved");
-    } catch {
+    } catch (error) {
+      if (isRequestAborted(error, controller.signal)) return;
       // surfaced below
     }
   }
@@ -648,22 +680,30 @@ export default function MeetingAgentTopicModal(props: Props) {
 
     setValidationError(null);
 
+    resolveAbortRef.current?.abort();
+    const controller = new AbortController();
+    resolveAbortRef.current = controller;
+
     try {
 
       const result = await resolveMutation.mutateAsync({
-        decision: "create_new",
-        description: form.description.trim(),
-        manager_fio: form.managerFio.trim(),
-        meeting_type: form.meetingType.trim(),
-        topic_details: form.topicDetails.trim() || null,
-        initiator_fio: initiatorFio,
-        participant_fios: buildMergedParticipantFios()
+        payload: {
+          decision: "create_new",
+          description: form.description.trim(),
+          manager_fio: form.managerFio.trim(),
+          meeting_type: form.meetingType.trim(),
+          topic_details: form.topicDetails.trim() || null,
+          initiator_fio: initiatorFio,
+          participant_fios: buildMergedParticipantFios()
+        },
+        signal: controller.signal
       });
+      if (controller.signal.aborted) return;
       setResolveResult(result);
       setStep("resolved");
 
-    } catch {
-
+    } catch (error) {
+      if (isRequestAborted(error, controller.signal)) return;
       // surfaced below
 
     }
@@ -680,7 +720,7 @@ export default function MeetingAgentTopicModal(props: Props) {
 
   return (
 
-    <div className={styles.modalOverlay} onClick={onClose} role="presentation">
+    <div className={styles.modalOverlay} onClick={handleClose} role="presentation">
 
       <div
 
@@ -706,9 +746,7 @@ export default function MeetingAgentTopicModal(props: Props) {
 
             className={styles.modalCloseButton}
 
-            onClick={onClose}
-
-            disabled={loading}
+            onClick={handleClose}
 
             aria-label="Закрыть"
 
@@ -952,7 +990,7 @@ export default function MeetingAgentTopicModal(props: Props) {
 
           <div className={styles.modalActionsStart}>
 
-            <button type="button" className={styles.ghostButton} onClick={onClose} disabled={loading}>
+            <button type="button" className={styles.ghostButton} onClick={handleClose}>
 
               Отмена
 
