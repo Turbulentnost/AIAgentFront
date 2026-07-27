@@ -24,6 +24,21 @@
   flex-wrap: wrap;
 }
 
+.agentControls,
+.searchControls {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.agentControls .actions,
+.searchControls .actions {
+  flex: 1 1 220px;
+  justify-content: flex-start;
+}
+
 .header h2,
 .sectionHeader h3,
 .sectionHeader h4 {
@@ -651,6 +666,12 @@
   font-weight: 700;
 }
 
+.nomenclatureQuery {
+  margin: 4px 0 0;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
 .supplierLink {
   color: var(--color-primary);
   word-break: break-all;
@@ -716,8 +737,18 @@
   resize: vertical;
 }
 
+.letterBody {
+  min-height: 240px;
+  line-height: 1.45;
+  font-family: inherit;
+}
+
 .full {
   grid-column: 1 / -1;
+}
+
+a.secondary {
+  text-decoration: none;
 }
 
 .primary,
@@ -868,6 +899,74 @@
   to {
     transform: rotate(360deg);
   }
+}
+
+/* Compact “AI thoughts” while force_web supplier search is pending */
+.thoughtsPanel {
+  display: grid;
+  gap: 8px;
+  max-width: 420px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-surface));
+  color: var(--color-text);
+}
+
+.thoughtsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.thoughtsTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.thoughtsDismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 7px;
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.thoughtsDismiss:hover {
+  color: var(--color-text);
+  border-color: color-mix(in srgb, var(--color-text) 25%, var(--color-border));
+}
+
+.thoughtsList {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+}
+
+.thoughtCurrent {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text);
+}
+
+.thoughtPast {
+  font-size: 12px;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
 }
 
 @media (max-width: 1100px) {

@@ -1,0 +1,158 @@
+.root {
+  --alarm-blue: #2563eb;
+  --alarm-blue-soft: color-mix(in srgb, #2563eb 14%, var(--color-surface, #fff));
+  --alarm-metal: #64748b;
+  --alarm-ink: #1e293b;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 132px;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--alarm-blue) 5%, var(--color-surface, #fff));
+  user-select: none;
+}
+
+.rootActive {
+  border-color: color-mix(in srgb, var(--alarm-blue) 45%, var(--color-border, #e2e8f0));
+  background: var(--alarm-blue-soft);
+}
+
+.rootDisabled {
+  opacity: 0.55;
+}
+
+.countdown {
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  color: var(--alarm-ink);
+}
+
+.rootActive .countdown {
+  color: var(--alarm-blue);
+}
+
+.hint {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+  text-align: center;
+}
+
+.dial {
+  width: 112px;
+  height: 112px;
+  cursor: grab;
+  outline: none;
+  touch-action: none;
+}
+
+.dial:focus-visible {
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--alarm-blue) 55%, transparent);
+}
+
+.rootActive .dial,
+.rootDisabled .dial {
+  cursor: default;
+}
+
+.bell,
+.bellKnob {
+  fill: var(--alarm-metal);
+}
+
+.leg {
+  stroke: var(--alarm-metal);
+  stroke-width: 3.2;
+  stroke-linecap: round;
+}
+
+.rim {
+  fill: #cbd5e1;
+  stroke: #94a3b8;
+  stroke-width: 1.2;
+}
+
+.face {
+  stroke: #94a3b8;
+  stroke-width: 0.8;
+}
+
+.track {
+  fill: none;
+  stroke: var(--alarm-blue);
+  stroke-width: 3.4;
+  stroke-linecap: round;
+  opacity: 0.85;
+  transition: stroke-dasharray 0.18s linear;
+}
+
+.tick {
+  stroke: #64748b;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+.hand {
+  stroke: var(--alarm-blue);
+  stroke-width: 2.6;
+  stroke-linecap: round;
+  transition: x2 0.12s linear, y2 0.12s linear;
+}
+
+.root:not(.rootActive) .hand {
+  transition: none;
+}
+
+.hub {
+  fill: var(--alarm-ink);
+}
+
+.handKnob {
+  fill: var(--alarm-blue);
+  stroke: #fff;
+  stroke-width: 1;
+}
+
+.presets {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.preset,
+.presetActive {
+  padding: 3px 7px;
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 999px;
+  background: var(--color-surface, #fff);
+  color: var(--color-text, #1e293b);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.preset:hover:not(:disabled),
+.presetActive:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--alarm-blue) 40%, var(--color-border, #e2e8f0));
+}
+
+.presetActive {
+  border-color: color-mix(in srgb, var(--alarm-blue) 50%, var(--color-border, #e2e8f0));
+  background: var(--alarm-blue-soft);
+  color: var(--alarm-blue);
+}
+
+.preset:disabled,
+.presetActive:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}

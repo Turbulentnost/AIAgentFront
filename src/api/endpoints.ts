@@ -293,13 +293,22 @@ export const procurementManagerApi = {
         timeout: config?.timeout ?? 12_000
       })
       .then((r) => r.data),
-  getDashboard: () =>
+  getDashboard: (config?: { signal?: AbortSignal; timeout?: number }) =>
     apiClient
-      .get<ProcurementManagerDashboard>(`${PROCUREMENT_MANAGER_BASE}/dashboard`)
+      .get<ProcurementManagerDashboard>(`${PROCUREMENT_MANAGER_BASE}/dashboard`, {
+        signal: config?.signal,
+        timeout: config?.timeout ?? 20_000
+      })
       .then((r) => r.data),
-  getWorkspaceSummary: () =>
+  getWorkspaceSummary: (config?: { signal?: AbortSignal; timeout?: number }) =>
     apiClient
-      .get<ProcurementManagerWorkspaceSummary>(`${PROCUREMENT_MANAGER_BASE}/workspace-summary`)
+      .get<ProcurementManagerWorkspaceSummary>(
+        `${PROCUREMENT_MANAGER_BASE}/workspace-summary`,
+        {
+          signal: config?.signal,
+          timeout: config?.timeout ?? 15_000
+        }
+      )
       .then((r) => r.data),
   getMaterialBank: () =>
     apiClient
@@ -309,9 +318,12 @@ export const procurementManagerApi = {
     apiClient
       .get<MaterialAllocationResult>(`${PROCUREMENT_MANAGER_BASE}/coverage`)
       .then((r) => r.data),
-  getAllPositions: () =>
+  getAllPositions: (config?: { signal?: AbortSignal; timeout?: number }) =>
     apiClient
-      .get<AllPositionsResponse>(`${PROCUREMENT_MANAGER_BASE}/all-positions`)
+      .get<AllPositionsResponse>(`${PROCUREMENT_MANAGER_BASE}/all-positions`, {
+        signal: config?.signal,
+        timeout: config?.timeout ?? 25_000
+      })
       .then((r) => r.data),
   getSupplierOffers: (
     caseId: string,
@@ -323,9 +335,15 @@ export const procurementManagerApi = {
         { params }
       )
       .then((r) => r.data),
-  getCase: (caseId: string) =>
+  getCase: (caseId: string, config?: { signal?: AbortSignal; timeout?: number }) =>
     apiClient
-      .get<ProcurementManagerCaseDetail>(`${PROCUREMENT_MANAGER_BASE}/cases/${caseId}`)
+      .get<ProcurementManagerCaseDetail>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}`,
+        {
+          signal: config?.signal,
+          timeout: config?.timeout ?? 20_000
+        }
+      )
       .then((r) => r.data),
   updateLineAmounts: (caseId: string, payload: LineAmountsUpdatePayload) =>
     apiClient
@@ -371,11 +389,28 @@ export const procurementManagerApi = {
     longRunningApiClient
       .post<ProcurementSyncFrom1CResult>(`${PROCUREMENT_MANAGER_BASE}/sync-from-1c`)
       .then((r) => r.data),
-  searchSuppliers: (caseId: string, payload?: SupplierSearchRequest) =>
+  searchSuppliers: (
+    caseId: string,
+    payload?: SupplierSearchRequest,
+    config?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
       .post<SupplierSearchResult>(
         `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/supplier-search`,
-        payload
+        payload,
+        { signal: config?.signal }
+      )
+      .then((r) => r.data),
+  getSupplierSearchProgress: (caseId: string, operationId: string) =>
+    apiClient
+      .get<{
+        operation_id: string;
+        case_id: string;
+        status: string;
+        thoughts: string[];
+      }>(
+        `${PROCUREMENT_MANAGER_BASE}/cases/${caseId}/supplier-search/progress/${encodeURIComponent(operationId)}`,
+        { timeout: 8_000 }
       )
       .then((r) => r.data),
   getSuppliers: (caseId: string) =>

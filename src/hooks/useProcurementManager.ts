@@ -43,27 +43,39 @@ export function useProcurementManagerPermissions() {
 export function useProcurementManagerDashboard(enabled: boolean) {
   return useQuery({
     queryKey: [...rootKey, "dashboard"],
-    queryFn: procurementManagerApi.getDashboard,
+    queryFn: ({ signal }) => procurementManagerApi.getDashboard({ signal }),
     enabled,
-    refetchInterval: 30_000
+    staleTime: 90_000,
+    gcTime: 10 * 60_000,
+    refetchInterval: 90_000,
+    refetchOnWindowFocus: false,
+    retry: 0
   });
 }
 
 export function useProcurementManagerWorkspaceSummary(enabled: boolean) {
   return useQuery({
     queryKey: [...rootKey, "workspace-summary"],
-    queryFn: procurementManagerApi.getWorkspaceSummary,
+    queryFn: ({ signal }) => procurementManagerApi.getWorkspaceSummary({ signal }),
     enabled,
-    refetchInterval: 30_000
+    staleTime: 90_000,
+    gcTime: 10 * 60_000,
+    refetchInterval: 90_000,
+    refetchOnWindowFocus: false,
+    retry: 0
   });
 }
 
 export function useProcurementManagerAllPositions(enabled: boolean) {
   return useQuery({
     queryKey: [...rootKey, "all-positions"],
-    queryFn: procurementManagerApi.getAllPositions,
+    queryFn: ({ signal }) => procurementManagerApi.getAllPositions({ signal }),
     enabled,
-    refetchInterval: 30_000
+    staleTime: 90_000,
+    gcTime: 10 * 60_000,
+    refetchInterval: 120_000,
+    refetchOnWindowFocus: false,
+    retry: 0
   });
 }
 
@@ -89,8 +101,12 @@ export function useProcurementManagerSupplierOffers(
 export function useProcurementManagerCase(caseId: string | null, enabled: boolean) {
   return useQuery({
     queryKey: [...rootKey, "case", caseId],
-    queryFn: () => procurementManagerApi.getCase(caseId!),
-    enabled: enabled && Boolean(caseId)
+    queryFn: ({ signal }) => procurementManagerApi.getCase(caseId!, { signal }),
+    enabled: enabled && Boolean(caseId),
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 0
   });
 }
 
@@ -98,9 +114,11 @@ export function useProcurementManagerCases(caseIds: string[], enabled: boolean) 
   return useQueries({
     queries: caseIds.map((id) => ({
       queryKey: [...rootKey, "case", id] as const,
-      queryFn: () => procurementManagerApi.getCase(id),
+      queryFn: ({ signal }: { signal: AbortSignal }) =>
+        procurementManagerApi.getCase(id, { signal }),
       enabled: enabled && Boolean(id),
-      staleTime: 30_000
+      staleTime: 30_000,
+      retry: 1
     }))
   });
 }
@@ -109,7 +127,11 @@ export function useProcurementManagerSuppliers(caseId: string | null, enabled: b
   return useQuery({
     queryKey: [...rootKey, "suppliers", caseId],
     queryFn: () => procurementManagerApi.getSuppliers(caseId!),
-    enabled: enabled && Boolean(caseId)
+    enabled: enabled && Boolean(caseId),
+    staleTime: 60_000,
+    gcTime: 15 * 60_000,
+    refetchOnWindowFocus: false,
+    retry: 0
   });
 }
 
@@ -118,6 +140,7 @@ export function useProcurementManagerComparison(caseId: string | null, enabled: 
     queryKey: [...rootKey, "comparison", caseId],
     queryFn: () => procurementManagerApi.getComparison(caseId!),
     enabled: enabled && Boolean(caseId),
+    staleTime: 30_000,
     retry: false
   });
 }
@@ -155,8 +178,15 @@ function useCaseMutation<TPayload, TResult>(
 export function useSearchProcurementSuppliers() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ caseId, payload }: { caseId: string; payload?: SupplierSearchRequest }) =>
-      procurementManagerApi.searchSuppliers(caseId, payload),
+    mutationFn: ({
+      caseId,
+      payload,
+      signal
+    }: {
+      caseId: string;
+      payload?: SupplierSearchRequest;
+      signal?: AbortSignal;
+    }) => procurementManagerApi.searchSuppliers(caseId, payload, { signal }),
     onSuccess: async (_data, { caseId }) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: [...rootKey, "case", caseId] }),

@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Database } from "lucide-react";
 import { OtkPresentationCardView } from "./OtkPresentationCard";
 import { OtkShipmentLines } from "./OtkShipmentLines";
 import type { OtkPresentationCard, OtkShipmentLine } from "./mockData";
@@ -11,7 +10,6 @@ import {
   useOtkPresentationsList,
   useOtkUpdateLine,
   useOtkUpdatePresentation,
-  useOtkWriteTo1C,
   writeOtkDetailCache
 } from "@/hooks/useOtkWorker";
 import { mergePresentationCard } from "./otkCardMerge";
@@ -88,7 +86,6 @@ export default function OtkWorkerWorkspace() {
   const [selectedId, setSelectedId] = useState<string>("");
   const [listFilter, setListFilter] = useState<OtkListFilter>("all");
   const [listSort, setListSort] = useState<OtkListSort>("in_work");
-  const [stubMessage, setStubMessage] = useState<string | null>(null);
   const [localCard, setLocalCard] = useState<OtkPresentationCardUi | null>(null);
   const headerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lineTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
@@ -115,7 +112,6 @@ export default function OtkWorkerWorkspace() {
   const addLineMut = useOtkAddLine();
   const updateLineMut = useOtkUpdateLine();
   const deleteLineMut = useOtkDeleteLine();
-  const writeTo1C = useOtkWriteTo1C();
 
   const lockedLineIds = (): Set<string> => {
     const locked = new Set<string>();
@@ -251,15 +247,6 @@ export default function OtkWorkerWorkspace() {
       void _s;
       scheduleLinePatch(id, patch);
     }
-  };
-
-  const handleWriteToOneC = () => {
-    if (!selectedId) return;
-    writeTo1C.mutate(selectedId, {
-      onSuccess: (result) => setStubMessage(result.message),
-      onError: () =>
-        setStubMessage("Не удалось вызвать заглушку записи в 1С. Проверьте доступ и API.")
-    });
   };
 
   const resetLocalSyncState = () => {
@@ -422,25 +409,6 @@ export default function OtkWorkerWorkspace() {
 
               <h4 className={styles.sectionTitle}>Элементы в поставке</h4>
               <OtkShipmentLines lines={selected.lines} onChange={handleLinesChange} />
-
-              <div className={styles.actionsRow}>
-                <button
-                  type="button"
-                  className={styles.primaryButton}
-                  onClick={handleWriteToOneC}
-                  disabled={writeTo1C.isPending}
-                >
-                  <Database size={16} />
-                  Записать проверку в 1С
-                </button>
-              </div>
-
-              {stubMessage ? (
-                <div className={styles.toast} role="status">
-                  <AlertTriangle size={16} />
-                  <span>{stubMessage}</span>
-                </div>
-              ) : null}
             </>
           )}
         </section>

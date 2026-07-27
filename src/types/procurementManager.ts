@@ -54,6 +54,8 @@ export interface SupplierSearchRequest {
   mode?: "auto" | "manual_web";
   idempotency_key?: string;
   nomenclatures?: NomenclatureSearchItem[];
+  /** UI alarm-clock budget (seconds); backend stops between page fetches when exceeded. */
+  timeout_seconds?: number;
 }
 
 export interface SupplierSearchResult {
@@ -245,6 +247,8 @@ export interface UsedSupplierPart {
   supplier_id: string;
   supplier_name: string;
   quantity: string | number;
+  /** Present when portion comes from PO/optimize/quote join. */
+  unit_price?: string | number | null;
 }
 
 export interface OrderCoverageLine {
@@ -449,6 +453,8 @@ export interface LineAmountEntry {
   unit_price?: number | null;
   amount?: number | null;
   currency?: string;
+  /** manual = user save; po = synced from purchase-order drafts. */
+  source?: "manual" | "po" | string | null;
 }
 
 export interface LineAmountsUpdatePayload {
@@ -524,11 +530,21 @@ export interface OperationStatus {
   operation_id: string;
   case_id?: string | null;
   operation: string;
-  status: "draft" | "approval_required" | "approved" | "executed" | "rejected" | "failed";
+  status:
+    | "draft"
+    | "running"
+    | "completed"
+    | "approval_required"
+    | "approved"
+    | "executed"
+    | "rejected"
+    | "failed";
   approval_id?: string | null;
   external_ref?: string | null;
   error?: string | null;
   updated_at: string;
+  /** Live Qwen / web-search stages from the progress buffer. */
+  thoughts?: string[];
 }
 
 export interface CreateRfqDraftPayload {
