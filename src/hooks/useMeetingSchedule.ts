@@ -182,6 +182,23 @@ export function useMeetingSchedulePlanSeries() {
   });
 }
 
+export function useMeetingScheduleCancelSeries() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { meetingId: string; message?: string }) =>
+      meetingsApi.cancelScheduled(input.meetingId, { message: input.message ?? "" }),
+    onSuccess: (result) => {
+      queryClient.setQueryData<MeetingScheduleQueryData>(meetingScheduleQueryKey, (current) => {
+        const base = current ?? emptyScheduleQueryData();
+        return upsertScheduleSeries(base, result.series);
+      });
+      void queryClient.invalidateQueries({ queryKey: meetingScheduleQueryKey });
+      void queryClient.invalidateQueries({ queryKey: [...meetingScheduleQueryKey, "detail"] });
+    }
+  });
+}
+
 type UpdateMeetingScheduleSeriesInput = {
   meetingId: string;
   original: ScheduledMeetingRead;

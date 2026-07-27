@@ -33,14 +33,23 @@ import {
   useMeetingAgentSlotPreviewDetails,
   useMeetingMemoApprove,
   useMeetingMemoDetail,
+  useMeetingMemoCreateSeries,
   useMeetingMemoReject,
+  useMeetingMemoSeriesPlanningChoice,
   useMeetingRunResult
 } from "@/hooks/useMeetingMemoDetail";
+import { meetingScheduleQueryKey } from "@/hooks/useMeetingSchedule";
 import MeetingAgentRegistry from "@/pages/MeetingAgentRegistry";
 import MeetingAgentSchedule from "@/pages/MeetingAgentSchedule";
 import MeetingAgentRejectModal from "@/pages/MeetingAgentRejectModal";
+import MeetingAgentSeriesConfirmModal from "@/pages/MeetingAgentSeriesConfirmModal";
 import MeetingAgentSlotPreviewModal from "@/pages/MeetingAgentSlotPreviewModal";
-import type { MeetingDashboardItem, MeetingMemoDetail } from "@/types/meetings";
+import MeetingAgentTopicModal from "@/pages/MeetingAgentTopicModal";
+import type {
+  MeetingDashboardItem,
+  MeetingMemoDetail,
+  MeetingTopicResolveRead
+} from "@/types/meetings";
 import {
   buildMeetingStats,
   buildMeetingQueueFilterCounts,
@@ -67,6 +76,18 @@ import {
   resolveMeetingSlotPreview,
   type MeetingQueueFilter
 } from "@/utils/meetingDashboard";
+import {
+  buildMeetingTopicCheckPayload,
+  buildMeetingTopicRequestPayload,
+  formatResolvedMeetingTopicLabel,
+  resetMeetingTopicResolutionCache,
+  resolveMeetingSubjectFromTopic,
+  resolveMeetingTypeFromTopic,
+  saveMeetingTopicResolution,
+  validateStoredMeetingTopicResolution,
+  type MeetingTopicPendingAction
+} from "@/utils/meetingTopic";
+import { meetingsApi } from "@/api/endpoints";
 import styles from "./MeetingAgent.module.css";
 
 type MeetingPageTab = "queue" | "registry" | "schedule";
@@ -118,9 +139,15 @@ function MeetingAgentPage() {
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const [forceMemoRefresh, setForceMemoRefresh] = useState(false);
   const [slotPreviewOpen, setSlotPreviewOpen] = useState(false);
+  const [topicModalOpen, setTopicModalOpen] = useState(false);
+  const [topicPendingAction, setTopicPendingAction] = useState<MeetingTopicPendingAction | null>(null);
+  const [resolvedTopic, setResolvedTopic] = useState<MeetingTopicResolveRead | null>(null);
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [outlookMeetingUrl, setOutlookMeetingUrl] = useState<string | null>(null);
+  const [scheduleHighlightId, setScheduleHighlightId] = useState<string | null>(null);
+  const [seriesPlanningError, setSeriesPlanningError] = useState<string | null>(null);
+  const [seriesConfirmModalOpen, setSeriesConfirmModalOpen] = useState(false);
 
   const dashboard = dashboardQuery.data;
   const queueItems = useMemo(
@@ -150,7 +177,14 @@ function MeetingAgentPage() {
   const approveSlotMutation = useMeetingAgentSlotApprove();
   const approveMemoMutation = useMeetingMemoApprove();
   const rejectMemoMutation = useMeetingMemoReject();
+  const seriesChoiceMutation = useMeetingMemoSeriesPlanningChoice();
+  const createSeriesMutation = useMeetingMemoCreateSeries();
   const runQuery = useMeetingRunResult(activeRunId);
+
+  useEffect(() => {
+    if (!isQueueTab) return;
+    resetMeetingTopicResolutionCache();
+  }, [isQueueTab]);
 
   useEffect(() => {
     if (!queueItems.length) {
@@ -165,6 +199,20 @@ function MeetingAgentPage() {
   useEffect(() => {
     setActiveRunId(null);
     setForceMemoRefresh(false);
+    setTopicPendingAction(null);
+    setTopicModalOpen(false);
+    setResolvedTopic(null);
+
+    if (!selectedRefKey) return;
+    let cancelled = false;
+    void validateStoredMeetingTopicResolution(selectedRefKey).then((stored) => {
+      if (!cancelled) {
+        setResolvedTopic(stored);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [selectedRefKey]);
 
   useEffect(() => {
@@ -199,6 +247,65 @@ function MeetingAgentPage() {
 
   const isDashboardFetching = dashboardQuery.isFetching || isRefreshing;
 
+  async function handleSeriesPlanningChoice(mode: "series" | "single") {
+    if (!detail?.ref_key) return;
+    setSeriesPlanningError(null);
+
+    if (mode === "single") {
+      try {
+        await seriesChoiceMutation.mutateAsync({ memoRefKey: detail.ref_key, mode: "single" });
+        await detailQuery.refetch();
+      } catch (error) {
+        setSeriesPlanningError(getMeetingMemoActionError(error));
+      }
+      return;
+    }
+
+    void ensureTopicWorkflow("series", openSeriesConfirmModal);
+  }
+
+  function openSeriesConfirmModal() {
+    setSeriesConfirmModalOpen(true);
+    setSeriesPlanningError(null);
+  }
+
+  async function handleConfirmSeriesPlanning() {
+    if (!detail?.ref_key) return;
+    setSeriesPlanningError(null);
+
+    try {
+      const created = await createSeriesMutation.mutateAsync({
+        memoRefKey: detail.ref_key,
+        payload: {
+          meeting_topic: buildMeetingTopicRequestPayload(resolvedTopic) ?? null
+        }
+      });
+      setSeriesConfirmModalOpen(false);
+      setScheduleHighlightId(created.scheduled_meeting_id);
+      setPageTab("schedule");
+      const parts = [
+        `Серия «${created.scheduled_meeting_title}» сохранена в графике`,
+        created.recurrence_label ? `(${created.recurrence_label})` : null,
+        created.memo_approved ? "СЗ согласована" : created.memo_approve_message
+      ].filter(Boolean);
+      setSuccessMessage(`${parts.join(". ")}. Распланируйте серию в Outlook на вкладке «График совещаний».`);
+      await Promise.all([
+        detailQuery.refetch(),
+        queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: meetingScheduleQueryKey })
+      ]);
+    } catch (error) {
+      setSeriesPlanningError(getMeetingMemoActionError(error));
+    }
+  }
+
+  function handleCloseSeriesConfirmModal() {
+    if (createSeriesMutation.isPending) return;
+    setSeriesConfirmModalOpen(false);
+    setSeriesPlanningError(null);
+    createSeriesMutation.reset();
+  }
+
   if (permissionsQuery.isLoading) {
     return (
       <section className={styles.page}>
@@ -227,12 +334,63 @@ function MeetingAgentPage() {
     setActiveRunId(run.task_id);
   }
 
-  async function handleLaunchAgent() {
-    if (!detail?.ref_key || slotPreviewMutation.isPending) return;
+  async function performApproveMemo() {
+    if (!detail?.ref_key || approveMemoMutation.isPending) return;
+
     setSuccessMessage(null);
     setOutlookMeetingUrl(null);
-    approveSlotMutation.reset();
     approveMemoMutation.reset();
+    try {
+      const result = await approveMemoMutation.mutateAsync({
+        memoRefKey: detail.ref_key
+      });
+      setSuccessMessage(
+        result.message?.trim() || (
+          result.already_approved
+            ? `${result.number ? `СЗ №${result.number}` : "Служебная записка"} уже согласована`
+            : `${result.number ? `СЗ №${result.number}` : "Служебная записка"} согласована`
+        )
+      );
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
+        queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", detail.ref_key] })
+      ]);
+    } catch {
+      // error surfaced in MeetingDetails
+    }
+  }
+
+  function shouldRunTopicWorkflow(): boolean {
+    if (!detail) return false;
+    return buildMeetingTopicCheckPayload(detail, selectedItem) != null;
+  }
+
+  async function ensureTopicWorkflow(
+    action: MeetingTopicPendingAction,
+    proceed: () => void | Promise<void>
+  ) {
+    if (!detail?.ref_key || topicModalOpen) return;
+
+    if (!shouldRunTopicWorkflow()) {
+      await proceed();
+      return;
+    }
+
+    const stored = await validateStoredMeetingTopicResolution(detail.ref_key);
+    if (stored) {
+      setResolvedTopic(stored);
+      await proceed();
+      return;
+    }
+
+    setSuccessMessage(null);
+    setOutlookMeetingUrl(null);
+    setTopicPendingAction(action);
+    setTopicModalOpen(true);
+  }
+
+  async function startSlotPreview() {
+    if (!detail?.ref_key || slotPreviewMutation.isPending) return;
     setSlotPreviewOpen(true);
     slotPreviewMutation.reset();
     try {
@@ -242,6 +400,51 @@ function MeetingAgentPage() {
       });
     } catch {
       // mutation error surfaced in modal
+    }
+  }
+
+  function handleLaunchAgent() {
+    if (!detail?.ref_key || slotPreviewMutation.isPending || topicModalOpen) return;
+    approveSlotMutation.reset();
+    approveMemoMutation.reset();
+    slotPreviewMutation.reset();
+    void ensureTopicWorkflow("slot", startSlotPreview);
+  }
+
+  function handleCloseTopicModal() {
+    if (slotPreviewMutation.isPending || approveMemoMutation.isPending) return;
+    setTopicModalOpen(false);
+    setTopicPendingAction(null);
+  }
+
+  async function handleTopicResolved(result: MeetingTopicResolveRead) {
+    if (!detail?.ref_key) return;
+
+    saveMeetingTopicResolution(detail.ref_key, result);
+    setResolvedTopic(result);
+    setTopicModalOpen(false);
+
+    try {
+      await meetingsApi.saveRegistryMeetingTopic(detail.ref_key, result);
+    } catch {
+      // Карточка реестра может ещё не существовать до отправки приглашения.
+    }
+
+    const pendingAction = topicPendingAction;
+    setTopicPendingAction(null);
+
+    if (pendingAction === "approve") {
+      await performApproveMemo();
+      return;
+    }
+
+    if (pendingAction === "slot") {
+      await startSlotPreview();
+      return;
+    }
+
+    if (pendingAction === "series") {
+      openSeriesConfirmModal();
     }
   }
 
@@ -312,7 +515,7 @@ function MeetingAgentPage() {
         payload: {
           slot_start: slot.start,
           slot_end: slot.end,
-          subject: detail.title || detail.application.agenda || undefined,
+          subject: resolveMeetingSubjectFromTopic(detail, resolvedTopic),
           location:
             detail.application.invite_location ||
             detail.application.location ||
@@ -322,7 +525,8 @@ function MeetingAgentPage() {
           company_calendar_cache_id: slotDetails?.company_calendar_cache_id,
           reschedule_message: slotDetails?.requires_reschedule
             ? "Встреча перенесена для освобождения слота по служебной записке"
-            : undefined
+            : undefined,
+          meeting_topic: buildMeetingTopicRequestPayload(resolvedTopic)
         }
       });
       setSlotPreviewOpen(false);
@@ -350,30 +554,9 @@ function MeetingAgentPage() {
     }
   }
 
-  async function handleApproveMemo() {
-    if (!detail?.ref_key || approveMemoMutation.isPending) return;
-
-    setSuccessMessage(null);
-    setOutlookMeetingUrl(null);
-    approveMemoMutation.reset();
-    try {
-      const result = await approveMemoMutation.mutateAsync({
-        memoRefKey: detail.ref_key
-      });
-      setSuccessMessage(
-        result.message?.trim() || (
-          result.already_approved
-            ? `${result.number ? `СЗ №${result.number}` : "Служебная записка"} уже согласована`
-            : `${result.number ? `СЗ №${result.number}` : "Служебная записка"} согласована`
-        )
-      );
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["meetings", "dashboard"] }),
-        queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", detail.ref_key] })
-      ]);
-    } catch {
-      // error surfaced in MeetingDetails
-    }
+  function handleApproveMemo() {
+    if (!detail?.ref_key || approveMemoMutation.isPending || topicModalOpen) return;
+    void ensureTopicWorkflow("approve", performApproveMemo);
   }
 
   function handleOpenRejectModal() {
@@ -452,6 +635,16 @@ function MeetingAgentPage() {
 
   return (
     <section className={styles.page} aria-labelledby="meeting-agent-title">
+      {detail ? (
+        <MeetingAgentTopicModal
+          mode="memo"
+          open={topicModalOpen}
+          detail={detail}
+          queueItem={selectedItem}
+          onClose={handleCloseTopicModal}
+          onResolved={(result) => void handleTopicResolved(result)}
+        />
+      ) : null}
       <MeetingAgentSlotPreviewModal
         open={slotPreviewOpen}
         loading={slotPreviewMutation.isPending}
@@ -472,6 +665,18 @@ function MeetingAgentPage() {
         onClose={handleCloseRejectModal}
         onConfirm={(payload) => void handleConfirmReject(payload)}
       />
+      {detail?.series_planning ? (
+        <MeetingAgentSeriesConfirmModal
+          open={seriesConfirmModalOpen}
+          memoLabel={detail.number ? `СЗ №${detail.number}` : "Служебная записка"}
+          planning={detail.series_planning}
+          resolvedTopicLabel={formatResolvedMeetingTopicLabel(resolvedTopic)}
+          loading={createSeriesMutation.isPending}
+          error={seriesPlanningError}
+          onClose={handleCloseSeriesConfirmModal}
+          onConfirm={() => void handleConfirmSeriesPlanning()}
+        />
+      ) : null}
       {successMessage ? (
         <div className={styles.successBanner} role="status">
           <CheckCircle2 size={16} aria-hidden="true" />
@@ -535,7 +740,10 @@ function MeetingAgentPage() {
       {pageTab === "registry" ? (
         <MeetingAgentRegistry canAccessAgent={canAccessAgent} />
       ) : pageTab === "schedule" ? (
-        <MeetingAgentSchedule canAccessAgent={canAccessAgent} />
+        <MeetingAgentSchedule
+          canAccessAgent={canAccessAgent}
+          initialSelectedId={scheduleHighlightId}
+        />
       ) : !dashboard ? (
         <div className={styles.stateMessage}>
           {dashboardQuery.isError && isMeetingDashboardForbidden(dashboardQuery.error)
@@ -642,16 +850,27 @@ function MeetingAgentPage() {
               isRunning={
                 createRun.isPending ||
                 isMeetingRunActive(runQuery.data?.status) ||
+                topicModalOpen ||
                 slotPreviewMutation.isPending ||
                 rejectMemoMutation.isPending ||
-                approveMemoMutation.isPending
+                approveMemoMutation.isPending ||
+                seriesChoiceMutation.isPending ||
+                createSeriesMutation.isPending
               }
               isRejecting={rejectMemoMutation.isPending}
               isApproving={approveMemoMutation.isPending}
               approveError={approveMemoError}
+              seriesPlanningError={seriesPlanningError}
+              isSeriesPlanningPending={
+                seriesChoiceMutation.isPending || createSeriesMutation.isPending
+              }
+              onSeriesPlanningChoice={(mode) => void handleSeriesPlanningChoice(mode)}
               onLaunchAgent={() => void handleLaunchAgent()}
               onAutoApprove={() => void handleApproveMemo()}
               onReject={() => handleOpenRejectModal()}
+              isTopicChecking={topicModalOpen}
+              topicPendingAction={topicPendingAction}
+              resolvedTopic={resolvedTopic}
             />
           ) : null}
         </section>
@@ -688,6 +907,11 @@ function QueueCard({
           </span>
           {isMeetingPsdLevel(item) ? (
             <span className={styles.queueCardPsdBadge}>ПСД</span>
+          ) : null}
+          {item.series_detected ? (
+            <span className={styles.queueCardSeriesBadge} title={item.series_recurrence_label ?? undefined}>
+              Серия
+            </span>
           ) : null}
         </div>
       </div>
@@ -752,9 +976,15 @@ function MeetingDetails({
   isRejecting = false,
   isApproving = false,
   approveError,
+  seriesPlanningError,
+  isSeriesPlanningPending = false,
+  onSeriesPlanningChoice,
   onLaunchAgent,
   onAutoApprove,
-  onReject
+  onReject,
+  isTopicChecking = false,
+  topicPendingAction = null,
+  resolvedTopic = null
 }: {
   detail: MeetingMemoDetail;
   queueItem: MeetingDashboardItem | null;
@@ -765,14 +995,27 @@ function MeetingDetails({
   isRejecting?: boolean;
   isApproving?: boolean;
   approveError?: string | null;
+  seriesPlanningError?: string | null;
+  isSeriesPlanningPending?: boolean;
+  onSeriesPlanningChoice?: (mode: "series" | "single") => void;
   onLaunchAgent: () => void;
   onAutoApprove?: () => void;
   onReject?: () => void;
+  isTopicChecking?: boolean;
+  topicPendingAction?: MeetingTopicPendingAction | null;
+  resolvedTopic?: MeetingTopicResolveRead | null;
 }) {
   const application = detail.application;
   const participantNames = getMeetingParticipantNames(application, queueItem);
   const stoChecklist = detail.sto_checklist ?? [];
   const stoPassedCount = countPassedStoChecklist(detail);
+  const seriesPlanning = detail.series_planning;
+  const selectedSeriesMode = seriesPlanning?.selected_mode ?? null;
+  const canPlanAsSeries = seriesPlanning?.planning_options.includes("series") ?? false;
+  const showSeriesPlanning =
+    Boolean(seriesPlanning?.detected) && selectedSeriesMode !== "single";
+  const isSingleSeriesMode = selectedSeriesMode === "single";
+  const isSeriesMode = selectedSeriesMode === "series";
   const visibleStatus = getMeetingStatusLabel(
     queueItem?.status ?? detail.status,
     queueItem?.status_label ?? detail.status_label
@@ -842,10 +1085,21 @@ function MeetingDetails({
           <DataField
             label="Тип совещания"
             icon={Presentation}
-            value={application.meeting_type_label ?? application.meeting_type ?? "—"}
+            value={
+              resolveMeetingTypeFromTopic(detail, resolvedTopic) ??
+              application.meeting_type_label ??
+              application.meeting_type ??
+              "—"
+            }
           />
           <DataField label="Приоритет" icon={Flag} value={application.priority ?? "—"} />
         </dl>
+        {application.memo_text ? (
+          <div className={styles.memoTextBlock}>
+            <h4 className={styles.memoTextTitle}>Текст СЗ</h4>
+            <p className={styles.memoTextBody}>{application.memo_text}</p>
+          </div>
+        ) : null}
       </div>
 
       <div className={styles.section}>
@@ -909,6 +1163,84 @@ function MeetingDetails({
         )}
       </div>
 
+      {showSeriesPlanning ? (
+        <div className={styles.section}>
+          <h3>Планирование серии</h3>
+          <div className={styles.recommendationBox}>
+            <strong>Распознана периодичность</strong>
+            <p>{seriesPlanning?.recurrence_label ?? "Периодичность определена по тексту СЗ"}</p>
+            {seriesPlanning?.occurrence_count ? (
+              <p className={styles.inlineMuted}>
+                Запланировано встреч: {seriesPlanning.occurrence_count}
+              </p>
+            ) : null}
+            {seriesPlanning?.source_quote ? (
+              <p className={styles.inlineMuted}>Фрагмент: «{seriesPlanning.source_quote}»</p>
+            ) : null}
+            {(seriesPlanning?.ambiguities ?? []).length ? (
+              <ul className={styles.seriesAmbiguities}>
+                {(seriesPlanning?.ambiguities ?? []).map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
+            {isSeriesMode ? (
+              <p className={styles.seriesChoiceNote}>
+                Выбрано: <strong>серия</strong> — запись создана в графике, СЗ согласована.
+                Распланируйте серию в Outlook на вкладке «График совещаний».
+              </p>
+            ) : isSingleSeriesMode ? (
+              <p className={styles.seriesChoiceNote}>
+                Выбрано: <strong>единоразовое</strong> — дальше работает обычный подбор слота.
+              </p>
+            ) : (
+              <>
+                <p className={styles.inlineMuted}>
+                  Уточните, как планировать совещание: серией в графике или как единоразовое.
+                </p>
+                <div className={styles.actionRow}>
+                  {canPlanAsSeries ? (
+                    <button
+                      type="button"
+                      className={styles.primaryButton}
+                      disabled={isRunning || isSeriesPlanningPending}
+                      onClick={() => onSeriesPlanningChoice?.("series")}
+                    >
+                      {isTopicChecking && topicPendingAction === "series" ? (
+                        <>
+                          <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                          Проверяем тему…
+                        </>
+                      ) : isSeriesPlanningPending ? (
+                        <>
+                          <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                          Сохраняем серию…
+                        </>
+                      ) : (
+                        "Запланировать серию"
+                      )}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    className={canPlanAsSeries ? styles.secondaryButton : styles.primaryButton}
+                    disabled={isRunning || isSeriesPlanningPending}
+                    onClick={() => onSeriesPlanningChoice?.("single")}
+                  >
+                    Единоразовое
+                  </button>
+                </div>
+              </>
+            )}
+            {seriesPlanningError ? (
+              <p className={styles.runError} role="alert">
+                {seriesPlanningError}
+              </p>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
+
       <div className={styles.section}>
         <h3>Решение УД</h3>
         <div className={styles.recommendationBox}>
@@ -918,11 +1250,19 @@ function MeetingDetails({
           {runError ? <p className={styles.runError}>{runError}</p> : null}
         </div>
         <div className={styles.actionRow}>
-          <button type="button" className={styles.primaryButton} disabled={isRunning} onClick={onLaunchAgent}>
+          <button
+            type="button"
+            className={styles.primaryButton}
+            disabled={isRunning || isSeriesMode}
+            onClick={onLaunchAgent}
+            title={isSeriesMode ? "Для серии используйте график совещаний" : undefined}
+          >
             {isRunning ? (
               <>
                 <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
-                Подбираем слот…
+                {isTopicChecking && topicPendingAction === "slot"
+                  ? "Проверяем тему…"
+                  : "Подбираем слот…"}
               </>
             ) : (
               "Выбрать слот"
@@ -931,10 +1271,12 @@ function MeetingDetails({
           <button
             type="button"
             className={styles.secondaryButton}
-            disabled={isRunning || !canShowDecisionActions}
+            disabled={isRunning || !canShowDecisionActions || isSeriesMode}
             onClick={onAutoApprove}
             title={
-              canShowDecisionActions
+              isSeriesMode
+                ? "Согласование единоразового слота недоступно — совещание запланировано серией"
+                : canShowDecisionActions
                 ? detail.sto_ready
                   ? undefined
                   : "Не все пункты СТО выполнены — бэкенд может отклонить согласование"
@@ -945,6 +1287,11 @@ function MeetingDetails({
               <>
                 <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
                 Согласуем…
+              </>
+            ) : isTopicChecking && topicPendingAction === "approve" ? (
+              <>
+                <Loader2 size={16} className={styles.spinner} aria-hidden="true" />
+                Проверяем тему…
               </>
             ) : (
               "Согласовать"
@@ -966,7 +1313,12 @@ function MeetingDetails({
           </p>
         ) : null}
         <p className={styles.footerNote}>
-          После подтверждения агент создаст событие в Outlook и обновит 1С ERP.
+          Тема в 1С проверяется один раз — при согласовании, выборе слота или планировании серии.
+          {resolvedTopic?.used_existing
+            ? ` Используется существующая тема: ${formatResolvedMeetingTopicLabel(resolvedTopic) ?? "—"}. Совещание оформляется с тем же названием и видом совещания из 1С.`
+            : formatResolvedMeetingTopicLabel(resolvedTopic)
+              ? ` Выбрана тема ${formatResolvedMeetingTopicLabel(resolvedTopic)}.`
+              : ""}
         </p>
       </div>
     </>

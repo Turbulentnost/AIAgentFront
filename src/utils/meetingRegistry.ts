@@ -5,12 +5,13 @@ import type {
   MeetingRegistryParticipantsApplyResponse,
   MeetingRegistryParticipantsAddConfirmResponse,
   MeetingRegistryParticipantsRemovalConfirmResponse,
+  MeetingRegistryProtocolCreateResponse,
   MeetingRegistryReschedulableStage,
   MeetingRegistryRescheduleApproveResponse,
   MeetingRegistryStage,
   MeetingRegistryStageFilter
 } from "@/types/meetings";
-import { formatMeetingTime } from "@/utils/meetingDashboard";
+import { formatMeetingDateTime, formatMeetingTime } from "@/utils/meetingDashboard";
 
 export type MeetingRegistryStepStage = MeetingRegistryStage | "approved";
 
@@ -29,8 +30,13 @@ export interface MeetingRegistryViewItem {
   stage: MeetingRegistryStage;
   invitationsSentAt: string;
   protocolNumber: string | null;
+  protocolDraftAt: string | null;
+  protocolDraftCreatedAt: string | null;
+  protocolDraftError: string | null;
   cancelledAt: string | null;
   updatedAt: string;
+  canCancel: boolean;
+  actionsLocked: boolean;
 }
 
 export const meetingRegistryCancelledStage = {
@@ -51,6 +57,18 @@ export const meetingRegistryStages: {
   { id: "meeting_completed", label: "Совещание завершено", shortLabel: "Завершено" }
 ];
 
+export function isMeetingRegistryActionsLocked(stage: MeetingRegistryStage): boolean {
+  return (
+    stage === "meeting_completed" ||
+    stage === "protocol_conducted" ||
+    stage === "cancelled"
+  );
+}
+
+export function meetingRegistryCanCancel(stage: MeetingRegistryStage): boolean {
+  return !isMeetingRegistryActionsLocked(stage);
+}
+
 export function mapMeetingRegistryItem(item: MeetingRegistryItem): MeetingRegistryViewItem {
   const meetingAtLabel =
     item.slot_start && item.slot_end
@@ -61,7 +79,7 @@ export function mapMeetingRegistryItem(item: MeetingRegistryItem): MeetingRegist
     id: item.ref_key,
     refKey: item.ref_key,
     memoNumber: item.memo_number ?? "—",
-    title: item.title ?? item.subject ?? "Заявка на совещание",
+    title: item.subject ?? item.title ?? "Заявка на совещание",
     meetingAtLabel,
     slotStart: item.slot_start,
     slotEnd: item.slot_end,
@@ -72,9 +90,32 @@ export function mapMeetingRegistryItem(item: MeetingRegistryItem): MeetingRegist
     stage: item.stage,
     invitationsSentAt: item.invitations_sent_at,
     protocolNumber: item.protocol_number,
+    protocolDraftAt: item.protocol_draft_at,
+    protocolDraftCreatedAt: item.protocol_draft_created_at,
+    protocolDraftError: item.protocol_draft_error,
     cancelledAt: item.cancelled_at,
-    updatedAt: item.updated_at
+    updatedAt: item.updated_at,
+    canCancel:
+      item.can_cancel ??
+      meetingRegistryCanCancel(item.stage),
+    actionsLocked:
+      item.actions_locked ?? isMeetingRegistryActionsLocked(item.stage)
   };
+}
+
+export function formatProtocolDraftStatus(item: MeetingRegistryViewItem): string | null {
+  if (item.protocolDraftCreatedAt) {
+    const numberLabel = item.protocolNumber ? ` №${item.protocolNumber}` : "";
+    return `Черновик протокола создан${numberLabel}`;
+  }
+  if (item.protocolDraftError) {
+    return `Ошибка создания протокола: ${item.protocolDraftError}`;
+  }
+  if (item.protocolDraftAt) {
+    const label = formatMeetingDateTime(item.protocolDraftAt);
+    return label ? `Черновик протокола будет создан ${label}` : null;
+  }
+  return null;
 }
 
 export function getMeetingRegistryStageLabel(stage: MeetingRegistryStage): string {
@@ -130,6 +171,51 @@ export function isMeetingRegistryReschedulable(
   stage: MeetingRegistryStage
 ): stage is MeetingRegistryReschedulableStage {
   return stage === "invitations_sent" || stage === "cancelled";
+}
+
+export function patchRegistryContextAfterProtocolCreate(
+  data: MeetingRegistryContext,
+  refKey: string,
+  result: MeetingRegistryProtocolCreateResponse,
+  stageFilter: MeetingRegistryStageFilter = "all"
+): MeetingRegistryContext {
+  const target = data.items.find((item) => item.ref_key === refKey);
+  if (!target || !result.created) return data;
+
+  const updatedAt = result.protocol_draft_created_at ?? new Date().toISOString();
+  const updatedItem: MeetingRegistryItem = {
+    ...target,
+    stage: result.stage ?? "protocol_created",
+    protocol_number: result.protocol_number ?? target.protocol_number,
+    protocol_draft_created_at: result.protocol_draft_created_at ?? updatedAt,
+    protocol_draft_error: null,
+    updated_at: updatedAt
+  };
+
+  let nextItems = data.items.map((item) => (item.ref_key === refKey ? updatedItem : item));
+
+  if (
+    stageFilter !== "all" &&
+    stageFilter !== "approved" &&
+    stageFilter !== "protocol_created" &&
+    stageFilter !== updatedItem.stage
+  ) {
+    nextItems = nextItems.filter((item) => item.ref_key !== refKey);
+  }
+
+  const nextCounts = { ...data.stage_counts };
+  if (target.stage !== updatedItem.stage) {
+    if (typeof nextCounts[target.stage] === "number") {
+      nextCounts[target.stage] = Math.max(0, nextCounts[target.stage] - 1);
+    }
+    nextCounts[updatedItem.stage] = (nextCounts[updatedItem.stage] ?? 0) + 1;
+  }
+
+  return {
+    ...data,
+    items: nextItems,
+    stage_counts: nextCounts
+  };
 }
 
 export function patchRegistryContextAfterCancel(

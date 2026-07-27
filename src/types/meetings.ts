@@ -21,6 +21,8 @@ export interface MeetingDashboardItem {
   initiator?: MeetingPerson | null;
   manager?: MeetingPerson | null;
   psd_level?: boolean;
+  series_detected?: boolean;
+  series_recurrence_label?: string | null;
 }
 
 export interface MeetingLoginContext {
@@ -81,12 +83,54 @@ export interface MeetingHistoryEvent {
   message: string;
 }
 
+export type MeetingSeriesPlanningConfidence = "high" | "medium" | "low";
+export type MeetingSeriesPlanningMode = "series" | "single";
+
+export interface MeetingMemoSeriesPlanning {
+  detected: boolean;
+  requires_user_choice: boolean;
+  confidence: MeetingSeriesPlanningConfidence;
+  recurrence_label: string | null;
+  series_start_date: string | null;
+  series_end_date: string | null;
+  occurrence_count: number | null;
+  source_quote: string | null;
+  ambiguities: string[];
+  planning_options: MeetingSeriesPlanningMode[];
+  selected_mode: MeetingSeriesPlanningMode | null;
+}
+
+export interface MeetingMemoSeriesPlanningChoiceRequest {
+  mode: MeetingSeriesPlanningMode;
+}
+
+export interface MeetingMemoSeriesPlanningChoiceRead {
+  ref_key: string;
+  mode: MeetingSeriesPlanningMode;
+  stored: boolean;
+}
+
+export interface MeetingMemoSeriesCreateRead {
+  ref_key: string;
+  scheduled_meeting_id: string;
+  scheduled_meeting_title: string;
+  recurrence_label: string | null;
+  occurrence_count?: number | null;
+  memo_approved?: boolean;
+  memo_approve_message?: string | null;
+}
+
+export interface MeetingMemoSeriesCreateRequest {
+  meeting_topic?: Record<string, unknown> | null;
+}
+
 export interface MeetingApplication {
   initiator: MeetingPerson | null;
   manager: MeetingPerson | null;
   participants: MeetingParticipantDetail[];
   participants_count: number;
   agenda: string | null;
+  memo_text: string | null;
   scheduled_label: string | null;
   document_date: string | null;
   meeting_start: string | null;
@@ -116,6 +160,7 @@ export interface MeetingMemoDetail {
   auto_approve_allowed?: boolean;
   sto_checklist?: MeetingStoChecklistItem[];
   sto_issues?: MeetingStoIssue[];
+  series_planning?: MeetingMemoSeriesPlanning | null;
 }
 
 export interface MeetingSlot {
@@ -319,6 +364,7 @@ export interface MeetingAgentSlotApproveRequest {
   participants?: MeetingSlotPreviewParticipant[];
   company_calendar_cache_id?: string | null;
   reschedule_message?: string | null;
+  meeting_topic?: Record<string, unknown> | null;
 }
 
 export interface MeetingAgentSlotApprove {
@@ -392,6 +438,11 @@ export interface MeetingRegistryItem {
   invitations_sent_at: string;
   approved_at: string | null;
   protocol_number: string | null;
+  protocol_draft_at: string | null;
+  protocol_draft_created_at: string | null;
+  protocol_draft_error: string | null;
+  can_cancel?: boolean;
+  actions_locked?: boolean;
   cancelled_at: string | null;
   updated_at: string;
 }
@@ -407,6 +458,18 @@ export interface MeetingRegistryCancelResponse {
   outlook_cancelled: boolean;
   message: string | null;
   cancelled_at: string | null;
+}
+
+export interface MeetingRegistryProtocolCreateResponse {
+  ref_key: string;
+  created: boolean;
+  skipped: boolean;
+  reason?: string | null;
+  message?: string | null;
+  protocol_ref_key?: string | null;
+  protocol_number?: string | null;
+  stage?: MeetingRegistryStage | null;
+  protocol_draft_created_at?: string | null;
 }
 
 export type MeetingRegistryReschedulableStage = "invitations_sent" | "cancelled";
@@ -646,6 +709,16 @@ export interface MeetingScheduleSeriesItem {
   name: string;
   type: MeetingScheduleType;
   type_label?: string | null;
+  meeting_category_id?: string | null;
+  meeting_category_name?: string | null;
+  manager_user_id?: string | null;
+  manager_user_fio?: string | null;
+  manager_position_id?: string | null;
+  manager_position_name?: string | null;
+  responsible_user_id?: string | null;
+  responsible_user_fio?: string | null;
+  responsible_position_id?: string | null;
+  responsible_position_name?: string | null;
   participant_roles: string[];
   extra_participants_count?: number;
   frequency_label: string;
@@ -687,10 +760,12 @@ export interface MeetingScheduleOccurrenceView {
 export interface MeetingScheduleSeriesDetailView {
   seriesTitle: string;
   nextOccurrence: MeetingScheduleOccurrenceView | null;
+  upcomingOccurrences: MeetingScheduleOccurrenceView[];
   pastOccurrences: MeetingScheduleOccurrenceView[];
   comment: string | null;
   participants: string[];
   recurrenceLabel: string;
+  occurrenceCount: number | null;
   outlookMeetingUrl: string | null;
   usesRuleFallback: boolean;
 }
@@ -732,6 +807,15 @@ export interface MeetingScheduleContext {
 
 export interface MeetingScheduleSeriesSavePayload {
   title: string;
+  meeting_category_id: string;
+  manager_user_id: string;
+  responsible_user_id: string;
+  manager_person_fio?: string;
+  manager_person_email?: string;
+  responsible_person_fio?: string;
+  responsible_person_email?: string;
+  manager_position_id?: string | null;
+  responsible_position_id?: string | null;
   meeting_type: MeetingScheduleType;
   status: ScheduledMeetingStatus;
   participants: ScheduledMeetingParticipantCreate[];
@@ -739,6 +823,7 @@ export interface MeetingScheduleSeriesSavePayload {
   comment?: string | null;
   series_start_date?: string | null;
   series_end_date?: string | null;
+  payload?: Record<string, unknown> | null;
 }
 
 export type ScheduledMeetingStatus = "planned" | "created" | "archive";
@@ -766,14 +851,33 @@ export interface ScheduledMeetingRecurrenceCreate {
 }
 
 export interface ScheduledMeetingParticipantCreate {
+  user_id?: string;
+  person_fio?: string;
+  person_email?: string;
   department_id?: string;
   position_id?: string;
   sort_order?: number;
   is_required?: boolean;
 }
 
+export interface MeetingCategoryRead {
+  id: string;
+  name: string;
+  sort_order: number;
+  is_active: boolean;
+}
+
 export interface ScheduledMeetingCreate {
   title: string;
+  meeting_category_id: string;
+  manager_user_id: string;
+  responsible_user_id: string;
+  manager_person_fio?: string;
+  manager_person_email?: string;
+  responsible_person_fio?: string;
+  responsible_person_email?: string;
+  manager_position_id?: string;
+  responsible_position_id?: string;
   meeting_type: MeetingScheduleType;
   status?: ScheduledMeetingStatus;
   series_start_date?: string;
@@ -781,10 +885,34 @@ export interface ScheduledMeetingCreate {
   comment?: string | null;
   recurrence: ScheduledMeetingRecurrenceCreate;
   participants: ScheduledMeetingParticipantCreate[];
+  payload?: Record<string, unknown> | null;
+}
+
+export interface ScheduledMeetingEmployeeOption {
+  id: string;
+  fio: string;
+  email: string;
+  position_name?: string | null;
+  position_id?: string | null;
+}
+
+export interface ScheduledMeetingPositionResolveItem {
+  position_id: string;
+  position_name: string;
+  status: "resolved" | "ambiguous" | "empty" | "not_found";
+  employee: ScheduledMeetingEmployeeOption | null;
+  candidates: ScheduledMeetingEmployeeOption[];
+}
+
+export interface ScheduledMeetingPositionResolveRead {
+  items: ScheduledMeetingPositionResolveItem[];
 }
 
 export interface ScheduledMeetingParticipantRead {
   id: string;
+  user_id?: string | null;
+  person_fio?: string | null;
+  person_email?: string | null;
   department_id?: string;
   department_name?: string | null;
   position_id?: string;
@@ -798,9 +926,32 @@ export interface ScheduledMeetingParticipantOption {
   name: string;
 }
 
+export interface ScheduledMeetingCancelRequest {
+  message?: string;
+}
+
+export interface ScheduledMeetingCancelRead {
+  series: ScheduledMeetingRead;
+  cancelled: boolean;
+  outlook_cancelled: boolean;
+  outlook_warning?: string | null;
+  registry_warning?: string | null;
+  message?: string | null;
+}
+
 export interface ScheduledMeetingRead {
   id: string;
   title: string;
+  meeting_category_id: string;
+  meeting_category_name?: string | null;
+  manager_user_id?: string | null;
+  manager_user_fio?: string | null;
+  manager_position_id: string;
+  manager_position_name?: string | null;
+  responsible_user_id?: string | null;
+  responsible_user_fio?: string | null;
+  responsible_position_id: string;
+  responsible_position_name?: string | null;
   meeting_type: MeetingScheduleType;
   status: ScheduledMeetingStatus;
   time_local: string;
@@ -814,6 +965,7 @@ export interface ScheduledMeetingRead {
   series_start_date: string;
   series_end_date: string;
   recurrence_label: string;
+  occurrence_count?: number | null;
   recurrence_rule: Record<string, unknown>;
   outlook_series_id: string | null;
   outlook_changekey: string | null;
@@ -825,6 +977,7 @@ export interface ScheduledMeetingRead {
 export interface ScheduledMeetingDetailRead {
   series: ScheduledMeetingRead;
   next_occurrence: ScheduledMeetingOccurrence | null;
+  upcoming_occurrences: ScheduledMeetingOccurrence[];
   past_occurrences: ScheduledMeetingOccurrence[];
   current_card?: unknown | null;
   history?: unknown[];
@@ -832,6 +985,11 @@ export interface ScheduledMeetingDetailRead {
 
 export interface ScheduledMeetingUpdate {
   title?: string;
+  meeting_category_id?: string;
+  manager_user_id?: string;
+  responsible_user_id?: string;
+  manager_position_id?: string;
+  responsible_position_id?: string;
   meeting_type?: MeetingScheduleType;
   recurrence?: ScheduledMeetingRecurrenceCreate;
   series_start_date?: string;
@@ -853,3 +1011,98 @@ export interface ScheduledMeetingUpdateRead {
   series: ScheduledMeetingRead;
   applied_changes: ScheduledMeetingAppliedChanges;
 }
+
+export type MeetingTopicDecision = "use_existing" | "create_new";
+
+export interface MeetingTopicSimilarityBreakdown {
+  topic?: number | null;
+  participants?: number | null;
+  details?: number | null;
+}
+
+export interface MeetingTopicParticipant {
+  participant_ref_key?: string | null;
+  fio?: string | null;
+}
+
+export interface MeetingTopicSummary {
+  ref_key?: string | null;
+  code?: string | null;
+  description: string;
+  details?: string | null;
+  meeting_type?: string | null;
+  manager?: string | null;
+  reviewer?: string | null;
+  department?: string | null;
+  room?: string | null;
+  project?: string | null;
+  committee?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  closed_date?: string | null;
+  is_active?: boolean;
+  similarity_score?: number | null;
+  similarity_method?: string | null;
+  similarity_breakdown?: MeetingTopicSimilarityBreakdown | null;
+  participants?: MeetingTopicParticipant[];
+}
+
+export interface MeetingTopicCheckSimilarRequest {
+  description: string;
+  manager_fio: string;
+  meeting_type?: string;
+  topic_details?: string | null;
+  initiator_fio?: string | null;
+  participant_fios?: string[];
+}
+
+export interface MeetingTopicCheckSimilarRead {
+  similar_found: boolean;
+  requires_user_decision: boolean;
+  similar_topic?: MeetingTopicSummary | null;
+  similarity_score?: number | null;
+  similarity_method?: string | null;
+  similarity_breakdown?: MeetingTopicSimilarityBreakdown | null;
+  required_fields: string[];
+  message: string;
+}
+
+export interface MeetingTopicResolveRequest {
+  decision: MeetingTopicDecision;
+  existing_topic_ref_key?: string | null;
+  description?: string | null;
+  manager_fio?: string | null;
+  meeting_type?: string | null;
+  reviewer_fio?: string | null;
+  closed_date?: string | null;
+  closed_end_of_year?: boolean;
+  department_key?: string | null;
+  room_key?: string | null;
+  project_key?: string | null;
+  committee_key?: string | null;
+  organization_key?: string | null;
+  start_time?: string | null;
+  end_time?: string | null;
+  is_management_circle_topic?: boolean | null;
+  topic_details?: string | null;
+  initiator_fio?: string | null;
+  participant_fios?: string[];
+  dry_run?: boolean;
+}
+
+export interface MeetingTopicResolveRead {
+  decision: MeetingTopicDecision;
+  used_existing: boolean;
+  created: boolean;
+  dry_run?: boolean;
+  topic: MeetingTopicSummary;
+  participants_count: number;
+  message: string;
+}
+
+export interface MeetingTopicValidationRead {
+  valid: boolean;
+  topic?: MeetingTopicSummary | null;
+  reason?: string | null;
+}
+

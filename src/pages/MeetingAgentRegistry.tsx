@@ -34,6 +34,8 @@ import {
 
   useMeetingRegistryCancel,
 
+  useMeetingRegistryCreateProtocol,
+
   useMeetingRegistryParticipantsApply,
 
   useMeetingRegistryParticipantsConfirmAdd,
@@ -56,7 +58,7 @@ import {
   useMeetingAgentSlotPreviewDetails
 } from "@/hooks/useMeetingMemoDetail";
 
-import { getMeetingMemoActionError, getMeetingRequestError } from "@/hooks/useMeetingDashboard";
+import { getMeetingMemoActionError, getMeetingProtocolError, getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 
 import type {
   MeetingRegistryConfirmationKind,
@@ -71,9 +73,13 @@ import {
 
   defaultRegistryStageCounts,
 
+  formatProtocolDraftStatus,
+
   getMeetingRegistryStageIndex,
 
   getMeetingRegistryStageLabel,
+
+  isMeetingRegistryActionsLocked,
 
   isMeetingRegistryReschedulable,
 
@@ -154,6 +160,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
   const [participantsSuccessMessage, setParticipantsSuccessMessage] = useState<string | null>(null);
 
+  const [protocolSuccessMessage, setProtocolSuccessMessage] = useState<string | null>(null);
+
   const [participantsPendingState, setParticipantsPendingState] = useState<ParticipantsPendingState | null>(null);
 
   const [confirmingPendingSlotKey, setConfirmingPendingSlotKey] = useState<string | null>(null);
@@ -163,6 +171,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   const refreshRegistry = useRefreshMeetingRegistry();
 
   const cancelMeetingMutation = useMeetingRegistryCancel();
+
+  const createProtocolMutation = useMeetingRegistryCreateProtocol();
 
   const reschedulePreviewMutation = useMeetingRegistryRescheduleSlotPreview();
 
@@ -355,6 +365,8 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
     setParticipantsSuccessMessage(null);
 
+    setProtocolSuccessMessage(null);
+
     setParticipantsPendingState(null);
 
   }, [selectedId]);
@@ -498,6 +510,31 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
   }
 
 
+
+  const createProtocolError = createProtocolMutation.isError
+    ? getMeetingProtocolError(createProtocolMutation.error)
+    : null;
+
+  function handleCreateProtocol() {
+    if (!selectedItem?.refKey || createProtocolMutation.isPending || selectedItem.protocolNumber) return;
+
+    createProtocolMutation.reset();
+    setProtocolSuccessMessage(null);
+
+    void createProtocolMutation
+      .mutateAsync({ refKey: selectedItem.refKey })
+      .then((result) => {
+        setProtocolSuccessMessage(
+          result.message ??
+            (result.protocol_number
+              ? `Создан протокол №${result.protocol_number}`
+              : "Протокол создан")
+        );
+      })
+      .catch(() => {
+        // error shown in details panel
+      });
+  }
 
   function handleOpenCancelModal() {
 
@@ -1097,6 +1134,14 @@ export default function MeetingAgentRegistry({ canAccessAgent }: Props) {
 
               onParticipants={handleOpenParticipantsModal}
 
+              onCreateProtocol={handleCreateProtocol}
+
+              isCreatingProtocol={createProtocolMutation.isPending}
+
+              protocolSuccessMessage={protocolSuccessMessage}
+
+              protocolError={createProtocolError}
+
               participantsSuccessMessage={participantsSuccessMessage}
 
             />
@@ -1258,6 +1303,14 @@ function RegistryDetails({
 
   onParticipants,
 
+  onCreateProtocol,
+
+  isCreatingProtocol,
+
+  protocolSuccessMessage,
+
+  protocolError,
+
   participantsSuccessMessage
 
 }: {
@@ -1278,17 +1331,27 @@ function RegistryDetails({
 
   onParticipants: () => void;
 
+  onCreateProtocol: () => void;
+
+  isCreatingProtocol: boolean;
+
+  protocolSuccessMessage: string | null;
+
+  protocolError: string | null;
+
   participantsSuccessMessage: string | null;
 
 }) {
 
   const isCancelled = item.stage === "cancelled";
 
+  const actionsLocked = item.actionsLocked || isMeetingRegistryActionsLocked(item.stage);
+
   const currentIndex = getMeetingRegistryStageIndex(item.stage);
 
-  const canCancelMeeting = item.stage !== "cancelled";
+  const canCancelMeeting = item.canCancel && !actionsLocked;
 
-  const canRescheduleMeeting = isMeetingRegistryReschedulable(item.stage);
+  const canRescheduleMeeting = isMeetingRegistryReschedulable(item.stage) && !actionsLocked;
 
 
 
@@ -1458,6 +1521,13 @@ function RegistryDetails({
 
           ) : null}
 
+          {formatProtocolDraftStatus(item) ? (
+            <div>
+              <dt>Протокол</dt>
+              <dd>{formatProtocolDraftStatus(item)}</dd>
+            </div>
+          ) : null}
+
         </dl>
 
       </div>
@@ -1578,7 +1648,7 @@ function RegistryDetails({
 
           ) : null}
 
-          {canCancelMeeting ? (
+          {canCancelMeeting || actionsLocked ? (
 
             <button
 
@@ -1586,7 +1656,7 @@ function RegistryDetails({
 
               className={styles.rejectButton}
 
-              disabled={isCancelling}
+              disabled={isCancelling || actionsLocked}
 
               onClick={onCancel}
 
@@ -1626,15 +1696,62 @@ function RegistryDetails({
 
           </button>
 
-          <button type="button" className={styles.ghostButton} disabled title="Скоро">
+          {item.protocolNumber ? (
 
-            <FileText size={15} aria-hidden="true" />
+            <button type="button" className={styles.ghostButton} disabled title="Скоро">
 
-            Открыть протокол
+              <FileText size={15} aria-hidden="true" />
 
-          </button>
+              Открыть протокол
 
-          <button type="button" className={styles.ghostButton} onClick={onParticipants}>
+            </button>
+
+          ) : (
+
+            <button
+
+              type="button"
+
+              className={styles.secondaryButton}
+
+              disabled={isCreatingProtocol || isCancelled || actionsLocked}
+
+              onClick={onCreateProtocol}
+
+            >
+
+              {isCreatingProtocol ? (
+
+                <>
+
+                  <Loader2 size={15} className={styles.spinner} aria-hidden="true" />
+
+                  Создаём протокол…
+
+                </>
+
+              ) : (
+
+                <>
+
+                  <FileText size={15} aria-hidden="true" />
+
+                  Создать протокол
+
+                </>
+
+              )}
+
+            </button>
+
+          )}
+
+          <button
+            type="button"
+            className={styles.ghostButton}
+            disabled={actionsLocked}
+            onClick={onParticipants}
+          >
 
             <Users size={15} aria-hidden="true" />
 
@@ -1669,6 +1786,26 @@ function RegistryDetails({
           <p className={styles.registrySuccessNote} role="status">
 
             {participantsSuccessMessage}
+
+          </p>
+
+        ) : null}
+
+        {protocolSuccessMessage ? (
+
+          <p className={styles.registrySuccessNote} role="status">
+
+            {protocolSuccessMessage}
+
+          </p>
+
+        ) : null}
+
+        {protocolError ? (
+
+          <p className={styles.registryFailureNote} role="alert">
+
+            {protocolError}
 
           </p>
 

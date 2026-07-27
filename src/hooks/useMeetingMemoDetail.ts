@@ -1,4 +1,4 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { meetingsApi } from "@/api/endpoints";
 import type {
@@ -7,8 +7,13 @@ import type {
   MeetingAgentSlotApproveRequest,
   MeetingAgentSlotPreviewDetailsRequest,
   MeetingMemoRejectRequest,
-  MeetingMemoApproveRequest
+  MeetingMemoApproveRequest,
+  MeetingMemoSeriesPlanningChoiceRequest,
+  MeetingMemoSeriesCreateRequest,
+  MeetingTopicCheckSimilarRequest,
+  MeetingTopicResolveRequest
 } from "@/types/meetings";
+import { meetingScheduleQueryKey } from "@/hooks/useMeetingSchedule";
 
 const RUNNING_STATUSES = new Set(["pending", "planning", "running", "waiting_human"]);
 
@@ -116,5 +121,41 @@ export function useMeetingMemoApprove() {
       memoRefKey: string;
       payload?: MeetingMemoApproveRequest;
     }) => meetingsApi.approveMemo(memoRefKey, payload)
+  });
+}
+
+export function useMeetingTopicCheckSimilar() {
+  return useMutation({
+    mutationFn: (payload: MeetingTopicCheckSimilarRequest) => meetingsApi.checkSimilarTopic(payload)
+  });
+}
+
+export function useMeetingTopicResolve() {
+  return useMutation({
+    mutationFn: (payload: MeetingTopicResolveRequest) => meetingsApi.resolveTopic(payload)
+  });
+}
+
+export function useMeetingMemoSeriesPlanningChoice() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      mode
+    }: {
+      memoRefKey: string;
+      mode: MeetingMemoSeriesPlanningChoiceRequest["mode"];
+    }) => meetingsApi.saveSeriesPlanningChoice(memoRefKey, { mode })
+  });
+}
+
+export function useMeetingMemoCreateSeries() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { memoRefKey: string; payload?: MeetingMemoSeriesCreateRequest }) =>
+      meetingsApi.createSeriesFromMemo(input.memoRefKey, input.payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: meetingScheduleQueryKey });
+    }
   });
 }

@@ -6,6 +6,7 @@ import { ChevronDown, Search, X } from "lucide-react";
 
 import { meetingsApi } from "@/api/endpoints";
 import MeetingAgentScheduleRecurrenceField from "@/pages/MeetingAgentScheduleRecurrenceField";
+import MeetingAgentScheduleFillFromPositionsPanel from "@/pages/MeetingAgentScheduleFillFromPositionsPanel";
 import type {
   MeetingScheduleRecurrenceFormState,
   MeetingScheduleSeriesSavePayload,
@@ -31,11 +32,17 @@ type Props = {
 type ScheduleParticipant = {
   id: string;
   name: string;
-  kind: "position" | "department";
+  email: string;
+  positionName?: string | null;
+  positionId?: string | null;
+  kind: "employee";
 };
 
 type FormState = {
   title: string;
+  meetingCategoryId: string;
+  manager: ScheduleParticipant | null;
+  responsible: ScheduleParticipant | null;
   meetingType: MeetingScheduleType;
   participants: ScheduleParticipant[];
   recurrence: MeetingScheduleRecurrenceFormState;
@@ -46,6 +53,9 @@ type FormState = {
 
 const emptyForm = (): FormState => ({
   title: "",
+  meetingCategoryId: "",
+  manager: null,
+  responsible: null,
   meetingType: "planned",
   participants: [],
   recurrence: createDefaultRecurrenceFormState(),
@@ -99,7 +109,16 @@ export default function MeetingAgentScheduleSeriesDrawer({
     };
   }, [open, onClose]);
 
-  const canSave = form.title.trim().length > 0 && form.participants.length > 0 && !saving;
+  const saveBlockers = useMemo(() => {
+    const blockers: string[] = [];
+    if (!form.title.trim()) blockers.push("название");
+    if (!form.meetingCategoryId) blockers.push("вид совещания");
+    if (!form.manager) blockers.push("руководитель (сотрудник)");
+    if (!form.responsible) blockers.push("ответственный (сотрудник)");
+    return blockers;
+  }, [form.title, form.meetingCategoryId, form.manager, form.responsible]);
+
+  const canSave = saveBlockers.length === 0 && !saving;
 
   if (!open) return null;
 
@@ -123,12 +142,45 @@ export default function MeetingAgentScheduleSeriesDrawer({
     onClose();
   }
 
+  function handleFillFromPositions(payload: {
+    manager: ScheduleParticipant | null;
+    responsible: ScheduleParticipant | null;
+    participants: ScheduleParticipant[];
+  }) {
+    setForm((current) => {
+      const roleUserIds = new Set(
+        [payload.manager?.id, payload.responsible?.id].filter(Boolean) as string[]
+      );
+      const mergedParticipants = [...current.participants];
+      for (const participant of payload.participants) {
+        if (roleUserIds.has(participant.id)) continue;
+        if (mergedParticipants.some((item) => item.id === participant.id)) continue;
+        mergedParticipants.push(participant);
+      }
+      return {
+        ...current,
+        manager: payload.manager ?? current.manager,
+        responsible: payload.responsible ?? current.responsible,
+        participants: mergedParticipants
+      };
+    });
+  }
+
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSave) return;
 
     onSave({
       title: form.title.trim(),
+      meeting_category_id: form.meetingCategoryId,
+      manager_user_id: form.manager!.id,
+      responsible_user_id: form.responsible!.id,
+      manager_person_fio: form.manager!.name,
+      manager_person_email: form.manager!.email,
+      responsible_person_fio: form.responsible!.name,
+      responsible_person_email: form.responsible!.email,
+      manager_position_id: form.manager!.positionId ?? null,
+      responsible_position_id: form.responsible!.positionId ?? null,
       meeting_type: form.meetingType,
       status: "created",
       participants: mapScheduleFormParticipantsToApi(form.participants),
@@ -191,6 +243,25 @@ export default function MeetingAgentScheduleSeriesDrawer({
             </div>
           </label>
 
+          <ScheduleCategoryField
+            value={form.meetingCategoryId}
+            onChange={(meetingCategoryId) => updateField("meetingCategoryId", meetingCategoryId)}
+          />
+
+          <MeetingAgentScheduleFillFromPositionsPanel onApply={handleFillFromPositions} />
+
+          <ScheduleSingleEmployeeField
+            label="Руководитель"
+            value={form.manager}
+            onChange={(manager) => updateField("manager", manager)}
+          />
+
+          <ScheduleSingleEmployeeField
+            label="Ответственный"
+            value={form.responsible}
+            onChange={(responsible) => updateField("responsible", responsible)}
+          />
+
           <div className={styles.scheduleField}>
             <span className={styles.scheduleFieldLabel}>Участники</span>
             <ScheduleParticipantField
@@ -238,6 +309,14 @@ export default function MeetingAgentScheduleSeriesDrawer({
 
           <div className={styles.scheduleDrawerActions}>
             {saveError ? <p className={styles.scheduleDrawerError}>{saveError}</p> : null}
+            {!canSave && saveBlockers.length ? (
+              <p className={styles.scheduleParticipantEmptyHint}>
+                Для сохранения укажите: {saveBlockers.join(", ")}.
+                {saveBlockers.some((item) => item.includes("руководитель") || item.includes("ответственный"))
+                  ? " После выбора должностей нажмите «Подставить сотрудников» или найдите людей вручную."
+                  : ""}
+              </p>
+            ) : null}
             <button type="button" className={styles.secondaryButton} onClick={onClose} disabled={saving}>
               Отмена
             </button>
@@ -252,46 +331,67 @@ export default function MeetingAgentScheduleSeriesDrawer({
   );
 }
 
-function filterDepartmentSuggestions(
+function filterEmployeeSuggestions(
   query: string,
   selectedIds: string[],
-  departments: ScheduleParticipant[]
+  employees: ScheduleParticipant[]
 ): ScheduleParticipant[] {
   const normalized = query.trim().toLowerCase().replace("ё", "е");
-  if (!normalized) return [];
+  if (normalized.length < 3) return [];
 
-  return departments
-    .filter((department) => !selectedIds.includes(department.id))
-    .filter((department) => department.name.toLowerCase().replace("ё", "е").includes(normalized))
+  return employees
+    .filter((employee) => !selectedIds.includes(employee.id))
+    .filter((employee) => {
+      const haystack = `${employee.name} ${employee.email} ${employee.positionName ?? ""}`
+        .toLowerCase()
+        .replace("ё", "е");
+      return haystack.includes(normalized);
+    })
     .slice(0, 8);
+}
+
+function mapEmployeeOption(option: {
+  id: string;
+  fio: string;
+  email: string;
+  position_name?: string | null;
+  position_id?: string | null;
+}): ScheduleParticipant {
+  return {
+    id: option.id,
+    name: option.fio.trim(),
+    email: option.email.trim(),
+    positionName: option.position_name?.trim() || null,
+    positionId: option.position_id ?? null,
+    kind: "employee"
+  };
 }
 
 export function ScheduleParticipantField({
   selectedParticipants,
   onAdd,
-  onRemove
+  onRemove,
+  lockedParticipantIds = []
 }: {
   selectedParticipants: ScheduleParticipant[];
   onAdd: (participant: ScheduleParticipant) => void;
   onRemove: (participantId: string) => void;
+  lockedParticipantIds?: string[];
 }) {
   const [searchQuery, setSearchQuery] = useState("");
   const trimmedSearch = searchQuery.trim();
+  const employeeSearch = trimmedSearch.length >= 3 ? trimmedSearch : "";
 
-  const departmentsQuery = useQuery({
-    queryKey: ["meetings", "schedule", "participant-options", trimmedSearch],
-    queryFn: () => meetingsApi.listScheduleParticipantOptions(trimmedSearch || undefined),
-    staleTime: 60_000
+  const employeesQuery = useQuery({
+    queryKey: ["meetings", "schedule", "employee-options", employeeSearch],
+    queryFn: () => meetingsApi.listScheduleEmployeeOptions(employeeSearch),
+    enabled: employeeSearch.length >= 3,
+    staleTime: 30_000
   });
 
-  const departmentOptions = useMemo(
-    () =>
-      (departmentsQuery.data ?? []).map((department) => ({
-        id: department.id,
-        name: department.name.trim(),
-        kind: "position" as const
-      })),
-    [departmentsQuery.data]
+  const employeeOptions = useMemo(
+    () => (employeesQuery.data ?? []).map(mapEmployeeOption),
+    [employeesQuery.data]
   );
 
   const selectedIds = useMemo(
@@ -300,8 +400,8 @@ export function ScheduleParticipantField({
   );
 
   const suggestions = useMemo(
-    () => filterDepartmentSuggestions(searchQuery, selectedIds, departmentOptions),
-    [searchQuery, selectedIds, departmentOptions]
+    () => filterEmployeeSuggestions(searchQuery, selectedIds, employeeOptions),
+    [searchQuery, selectedIds, employeeOptions]
   );
 
   function handleAddParticipant(participant: ScheduleParticipant) {
@@ -323,7 +423,7 @@ export function ScheduleParticipantField({
           <input
             className={`${styles.scheduleControl} ${styles.scheduleParticipantSearchInput}`}
             value={searchQuery}
-            placeholder="Поиск должности"
+            placeholder="Поиск участника (мин. 3 символа)"
             onChange={(event) => setSearchQuery(event.target.value)}
             onKeyDown={handleSearchKeyDown}
           />
@@ -339,14 +439,18 @@ export function ScheduleParticipantField({
         ) : null}
       </div>
 
-      {departmentsQuery.isLoading ? (
-        <p className={styles.scheduleParticipantEmptyHint}>Загружаем должности…</p>
-      ) : departmentsQuery.isError ? (
-        <p className={styles.scheduleParticipantEmptyHint}>Не удалось загрузить должности</p>
+      {employeesQuery.isLoading && employeeSearch ? (
+        <p className={styles.scheduleParticipantEmptyHint}>Ищем сотрудников…</p>
+      ) : employeesQuery.isError && employeeSearch ? (
+        <p className={styles.scheduleParticipantEmptyHint}>Не удалось загрузить сотрудников</p>
       ) : null}
 
-      {trimmedSearch && suggestions.length > 1 ? (
-        <ul className={styles.scheduleParticipantSuggestions} aria-label="Найденные должности">
+      {trimmedSearch.length > 0 && trimmedSearch.length < 3 ? (
+        <p className={styles.scheduleParticipantEmptyHint}>Введите минимум 3 символа</p>
+      ) : null}
+
+      {employeeSearch && suggestions.length > 1 ? (
+        <ul className={styles.scheduleParticipantSuggestions} aria-label="Найденные сотрудники">
           {suggestions.map((participant) => (
             <li key={participant.id}>
               <button
@@ -354,22 +458,36 @@ export function ScheduleParticipantField({
                 className={styles.scheduleParticipantSuggestionButton}
                 onClick={() => handleAddParticipant(participant)}
               >
-                {participant.name}
+                <span>{participant.name}</span>
+                <span className={styles.scheduleParticipantSuggestionMeta}>{participant.email}</span>
               </button>
             </li>
           ))}
         </ul>
-      ) : trimmedSearch && suggestions.length === 1 ? (
-        <p className={styles.scheduleParticipantMatchHint}>Найдено: {suggestions[0]!.name}</p>
-      ) : trimmedSearch && !departmentsQuery.isLoading && !departmentsQuery.isError && !suggestions.length ? (
-        <p className={styles.scheduleParticipantEmptyHint}>Должность не найдена</p>
+      ) : employeeSearch && suggestions.length === 1 ? (
+        <p className={styles.scheduleParticipantMatchHint}>
+          Найдено: {suggestions[0]!.name} ({suggestions[0]!.email})
+        </p>
+      ) : employeeSearch && !employeesQuery.isLoading && !employeesQuery.isError && !suggestions.length ? (
+        <p className={styles.scheduleParticipantEmptyHint}>Сотрудник не найден</p>
       ) : null}
 
       {selectedParticipants.length ? (
         <div className={styles.scheduleParticipantChipList}>
-          {selectedParticipants.map((participant) => (
+          {selectedParticipants.map((participant) => {
+            const isLocked = lockedParticipantIds.includes(participant.id);
+            return (
             <span className={styles.scheduleParticipantChip} key={participant.id}>
-              <span className={styles.scheduleParticipantChipLabel}>{participant.name}</span>
+              <span className={styles.scheduleParticipantChipLabel}>
+                {participant.name}
+                {participant.positionName ? (
+                  <span className={styles.scheduleParticipantSuggestionMeta}>
+                    {" "}
+                    · {participant.positionName}
+                  </span>
+                ) : null}
+              </span>
+              {!isLocked ? (
               <button
                 type="button"
                 className={styles.scheduleParticipantChipRemove}
@@ -378,12 +496,158 @@ export function ScheduleParticipantField({
               >
                 <X size={12} aria-hidden="true" />
               </button>
+              ) : null}
             </span>
-          ))}
+            );
+          })}
         </div>
-      ) : !trimmedSearch && !departmentsQuery.isLoading && !departmentsQuery.isError ? (
-        <p className={styles.scheduleParticipantEmptyHint}>Добавьте хотя бы одну должность</p>
+      ) : !trimmedSearch && !employeesQuery.isLoading && !employeesQuery.isError ? (
+        <p className={styles.scheduleParticipantEmptyHint}>Добавьте хотя бы одного участника</p>
       ) : null}
+    </div>
+  );
+}
+
+function ScheduleCategoryField({
+  value,
+  onChange
+}: {
+  value: string;
+  onChange: (categoryId: string) => void;
+}) {
+  const categoriesQuery = useQuery({
+    queryKey: ["meetings", "schedule", "category-options"],
+    queryFn: () => meetingsApi.listScheduleCategoryOptions(),
+    staleTime: 60_000
+  });
+
+  return (
+    <label className={styles.scheduleField}>
+      <span className={styles.scheduleFieldLabel}>Вид совещания</span>
+      <div className={styles.scheduleSelectField}>
+        <select
+          className={styles.scheduleControl}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          disabled={categoriesQuery.isLoading || categoriesQuery.isError}
+        >
+          <option value="">
+            {categoriesQuery.isLoading ? "Загрузка…" : "Выберите вид"}
+          </option>
+          {(categoriesQuery.data ?? []).map((category) => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
+        <ChevronDown className={styles.scheduleSelectChevron} size={16} aria-hidden="true" />
+      </div>
+    </label>
+  );
+}
+
+function ScheduleSingleEmployeeField({
+  label,
+  value,
+  onChange
+}: {
+  label: string;
+  value: ScheduleParticipant | null;
+  onChange: (participant: ScheduleParticipant | null) => void;
+}) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const trimmedSearch = searchQuery.trim();
+  const employeeSearch = trimmedSearch.length >= 3 ? trimmedSearch : "";
+
+  const employeesQuery = useQuery({
+    queryKey: ["meetings", "schedule", "employee-options", label, employeeSearch],
+    queryFn: () => meetingsApi.listScheduleEmployeeOptions(employeeSearch),
+    enabled: employeeSearch.length >= 3,
+    staleTime: 30_000
+  });
+
+  const employeeOptions = useMemo(
+    () => (employeesQuery.data ?? []).map(mapEmployeeOption),
+    [employeesQuery.data]
+  );
+
+  const suggestions = useMemo(
+    () => filterEmployeeSuggestions(searchQuery, value ? [value.id] : [], employeeOptions),
+    [searchQuery, value, employeeOptions]
+  );
+
+  function handleSelect(participant: ScheduleParticipant) {
+    onChange(participant);
+    setSearchQuery("");
+  }
+
+  return (
+    <div className={styles.scheduleField}>
+      <span className={styles.scheduleFieldLabel}>{label}</span>
+      {value ? (
+        <div className={styles.scheduleParticipantChipList}>
+          <span className={styles.scheduleParticipantChip}>
+            <span className={styles.scheduleParticipantChipLabel}>
+              {value.name}
+              {value.positionName ? (
+                <span className={styles.scheduleParticipantSuggestionMeta}>
+                  {" "}
+                  · {value.positionName}
+                </span>
+              ) : null}
+            </span>
+            <button
+              type="button"
+              className={styles.scheduleParticipantChipRemove}
+              aria-label={`Сменить ${label.toLowerCase()}`}
+              onClick={() => onChange(null)}
+            >
+              <X size={12} aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+      ) : (
+        <div className={styles.scheduleParticipantField}>
+          <div className={styles.scheduleParticipantSearchRow}>
+            <div className={styles.scheduleParticipantSearchField}>
+              <Search className={styles.scheduleParticipantSearchIcon} size={16} aria-hidden="true" />
+              <input
+                className={`${styles.scheduleControl} ${styles.scheduleParticipantSearchInput}`}
+                value={searchQuery}
+                placeholder={`Поиск ${label.toLowerCase()} (мин. 3 символа)`}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && suggestions[0]) {
+                    event.preventDefault();
+                    handleSelect(suggestions[0]!);
+                  }
+                }}
+              />
+            </div>
+          </div>
+          {trimmedSearch.length > 0 && trimmedSearch.length < 3 ? (
+            <p className={styles.scheduleParticipantEmptyHint}>Введите минимум 3 символа</p>
+          ) : null}
+          {employeeSearch && suggestions.length ? (
+            <ul className={styles.scheduleParticipantSuggestions} aria-label={`Найденные сотрудники: ${label}`}>
+              {suggestions.map((participant) => (
+                <li key={participant.id}>
+                  <button
+                    type="button"
+                    className={styles.scheduleParticipantSuggestionButton}
+                    onClick={() => handleSelect(participant)}
+                  >
+                    <span>{participant.name}</span>
+                    <span className={styles.scheduleParticipantSuggestionMeta}>{participant.email}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : employeeSearch && !employeesQuery.isLoading && !employeesQuery.isError ? (
+            <p className={styles.scheduleParticipantEmptyHint}>Сотрудник не найден</p>
+          ) : null}
+        </div>
+      )}
     </div>
   );
 }

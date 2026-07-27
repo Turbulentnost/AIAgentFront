@@ -164,6 +164,11 @@ export default function MeetingAgentScheduleSeriesEditDrawer({
       original: baseline,
       payload: {
         title: baseline.title,
+        meeting_category_id: baseline.meeting_category_id,
+        manager_user_id: baseline.manager_user_id ?? baseline.manager_position_id,
+        responsible_user_id: baseline.responsible_user_id ?? baseline.responsible_position_id,
+        manager_position_id: baseline.manager_position_id,
+        responsible_position_id: baseline.responsible_position_id,
         meeting_type: baseline.meeting_type,
         status: baseline.status,
         participants: mapScheduleFormParticipantsToApi(form.participants),
@@ -219,6 +224,9 @@ export default function MeetingAgentScheduleSeriesEditDrawer({
               <p className={styles.scheduleEditSummaryTitle}>{series.title}</p>
               <div className={styles.scheduleEditSummaryMeta}>
                 <span>{typeLabel}</span>
+                <span>{series.meeting_category_name ?? "—"}</span>
+                <span>Руководитель: {series.manager_user_fio ?? series.manager_position_name ?? "—"}</span>
+                <span>Ответственный: {series.responsible_user_fio ?? series.responsible_position_name ?? "—"}</span>
                 <span>Срок с {formatDateLabel(series.series_start_date)}</span>
               </div>
             </div>
@@ -229,6 +237,12 @@ export default function MeetingAgentScheduleSeriesEditDrawer({
                 selectedParticipants={form.participants}
                 onAdd={handleAddParticipant}
                 onRemove={handleRemoveParticipant}
+                lockedParticipantIds={[
+                  series.manager_user_id,
+                  series.responsible_user_id,
+                  series.manager_position_id,
+                  series.responsible_position_id
+                ].filter(Boolean) as string[]}
               />
             </div>
 

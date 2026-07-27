@@ -11,6 +11,9 @@ export type MeetingScheduleStatusTone = "green" | "amber" | "slate";
 export interface MeetingScheduleViewItem extends MeetingScheduleSeriesItem {
   typeLabel: string;
   typeTone: MeetingScheduleTypeTone;
+  categoryLabel: string;
+  managerLabel: string;
+  responsibleLabel: string;
   statusLabel: string;
   statusTone: MeetingScheduleStatusTone;
   deadlinePrimary: string;
@@ -123,6 +126,10 @@ export function mapMeetingScheduleItem(item: MeetingScheduleSeriesItem): Meeting
     ...item,
     typeLabel: item.type_label?.trim() || typeLabels[item.type],
     typeTone: typeTones[item.type],
+    categoryLabel: item.meeting_category_name?.trim() || "—",
+    managerLabel: item.manager_user_fio?.trim() || item.manager_position_name?.trim() || "—",
+    responsibleLabel:
+      item.responsible_user_fio?.trim() || item.responsible_position_name?.trim() || "—",
     statusLabel: item.status_label?.trim() || statusLabels[item.status],
     statusTone: statusTones[item.status],
     deadlinePrimary: deadline.primary,

@@ -7,6 +7,7 @@ import type {
   MeetingRegistryParticipantsApplyRequest,
   MeetingRegistryParticipantsAddConfirmRequest,
   MeetingRegistryParticipantsRemovalConfirmRequest,
+  MeetingRegistryProtocolCreateResponse,
   MeetingRegistryStageFilter
 } from "@/types/meetings";
 import {
@@ -14,6 +15,7 @@ import {
   patchRegistryContextAfterParticipantsApply,
   patchRegistryContextAfterParticipantsAddConfirm,
   patchRegistryContextAfterParticipantsRemovalConfirm,
+  patchRegistryContextAfterProtocolCreate,
   patchRegistryContextAfterReschedule,
   registryStageQueryParam
 } from "@/utils/meetingRegistry";
@@ -225,6 +227,30 @@ export function useMeetingRegistryParticipantsConfirmRemoval() {
       void queryClient.invalidateQueries({ queryKey: ["meetings", "registry"] });
       void queryClient.invalidateQueries({ queryKey: ["meetings", "registry", "participants", refKey] });
       void queryClient.invalidateQueries({ queryKey: ["meetings", "memo-detail", refKey] });
+    }
+  });
+}
+
+export function useMeetingRegistryCreateProtocol() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: ({ refKey }: { refKey: string }) => meetingsApi.createRegistryProtocol(refKey),
+    onSuccess: (result, { refKey }) => {
+      const queries = queryClient.getQueriesData<MeetingRegistryContext>({
+        queryKey: ["meetings", "registry"]
+      });
+
+      for (const [queryKey, data] of queries) {
+        if (!data || !Array.isArray(data.items)) continue;
+        const stageFilter = (queryKey[2] as MeetingRegistryStageFilter | undefined) ?? "all";
+        queryClient.setQueryData(
+          queryKey,
+          patchRegistryContextAfterProtocolCreate(data, refKey, result, stageFilter)
+        );
+      }
+
+      void queryClient.invalidateQueries({ queryKey: ["meetings", "registry"] });
     }
   });
 }
