@@ -18,6 +18,7 @@ import {
   useMeetingScheduleCancelSeries,
   useMeetingScheduleCategories,
   useMeetingScheduleCreateSeries,
+  useMeetingSchedulePlanPreview,
   useMeetingSchedulePlanSeries,
   useMeetingScheduleDetail,
   useMeetingScheduleSeriesForEdit,
@@ -25,6 +26,7 @@ import {
 } from "@/hooks/useMeetingSchedule";
 import { getMeetingRequestError } from "@/hooks/useMeetingDashboard";
 import MeetingAgentScheduleCancelModal from "@/pages/MeetingAgentScheduleCancelModal";
+import MeetingAgentSchedulePlanPreviewModal from "@/pages/MeetingAgentSchedulePlanPreviewModal";
 import MeetingAgentScheduleSeriesDrawer from "@/pages/MeetingAgentScheduleSeriesDrawer";
 import MeetingAgentScheduleSeriesEditDrawer from "@/pages/MeetingAgentScheduleSeriesEditDrawer";
 import MeetingAgentTopicModal from "@/pages/MeetingAgentTopicModal";
@@ -33,6 +35,8 @@ import type {
   MeetingScheduleSeriesSavePayload,
   MeetingTopicResolveRead,
   ScheduledMeetingAppliedChanges,
+  ScheduledMeetingPlanOverride,
+  ScheduledMeetingPlanPreviewRead,
   ScheduledMeetingRead
 } from "@/types/meetings";
 import {
@@ -81,13 +85,18 @@ export default function MeetingAgentSchedule({
 }: Props) {
   const scheduleQuery = useMeetingSchedule(canAccessAgent);
   const createSeriesMutation = useMeetingScheduleCreateSeries();
+  const planPreviewMutation = useMeetingSchedulePlanPreview();
   const planSeriesMutation = useMeetingSchedulePlanSeries();
   const cancelSeriesMutation = useMeetingScheduleCancelSeries();
   const updateSeriesMutation = useMeetingScheduleUpdateSeries();
   const [selectedId, setSelectedId] = useState("");
+  const [expandedParticipantsRowId, setExpandedParticipantsRowId] = useState<string | null>(null);
   const [isCreateDrawerOpen, setIsCreateDrawerOpen] = useState(false);
   const [editSeriesId, setEditSeriesId] = useState<string | null>(null);
   const [cancelSeriesTarget, setCancelSeriesTarget] = useState<MeetingScheduleViewItem | null>(null);
+  const [planPreviewTarget, setPlanPreviewTarget] = useState<MeetingScheduleViewItem | null>(null);
+  const [planPreview, setPlanPreview] = useState<ScheduledMeetingPlanPreviewRead | null>(null);
+  const [planPreviewError, setPlanPreviewError] = useState<string | null>(null);
   const [planError, setPlanError] = useState<string | null>(null);
   const [editSuccessMessage, setEditSuccessMessage] = useState<string | null>(null);
   const [cancelSuccessMessage, setCancelSuccessMessage] = useState<string | null>(null);
@@ -244,16 +253,60 @@ export default function MeetingAgentSchedule({
     );
   }
 
-  function handlePlanSeries(meetingId: string) {
+  function handleOpenPlanPreview(item: MeetingScheduleViewItem) {
     setPlanError(null);
-    planSeriesMutation.mutate(meetingId, {
-      onSuccess: () => {
-        setPlanError(null);
-      },
-      onError: (error) => {
-        setPlanError(getMeetingRequestError(error));
+    setPlanPreviewError(null);
+    setPlanPreview(null);
+    setPlanPreviewTarget(item);
+    planPreviewMutation.mutate(
+      { meetingId: item.id, payload: { conflict_policy: "soft_week" } },
+      {
+        onSuccess: (preview) => {
+          setPlanPreview(preview);
+          setPlanPreviewError(null);
+        },
+        onError: (error) => {
+          setPlanPreviewError(getMeetingRequestError(error));
+        }
       }
-    });
+    );
+  }
+
+  function handleClosePlanPreview() {
+    if (planPreviewMutation.isPending || planSeriesMutation.isPending) return;
+    setPlanPreviewTarget(null);
+    setPlanPreview(null);
+    setPlanPreviewError(null);
+    setPlanError(null);
+    planPreviewMutation.reset();
+  }
+
+  function handleConfirmPlanSeries(overrides: ScheduledMeetingPlanOverride[]) {
+    if (!planPreviewTarget) return;
+    setPlanError(null);
+    planSeriesMutation.mutate(
+      {
+        meetingId: planPreviewTarget.id,
+        payload: {
+          conflict_policy: "soft_week",
+          overrides
+        }
+      },
+      {
+        onSuccess: () => {
+          setPlanPreviewTarget(null);
+          setPlanPreview(null);
+          setPlanPreviewError(null);
+          setPlanError(null);
+          setEditSuccessMessage(
+            `Серия «${planPreviewTarget.name}» распланирована в Outlook`
+          );
+        },
+        onError: (error) => {
+          setPlanError(getMeetingRequestError(error));
+        }
+      }
+    );
   }
 
   if (scheduleQuery.isLoading && !scheduleQuery.data) {
@@ -412,7 +465,11 @@ export default function MeetingAgentSchedule({
                   visibleItems.map((item) => {
                     const isSelected = item.id === selectedId;
                     const isArchived = isMeetingScheduleArchived(item);
-                    const participantPreview = item.participant_roles.slice(0, 2).join(", ");
+                    const participantsExpanded = expandedParticipantsRowId === item.id;
+                    const visibleRoles = participantsExpanded
+                      ? item.participant_roles
+                      : item.participant_roles.slice(0, 2);
+                    const participantPreview = visibleRoles.join(", ");
                     const hiddenParticipants = Math.max(
                       item.participant_roles.length - 2,
                       item.extra_participants_count ?? 0
@@ -453,7 +510,26 @@ export default function MeetingAgentSchedule({
                           {participantPreview ? (
                             <span className={styles.scheduleParticipantsPreview}>
                               {participantPreview}
-                              {hiddenParticipants > 0 ? ` +${hiddenParticipants}` : ""}
+                              {hiddenParticipants > 0 ? (
+                                <>
+                                  {" "}
+                                  <button
+                                    type="button"
+                                    className={styles.scheduleParticipantMoreInline}
+                                    aria-expanded={participantsExpanded}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      setExpandedParticipantsRowId((current) =>
+                                        current === item.id ? null : item.id
+                                      );
+                                    }}
+                                  >
+                                    {participantsExpanded
+                                      ? "свернуть"
+                                      : `+${hiddenParticipants}`}
+                                  </button>
+                                </>
+                              ) : null}
                             </span>
                           ) : null}
                         </td>
@@ -520,17 +596,19 @@ export default function MeetingAgentSchedule({
                                   type="button"
                                   className={`${styles.scheduleActionButton} ${styles.scheduleActionButtonPrimary}`}
                                   disabled={
-                                    planSeriesMutation.isPending &&
-                                    planSeriesMutation.variables === item.id
+                                    (planPreviewMutation.isPending ||
+                                      planSeriesMutation.isPending) &&
+                                    planPreviewTarget?.id === item.id
                                   }
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    handlePlanSeries(item.id);
+                                    handleOpenPlanPreview(item);
                                   }}
                                 >
-                                  {planSeriesMutation.isPending &&
-                                  planSeriesMutation.variables === item.id
-                                    ? "Распланируем…"
+                                  {(planPreviewMutation.isPending ||
+                                    planSeriesMutation.isPending) &&
+                                  planPreviewTarget?.id === item.id
+                                    ? "Проверяем…"
                                     : schedulePlanAction.label}
                                 </button>
                               ) : null}
@@ -573,6 +651,17 @@ export default function MeetingAgentSchedule({
         }
         onClose={handleCloseCancelModal}
         onConfirm={handleConfirmCancelSeries}
+      />
+      <MeetingAgentSchedulePlanPreviewModal
+        open={Boolean(planPreviewTarget)}
+        seriesLabel={planPreviewTarget?.name ?? "Серия совещаний"}
+        loadingPreview={planPreviewMutation.isPending}
+        planning={planSeriesMutation.isPending}
+        preview={planPreview}
+        previewError={planPreviewError}
+        planError={planError}
+        onClose={handleClosePlanPreview}
+        onConfirm={handleConfirmPlanSeries}
       />
       <MeetingAgentScheduleSeriesDrawer
         open={isCreateDrawerOpen}
@@ -705,9 +794,14 @@ function ScheduleDetails({
               )
             )}
             {!showAllParticipants && allParticipants.length > 2 ? (
-              <span className={styles.scheduleParticipantMoreMuted}>
+              <button
+                type="button"
+                className={styles.scheduleParticipantMore}
+                aria-expanded={false}
+                onClick={() => setShowAllParticipants(true)}
+              >
                 +{allParticipants.length - 2}
-              </span>
+              </button>
             ) : null}
           </div>
         </div>

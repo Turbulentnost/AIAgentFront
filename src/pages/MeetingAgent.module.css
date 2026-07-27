@@ -2748,19 +2748,29 @@
 }
 
 .scheduleCategoryPicker {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-direction: column;
   gap: 8px;
-  max-height: 220px;
-  padding: 2px;
-  overflow: auto;
+  max-height: 260px;
+  padding: 2px 4px 2px 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .scheduleCategoryPickerTile {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 100%;
   min-height: 44px;
+  height: auto;
+  box-sizing: border-box;
   padding: 10px 12px;
   color: var(--color-text-secondary);
   text-align: left;
+  white-space: normal;
+  word-break: break-word;
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle);
   border-radius: 10px;
@@ -2959,6 +2969,24 @@
   color: var(--color-muted);
   font-size: 12px;
   line-height: 1.35;
+}
+
+.scheduleParticipantMoreInline {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary-text, #1d4ed8);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.scheduleParticipantMoreInline:hover {
+  color: var(--color-text);
 }
 
 .scheduleScheduleCell {
@@ -4098,10 +4126,6 @@
     grid-template-columns: 1fr;
   }
 
-  .scheduleCategoryPicker {
-    grid-template-columns: 1fr;
-  }
-
   .scheduleDetailsGrid {
     grid-template-columns: 1fr;
   }
@@ -4194,5 +4218,171 @@
   margin-top: 2px;
   color: var(--color-placeholder);
   font-size: 11px;
+  font-weight: 600;
+}
+
+.planPreviewModalCard {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+
+.planPreviewLoading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.planPreviewSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.planPreviewSummary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-hover);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planPreviewSummaryTotal {
+  background: transparent !important;
+}
+
+.planPreviewGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.planPreviewGroup {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface, #fff);
+}
+
+.planPreviewGroupHeader {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planPreviewGroupHeader strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.planPreviewChevron,
+.planPreviewChevronOpen {
+  flex-shrink: 0;
+  margin-top: 2px;
+  transition: transform 0.15s ease;
+}
+
+.planPreviewChevronOpen {
+  transform: rotate(180deg);
+}
+
+.planPreviewOccurrenceList {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.planPreviewOccurrence {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-hover);
+}
+
+.planPreviewOccurrenceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planPreviewOccurrenceMeta {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.planPreviewDifficulty {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.planPreviewChoiceField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planPreviewChoiceField select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  font: inherit;
+}
+
+.planPreviewReason {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.planPreviewBlockers {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.planPreviewBlockers li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
   font-weight: 600;
 }

@@ -131,6 +131,9 @@ import type {
   ScheduledMeetingEmployeeOption,
   ScheduledMeetingPositionResolveRead,
   ScheduledMeetingParticipantOption,
+  ScheduledMeetingPlanPreviewRead,
+  ScheduledMeetingPlanPreviewRequest,
+  ScheduledMeetingPlanRequest,
   ScheduledMeetingRead,
   ScheduledMeetingUpdate,
   ScheduledMeetingUpdateRead,
@@ -393,9 +396,22 @@ export const meetingsApi = {
     longRunningApiClient
       .patch<ScheduledMeetingUpdateRead>(`/meetings/scheduled/${meetingId}`, payload)
       .then((r) => r.data),
-  planScheduled: (meetingId: string) =>
+  planPreviewScheduled: (
+    meetingId: string,
+    payload?: ScheduledMeetingPlanPreviewRequest
+  ) =>
     longRunningApiClient
-      .post<ScheduledMeetingRead>(`/meetings/scheduled/${meetingId}/plan`, {})
+      .post<ScheduledMeetingPlanPreviewRead>(
+        `/meetings/scheduled/${meetingId}/plan-preview`,
+        payload ?? { conflict_policy: "soft_week" }
+      )
+      .then((r) => r.data),
+  planScheduled: (meetingId: string, payload?: ScheduledMeetingPlanRequest) =>
+    longRunningApiClient
+      .post<ScheduledMeetingRead>(
+        `/meetings/scheduled/${meetingId}/plan`,
+        payload ?? {}
+      )
       .then((r) => r.data),
   cancelScheduled: (meetingId: string, payload?: ScheduledMeetingCancelRequest) =>
     longRunningApiClient

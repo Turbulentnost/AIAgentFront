@@ -2,6 +2,7 @@ import { Component, useCallback, useEffect, useMemo, useRef, useState, type Reac
 import { useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
+  CalendarClock,
   CalendarDays,
   CheckCircle2,
   Clock3,
@@ -1033,11 +1034,19 @@ function MeetingDetails({
   const stoPassedCount = countPassedStoChecklist(detail);
   const seriesPlanning = detail.series_planning;
   const selectedSeriesMode = seriesPlanning?.selected_mode ?? null;
-  const canPlanAsSeries = seriesPlanning?.planning_options.includes("series") ?? false;
-  const showSeriesPlanning =
-    Boolean(seriesPlanning?.detected) && selectedSeriesMode !== "single";
+  const seriesDetected =
+    Boolean(seriesPlanning?.detected) || Boolean(queueItem?.series_detected);
+  const canPlanAsSeries =
+    (seriesPlanning?.planning_options?.includes("series") ?? false) ||
+    (Boolean(queueItem?.series_detected) && selectedSeriesMode !== "series");
+  // Показываем блок, когда периодичность видна в карточке — и до выбора режима, и после.
+  const showSeriesPlanning = seriesDetected;
   const isSingleSeriesMode = selectedSeriesMode === "single";
   const isSeriesMode = selectedSeriesMode === "series";
+  const periodicityLabel =
+    (seriesPlanning?.detected && seriesPlanning.recurrence_label?.trim()) ||
+    (queueItem?.series_detected && queueItem.series_recurrence_label?.trim()) ||
+    null;
   const visibleStatus = getMeetingStatusLabel(
     queueItem?.status ?? detail.status,
     queueItem?.status_label ?? detail.status_label
@@ -1094,6 +1103,9 @@ function MeetingDetails({
             icon={CalendarDays}
             value={application.scheduled_label ?? "—"}
           />
+          {periodicityLabel ? (
+            <DataField label="Периодичность" icon={CalendarClock} value={periodicityLabel} />
+          ) : null}
           <DataField
             label="Длительность"
             icon={Clock3}
@@ -1190,7 +1202,11 @@ function MeetingDetails({
           <h3>Планирование серии</h3>
           <div className={styles.recommendationBox}>
             <strong>Распознана периодичность</strong>
-            <p>{seriesPlanning?.recurrence_label ?? "Периодичность определена по тексту СЗ"}</p>
+            <p>
+              {seriesPlanning?.recurrence_label?.trim() ||
+                periodicityLabel ||
+                "Периодичность определена по тексту СЗ"}
+            </p>
             {seriesPlanning?.occurrence_count ? (
               <p className={styles.inlineMuted}>
                 Запланировано встреч: {seriesPlanning.occurrence_count}

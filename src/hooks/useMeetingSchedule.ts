@@ -5,6 +5,8 @@ import { meetingsApi } from "@/api/endpoints";
 import type {
   MeetingScheduleContext,
   MeetingScheduleSeriesSavePayload,
+  ScheduledMeetingPlanPreviewRequest,
+  ScheduledMeetingPlanRequest,
   ScheduledMeetingRead
 } from "@/types/meetings";
 import {
@@ -166,11 +168,25 @@ export function useMeetingScheduleCreateSeries() {
   });
 }
 
+export function useMeetingSchedulePlanPreview() {
+  return useMutation({
+    mutationFn: (input: {
+      meetingId: string;
+      payload?: ScheduledMeetingPlanPreviewRequest;
+    }) => meetingsApi.planPreviewScheduled(input.meetingId, input.payload)
+  });
+}
+
 export function useMeetingSchedulePlanSeries() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (meetingId: string) => meetingsApi.planScheduled(meetingId),
+    mutationFn: (input: { meetingId: string; payload?: ScheduledMeetingPlanRequest } | string) => {
+      if (typeof input === "string") {
+        return meetingsApi.planScheduled(input);
+      }
+      return meetingsApi.planScheduled(input.meetingId, input.payload);
+    },
     onSuccess: (read) => {
       queryClient.setQueryData<MeetingScheduleQueryData>(meetingScheduleQueryKey, (current) => {
         const base = current ?? emptyScheduleQueryData();

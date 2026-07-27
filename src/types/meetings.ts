@@ -939,6 +939,80 @@ export interface ScheduledMeetingCancelRead {
   message?: string | null;
 }
 
+export type ScheduledMeetingConflictPolicy = "strict" | "soft_week" | "skip";
+export type ScheduledMeetingPlanOccurrenceStatus =
+  | "ok"
+  | "conflict"
+  | "shifted"
+  | "skip"
+  | "unresolved";
+export type ScheduledMeetingPlanOverrideAction = "keep" | "shift" | "skip";
+export type ScheduledMeetingPlanOptionKind =
+  | "shift_ours"
+  | "reschedule_blockers"
+  | "keep_conflict"
+  | "skip";
+export type ScheduledMeetingPlanDifficulty = "easy" | "medium" | "hard";
+
+export interface ScheduledMeetingPlanPreviewRequest {
+  conflict_policy?: ScheduledMeetingConflictPolicy;
+}
+
+export interface ScheduledMeetingPlanConflict {
+  attendee_email: string;
+  event_start?: string | null;
+  event_end?: string | null;
+  event_subject?: string | null;
+  busy_type?: string | null;
+  movability?: "high" | "medium" | "low" | null;
+  source?: "freebusy" | "interval" | "calendar" | "company_calendar" | null;
+  reschedule_hint_start?: string | null;
+  reschedule_hint_end?: string | null;
+}
+
+export interface ScheduledMeetingPlanOption {
+  kind: ScheduledMeetingPlanOptionKind;
+  available: boolean;
+  cost?: number | null;
+  difficulty?: ScheduledMeetingPlanDifficulty | null;
+  recommended: boolean;
+  suggested_start?: string | null;
+  suggested_end?: string | null;
+  blockers?: ScheduledMeetingPlanConflict[];
+  reason?: string | null;
+}
+
+export interface ScheduledMeetingPlanOccurrencePreview {
+  occurrence_date: string;
+  planned_start: string;
+  planned_end: string;
+  status: ScheduledMeetingPlanOccurrenceStatus;
+  busy_attendees: string[];
+  conflicts: ScheduledMeetingPlanConflict[];
+  suggested_start?: string | null;
+  suggested_end?: string | null;
+  options: ScheduledMeetingPlanOption[];
+  recommended_option?: ScheduledMeetingPlanOptionKind | null;
+}
+
+export interface ScheduledMeetingPlanPreviewRead {
+  meeting_id: string;
+  conflict_policy: ScheduledMeetingConflictPolicy;
+  occurrences: ScheduledMeetingPlanOccurrencePreview[];
+  summary: Record<string, number>;
+}
+
+export interface ScheduledMeetingPlanOverride {
+  occurrence_date: string;
+  action: ScheduledMeetingPlanOverrideAction;
+  new_start?: string | null;
+}
+
+export interface ScheduledMeetingPlanRequest {
+  conflict_policy?: ScheduledMeetingConflictPolicy;
+  overrides?: ScheduledMeetingPlanOverride[];
+}
+
 export interface ScheduledMeetingRead {
   id: string;
   title: string;
