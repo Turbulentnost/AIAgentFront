@@ -3,6 +3,8 @@
 interface ImportMetaEnv {
   readonly VITE_API_SERVER?: string;
   readonly VITE_API_URL?: string;
+  readonly VITE_ESKD_API_URL?: string;
+  readonly VITE_ESKD_API_PROXY?: string;
   readonly VITE_API_PROXY?: string;
   readonly VITE_POCHTA_API_URL?: string;
   readonly VITE_POCHTA_API_PROXY?: string;

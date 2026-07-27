@@ -25,6 +25,8 @@ export const QUALITY_DEPUTY_DIRECTOR_AGENT_SLUG = "quality_deputy_director_agent
 export const QUALITY_DEPUTY_DIRECTOR_AGENT_PATH = "/agents/quality-deputy-director";
 export const QUALITY_KPI_AGENT_SLUG = "quality_kpi_agent";
 export const QUALITY_KPI_AGENT_PATH = "/agents/quality-kpi";
+export const ESKD_AGENT_SLUG = "eskd_agent";
+export const ESKD_AGENT_PATH = "/agents/eskd";
 export const AGENT_LAUNCH_MORPH_MS = 520;
 
 function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
@@ -86,6 +88,10 @@ export function isQualityKpiAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === QUALITY_KPI_AGENT_SLUG;
 }
 
+export function isEskdAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === ESKD_AGENT_SLUG || agent.slug === "eskd-agent";
+}
+
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
   return (
     isNdControlAgent(agent) ||
@@ -98,6 +104,7 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isQualityEngineerAgent(agent) ||
     isQualityDeputyDirectorAgent(agent) ||
     isQualityKpiAgent(agent) ||
+    isEskdAgent(agent) ||
     isProcurementAgent(agent)
   );
 }
@@ -160,6 +167,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isQualityKpiAgent(agent)) {
     return {
       path: QUALITY_KPI_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isEskdAgent(agent)) {
+    return {
+      path: ESKD_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }

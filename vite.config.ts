@@ -8,6 +8,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   const apiProxy = env.VITE_API_PROXY || env.VITE_API_SERVER || DEFAULT_API_SERVER;
   const pochtaProxy = env.VITE_POCHTA_API_PROXY || "http://127.0.0.1:8080";
+  const eskdProxy = env.VITE_ESKD_API_PROXY || "http://127.0.0.1:8080";
   const onecProxy = env.VITE_ONEC_API_SERVER || "http://192.168.0.247:8000";
 
   return {
@@ -44,6 +45,13 @@ export default defineConfig(({ mode }) => {
           rewrite: (path) => path.replace(/^\/pochta-api/, ""),
           timeout: 120_000,
           proxyTimeout: 120_000
+        },
+        "/eskd-api": {
+          target: eskdProxy,
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/eskd-api/, ""),
+          timeout: 600_000,
+          proxyTimeout: 600_000
         },
         "/onec-api": {
           target: onecProxy,

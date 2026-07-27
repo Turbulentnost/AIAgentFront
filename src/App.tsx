@@ -27,6 +27,7 @@ import Profile from "./pages/Profile";
 import ProfileEdit from "./pages/ProfileEdit";
 import Users from "./pages/Users";
 import Departments from "./pages/Departments";
+import EskdAgent from "@/pages/EskdAgent";
 
 function ProtectedRoute({ children }: { children: ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
@@ -62,6 +63,7 @@ export default function App() {
       <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Инженер по качеству"><QualityEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-deputy-director" element={<ProtectedRoute><Layout title="ЗДК"><QualityDeputyDirectorAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-kpi" element={<ProtectedRoute><Layout title="Агент качества (KPI)"><QualityKpiAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/eskd" element={<ProtectedRoute><Layout title="ESKD Agent"><EskdAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />
