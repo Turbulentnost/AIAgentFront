@@ -4,6 +4,7 @@
   width: 100%;
   max-width: 1440px;
   margin: 0 auto;
+  color: var(--color-text);
 }
 
 .statsRow {
@@ -18,9 +19,9 @@
   min-height: 72px;
   padding: 14px 16px;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 12px;
-  box-shadow: 0 8px 18px var(--color-shadow-06);
+  box-shadow: var(--shadow-md);
 }
 
 .statCard strong {
@@ -37,39 +38,33 @@
 .statValueblue { color: var(--color-primary); }
 .statValueviolet { color: var(--color-violet); }
 .statValueamber { color: var(--color-warning-dark); }
-.statValueslate { color: var(--color-muted); }
+.statValueslate { color: var(--color-text-secondary); }
 .statValuegreen { color: var(--color-success); }
 .statValuered { color: var(--color-danger); }
 
 .workspace {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr) 320px;
+  grid-template-columns: 300px minmax(0, 1fr);
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
+  min-height: 0;
 }
 
 .queuePanel,
-.detailsPanel,
-.contextPanel {
+.detailsPanel {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 14px;
-  box-shadow: 0 10px 24px var(--color-shadow-06);
+  box-shadow: var(--shadow-lg);
+  min-height: 0;
 }
 
 .queuePanel {
-  display: grid;
-  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  display: flex;
+  flex-direction: column;
   gap: 14px;
   padding: 16px;
-  overflow: hidden;
-  align-self: start;
-}
-
-.contextPanel {
-  display: grid;
-  gap: 14px;
-  padding: 16px;
+  max-height: calc(100vh - 168px);
 }
 
 .detailsPanel {
@@ -83,7 +78,6 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .panelHead h2,
@@ -106,76 +100,210 @@
 }
 
 .queueTabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
-  flex-shrink: 0;
 }
 
 .queueTab {
   min-height: 32px;
-  padding: 0 12px;
+  padding: 6px 10px;
   color: var(--color-muted);
   background: var(--color-hover);
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-size: 12px;
+  border-radius: 10px;
+  font-size: 11px;
   font-weight: 700;
-  cursor: pointer;
+  line-height: 1.3;
+  text-align: center;
 }
 
 .queueTabActive {
-  color: var(--nav-button-secondary-color);
-  background: var(--nav-button-secondary-bg);
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
   border-color: var(--color-border-accent);
-}
-
-.queueScrollArea {
-  min-height: 0;
-  overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-
-.queueScrollArea::-webkit-scrollbar {
-  display: none;
 }
 
 .queueList {
   display: grid;
   gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-content: start;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 4px;
+  margin-right: -4px;
+}
+
+.queueList::-webkit-scrollbar {
+  width: 6px;
+}
+
+.queueList::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 999px;
+}
+
+.queueList::-webkit-scrollbar-thumb:hover {
+  background: var(--color-placeholder);
 }
 
 .queueCard {
   display: grid;
-  gap: 8px;
+  gap: 10px;
+  align-content: start;
   width: 100%;
-  padding: 12px;
+  height: auto;
+  padding: 14px 16px;
   text-align: left;
-  background: var(--color-surface-elevated);
+  background: var(--color-surface-elevated, var(--color-surface));
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: 14px;
   cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    background-color 0.15s ease;
+}
+
+.queueCard:hover {
+  border-color: var(--color-border-strong);
+  box-shadow: var(--shadow-md);
 }
 
 .queueCardActive {
-  background: var(--color-blue-soft);
+  background: var(--color-info-surface);
   border-color: var(--color-border-accent);
-  box-shadow: inset 0 0 0 1px var(--color-primary-alpha-07);
+  box-shadow: var(--shadow-md);
+}
+
+.queueCardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.queueCardCode {
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.queueCardBadges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.queueCardPsdBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-violet-soft, #ede9fe);
+  border: 1px solid var(--color-violet-border, #c4b5fd);
+  color: var(--color-violet-dark, #5b21b6);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.queueCardSeriesBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-primary-tint, #dbeafe);
+  border: 1px solid var(--color-primary-border, #93c5fd);
+  color: var(--color-primary-text, #1d4ed8);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.queueCardStatus {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.35;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.queueCardStatusblue { color: var(--color-primary-text); background: var(--color-primary-tint); }
+.queueCardStatusamber { color: var(--color-warning-dark); background: var(--color-amber-soft); }
+.queueCardStatusred { color: var(--color-danger-text); background: var(--color-danger-soft); }
+.queueCardStatusgreen { color: var(--color-success-text); background: var(--color-success-soft); }
+.queueCardStatusslate { color: var(--color-slate); background: var(--color-gray-soft); }
+
+.queueCardTheme {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.45;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.queueCardFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--color-hover);
+  border-radius: 10px;
+}
+
+.queueCardFields div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.queueCardFields dt {
+  color: var(--color-placeholder);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.queueCardFields dd {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.queueCardFieldPerson {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .queueCardTop {
-  display: grid;
-  gap: 2px;
-}
-
-.queueCardTop strong {
-  color: var(--color-text-strong);
-  font-size: 13px;
-}
-
-.queueCardTop span {
-  color: var(--color-text);
+  color: var(--color-slate);
   font-size: 12px;
   font-weight: 600;
 }
@@ -211,18 +339,17 @@
   font-weight: 800;
 }
 
-.tagblue { color: var(--color-primary-text); background: var(--color-blue-soft); }
+.tagblue { color: var(--color-primary-text); background: var(--color-primary-tint); }
 .tagamber { color: var(--color-warning-dark); background: var(--color-amber-soft); }
 .tagred { color: var(--color-danger-text); background: var(--color-danger-soft); }
 .taggreen { color: var(--color-success-text); background: var(--color-success-soft); }
 
 .queueMore {
   justify-self: start;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   background: transparent;
   font-size: 12px;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .detailsHead {
@@ -257,25 +384,6 @@
   padding-top: 0;
 }
 
-.agentInsightsGrid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 20px 24px;
-  align-items: start;
-}
-
-.agentInsightBlock {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.sectionTitleWithIcon {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .dataGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -301,13 +409,49 @@
   font-weight: 600;
 }
 
+.memoTextBlock {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.memoTextTitle {
+  margin: 0 0 8px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.memoTextBody {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.dataFieldValue {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.dataFieldIcon,
+.participantListIcon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--color-muted);
+}
+
 .linkButton {
   padding: 0;
-  color: var(--color-primary);
+  color: var(--color-primary-text);
   background: transparent;
   font-size: inherit;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .priorityBadge {
@@ -327,23 +471,60 @@
 
 .checkList {
   display: grid;
-  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.checkItem {
+.sectionHead {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.checklistSummary {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.checklistSummaryReady {
+  color: var(--color-success-text);
+}
+
+.checklistIntro {
+  margin: -4px 0 10px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.checkItemBody {
+  display: grid;
+  gap: 2px;
+}
+
+.checkItemHint {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.checkItem {
+  display: flex;
+  align-items: flex-start;
   gap: 8px;
-  color: var(--color-text);
+  color: var(--color-slate);
   font-size: 13px;
   font-weight: 600;
 }
 
 .checkItem svg {
   flex: 0 0 auto;
+  margin-top: 2px;
 }
 
 .checksuccess svg {
@@ -368,59 +549,91 @@
 }
 
 .recommendationBox strong {
-  color: var(--color-accent-text);
+  color: var(--color-primary-text);
   font-size: 12px;
 }
 
 .recommendationBox p {
   margin: 0;
-  color: var(--color-primary-text);
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.seriesAmbiguities {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--color-warning-dark, #b45309);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.seriesChoiceNote {
+  margin: 10px 0 0;
+  color: var(--color-text);
   font-size: 13px;
   line-height: 1.45;
 }
 
 .actionRow,
+.tertiaryRow,
 .slotRow {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
 }
 
-.actionButton,
+.primaryButton,
+.secondaryButton,
+.rejectButton,
+.ghostButton,
 .slotButton {
+  min-height: 38px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.primaryButton {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  min-height: var(--nav-button-min-height, 46px);
-  padding: 0 16px;
-  color: var(--nav-button-secondary-color);
-  background: var(--nav-button-secondary-bg);
-  border: var(--form-control-border-width, 1px) solid var(--color-border-accent);
-  border-radius: var(--nav-button-radius, var(--form-control-border-radius, 8px));
-  font-size: var(--nav-button-font-size, 14px);
-  font-weight: var(--nav-button-font-weight, 600);
-  line-height: 1.2;
-  cursor: pointer;
-  transition: var(--form-control-transition, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  box-shadow: var(--shadow-md);
 }
 
-.actionButton:hover:not(:disabled),
-.slotButton:hover:not(:disabled) {
-  background: var(--color-blue-soft);
-  border-color: var(--form-control-focus-border-color);
-}
-
-.actionButton:focus-visible,
-.slotButton:focus-visible {
-  outline: none;
-  border-color: var(--form-control-focus-border-color);
-  box-shadow: var(--form-control-focus-ring);
-}
-
-.actionButton:disabled {
-  opacity: 0.6;
+.primaryButton:disabled {
   cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.secondaryButton {
+  color: var(--color-primary-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-accent);
+}
+
+.rejectButton {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
+.rejectButton:disabled,
+.ghostButton:disabled,
+.secondaryButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  box-shadow: none;
+}
+
+.ghostButton {
+  color: var(--color-muted);
+  background: transparent;
+  font-size: 12px;
 }
 
 .footerNote {
@@ -461,7 +674,7 @@
 
 .legendFree { background: var(--color-success); }
 .legendBusy { background: var(--color-danger); }
-.legendUnknown { background: var(--color-timeline-neutral); }
+.legendUnknown { background: var(--color-border-strong); }
 
 .calendarGrid {
   display: grid;
@@ -476,7 +689,7 @@
 }
 
 .calendarLabel {
-  color: var(--color-text);
+  color: var(--color-slate);
   font-size: 11px;
   font-weight: 700;
 }
@@ -497,9 +710,9 @@
   border-radius: 999px;
 }
 
-.segmentfree { background: var(--color-success); opacity: 0.75; }
-.segmentbusy { background: var(--color-danger); opacity: 0.75; }
-.segmentunknown { background: var(--color-timeline-neutral); }
+.segmentfree { background: var(--color-success); opacity: 0.65; }
+.segmentbusy { background: var(--color-danger); opacity: 0.65; }
+.segmentunknown { background: var(--color-border-strong); }
 
 .calendarSelection {
   position: absolute;
@@ -509,26 +722,13 @@
   width: 30%;
   border: 2px dashed var(--color-primary);
   border-radius: 8px;
-  background: var(--color-primary-alpha-07);
+  background: var(--color-primary-tint);
 }
 
 .slotButton {
-  min-height: 38px;
-  font-size: 13px;
-}
-
-@media (max-width: 1280px) {
-  .statsRow {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .agentInsightsGrid {
-    grid-template-columns: 1fr;
-  }
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border-accent);
 }
 
 .historyList {
@@ -544,7 +744,7 @@
   gap: 4px;
   padding-left: 12px;
   border-left: 2px solid var(--color-primary-tint);
-  color: var(--color-text);
+  color: var(--color-slate);
   font-size: 12px;
   line-height: 1.35;
 }
@@ -574,21 +774,26 @@
   line-height: 1.4;
 }
 
-.participantNames {
-  color: var(--color-text-strong);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.45;
-  white-space: normal;
-}
-
 .participantsField {
   grid-column: 1 / -1;
 }
 
 .participantList {
-  color: var(--color-muted);
-  font-size: 12px;
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participantListItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
 }
 
 .runStatus {
@@ -631,9 +836,9 @@
   overflow: auto;
   padding: 20px;
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 14px;
-  box-shadow: 0 24px 48px var(--color-shadow-22);
+  box-shadow: var(--shadow-xl);
 }
 
 .modalHeader {
@@ -660,12 +865,6 @@
   background: var(--color-hover);
   border: 1px solid var(--color-border);
   border-radius: 8px;
-  cursor: pointer;
-}
-
-.modalCloseButton:hover {
-  color: var(--color-text-strong);
-  background: var(--color-hover-strong);
 }
 
 .modalLoader {
@@ -691,6 +890,331 @@
   font-weight: 600;
 }
 
+.modalSlotWarning {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+  border: 1px solid var(--color-warning-border, var(--color-border-accent));
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.modalSlotSuccess {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+  border: 1px solid var(--color-success-border, #86efac);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.modalSlotChecking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-muted, #f8fafc);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.manualSlotRescheduleList {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  font-weight: 500;
+}
+
+.manualSlotRescheduleList li + li {
+  margin-top: 6px;
+}
+
+.previewTableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.previewTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.previewTable th,
+.previewTable td {
+  padding: 8px 10px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.previewTable th {
+  color: var(--color-muted);
+  background: var(--color-hover);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.previewTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.previewTableRowActive {
+  background: var(--color-info-surface);
+  cursor: pointer;
+}
+
+.previewTable tbody tr {
+  cursor: pointer;
+}
+
+.previewTable tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.modalErrorContent {
+  display: grid;
+  gap: 4px;
+}
+
+.modalErrorStage {
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+
+.slotCandidateList {
+  display: grid;
+  gap: 10px;
+}
+
+.slotCandidateCard {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface, #fff);
+}
+
+.slotCandidateCardExpanded {
+  border-color: var(--color-border-accent);
+  box-shadow: 0 0 0 1px var(--color-border-accent);
+}
+
+.slotCandidateHeader {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  position: relative;
+  padding-right: 36px;
+}
+
+.slotCandidateHeader:disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.slotCandidateTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.slotCandidateLabel {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--color-primary-text);
+}
+
+.slotCandidateBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border-accent);
+  color: var(--color-primary-text);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.slotCandidateCoverage,
+.slotCandidateMeta {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+.slotCandidateAttendees {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.slotCandidateAttendeeGroup {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.slotCandidateAttendeeLabel {
+  font-weight: 800;
+}
+
+.slotCandidateAttendeeGroupFree {
+  color: var(--color-success-dark, #166534);
+}
+
+.slotCandidateAttendeeGroupBusy {
+  color: var(--color-warning-dark);
+}
+
+.slotCandidateChevron {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  color: var(--color-muted);
+  transition: transform 0.15s ease;
+}
+
+.slotCandidateChevronOpen {
+  transform: rotate(180deg);
+}
+
+.slotCandidateDetails {
+  padding: 0 14px 14px;
+  border-top: 1px solid var(--color-border);
+}
+
+.slotCandidateDetailsLoader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0 4px;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.slotParticipantList {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slotParticipantItem {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-hover);
+}
+
+.slotParticipantHeader {
+  display: grid;
+  gap: 2px;
+}
+
+.slotParticipantRole {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.slotParticipantName {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.slotParticipantEmail {
+  font-size: 12px;
+  color: var(--color-muted);
+}
+
+.slotParticipantStatus {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.slotParticipantStatusFree {
+  color: var(--color-success-dark, #166534);
+}
+
+.slotParticipantStatusBusy {
+  color: var(--color-danger-dark);
+}
+
+.slotParticipantStatusUnknown {
+  color: var(--color-muted);
+}
+
+.slotBlockingEvents {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.slotBlockingEvent {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
+.slotBlockingEventLabel {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.slotBlockingEventMeta {
+  font-size: 11px;
+  color: var(--color-muted);
+  line-height: 1.45;
+}
+
+.slotParticipantAccessError {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-danger-dark);
+}
+
 .modalSlotHighlight {
   display: grid;
   gap: 6px;
@@ -701,7 +1225,7 @@
 }
 
 .modalSlotHighlight strong {
-  color: var(--color-accent-text);
+  color: var(--color-primary-text);
   font-size: 12px;
   font-weight: 800;
   text-transform: uppercase;
@@ -764,6 +1288,30 @@
   font-size: 12px;
 }
 
+.attendeeSlot {
+  display: grid;
+  gap: 2px;
+  margin-top: 6px;
+  padding: 8px 10px;
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border-accent);
+  border-radius: 8px;
+}
+
+.attendeeSlotLabel {
+  color: var(--color-primary-text);
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.attendeeSlotTime {
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
 .attendeeStatus {
   display: inline-flex;
   align-items: center;
@@ -781,6 +1329,119 @@
   color: var(--color-danger-text);
 }
 
+.modalHint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  line-height: 1.45;
+}
+
+.seriesConfirmModalCard {
+  max-width: 560px;
+}
+
+.seriesConfirmLead {
+  margin: 0 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.seriesConfirmGrid {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.seriesConfirmGrid div {
+  display: grid;
+  gap: 4px;
+}
+
+.seriesConfirmGrid dt {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.seriesConfirmGrid dd {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.seriesConfirmQuote {
+  margin: 0 0 12px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.seriesConfirmAmbiguities {
+  margin: 0 0 16px;
+  padding-left: 18px;
+  color: #b45309;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.rejectReasonField {
+  display: grid;
+  gap: 6px;
+}
+
+.rejectReasonField label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.rejectReasonInput {
+  min-height: 96px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+.rejectReasonInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.rejectReasonInput:disabled {
+  opacity: 0.65;
+}
+
+.rejectReasonMeta {
+  justify-self: end;
+  font-size: 11px;
+  color: var(--color-muted);
+}
+
+.rejectNotifyField {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+
+.rejectNotifyField input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent);
+}
+
 .modalActions {
   display: flex;
   flex-wrap: wrap;
@@ -789,54 +1450,245 @@
   padding-top: 4px;
 }
 
-.modalPrimaryButton,
-.modalSecondaryButton {
+.modalActionsSplit {
+  flex-wrap: nowrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.modalActionsStart,
+.modalActionsEnd {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.modalActionsEnd {
+  margin-left: auto;
+}
+
+.participantsModalCard {
+  width: min(640px, 100%);
+}
+
+.participantsSearchField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.participantsSearchIcon {
+  position: absolute;
+  left: 12px;
+  z-index: 1;
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.participantsSearchInput {
+  width: 100%;
+  min-height: 40px;
+  padding: 10px 12px 10px 38px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+}
+
+.participantsSearchInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.participantsSearchInput:disabled {
+  opacity: 0.65;
+}
+
+.participantsSearchStatus {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.participantsSearchResultRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+}
+
+.participantsSearchResultInfo {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.participantsSearchResultName {
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.participantsSearchResultEmail {
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.participantsSearchResultHint {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.participantsSuggestions {
+  display: grid;
+  gap: 4px;
+  max-height: 180px;
+  margin: 0;
+  padding: 0;
+  overflow: auto;
+  list-style: none;
+}
+
+.participantsSuggestionItem {
+  width: 100%;
+  padding: 8px 12px;
+  color: var(--color-text);
+  text-align: left;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.participantsSuggestionItem:hover {
+  background: var(--color-primary-tint);
+  border-color: var(--color-primary-border);
+}
+
+.participantsUndoRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.participantsUndoButton {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
   gap: 8px;
-  min-height: var(--nav-button-min-height, 46px);
-  padding: 0 16px;
-  border-radius: var(--nav-button-radius, var(--form-control-border-radius, 8px));
-  font-size: var(--nav-button-font-size, 14px);
-  font-weight: var(--nav-button-font-weight, 600);
+  max-width: 100%;
+  padding: 6px 10px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-tint);
+  border: 1px solid var(--color-primary-border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
-  transition: var(--form-control-transition, border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease);
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.modalSecondaryButton {
-  color: var(--nav-button-secondary-color);
-  background: var(--nav-button-secondary-bg);
-  border: var(--form-control-border-width, 1px) solid var(--color-border-accent);
+.participantsUndoButton span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.modalSecondaryButton:hover:not(:disabled) {
-  background: var(--color-blue-soft);
-  border-color: var(--form-control-focus-border-color);
+.participantsUndoButton:hover:not(:disabled) {
+  background: var(--color-surface);
 }
 
-.modalPrimaryButton {
-  color: var(--nav-button-primary-color);
-  background: var(--nav-button-primary-bg);
-  border: none;
-  box-shadow: var(--nav-button-primary-shadow);
-}
-
-.modalPrimaryButton:hover:not(:disabled) {
-  filter: brightness(1.05);
-}
-
-.modalPrimaryButton:focus-visible,
-.modalSecondaryButton:focus-visible {
-  outline: none;
-  border-color: var(--form-control-focus-border-color);
-  box-shadow: var(--form-control-focus-ring);
-}
-
-.modalPrimaryButton:disabled,
-.modalSecondaryButton:disabled {
-  opacity: 0.6;
+.participantsUndoButton:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
+}
+
+.participantsChipPanel {
+  min-height: 120px;
+  padding: 12px;
+  background: var(--color-surface-muted, var(--color-hover));
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+}
+
+.participantsChipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.participantChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 6px 8px 6px 12px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.participantChipLabel {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.participantChipRemove {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  opacity: 0;
+  cursor: pointer;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.participantChip:hover .participantChipRemove,
+.participantChip:focus-within .participantChipRemove {
+  opacity: 1;
+}
+
+.participantChipRemove:hover:not(:disabled) {
+  color: var(--color-danger-text);
+  background: var(--color-danger-soft);
+}
+
+.participantChipRemove:disabled {
+  cursor: not-allowed;
+}
+
+.participantsEmpty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .stateMessage,
@@ -848,7 +1700,7 @@
   padding: 24px;
   color: var(--color-text-secondary);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-border-subtle);
   border-radius: 14px;
   font-size: 14px;
   font-weight: 600;
@@ -870,14 +1722,40 @@
 .successBanner {
   display: flex;
   align-items: center;
-  gap: 8px;
+  flex-wrap: wrap;
+  gap: 12px;
   padding: 12px 14px;
   color: var(--color-success-text);
   background: var(--color-success-surface);
-  border: 1px solid var(--color-success-alpha-24);
+  border: 1px solid var(--color-success-soft);
   border-radius: 12px;
   font-size: 13px;
   font-weight: 600;
+}
+
+.successBannerText {
+  flex: 1 1 240px;
+}
+
+.successBannerOutlookButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 14px;
+  margin-left: auto;
+  color: #fff;
+  background: #0078d4;
+  border: 1px solid #006cbe;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.successBannerOutlookButton:hover {
+  background: #106ebe;
 }
 
 .refreshButton,
@@ -887,13 +1765,12 @@
   justify-content: center;
   min-height: 32px;
   padding: 0 12px;
-  color: var(--nav-button-secondary-color);
-  background: var(--nav-button-secondary-bg);
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
   border: 1px solid var(--color-border-accent);
   border-radius: 8px;
   font-size: 12px;
   font-weight: 700;
-  cursor: pointer;
 }
 
 .refreshButton {
@@ -904,11 +1781,768 @@
 
 .refreshButton:disabled {
   opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .refreshButtonSpinning svg {
   animation: meetingSpin 0.8s linear infinite;
+}
+
+.pageTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 4px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.pageTab {
+  flex: 1 1 180px;
+  min-height: 40px;
+  padding: 8px 16px;
+  color: var(--color-muted);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.pageTabActive {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.registryStubBanner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+  border: 1px dashed var(--color-border-strong);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.registryStubBadge {
+  padding: 4px 8px;
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.registryStatsRow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.registryStatCardCancelled strong {
+  color: var(--color-danger-text);
+}
+
+.registryStatCard {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+}
+
+.registryStatCard strong {
+  color: var(--color-primary);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.registryStatCard span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.registryWorkspace {
+  grid-template-columns: minmax(280px, 320px) minmax(0, 1fr);
+  align-items: start;
+}
+
+.registryQueueCardFields {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px 12px;
+}
+
+.registryQueueCardFieldWide {
+  grid-column: 1 / -1;
+}
+
+.registryQueueCardFieldWide dd {
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.registryQueueCardFieldParticipants {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.registryQueueCardFieldParticipants dt {
+  flex-shrink: 0;
+}
+
+.registryQueueCardFieldParticipants dd {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.registryListPanel {
+  gap: 12px;
+  padding: 14px;
+  max-height: calc(100vh - 240px);
+}
+
+.registryListPanel .queueCard {
+  gap: 8px;
+  padding: 12px 14px;
+}
+
+.registryDetailsPanel {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 16px 18px 18px;
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+}
+
+.registryDetailsPanel .detailsHead {
+  margin-bottom: 4px;
+}
+
+.registrySection {
+  gap: 8px;
+  padding-top: 12px;
+  margin-top: 0;
+}
+
+.registrySection:first-of-type {
+  padding-top: 8px;
+}
+
+.registryFilters {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.registryFilterTab {
+  min-height: 34px;
+  padding: 6px 8px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: center;
+}
+
+.registryFilterTabActive {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.registryStageBadge {
+  flex-shrink: 0;
+  max-width: 52%;
+  padding: 4px 8px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-tint);
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.3;
+  text-align: right;
+}
+
+.registryStageBadge.registryStageBadgeCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
+.registryStageBadgeCompact {
+  flex-shrink: 0;
+  padding: 3px 8px;
+  color: var(--color-primary-text);
+  background: var(--color-primary-tint);
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 800;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.registryStageBadgeCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid var(--color-danger-border);
+}
+
+.registryProgressDots {
+  display: flex;
+  gap: 3px;
+}
+
+.registryProgressDot {
+  flex: 1 1 0;
+  height: 3px;
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+.registryProgressDotDone {
+  background: var(--color-primary);
+  opacity: 0.45;
+}
+
+.registryProgressDotCurrent {
+  opacity: 1;
+  box-shadow: 0 0 0 1px var(--color-border-accent);
+}
+
+.registryStepper {
+  display: flex;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.registryStep {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px 4px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.registryStepDone {
+  color: var(--color-success-text);
+  background: var(--color-success-surface);
+  border-color: var(--color-success-border);
+}
+
+.registryStepCurrent {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.registryStepCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-color: var(--color-danger-border);
+}
+
+.registryStepIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.registryStepLabel {
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1.2;
+  hyphens: auto;
+}
+
+.registryEvents {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.registryEventItem {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  color: var(--color-text);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.registryEventPending {
+  color: var(--color-muted);
+  border-style: dashed;
+}
+
+.registryEventCancelled {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-color: var(--color-danger-border);
+}
+
+.registrySuccessNote {
+  margin: 8px 0 0;
+  color: var(--color-success-text);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.registryFailureNote {
+  white-space: pre-line;
+  color: var(--color-danger-text);
+}
+
+.slotRescheduleRecommendations {
+  margin-top: 12px;
+}
+
+.registryEarlierSlotSection {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  background: var(--color-info-surface, var(--color-hover));
+  border: 1px solid var(--color-border-accent);
+  border-radius: 12px;
+}
+
+.registryEarlierSlotHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.registryEarlierSlotHead h3 {
+  margin: 0;
+}
+
+.registryEarlierSlotMessage {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.registryEarlierSlotMeta {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.registryEarlierSlotCard {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.registryEarlierSlotCardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.registryEarlierSlotLabel {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.registryEarlierSlotStats {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.registryEarlierSlotActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.modalOverlayNested {
+  z-index: 1100;
+}
+
+.manualSlotModalCard {
+  width: min(420px, 100%);
+}
+
+.manualSlotCalendar {
+  display: grid;
+  gap: 8px;
+}
+
+.manualSlotCalendarHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.manualSlotCalendarHead strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+}
+
+.manualSlotNavButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+}
+
+.manualSlotWeekdays,
+.manualSlotDays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.manualSlotWeekdays span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.manualSlotDay,
+.manualSlotDayEmpty {
+  min-height: 34px;
+}
+
+.manualSlotDay {
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.manualSlotDaySelected {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.manualSlotDayDisabled {
+  color: var(--color-placeholder);
+  background: var(--color-hover);
+  cursor: not-allowed;
+}
+
+.manualSlotTimeFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.manualSlotTimeField {
+  display: grid;
+  gap: 6px;
+}
+
+.manualSlotTimeField span {
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.manualSlotTimeField input {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--color-text-strong);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 13px;
+}
+
+.manualSlotPreviewLabel {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+}
+
+.manualSlotValidationError {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.modalActions .ghostButton {
+  display: inline-flex;
+  align-items: center;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.modalRescheduleContext {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.modalRescheduleContext p {
+  margin: 0;
+  color: var(--color-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.modalRescheduleContext strong {
+  color: var(--color-text-strong);
+}
+
+.topicModalCard {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.topicSimilarCard {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-muted, var(--color-surface));
+}
+
+.topicSimilarHeader {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  color: var(--color-text);
+}
+
+.topicSimilarHeader strong {
+  display: block;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.topicSimilarScore {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary);
+}
+
+.topicSimilarFields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.topicSimilarFields dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.topicSimilarFields dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.topicSimilarDetails {
+  grid-column: 1 / -1;
+}
+
+.topicSimilarParticipants {
+  display: grid;
+  gap: 6px;
+}
+
+.topicSimilarParticipantsLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.topicSimilarParticipants ul {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+}
+
+.topicSimilarParticipantsScore {
+  margin: 4px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-primary-text);
+}
+
+.topicMissingParticipants {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-warning-dark) 24%, transparent);
+  border-radius: 12px;
+  background: var(--color-amber-soft);
+}
+
+.topicMissingParticipantsMessage {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-strong);
+}
+
+.topicMissingParticipantsTitle,
+.topicResolveResultTitle {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+
+.topicMissingParticipantsList,
+.topicResolveResultList {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.topicResolveResult {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-success-soft, #ecfdf3);
+}
+
+.topicResolveResultMessage {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--color-text-strong);
+}
+
+.topicResolveResultEmpty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.topicCreateForm {
+  display: grid;
+  gap: 12px;
+}
+
+.topicTextInput,
+.topicSelectInput {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.topicTextInput:focus,
+.topicSelectInput:focus {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
+.registryActionRow {
+  gap: 8px;
+}
+
+.registryActionRow .secondaryButton,
+.registryActionRow .rejectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.registryActionRow .ghostButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.actionRow .secondaryButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .queueMetaNote {
@@ -919,11 +2553,1836 @@
   flex-shrink: 0;
 }
 
-.queueHint {
+.scheduleHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.scheduleTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.scheduleSubtitle {
+  margin: 6px 0 0;
+  color: var(--color-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.scheduleScopeRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scheduleScopeTile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 16px;
+  color: inherit;
+  text-align: left;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  transition:
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.scheduleScopeTile:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border-subtle));
+}
+
+.scheduleScopeTileActive {
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border-subtle));
+  box-shadow:
+    var(--shadow-md),
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 20%, transparent);
+  background: color-mix(in srgb, var(--color-info-surface) 55%, var(--color-surface));
+}
+
+.scheduleScopeTileIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-radius: 10px;
+}
+
+.scheduleScopeTileContent {
+  display: grid;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.scheduleScopeTileContent strong {
+  font-size: 14px;
+  line-height: 1.25;
+}
+
+.scheduleScopeTileContent span {
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scheduleScopeTileCount {
+  flex-shrink: 0;
+  min-width: 32px;
+  padding: 6px 10px;
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.scheduleCategorySection {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduleCategoryTitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.scheduleCategoryTiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 132px;
+  padding-bottom: 2px;
+  overflow: auto;
+}
+
+.scheduleCategoryTile {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
+  padding: 8px 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.scheduleCategoryTile:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.scheduleCategoryTileActive {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border-subtle));
+}
+
+.scheduleCategoryTileEmpty {
+  color: var(--color-muted);
+}
+
+.scheduleCategoryTileEmpty .scheduleCategoryTileCount {
+  opacity: 0.65;
+}
+
+.scheduleCategoryTileCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  color: inherit;
+  background: color-mix(in srgb, currentColor 10%, transparent);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.scheduleCategoryPickerHint {
+  margin: 0 0 10px;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.scheduleCategoryPickerHint strong {
+  color: var(--color-primary-text);
+}
+
+.scheduleCategoryPickerError {
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleCategoryPicker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 260px;
+  padding: 2px 4px 2px 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.scheduleCategoryPickerTile {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 100%;
+  min-height: 44px;
+  height: auto;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  text-align: left;
+  white-space: normal;
+  word-break: break-word;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+  cursor: pointer;
+  transition:
+    border-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+    color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.scheduleCategoryPickerTile:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.scheduleCategoryPickerTileActive {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border-subtle));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-primary) 15%, transparent);
+}
+
+.scheduleStatsRow {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.scheduleStatCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 72px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-md);
+}
+
+.scheduleStatIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-radius: 10px;
+}
+
+.scheduleStatContent {
+  display: grid;
+  gap: 2px;
+}
+
+.scheduleStatContent strong {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.scheduleStatContent span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedulePanel {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.scheduleTableToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  justify-content: flex-start;
+}
+
+.scheduleToolbarError {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scheduleToolbarSuccess {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-success-text, #166534);
+  background: var(--color-success-surface, #ecfdf3);
+  border: 1px solid color-mix(in srgb, var(--color-success-text, #166534) 20%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scheduleTableToolbar .primaryButton {
+  padding: 0 16px;
+}
+
+.scheduleTableWrap {
+  overflow: hidden;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.scheduleTableScroll {
+  overflow-x: auto;
+}
+
+.scheduleTable {
+  width: 100%;
+  min-width: 860px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.scheduleTableCompact tbody td {
+  padding: 12px 14px;
+  vertical-align: top;
+}
+
+.scheduleTableCompact .scheduleTableHead th {
+  padding: 10px 14px;
+}
+
+.scheduleNameCell {
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.scheduleSeriesMeta {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.scheduleLeadershipCell {
+  min-width: 160px;
+  max-width: 220px;
+}
+
+.scheduleLeadershipPrimary,
+.scheduleLeadershipSecondary {
+  display: block;
+  line-height: 1.35;
+}
+
+.scheduleLeadershipPrimary {
+  color: var(--color-text);
+  font-weight: 700;
+}
+
+.scheduleLeadershipSecondary {
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+}
+
+.scheduleParticipantsCell {
+  min-width: 140px;
+  max-width: 200px;
+}
+
+.scheduleParticipantsSummary {
+  display: block;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.scheduleParticipantsPreview {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.scheduleParticipantMoreInline {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-primary-text, #1d4ed8);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.scheduleParticipantMoreInline:hover {
+  color: var(--color-text);
+}
+
+.scheduleScheduleCell {
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.scheduleSchedulePrimary,
+.scheduleScheduleSecondary {
+  display: block;
+  line-height: 1.4;
+}
+
+.scheduleSchedulePrimary {
+  color: var(--color-text-secondary);
+}
+
+.scheduleScheduleSecondary {
+  margin-top: 4px;
+  color: var(--color-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleRowArchived {
+  background: color-mix(in srgb, var(--color-hover) 65%, transparent);
+}
+
+.scheduleEmptyCell {
+  padding: 28px 16px !important;
+  color: var(--color-muted);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.scheduleTableHead th {
+  padding: 12px 14px;
+  color: var(--color-muted);
+  background: var(--color-hover);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.scheduleTable tbody td {
+  padding: 14px;
+  border-bottom: 1px solid var(--color-border-subtle);
+  vertical-align: middle;
+}
+
+.scheduleTable tbody tr {
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.scheduleTable tbody tr:hover {
+  background: var(--color-hover);
+}
+
+.scheduleRowSelected {
+  background: var(--color-info-surface);
+}
+
+.scheduleColDrag {
+  width: 36px;
+  padding-inline: 8px !important;
+}
+
+.scheduleDragHandle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  color: var(--color-placeholder);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+}
+
+.scheduleDragHandle:hover {
+  color: var(--color-muted);
+  background: var(--color-hover);
+}
+
+.scheduleNameButton {
+  padding: 0;
+  color: var(--color-primary-text);
+  background: transparent;
+  border: 0;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.scheduleNameButton:hover {
+  text-decoration: underline;
+}
+
+.scheduleSeriesName {
+  display: inline-block;
+  color: var(--color-text);
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.scheduleTypeBadge,
+.scheduleStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.scheduleTypeBadgeblue {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+}
+
+.scheduleTypeBadgegreen {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+}
+
+.scheduleTypeBadgeviolet {
+  color: var(--color-violet);
+  background: color-mix(in srgb, var(--color-violet) 12%, white);
+}
+
+.scheduleTypeBadgeamber {
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+}
+
+.scheduleStatusBadgegreen {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+}
+
+.scheduleStatusBadgeamber {
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+}
+
+.scheduleStatusBadgeslate {
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+}
+
+.scheduleParticipants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scheduleParticipantsExpanded {
+  max-width: 280px;
+}
+
+.scheduleParticipantPill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.scheduleParticipantMore {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--color-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.scheduleParticipantMore:hover {
+  color: var(--color-text);
+  background: var(--color-hover);
+}
+
+.scheduleParticipantMoreMuted {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 2px 8px;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.scheduleDetailsParticipants {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.scheduleDetailsParticipantsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scheduleDetailsParticipantsHead h4 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scheduleFrequencyCell {
+  min-width: 180px;
+  color: var(--color-text-secondary);
+  line-height: 1.4;
+}
+
+.scheduleDeadlineCell {
+  min-width: 108px;
+}
+
+.scheduleDeadlinePrimary,
+.scheduleDeadlineSecondary {
+  display: block;
+  line-height: 1.35;
+}
+
+.scheduleDeadlinePrimary {
+  color: var(--color-text-strong);
+  font-weight: 700;
+}
+
+.scheduleDeadlineSecondary {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 220px;
+}
+
+.scheduleActionButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 28px;
+  padding: 4px 10px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.scheduleActionButton:hover {
+  color: var(--color-primary-text);
+  border-color: var(--color-border-accent);
+  background: var(--color-info-surface);
+}
+
+.scheduleActionButtonPrimary {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+  border-color: var(--color-success-border, #86efac);
+}
+
+.scheduleActionButtonPrimary:hover {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+  border-color: var(--color-success-dark, #166534);
+}
+
+.scheduleActionButtonDanger {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border-color: color-mix(in srgb, var(--color-danger-text) 22%, transparent);
+}
+
+.scheduleActionButtonDanger:hover {
+  color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger-text) 8%, var(--color-danger-surface));
+  border-color: var(--color-danger-text);
+}
+
+.scheduleTotalCount {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleDetailsPanel {
+  display: grid;
+  gap: 18px;
+  padding: 18px 20px 20px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg);
+}
+
+.scheduleDetailsHead h3 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.scheduleDetailsMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleDetailsGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
+  gap: 16px;
+}
+
+.scheduleDetailsColumn {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+}
+
+.scheduleDetailsColumn h4 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.scheduleDetailsEmpty {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scheduleDetailsError {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleDetailsFallbackBadge {
+  padding: 2px 8px;
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.schedulePastList {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.schedulePastItem {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+}
+
+.schedulePastDateBadge,
+.scheduleNextHeroDateBadge {
+  display: grid;
+  gap: 2px;
+  justify-items: center;
+  padding: 8px 6px;
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 10%, white);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 18%, transparent);
+  border-radius: 10px;
+}
+
+.schedulePastDateBadge strong,
+.scheduleNextHeroDateBadge strong {
+  font-size: 18px;
+  line-height: 1;
+}
+
+.schedulePastDateBadge span,
+.scheduleNextHeroDateBadge span {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.schedulePastContent {
+  display: grid;
+  gap: 4px;
+}
+
+.schedulePastContent strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.schedulePastContent span {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.schedulePastSubject {
+  color: var(--color-text-strong) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
+.scheduleNextHero {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: 14px;
+  padding: 16px;
+  background: linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--color-primary) 8%, white),
+    var(--color-surface)
+  );
+  border: 1px solid color-mix(in srgb, var(--color-primary) 16%, var(--color-border));
+  border-radius: 14px;
+}
+
+.scheduleNextHeroBody {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleNextHeroTitle {
+  color: var(--color-text-strong);
+  font-size: 16px;
+  line-height: 1.35;
+}
+
+.scheduleNextHeroDate {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.scheduleNextHeroTime {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleNextParticipants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scheduleNextOutlookLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  color: var(--color-primary);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.scheduleNextOutlookLink:hover {
+  text-decoration: underline;
+}
+
+.scheduleDetailsComment {
+  display: grid;
+  gap: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.scheduleDetailsCommentLabel {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.scheduleDetailsComment p {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.scheduleHistoryList {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduleHistoryItem {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.scheduleHistoryMarker {
+  position: relative;
+  width: 10px;
+  height: 10px;
+  margin-top: 4px;
+  background: var(--color-primary);
+  border-radius: 999px;
+}
+
+.scheduleHistoryMarker::after {
+  content: "";
+  position: absolute;
+  top: 12px;
+  left: 4px;
+  width: 2px;
+  height: calc(100% + 10px);
+  background: var(--color-border);
+}
+
+.scheduleHistoryItem:last-child .scheduleHistoryMarker::after {
+  display: none;
+}
+
+.scheduleHistoryContent {
+  display: grid;
+  gap: 4px;
+}
+
+.scheduleHistoryContent strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.scheduleHistoryProtocol {
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleHistoryOutcome {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.scheduleHistoryOutcomesuccess {
+  color: var(--color-success-dark, #166534);
+  background: var(--color-green-soft, #ecfdf5);
+}
+
+.scheduleHistoryOutcomewarning {
+  color: var(--color-warning-dark);
+  background: var(--color-amber-soft);
+}
+
+.scheduleHistoryOutcomeneutral {
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.scheduleNextCard {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.scheduleNextDate {
+  color: var(--color-text-strong);
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.scheduleNextFormat {
+  color: var(--color-muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.scheduleNextActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.scheduleNextActions .secondaryButton,
+.scheduleNextActions .rejectButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scheduleDrawerOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: flex;
+  justify-content: flex-end;
+  background: var(--color-overlay);
+}
+
+.scheduleDrawer {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(420px, 100%);
+  height: 100%;
+  background: var(--color-surface);
+  border-left: 1px solid var(--color-border-subtle);
+  box-shadow: var(--shadow-xl);
+}
+
+.scheduleDrawerHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.scheduleDrawerHead h2 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.scheduleDrawerForm {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  overflow: auto;
+  padding: 20px;
+}
+
+.scheduleField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduleFieldRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scheduleFieldLabel {
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.scheduleControl {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 14px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.4;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.scheduleControl:focus {
+  border-color: var(--color-border-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.scheduleControlWithIcon {
+  padding-left: 38px;
+}
+
+.scheduleTextarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.scheduleSelectField {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.scheduleSelectField .scheduleControl {
+  padding-right: 38px;
+  appearance: none;
+}
+
+.scheduleSelectIcon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-placeholder);
+  pointer-events: none;
+}
+
+.scheduleSelectChevron {
+  position: absolute;
+  right: 12px;
+  color: var(--color-placeholder);
+  pointer-events: none;
+}
+
+.scheduleDrawerActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.scheduleDrawerError {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--color-danger-text);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scheduleEditDrawerBody {
+  display: grid;
+  gap: 16px;
+  padding: 20px 24px 24px;
+}
+
+.scheduleEditSummary {
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  background: var(--color-surface-muted, #f6f7f9);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 10px;
+}
+
+.scheduleEditSummaryTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.35;
+  color: var(--color-text-primary, #111827);
+}
+
+.scheduleEditSummaryMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #6b7280);
+}
+
+.scheduleErrorPanel {
+  display: grid;
+  gap: 8px;
+  padding: 20px;
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text) 25%, transparent);
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.scheduleParticipantField {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduleParticipantSearchRow {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.scheduleParticipantSearchField {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+}
+
+.scheduleParticipantSearchIcon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-placeholder);
+  pointer-events: none;
+}
+
+.scheduleParticipantSearchInput {
+  padding-left: 38px;
+}
+
+.scheduleParticipantAddButton {
+  flex-shrink: 0;
+  min-height: 42px;
+  padding: 0 14px;
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border: 1px solid var(--color-border-accent);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.scheduleParticipantAddButton:hover {
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.scheduleParticipantMatchHint {
   margin: 0;
   color: var(--color-muted);
   font-size: 12px;
   font-weight: 600;
-  line-height: 1.35;
+}
+
+.scheduleParticipantSuggestions {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduleParticipantSuggestionButton {
+  width: 100%;
+  min-height: 36px;
+  padding: 8px 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  transition: all 0.15s ease;
+}
+
+.scheduleParticipantSuggestionButton:hover {
+  color: var(--color-text);
+  border-color: var(--color-border-accent);
+  background: var(--color-hover);
+}
+
+.scheduleParticipantEmptyHint {
+  margin: 0;
+  color: var(--color-placeholder);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleParticipantChipList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scheduleParticipantChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 30px;
+  padding: 4px 10px 4px 12px;
+  color: var(--color-text-secondary);
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.scheduleParticipantChip:hover {
+  background: var(--color-surface);
+  border-color: var(--color-border-accent);
+}
+
+.scheduleParticipantChipLabel {
+  line-height: 1.2;
+}
+
+.scheduleParticipantChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  color: var(--color-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  opacity: 0;
+  transition: opacity 0.15s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.scheduleParticipantChip:hover .scheduleParticipantChipRemove,
+.scheduleParticipantChipRemove:focus-visible {
+  opacity: 1;
+}
+
+.scheduleParticipantChipRemove:hover {
+  color: var(--color-danger-text);
+  background: var(--color-danger-surface);
+}
+
+.scheduleRecurrence {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-hover) 35%, var(--color-surface));
+}
+
+.scheduleRecurrenceLegend {
+  padding: 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.scheduleRecurrenceRow {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleRecurrenceRowLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleRecurrenceCustomRow,
+.scheduleRecurrenceTimeRow,
+.scheduleRecurrenceMonthlyWeekdayRow {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.scheduleRecurrenceInlineField {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduleRecurrenceInlineLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleRecurrenceWeekdays {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scheduleRecurrenceWeekdayButton {
+  min-width: 38px;
+  min-height: 34px;
+  padding: 0 8px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  transition: all 0.15s ease;
+}
+
+.scheduleRecurrenceWeekdayButton:hover {
+  border-color: var(--color-border-accent);
+  color: var(--color-text);
+}
+
+.scheduleRecurrenceWeekdayButtonActive {
+  color: var(--color-primary-text);
+  background: var(--color-info-surface);
+  border-color: var(--color-border-accent);
+}
+
+.scheduleRecurrenceMonthly {
+  display: grid;
+  gap: 10px;
+}
+
+.scheduleRecurrenceMonthlyModes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.scheduleRecurrenceRadio {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleRecurrenceRadio input {
+  accent-color: var(--color-primary);
+}
+
+.scheduleRecurrencePreview {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding-top: 4px;
+  color: var(--color-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.scheduleRecurrencePreviewMarker {
+  color: var(--color-placeholder);
+  font-size: 11px;
+}
+
+@media (max-width: 1280px) {
+  .statsRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .registryStatsRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .registryWorkspace {
+    grid-template-columns: 1fr;
+  }
+
+  .registryListPanel,
+  .registryDetailsPanel {
+    max-height: none;
+  }
+
+  .registryStepper {
+    flex-wrap: wrap;
+  }
+
+  .registryStep {
+    flex: 1 1 calc(33.333% - 4px);
+    min-width: 88px;
+  }
+
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .queuePanel {
+    max-height: min(420px, calc(100vh - 168px));
+  }
+
+  .scheduleStatsRow {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .scheduleScopeRow {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduleDetailsGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scheduleFillFromPositions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  background: rgba(0, 0, 0, 0.02);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+
+.scheduleFillToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: none;
+  border: none;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.scheduleFillToggleIcon,
+.scheduleFillToggleIconOpen {
+  transition: transform 0.15s ease;
+}
+
+.scheduleFillToggleIconOpen {
+  transform: rotate(180deg);
+}
+
+.scheduleFillBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scheduleFillHint {
+  margin: 0;
+  color: var(--color-placeholder);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.scheduleFillRoleField {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scheduleFillRoleLabel {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleFillAmbiguous {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--color-hover);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+}
+
+.scheduleFillAmbiguousTitle {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.scheduleFillAmbiguousRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleParticipantSuggestionMeta {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-placeholder);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.planPreviewModalCard {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+
+.planPreviewLoading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 16px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.planPreviewSummary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+
+.planPreviewSummary span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  background: var(--color-hover);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planPreviewSummaryTotal {
+  background: transparent !important;
+}
+
+.planPreviewGroups {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 12px 0 8px;
+}
+
+.planPreviewGroup {
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--color-surface, #fff);
+}
+
+.planPreviewGroupHeader {
+  width: 100%;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.planPreviewGroupHeader strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 14px;
+}
+
+.planPreviewChevron,
+.planPreviewChevronOpen {
   flex-shrink: 0;
+  margin-top: 2px;
+  transition: transform 0.15s ease;
+}
+
+.planPreviewChevronOpen {
+  transform: rotate(180deg);
+}
+
+.planPreviewOccurrenceList {
+  list-style: none;
+  margin: 0;
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.planPreviewOccurrence {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-hover);
+}
+
+.planPreviewOccurrenceHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.planPreviewOccurrenceMeta {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.planPreviewDifficulty {
+  flex-shrink: 0;
+  padding: 4px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.planPreviewChoiceField {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.planPreviewChoiceField select {
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  font: inherit;
+}
+
+.planPreviewReason {
+  margin: 8px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.planPreviewBlockers {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.planPreviewBlockers li {
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border);
+  font-size: 12px;
+  font-weight: 600;
 }

@@ -1,11 +1,19 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { meetingsApi } from "@/api/endpoints";
 import type {
   MeetingRunCreate,
   MeetingSlotsRequest,
-  MeetingAgentSlotApproveRequest
+  MeetingAgentSlotApproveRequest,
+  MeetingAgentSlotPreviewDetailsRequest,
+  MeetingMemoRejectRequest,
+  MeetingMemoApproveRequest,
+  MeetingMemoSeriesPlanningChoiceRequest,
+  MeetingMemoSeriesCreateRequest,
+  MeetingTopicCheckSimilarRequest,
+  MeetingTopicResolveRequest
 } from "@/types/meetings";
+import { meetingScheduleQueryKey } from "@/hooks/useMeetingSchedule";
 
 const RUNNING_STATUSES = new Set(["pending", "planning", "running", "waiting_human"]);
 
@@ -56,14 +64,17 @@ export function useMeetingAgentSlotPreview() {
   return useMutation({
     mutationFn: ({
       memoRefKey,
-      durationMinutes
+      durationMinutes,
+      signal
     }: {
       memoRefKey: string;
       durationMinutes?: number | null;
+      signal?: AbortSignal;
     }) =>
       meetingsApi.slotPreview(
         memoRefKey,
-        durationMinutes ? { duration_minutes: durationMinutes } : undefined
+        durationMinutes ? { duration_minutes: durationMinutes } : undefined,
+        { signal }
       )
   });
 }
@@ -77,5 +88,91 @@ export function useMeetingAgentSlotApprove() {
       memoRefKey: string;
       payload: MeetingAgentSlotApproveRequest;
     }) => meetingsApi.approveSlot(memoRefKey, payload)
+  });
+}
+
+export function useMeetingAgentSlotPreviewDetails() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload,
+      signal
+    }: {
+      memoRefKey: string;
+      payload: MeetingAgentSlotPreviewDetailsRequest;
+      signal?: AbortSignal;
+    }) => meetingsApi.slotPreviewDetails(memoRefKey, payload, { signal })
+  });
+}
+
+export function useMeetingMemoReject() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload
+    }: {
+      memoRefKey: string;
+      payload: MeetingMemoRejectRequest;
+    }) => meetingsApi.rejectMemo(memoRefKey, payload)
+  });
+}
+
+export function useMeetingMemoApprove() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      payload
+    }: {
+      memoRefKey: string;
+      payload?: MeetingMemoApproveRequest;
+    }) => meetingsApi.approveMemo(memoRefKey, payload)
+  });
+}
+
+export function useMeetingTopicCheckSimilar() {
+  return useMutation({
+    mutationFn: ({
+      payload,
+      signal
+    }: {
+      payload: MeetingTopicCheckSimilarRequest;
+      signal?: AbortSignal;
+    }) => meetingsApi.checkSimilarTopic(payload, { signal })
+  });
+}
+
+export function useMeetingTopicResolve() {
+  return useMutation({
+    mutationFn: ({
+      payload,
+      signal
+    }: {
+      payload: MeetingTopicResolveRequest;
+      signal?: AbortSignal;
+    }) => meetingsApi.resolveTopic(payload, { signal })
+  });
+}
+
+export function useMeetingMemoSeriesPlanningChoice() {
+  return useMutation({
+    mutationFn: ({
+      memoRefKey,
+      mode
+    }: {
+      memoRefKey: string;
+      mode: MeetingMemoSeriesPlanningChoiceRequest["mode"];
+    }) => meetingsApi.saveSeriesPlanningChoice(memoRefKey, { mode })
+  });
+}
+
+export function useMeetingMemoCreateSeries() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (input: { memoRefKey: string; payload?: MeetingMemoSeriesCreateRequest }) =>
+      meetingsApi.createSeriesFromMemo(input.memoRefKey, input.payload),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: meetingScheduleQueryKey });
+    }
   });
 }

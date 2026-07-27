@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { Bell, ChevronDown, Search } from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { isStandaloneIncomingMail } from "@/auth/standaloneIncomingMail";
+import NotificationsBell from "./NotificationsBell";
 import { nav } from "./Sidebar";
 import ThemeToggle from "./ThemeToggle";
 
@@ -12,7 +13,6 @@ export default function Topbar({ title }: { title: string }) {
   const standalone = isStandaloneIncomingMail();
   const { user, logout } = useAuth();
   const headerNav = standalone ? standaloneNav : nav;
-  const [notificationCount, setNotificationCount] = useState(8);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const displayName = user?.full_name || user?.email || "Пользователь";
   const position = user?.position || (user?.is_superuser ? "Суперадминистратор" : "Пользователь платформы");
@@ -48,17 +48,9 @@ export default function Topbar({ title }: { title: string }) {
           <kbd>⌘K</kbd>
         </label>
 
-        <button
-          className="notification-button"
-          type="button"
-          aria-label={`Уведомления: ${notificationCount}`}
-          onClick={() => setNotificationCount((count) => count + 1)}
-        >
-          <Bell aria-hidden="true" size={22} strokeWidth={1.9} />
-          <span className="notification-badge">{notificationCount}</span>
-        </button>
-
         <ThemeToggle />
+
+        <NotificationsBell />
 
         <div className="profile-menu">
           <button

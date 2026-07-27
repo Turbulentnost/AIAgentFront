@@ -96,14 +96,61 @@ import type {
   UserUpdate,
   MeetingLoginContext,
   MeetingMemoDetail,
+  MeetingMemoSeriesCreateRead,
+  MeetingMemoSeriesCreateRequest,
+  MeetingMemoSeriesPlanningChoiceRead,
+  MeetingMemoSeriesPlanningChoiceRequest,
   MeetingPermissions,
   MeetingRun,
   MeetingRunCreate,
   MeetingRunResult,
   MeetingAgentSlotPreview,
   MeetingAgentSlotPreviewRequest,
+  MeetingAgentSlotPreviewDetails,
+  MeetingAgentSlotPreviewDetailsRequest,
   MeetingAgentSlotApprove,
   MeetingAgentSlotApproveRequest,
+  MeetingMemoRejectRead,
+  MeetingMemoRejectRequest,
+  MeetingMemoApproveRead,
+  MeetingMemoApproveRequest,
+  MeetingRegistryContext,
+  MeetingRegistryCancelRequest,
+  MeetingRegistryCancelResponse,
+  MeetingRegistryProtocolCreateResponse,
+  MeetingRegistryParticipantsResponse,
+  MeetingRegistryParticipantSearchResponse,
+  MeetingRegistryParticipantsApplyRequest,
+  MeetingRegistryParticipantsApplyResponse,
+  MeetingRegistryParticipantsAddConfirmRequest,
+  MeetingRegistryParticipantsAddConfirmResponse,
+  MeetingRegistryParticipantsRemovalConfirmRequest,
+  MeetingRegistryParticipantsRemovalConfirmResponse,
+  MeetingRegistryRescheduleSlotPreviewRequest,
+  MeetingRegistryRescheduleSlotPreviewResponse,
+  MeetingRegistryRescheduleApproveRequest,
+  MeetingRegistryRescheduleApproveResponse,
+  MeetingScheduleSeriesItem,
+  MeetingScheduleSeriesSavePayload,
+  MeetingCategoryRead,
+  ScheduledMeetingCancelRead,
+  ScheduledMeetingCancelRequest,
+  ScheduledMeetingCreate,
+  ScheduledMeetingDetailRead,
+  ScheduledMeetingEmployeeOption,
+  ScheduledMeetingPositionResolveRead,
+  ScheduledMeetingParticipantOption,
+  ScheduledMeetingPlanPreviewRead,
+  ScheduledMeetingPlanPreviewRequest,
+  ScheduledMeetingPlanRequest,
+  ScheduledMeetingRead,
+  ScheduledMeetingUpdate,
+  ScheduledMeetingUpdateRead,
+  MeetingTopicCheckSimilarRead,
+  MeetingTopicCheckSimilarRequest,
+  MeetingTopicResolveRead,
+  MeetingTopicResolveRequest,
+  MeetingTopicValidationRead,
   MeetingSlot,
   MeetingSlotsRequest,
   PorucheniyaDashboardParams,
@@ -153,6 +200,29 @@ import type {
   OtkShipmentLineUpdateApi,
   OtkWriteTo1CResultApi
 } from "@/types/otk";
+import type {
+  AppNotification,
+  AppNotificationAccept,
+  AppNotificationAcceptRequest,
+  AppNotificationList,
+  AppNotificationOpen
+} from "@/types/notifications";
+
+export const notificationsApi = {
+  list: () => apiClient.get<AppNotificationList>("/notifications").then((r) => r.data),
+  markRead: (notificationId: string) =>
+    apiClient.post<AppNotification>(`/notifications/${notificationId}/read`).then((r) => r.data),
+  open: (notificationId: string) =>
+    longRunningApiClient
+      .post<AppNotificationOpen>(`/notifications/${notificationId}/open`)
+      .then((r) => r.data),
+  accept: (notificationId: string, payload?: AppNotificationAcceptRequest) =>
+    apiClient
+      .post<AppNotificationAccept>(`/notifications/${notificationId}/accept`, payload ?? {})
+      .then((r) => r.data),
+  dismiss: (notificationId: string) =>
+    apiClient.post<AppNotification>(`/notifications/${notificationId}/dismiss`).then((r) => r.data)
+};
 
 export const meetingsApi = {
   permissions: () => apiClient.get<MeetingPermissions>("/meetings/me/permissions").then((r) => r.data),
@@ -165,25 +235,254 @@ export const meetingsApi = {
       .then((r) => r.data),
   refreshDashboard: () =>
     longRunningApiClient.post<MeetingLoginContext>("/meetings/dashboard/refresh").then((r) => r.data),
+  getRegistry: (stage?: string) =>
+    apiClient
+      .get<MeetingRegistryContext>("/meetings/registry", {
+        params: stage ? { stage } : undefined,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  saveRegistryMeetingTopic: (memoRefKey: string, payload: MeetingTopicResolveRead) =>
+    apiClient
+      .post(`/meetings/registry/${memoRefKey}/meeting-topic`, payload)
+      .then((r) => r.data),
+  dispatchProtocolDrafts: () =>
+    apiClient.post("/meetings/registry/dispatch-protocol-drafts").then((r) => r.data),
+  createRegistryProtocol: (memoRefKey: string) =>
+    longRunningApiClient
+      .post<MeetingRegistryProtocolCreateResponse>(`/meetings/registry/${memoRefKey}/create-protocol`)
+      .then((r) => r.data),
+  getRegistryParticipants: (memoRefKey: string) =>
+    longRunningApiClient
+      .get<MeetingRegistryParticipantsResponse>(`/meetings/registry/${memoRefKey}/participants`)
+      .then((r) => r.data),
+  searchRegistryParticipants: (
+    memoRefKey: string,
+    fio: string,
+    options?: { signal?: AbortSignal }
+  ) =>
+    longRunningApiClient
+      .get<MeetingRegistryParticipantSearchResponse>(
+        `/meetings/registry/${memoRefKey}/participants/search`,
+        { params: { fio }, signal: options?.signal }
+      )
+      .then((r) => r.data),
+  applyRegistryParticipants: (memoRefKey: string, payload: MeetingRegistryParticipantsApplyRequest) =>
+    longRunningApiClient
+      .post<MeetingRegistryParticipantsApplyResponse>(
+        `/meetings/registry/${memoRefKey}/participants/apply`,
+        payload
+      )
+      .then((r) => r.data),
+  confirmRegistryParticipantsAdd: (
+    memoRefKey: string,
+    payload: MeetingRegistryParticipantsAddConfirmRequest
+  ) =>
+    longRunningApiClient
+      .post<MeetingRegistryParticipantsAddConfirmResponse>(
+        `/meetings/registry/${memoRefKey}/participants/confirm-add`,
+        payload
+      )
+      .then((r) => r.data),
+  confirmRegistryParticipantsRemoval: (
+    memoRefKey: string,
+    payload: MeetingRegistryParticipantsRemovalConfirmRequest
+  ) =>
+    longRunningApiClient
+      .post<MeetingRegistryParticipantsRemovalConfirmResponse>(
+        `/meetings/registry/${memoRefKey}/participants/confirm-removal`,
+        payload
+      )
+      .then((r) => r.data),
+  cancelRegistryParticipantsRemoval: (memoRefKey: string) =>
+    longRunningApiClient
+      .post<MeetingRegistryParticipantsResponse>(
+        `/meetings/registry/${memoRefKey}/participants/cancel-removal`
+      )
+      .then((r) => r.data),
+  cancelRegistryMeeting: (memoRefKey: string, payload?: MeetingRegistryCancelRequest) =>
+    longRunningApiClient
+      .post<MeetingRegistryCancelResponse>(`/meetings/registry/${memoRefKey}/cancel`, payload ?? {})
+      .then((r) => r.data),
+  rescheduleSlotPreview: (
+    memoRefKey: string,
+    payload?: MeetingRegistryRescheduleSlotPreviewRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
+    longRunningApiClient
+      .post<MeetingRegistryRescheduleSlotPreviewResponse>(
+        `/meetings/registry/${memoRefKey}/reschedule/slot-preview`,
+        payload ?? {},
+        { signal: options?.signal }
+      )
+      .then((r) => r.data),
+  approveRegistryReschedule: (
+    memoRefKey: string,
+    payload: MeetingRegistryRescheduleApproveRequest
+  ) =>
+    longRunningApiClient
+      .post<MeetingRegistryRescheduleApproveResponse>(
+        `/meetings/registry/${memoRefKey}/reschedule/approve`,
+        payload
+      )
+      .then((r) => r.data),
   getMemoDetail: (memoRefKey: string, options?: { forceRefresh?: boolean }) =>
     apiClient
       .get<MeetingMemoDetail>(`/meetings/memos/${memoRefKey}/detail`, {
         params: options?.forceRefresh ? { force_refresh: true } : undefined
       })
       .then((r) => r.data),
+  saveSeriesPlanningChoice: (
+    memoRefKey: string,
+    payload: MeetingMemoSeriesPlanningChoiceRequest
+  ) =>
+    apiClient
+      .post<MeetingMemoSeriesPlanningChoiceRead>(
+        `/meetings/memos/${memoRefKey}/series-planning-choice`,
+        payload
+      )
+      .then((r) => r.data),
+  createSeriesFromMemo: (
+    memoRefKey: string,
+    payload?: MeetingMemoSeriesCreateRequest
+  ) =>
+    apiClient
+      .post<MeetingMemoSeriesCreateRead>(`/meetings/memos/${memoRefKey}/create-series`, payload ?? {})
+      .then((r) => r.data),
   findSlots: (payload: MeetingSlotsRequest) =>
     apiClient.post<MeetingSlot[]>("/meetings/slots", payload).then((r) => r.data),
-  slotPreview: (memoRefKey: string, payload?: MeetingAgentSlotPreviewRequest) =>
+  slotPreview: (
+    memoRefKey: string,
+    payload?: MeetingAgentSlotPreviewRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
     longRunningApiClient
-      .post<MeetingAgentSlotPreview>(`/meetings/memos/${memoRefKey}/agent/slot-preview`, payload ?? {})
+      .post<MeetingAgentSlotPreview>(
+        `/meetings/memos/${memoRefKey}/agent/slot-preview`,
+        payload ?? {},
+        { signal: options?.signal }
+      )
+      .then((r) => r.data),
+  slotPreviewDetails: (
+    memoRefKey: string,
+    payload: MeetingAgentSlotPreviewDetailsRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
+    longRunningApiClient
+      .post<MeetingAgentSlotPreviewDetails>(
+        `/meetings/memos/${memoRefKey}/agent/slot-preview/details`,
+        payload,
+        { signal: options?.signal }
+      )
       .then((r) => r.data),
   approveSlot: (memoRefKey: string, payload: MeetingAgentSlotApproveRequest) =>
     longRunningApiClient
       .post<MeetingAgentSlotApprove>(`/meetings/memos/${memoRefKey}/agent/approve`, payload)
       .then((r) => r.data),
+  rejectMemo: (memoRefKey: string, payload: MeetingMemoRejectRequest) =>
+    longRunningApiClient
+      .post<MeetingMemoRejectRead>(`/meetings/memos/${memoRefKey}/reject`, payload)
+      .then((r) => r.data),
+  approveMemo: (memoRefKey: string, payload?: MeetingMemoApproveRequest) =>
+    longRunningApiClient
+      .post<MeetingMemoApproveRead>(`/meetings/memos/${memoRefKey}/approve`, payload ?? {})
+      .then((r) => r.data),
   createRun: (payload: MeetingRunCreate) =>
     apiClient.post<MeetingRun>("/meetings/runs", payload).then((r) => r.data),
-  getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data)
+  getRun: (taskId: string) => apiClient.get<MeetingRunResult>(`/meetings/runs/${taskId}`).then((r) => r.data),
+  getSchedule: () =>
+    apiClient
+      .get<ScheduledMeetingRead[]>("/meetings/scheduled", {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  listScheduleEmployeeOptions: (search?: string) =>
+    apiClient
+      .get<ScheduledMeetingEmployeeOption[]>("/meetings/scheduled/employee-options", {
+        params: search?.trim() ? { search: search.trim() } : undefined,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  resolveSchedulePositions: (positionIds: string[]) =>
+    apiClient
+      .post<ScheduledMeetingPositionResolveRead>("/meetings/scheduled/resolve-positions", {
+        position_ids: positionIds
+      })
+      .then((r) => r.data),
+  listScheduleParticipantOptions: (search?: string) =>
+    apiClient
+      .get<ScheduledMeetingParticipantOption[]>("/meetings/scheduled/participant-options", {
+        params: search?.trim() ? { search: search.trim() } : undefined,
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  listScheduleCategoryOptions: () =>
+    apiClient
+      .get<MeetingCategoryRead[]>("/meetings/scheduled/category-options", {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  getScheduled: (meetingId: string) =>
+    apiClient
+      .get<ScheduledMeetingRead>(`/meetings/scheduled/${meetingId}`, {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  getScheduledDetail: (meetingId: string) =>
+    apiClient
+      .get<ScheduledMeetingDetailRead>(`/meetings/scheduled/${meetingId}/detail`, {
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" }
+      })
+      .then((r) => r.data),
+  createScheduled: (payload: ScheduledMeetingCreate) =>
+    apiClient.post<ScheduledMeetingRead>("/meetings/scheduled", payload).then((r) => r.data),
+  updateScheduled: (meetingId: string, payload: ScheduledMeetingUpdate) =>
+    longRunningApiClient
+      .patch<ScheduledMeetingUpdateRead>(`/meetings/scheduled/${meetingId}`, payload)
+      .then((r) => r.data),
+  planPreviewScheduled: (
+    meetingId: string,
+    payload?: ScheduledMeetingPlanPreviewRequest
+  ) =>
+    longRunningApiClient
+      .post<ScheduledMeetingPlanPreviewRead>(
+        `/meetings/scheduled/${meetingId}/plan-preview`,
+        payload ?? { conflict_policy: "soft_week" }
+      )
+      .then((r) => r.data),
+  planScheduled: (meetingId: string, payload?: ScheduledMeetingPlanRequest) =>
+    longRunningApiClient
+      .post<ScheduledMeetingRead>(
+        `/meetings/scheduled/${meetingId}/plan`,
+        payload ?? {}
+      )
+      .then((r) => r.data),
+  cancelScheduled: (meetingId: string, payload?: ScheduledMeetingCancelRequest) =>
+    longRunningApiClient
+      .post<ScheduledMeetingCancelRead>(`/meetings/scheduled/${meetingId}/cancel`, payload ?? {})
+      .then((r) => r.data),
+  checkSimilarTopic: (
+    payload: MeetingTopicCheckSimilarRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
+    longRunningApiClient
+      .post<MeetingTopicCheckSimilarRead>("/meetings/topics/check-similar", payload, {
+        signal: options?.signal
+      })
+      .then((r) => r.data),
+  resolveTopic: (
+    payload: MeetingTopicResolveRequest,
+    options?: { signal?: AbortSignal }
+  ) =>
+    longRunningApiClient
+      .post<MeetingTopicResolveRead>("/meetings/topics/resolve", payload, {
+        signal: options?.signal
+      })
+      .then((r) => r.data),
+  validateTopicRef: (topicRefKey: string) =>
+    apiClient
+      .get<MeetingTopicValidationRead>(`/meetings/topics/${topicRefKey}/validate`)
+      .then((r) => r.data)
 };
 
 export const porucheniyaApi = {
@@ -460,6 +759,10 @@ export const usersApi = {
 };
 export const departmentsApi = {
   list: () => apiClient.get<Department[]>("/departments").then((r) => r.data),
+  listActive: () =>
+    apiClient
+      .get<Department[]>("/departments", { params: { active_only: true } })
+      .then((r) => r.data),
   create: (payload: DepartmentCreate) => apiClient.post<Department>("/departments", payload).then((r) => r.data),
   syncStatus: () => apiClient.get<DepartmentSyncStatus>("/departments/sync/status").then((r) => r.data),
   syncFrom1C: () => apiClient.post<DepartmentSyncStatus>("/departments/sync").then((r) => r.data)
