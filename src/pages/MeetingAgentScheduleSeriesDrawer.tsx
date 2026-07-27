@@ -521,28 +521,50 @@ function ScheduleCategoryField({
     staleTime: 60_000
   });
 
+  const categories = categoriesQuery.data ?? [];
+  const selectedCategory = categories.find((category) => category.id === value) ?? null;
+
   return (
-    <label className={styles.scheduleField}>
+    <div className={styles.scheduleField}>
       <span className={styles.scheduleFieldLabel}>Вид совещания</span>
-      <div className={styles.scheduleSelectField}>
-        <select
-          className={styles.scheduleControl}
-          value={value}
-          onChange={(event) => onChange(event.target.value)}
-          disabled={categoriesQuery.isLoading || categoriesQuery.isError}
-        >
-          <option value="">
-            {categoriesQuery.isLoading ? "Загрузка…" : "Выберите вид"}
-          </option>
-          {(categoriesQuery.data ?? []).map((category) => (
-            <option key={category.id} value={category.id}>
-              {category.name}
-            </option>
-          ))}
-        </select>
-        <ChevronDown className={styles.scheduleSelectChevron} size={16} aria-hidden="true" />
-      </div>
-    </label>
+      {categoriesQuery.isLoading ? (
+        <p className={styles.scheduleCategoryPickerHint}>Загрузка видов…</p>
+      ) : categoriesQuery.isError ? (
+        <p className={styles.scheduleCategoryPickerError}>Не удалось загрузить виды совещаний</p>
+      ) : (
+        <>
+          <p className={styles.scheduleCategoryPickerHint}>
+            {selectedCategory ? (
+              <>
+                Выбрано: <strong>{selectedCategory.name}</strong>
+              </>
+            ) : (
+              "Выберите вид из списка"
+            )}
+          </p>
+          <div
+            className={styles.scheduleCategoryPicker}
+            role="listbox"
+            aria-label="Вид совещания"
+          >
+            {categories.map((category) => (
+              <button
+                key={category.id}
+                type="button"
+                role="option"
+                aria-selected={value === category.id}
+                className={`${styles.scheduleCategoryPickerTile} ${
+                  value === category.id ? styles.scheduleCategoryPickerTileActive : ""
+                }`}
+                onClick={() => onChange(category.id)}
+              >
+                {category.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
   );
 }
 

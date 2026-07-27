@@ -226,3 +226,13 @@ export function useMeetingScheduleUpdateSeries() {
     }
   });
 }
+
+export function useMeetingScheduleCategories(enabled = true) {
+  return useQuery({
+    queryKey: ["meetings", "schedule", "category-options"],
+    queryFn: () => meetingsApi.listScheduleCategoryOptions(),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000
+  });
+}

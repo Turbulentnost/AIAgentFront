@@ -2,11 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   BarChart3,
+  Archive,
   Calendar,
   CalendarCheck2,
   CalendarClock,
   ExternalLink,
-  GripVertical,
   Plus,
   Users,
   Zap
@@ -16,6 +16,7 @@ import LoadingPanel from "@/components/LoadingPanel";
 import {
   useMeetingSchedule,
   useMeetingScheduleCancelSeries,
+  useMeetingScheduleCategories,
   useMeetingScheduleCreateSeries,
   useMeetingSchedulePlanSeries,
   useMeetingScheduleDetail,
@@ -39,8 +40,15 @@ import {
   scheduleTopicSnapshotFromPayload
 } from "@/utils/meetingTopic";
 import {
+  buildMeetingScheduleCategoryTiles,
+  filterMeetingScheduleByCategory,
+  filterMeetingScheduleByScope,
+  formatMeetingScheduleParticipantsSummary,
+  isMeetingScheduleArchived,
   mapMeetingScheduleItem,
   sortMeetingScheduleItems,
+  type MeetingScheduleCategoryFilter,
+  type MeetingScheduleScope,
   type MeetingScheduleViewItem
 } from "@/utils/meetingSchedule";
 import { canPlanMeetingScheduleSeries, canCancelMeetingScheduleSeries, canEditMeetingScheduleSeries, normalizeMeetingScheduleDetail } from "@/utils/meetingScheduleApi";
@@ -83,13 +91,13 @@ export default function MeetingAgentSchedule({
   const [planError, setPlanError] = useState<string | null>(null);
   const [editSuccessMessage, setEditSuccessMessage] = useState<string | null>(null);
   const [cancelSuccessMessage, setCancelSuccessMessage] = useState<string | null>(null);
-  const [expandedParticipantRowIds, setExpandedParticipantRowIds] = useState<Set<string>>(
-    () => new Set()
-  );
   const [pendingCreatePayload, setPendingCreatePayload] =
     useState<MeetingScheduleSeriesSavePayload | null>(null);
   const [topicModalOpen, setTopicModalOpen] = useState(false);
+  const [scope, setScope] = useState<MeetingScheduleScope>("active");
+  const [categoryFilter, setCategoryFilter] = useState<MeetingScheduleCategoryFilter>("all");
 
+  const categoriesQuery = useMeetingScheduleCategories(canAccessAgent);
   const editSeriesQuery = useMeetingScheduleSeriesForEdit(
     editSeriesId,
     canAccessAgent && Boolean(editSeriesId)
@@ -105,37 +113,50 @@ export default function MeetingAgentSchedule({
     setSelectedId(initialSelectedId);
   }, [initialSelectedId]);
 
+  const typeCounts = scheduleQuery.data?.type_counts;
+  const activeCount = useMemo(
+    () => items.filter((item) => !isMeetingScheduleArchived(item)).length,
+    [items]
+  );
+  const archiveCount = useMemo(
+    () => items.filter((item) => isMeetingScheduleArchived(item)).length,
+    [items]
+  );
+  const scopedItems = useMemo(() => filterMeetingScheduleByScope(items, scope), [items, scope]);
+  const categoryTiles = useMemo(
+    () => buildMeetingScheduleCategoryTiles(scopedItems, categoriesQuery.data ?? []),
+    [scopedItems, categoriesQuery.data]
+  );
+  const visibleItems = useMemo(
+    () => filterMeetingScheduleByCategory(scopedItems, categoryFilter),
+    [scopedItems, categoryFilter]
+  );
+  const totalRecords = scope === "archive" ? archiveCount : activeCount;
+  const selectedItem =
+    visibleItems.find((item) => item.id === selectedId) ??
+    items.find((item) => item.id === selectedId) ??
+    null;
+
   useEffect(() => {
-    if (!items.length) {
+    setCategoryFilter("all");
+  }, [scope]);
+
+  useEffect(() => {
+    if (!visibleItems.length) {
       setSelectedId("");
       return;
     }
 
-    if (!items.some((item) => item.id === selectedId)) {
-      setSelectedId(items[0]?.id ?? "");
+    if (!visibleItems.some((item) => item.id === selectedId)) {
+      setSelectedId(visibleItems[0]?.id ?? "");
     }
-  }, [items, selectedId]);
+  }, [visibleItems, selectedId]);
 
-  const selectedItem = items.find((item) => item.id === selectedId) ?? null;
   const detailQuery = useMeetingScheduleDetail(selectedId, canAccessAgent && Boolean(selectedId));
   const detailView = useMemo(
     () => (detailQuery.data ? normalizeMeetingScheduleDetail(detailQuery.data) : null),
     [detailQuery.data]
   );
-  const typeCounts = scheduleQuery.data?.type_counts;
-  const totalRecords = typeCounts?.total ?? items.length;
-
-  function handleToggleParticipantsRow(rowId: string) {
-    setExpandedParticipantRowIds((current) => {
-      const next = new Set(current);
-      if (next.has(rowId)) {
-        next.delete(rowId);
-      } else {
-        next.add(rowId);
-      }
-      return next;
-    });
-  }
 
   function handleOpenCreateDrawer() {
     setIsCreateDrawerOpen(true);
@@ -257,33 +278,99 @@ export default function MeetingAgentSchedule({
           </p>
         </div>
         <span className={styles.scheduleTotalCount}>
-          Всего записей: {totalRecords}
+          {scope === "archive" ? "В архиве" : "Активных серий"}: {totalRecords}
+          {categoryFilter !== "all" ? ` · показано ${visibleItems.length}` : ""}
         </span>
       </header>
 
-      <div className={styles.scheduleStatsRow} aria-label="Сводка по типам серий">
-        {statCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <article className={styles.scheduleStatCard} key={card.id}>
-              <span className={styles.scheduleStatIcon} aria-hidden="true">
-                <Icon size={16} strokeWidth={2.2} />
-              </span>
-              <div className={styles.scheduleStatContent}>
-                <strong>{typeCounts?.[card.key] ?? 0}</strong>
-                <span>{card.label}</span>
-              </div>
-            </article>
-          );
-        })}
+      <div className={styles.scheduleScopeRow} role="tablist" aria-label="Раздел графика">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "active"}
+          className={`${styles.scheduleScopeTile} ${
+            scope === "active" ? styles.scheduleScopeTileActive : ""
+          }`}
+          onClick={() => setScope("active")}
+        >
+          <span className={styles.scheduleScopeTileIcon} aria-hidden="true">
+            <CalendarClock size={18} strokeWidth={2.2} />
+          </span>
+          <span className={styles.scheduleScopeTileContent}>
+            <strong>Активные серии</strong>
+            <span>Плановые и регулярные совещания</span>
+          </span>
+          <span className={styles.scheduleScopeTileCount}>{activeCount}</span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={scope === "archive"}
+          className={`${styles.scheduleScopeTile} ${
+            scope === "archive" ? styles.scheduleScopeTileActive : ""
+          }`}
+          onClick={() => setScope("archive")}
+        >
+          <span className={styles.scheduleScopeTileIcon} aria-hidden="true">
+            <Archive size={18} strokeWidth={2.2} />
+          </span>
+          <span className={styles.scheduleScopeTileContent}>
+            <strong>Архив</strong>
+            <span>Отменённые и завершённые серии</span>
+          </span>
+          <span className={styles.scheduleScopeTileCount}>{archiveCount}</span>
+        </button>
       </div>
+
+      {scope === "active" ? (
+        <div className={styles.scheduleStatsRow} aria-label="Сводка по типам серий">
+          {statCards.map((card) => {
+            const Icon = card.icon;
+            return (
+              <article className={styles.scheduleStatCard} key={card.id}>
+                <span className={styles.scheduleStatIcon} aria-hidden="true">
+                  <Icon size={16} strokeWidth={2.2} />
+                </span>
+                <div className={styles.scheduleStatContent}>
+                  <strong>{typeCounts?.[card.key] ?? 0}</strong>
+                  <span>{card.label}</span>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
+
+      {(categoriesQuery.data?.length ?? 0) > 0 ? (
+        <section className={styles.scheduleCategorySection} aria-label="Фильтр по виду совещания">
+          <h3 className={styles.scheduleCategoryTitle}>Вид совещания</h3>
+          <div className={styles.scheduleCategoryTiles}>
+            {categoryTiles.map((tile) => (
+              <button
+                key={tile.id}
+                type="button"
+                className={`${styles.scheduleCategoryTile} ${
+                  categoryFilter === tile.id ? styles.scheduleCategoryTileActive : ""
+                } ${tile.count === 0 ? styles.scheduleCategoryTileEmpty : ""}`}
+                aria-pressed={categoryFilter === tile.id}
+                onClick={() => setCategoryFilter(tile.id)}
+              >
+                <span>{tile.label}</span>
+                <span className={styles.scheduleCategoryTileCount}>{tile.count}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section className={styles.schedulePanel}>
         <div className={styles.scheduleTableToolbar}>
-          <button type="button" className={styles.primaryButton} onClick={handleOpenCreateDrawer}>
-            <Plus size={16} aria-hidden="true" />
-            Добавить
-          </button>
+          {scope === "active" ? (
+            <button type="button" className={styles.primaryButton} onClick={handleOpenCreateDrawer}>
+              <Plus size={16} aria-hidden="true" />
+              Добавить
+            </button>
+          ) : null}
           {planError ? <p className={styles.scheduleToolbarError}>{planError}</p> : null}
           {editSuccessMessage ? (
             <p className={styles.scheduleToolbarSuccess}>{editSuccessMessage}</p>
@@ -295,176 +382,165 @@ export default function MeetingAgentSchedule({
 
         <div className={styles.scheduleTableWrap}>
           <div className={styles.scheduleTableScroll}>
-            <table className={styles.scheduleTable}>
+            <table className={`${styles.scheduleTable} ${styles.scheduleTableCompact}`}>
               <thead className={styles.scheduleTableHead}>
                 <tr>
-                  <th className={styles.scheduleColDrag} aria-label="Порядок" />
                   <th>Название</th>
                   <th>Тип</th>
-                  <th>Вид</th>
-                  <th>Руководитель</th>
-                  <th>Ответственный</th>
+                  <th>Руководство</th>
                   <th>Участники</th>
-                  <th>Периодичность</th>
-                  <th>Срок</th>
-                  <th>Статус</th>
-                  <th>Действия</th>
+                  <th>Расписание</th>
+                  {scope === "active" ? <th>Статус</th> : null}
+                  {scope === "active" ? <th>Действия</th> : null}
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => {
-                  const isSelected = item.id === selectedId;
-                  return (
-                    <tr
-                      key={item.id}
-                      className={isSelected ? styles.scheduleRowSelected : ""}
-                      onClick={() => setSelectedId(item.id)}
+                {visibleItems.length === 0 ? (
+                  <tr>
+                    <td
+                      className={styles.scheduleEmptyCell}
+                      colSpan={scope === "active" ? 7 : 5}
                     >
-                      <td className={styles.scheduleColDrag}>
-                        <button
-                          type="button"
-                          className={styles.scheduleDragHandle}
-                          aria-label={`Изменить порядок: ${item.name}`}
-                          onClick={(event) => event.stopPropagation()}
-                        >
-                          <GripVertical size={16} aria-hidden="true" />
-                        </button>
-                      </td>
-                      <td>
-                        <span className={styles.scheduleSeriesName}>{item.name}</span>
-                      </td>
-                      <td>
-                        <span
-                          className={`${styles.scheduleTypeBadge} ${styles[`scheduleTypeBadge${item.typeTone}`]}`}
-                        >
-                          {item.typeLabel}
-                        </span>
-                      </td>
-                      <td>{item.categoryLabel}</td>
-                      <td>{item.managerLabel}</td>
-                      <td>{item.responsibleLabel}</td>
-                      <td>
-                        {(() => {
-                          const isExpanded = expandedParticipantRowIds.has(item.id);
-                          const hasHiddenParticipants = item.extra_participants_count > 0;
-                          const participantsToShow = isExpanded
-                            ? item.participant_roles
-                            : item.visibleParticipants;
+                      {scope === "archive"
+                        ? "В архиве пока нет серий совещаний"
+                        : categoryFilter === "all"
+                          ? "Нет активных серий совещаний"
+                          : "Нет серий для выбранного вида совещания"}
+                    </td>
+                  </tr>
+                ) : (
+                  visibleItems.map((item) => {
+                    const isSelected = item.id === selectedId;
+                    const isArchived = isMeetingScheduleArchived(item);
+                    const participantPreview = item.participant_roles.slice(0, 2).join(", ");
+                    const hiddenParticipants = Math.max(
+                      item.participant_roles.length - 2,
+                      item.extra_participants_count ?? 0
+                    );
 
-                          return (
-                            <div
-                              className={`${styles.scheduleParticipants} ${
-                                isExpanded ? styles.scheduleParticipantsExpanded : ""
-                              }`}
+                    return (
+                      <tr
+                        key={item.id}
+                        className={[
+                          isSelected ? styles.scheduleRowSelected : "",
+                          isArchived ? styles.scheduleRowArchived : ""
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
+                        onClick={() => setSelectedId(item.id)}
+                      >
+                        <td className={styles.scheduleNameCell}>
+                          <span className={styles.scheduleSeriesName}>{item.name}</span>
+                          <span className={styles.scheduleSeriesMeta}>{item.categoryLabel}</span>
+                        </td>
+                        <td>
+                          <span
+                            className={`${styles.scheduleTypeBadge} ${styles[`scheduleTypeBadge${item.typeTone}`]}`}
+                          >
+                            {item.typeLabel}
+                          </span>
+                        </td>
+                        <td className={styles.scheduleLeadershipCell}>
+                          <span className={styles.scheduleLeadershipPrimary}>{item.managerLabel}</span>
+                          <span className={styles.scheduleLeadershipSecondary}>
+                            {item.responsibleLabel}
+                          </span>
+                        </td>
+                        <td className={styles.scheduleParticipantsCell}>
+                          <span className={styles.scheduleParticipantsSummary}>
+                            {formatMeetingScheduleParticipantsSummary(item.participant_roles.length)}
+                          </span>
+                          {participantPreview ? (
+                            <span className={styles.scheduleParticipantsPreview}>
+                              {participantPreview}
+                              {hiddenParticipants > 0 ? ` +${hiddenParticipants}` : ""}
+                            </span>
+                          ) : null}
+                        </td>
+                        <td className={styles.scheduleScheduleCell}>
+                          <span className={styles.scheduleSchedulePrimary}>{item.recurrenceLabel}</span>
+                          <span className={styles.scheduleScheduleSecondary}>
+                            {item.deadlinePrimary}
+                            {item.deadlineSecondary ? ` · ${item.deadlineSecondary}` : ""}
+                          </span>
+                        </td>
+                        {scope === "active" ? (
+                          <td>
+                            <span
+                              className={`${styles.scheduleStatusBadge} ${styles[`scheduleStatusBadge${item.statusTone}`]}`}
                             >
-                              {participantsToShow.map((participant) => (
-                                <span className={styles.scheduleParticipantPill} key={participant}>
-                                  {participant}
-                                </span>
-                              ))}
-                              {hasHiddenParticipants ? (
+                              {item.statusLabel}
+                            </span>
+                          </td>
+                        ) : null}
+                        {scope === "active" ? (
+                          <td>
+                            <div className={styles.scheduleActions}>
+                              {scheduleRowActions
+                                .filter((action) => {
+                                  if (action.id === "cancel") {
+                                    return canCancelMeetingScheduleSeries(item);
+                                  }
+                                  if (action.id === "edit") {
+                                    return canEditMeetingScheduleSeries(item);
+                                  }
+                                  return true;
+                                })
+                                .map((action) => (
+                                  <button
+                                    key={action.id}
+                                    type="button"
+                                    className={`${styles.scheduleActionButton} ${
+                                      action.id === "cancel" ? styles.scheduleActionButtonDanger : ""
+                                    }`}
+                                    onClick={(event) => {
+                                      event.stopPropagation();
+                                      if (action.id === "edit") {
+                                        handleOpenEditDrawer(item.id);
+                                      }
+                                      if (action.id === "cancel") {
+                                        handleOpenCancelModal(item);
+                                      }
+                                    }}
+                                    disabled={
+                                      action.id === "cancel" &&
+                                      cancelSeriesMutation.isPending &&
+                                      cancelSeriesTarget?.id === item.id
+                                    }
+                                  >
+                                    {action.id === "cancel" &&
+                                    cancelSeriesMutation.isPending &&
+                                    cancelSeriesTarget?.id === item.id
+                                      ? "Отменяем…"
+                                      : action.label}
+                                  </button>
+                                ))}
+                              {canPlanMeetingScheduleSeries(item) ? (
                                 <button
                                   type="button"
-                                  className={styles.scheduleParticipantMore}
-                                  aria-expanded={isExpanded}
-                                  aria-label={
-                                    isExpanded
-                                      ? "Свернуть список участников"
-                                      : `Показать всех участников (${item.participant_roles.length})`
+                                  className={`${styles.scheduleActionButton} ${styles.scheduleActionButtonPrimary}`}
+                                  disabled={
+                                    planSeriesMutation.isPending &&
+                                    planSeriesMutation.variables === item.id
                                   }
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    handleToggleParticipantsRow(item.id);
+                                    handlePlanSeries(item.id);
                                   }}
                                 >
-                                  {isExpanded
-                                    ? "Свернуть"
-                                    : `+${item.extra_participants_count}`}
+                                  {planSeriesMutation.isPending &&
+                                  planSeriesMutation.variables === item.id
+                                    ? "Распланируем…"
+                                    : schedulePlanAction.label}
                                 </button>
                               ) : null}
                             </div>
-                          );
-                        })()}
-                      </td>
-                      <td className={styles.scheduleFrequencyCell}>{item.recurrenceLabel}</td>
-                      <td className={styles.scheduleDeadlineCell}>
-                        <span className={styles.scheduleDeadlinePrimary}>{item.deadlinePrimary}</span>
-                        {item.deadlineSecondary ? (
-                          <span className={styles.scheduleDeadlineSecondary}>
-                            {item.deadlineSecondary}
-                          </span>
+                          </td>
                         ) : null}
-                      </td>
-                      <td>
-                        <span
-                          className={`${styles.scheduleStatusBadge} ${styles[`scheduleStatusBadge${item.statusTone}`]}`}
-                        >
-                          {item.statusLabel}
-                        </span>
-                      </td>
-                      <td>
-                        <div className={styles.scheduleActions}>
-                          {scheduleRowActions
-                            .filter((action) => {
-                              if (action.id === "cancel") {
-                                return canCancelMeetingScheduleSeries(item);
-                              }
-                              if (action.id === "edit") {
-                                return canEditMeetingScheduleSeries(item);
-                              }
-                              return true;
-                            })
-                            .map((action) => (
-                            <button
-                              key={action.id}
-                              type="button"
-                              className={`${styles.scheduleActionButton} ${
-                                action.id === "cancel" ? styles.scheduleActionButtonDanger : ""
-                              }`}
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                if (action.id === "edit") {
-                                  handleOpenEditDrawer(item.id);
-                                }
-                                if (action.id === "cancel") {
-                                  handleOpenCancelModal(item);
-                                }
-                              }}
-                              disabled={
-                                action.id === "cancel" &&
-                                cancelSeriesMutation.isPending &&
-                                cancelSeriesTarget?.id === item.id
-                              }
-                            >
-                              {action.id === "cancel" &&
-                              cancelSeriesMutation.isPending &&
-                              cancelSeriesTarget?.id === item.id
-                                ? "Отменяем…"
-                                : action.label}
-                            </button>
-                          ))}
-                          {canPlanMeetingScheduleSeries(item) ? (
-                            <button
-                              type="button"
-                              className={`${styles.scheduleActionButton} ${styles.scheduleActionButtonPrimary}`}
-                              disabled={
-                                planSeriesMutation.isPending && planSeriesMutation.variables === item.id
-                              }
-                              onClick={(event) => {
-                                event.stopPropagation();
-                                handlePlanSeries(item.id);
-                              }}
-                            >
-                              {planSeriesMutation.isPending && planSeriesMutation.variables === item.id
-                                ? "Распланируем…"
-                                : schedulePlanAction.label}
-                            </button>
-                          ) : null}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                      </tr>
+                    );
+                  })
+                )}
               </tbody>
             </table>
           </div>

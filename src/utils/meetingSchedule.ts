@@ -143,6 +143,85 @@ export function sortMeetingScheduleItems(items: MeetingScheduleViewItem[]): Meet
   return [...items].sort((left, right) => (left.sort_order ?? 0) - (right.sort_order ?? 0));
 }
 
+export type MeetingScheduleScope = "active" | "archive";
+
+export type MeetingScheduleCategoryFilter = "all" | string;
+
+const UNCategorizedCategoryId = "__none__";
+
+export function isMeetingScheduleArchived(item: Pick<MeetingScheduleViewItem, "status">): boolean {
+  return item.status === "archive";
+}
+
+export function filterMeetingScheduleByScope(
+  items: MeetingScheduleViewItem[],
+  scope: MeetingScheduleScope
+): MeetingScheduleViewItem[] {
+  return items.filter((item) =>
+    scope === "archive" ? isMeetingScheduleArchived(item) : !isMeetingScheduleArchived(item)
+  );
+}
+
+export function filterMeetingScheduleByCategory(
+  items: MeetingScheduleViewItem[],
+  categoryFilter: MeetingScheduleCategoryFilter
+): MeetingScheduleViewItem[] {
+  if (categoryFilter === "all") return items;
+  if (categoryFilter === UNCategorizedCategoryId) {
+    return items.filter((item) => !item.meeting_category_id);
+  }
+  return items.filter((item) => item.meeting_category_id === categoryFilter);
+}
+
+export type MeetingScheduleCategoryTile = {
+  id: MeetingScheduleCategoryFilter;
+  label: string;
+  count: number;
+};
+
+export function buildMeetingScheduleCategoryTiles(
+  items: MeetingScheduleViewItem[],
+  categories: { id: string; name: string; sort_order: number }[]
+): MeetingScheduleCategoryTile[] {
+  const counts = new Map<string, number>();
+  for (const item of items) {
+    const key = item.meeting_category_id ?? UNCategorizedCategoryId;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const tiles: MeetingScheduleCategoryTile[] = [
+    { id: "all", label: "Все виды", count: items.length }
+  ];
+
+  for (const category of [...categories].sort((left, right) => left.sort_order - right.sort_order)) {
+    tiles.push({
+      id: category.id,
+      label: category.name,
+      count: counts.get(category.id) ?? 0
+    });
+  }
+
+  const uncategorizedCount = counts.get(UNCategorizedCategoryId) ?? 0;
+  if (uncategorizedCount > 0) {
+    tiles.push({
+      id: UNCategorizedCategoryId,
+      label: "Без вида",
+      count: uncategorizedCount
+    });
+  }
+
+  return tiles;
+}
+
+export function formatMeetingScheduleParticipantsSummary(count: number): string {
+  if (count <= 0) return "—";
+  const mod10 = count % 10;
+  const mod100 = count % 100;
+  if (mod10 === 1 && mod100 !== 11) return `${count} участник`;
+  if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return `${count} участника`;
+  return `${count} участников`;
+}
+
 const SCHEDULE_OCCURRENCE_TIMEZONE = "Europe/Moscow";
 
 function parseScheduleOccurrenceInstant(value: string): Date {
