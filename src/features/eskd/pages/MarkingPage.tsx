@@ -19,6 +19,7 @@ import type { MarkingDocumentLookup } from "@/features/eskd/types/marking";
 import DocumentPreview from "@/features/eskd/components/DocumentPreview";
 import GostSummaryForm from "@/features/eskd/components/GostSummaryForm";
 import type { GostFinding, MarkingDocument, PageLevelFinding } from "@/features/eskd/types/marking";
+import { filterLlmMetaText } from "@/features/eskd/utils/llmMetaFilter";
 import styles from "./MarkingPage.module.css";
 
 function emptyFindings(catalog: { key: string }[]): GostFinding[] {
@@ -139,8 +140,13 @@ export default function MarkingPage({
     const suggested = await fetchSuggestedMarkingLabel(docId);
     setLabelId(suggested.source === "saved" ? suggested.label_id : null);
     setDraftCheckRunId(suggested.source === "check_run" ? suggested.check_run_id : null);
-    setPageFindings(suggested.page_level ?? []);
-    setProblemReport(suggested.problem_report ?? "");
+    setPageFindings(
+      (suggested.page_level ?? []).map((entry) => ({
+        ...entry,
+        note: filterLlmMetaText(entry.note)
+      }))
+    );
+    setProblemReport(filterLlmMetaText(suggested.problem_report ?? ""));
     if (!suggested.found) {
       return "Документ открыт — разметка пока пустая";
     }

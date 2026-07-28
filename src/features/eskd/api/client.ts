@@ -22,14 +22,18 @@ export function syncEskdAuthFromPlatformUser(user: {
   full_name?: string | null;
 }) {
   const email = (user.email ?? "").toLowerCase();
-  const username = (user.username ?? "").toLowerCase();
+  const username = (user.username ?? "").trim().toLowerCase();
+  const emailLocal = email.split("@")[0]?.trim() ?? "";
+
   const login =
-    email.startsWith("arsunov") || username === "arsunov.test"
-      ? "otk.arsunov"
-      : user.username?.trim() ||
-        user.email?.split("@")[0]?.trim() ||
-        user.full_name?.trim().toLowerCase().replace(/\s+/g, ".") ||
-        "platform-user";
+    username.startsWith("otk.") ? username
+    : emailLocal.startsWith("otk.") ? emailLocal
+    : email.startsWith("arsunov") || username === "arsunov.test" ? "otk.arsunov"
+    : user.username?.trim() ||
+      emailLocal ||
+      user.full_name?.trim().toLowerCase().replace(/\s+/g, ".") ||
+      "platform-user";
+
   setDevAuth(login, "ESKD_OTK,ESKD_Designers");
 }
 

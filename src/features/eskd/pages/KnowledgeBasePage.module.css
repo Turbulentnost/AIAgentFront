@@ -338,6 +338,12 @@
   color: var(--color-warning-dark);
 }
 
+.modalError {
+  margin-top: 12px;
+  color: var(--color-danger);
+  font-size: 0.92rem;
+}
+
 .modalActions {
   display: flex;
   justify-content: flex-end;

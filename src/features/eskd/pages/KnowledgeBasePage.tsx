@@ -15,6 +15,7 @@ function DeleteDialog({
   item,
   step,
   deleting,
+  error,
   onClose,
   onContinue,
   onConfirm
@@ -22,6 +23,7 @@ function DeleteDialog({
   item: KnowledgeBaseItem;
   step: 1 | 2;
   deleting: boolean;
+  error?: string | null;
   onClose: () => void;
   onContinue: () => void;
   onConfirm: () => void;
@@ -61,6 +63,7 @@ function DeleteDialog({
             <p className={styles.modalWarn}>
               Это необратимо. Будут удалены все связанные данные по файлу <strong>{item.display_name}</strong>.
             </p>
+            {error ? <p className={styles.modalError}>{error}</p> : null}
             <div className={styles.modalActions}>
               <button type="button" className="secondaryBtn" onClick={onClose} disabled={deleting}>
                 Отмена
@@ -166,7 +169,9 @@ function Tile({
           <Sparkles size={12} /> Ответ ИИ — ждёт проверки человеком
         </p>
       )}
-      {item.designation && <p className={styles.tileDesignation}>{item.designation}</p>}
+      {item.designation && item.designation !== item.display_name && (
+        <p className={styles.tileDesignation}>{item.designation}</p>
+      )}
       <dl className={styles.tileMeta}>
         <dt>Листов</dt>
         <dd>{item.pages_count ?? "—"}</dd>
@@ -174,6 +179,10 @@ function Tile({
           <>
             <dt>Разметка</dt>
             <dd>{item.marked_pages_count} лист(ов)</dd>
+            <dt>Ошибки / замеч.</dt>
+            <dd>
+              {item.marking_errors_count ?? 0} / {item.marking_warnings_count ?? 0}
+            </dd>
             <dt>Дата разметки</dt>
             <dd>{formatDate(item.marking_updated_at)}</dd>
           </>
@@ -182,10 +191,14 @@ function Tile({
           <>
             <dt>Проверка ИИ</dt>
             <dd>{formatDate(item.last_checked_at)}</dd>
-            <dt>Ошибки / замеч.</dt>
-            <dd>
-              {item.total_errors ?? 0} / {item.total_warnings ?? 0}
-            </dd>
+            {!item.has_marking && (
+              <>
+                <dt>Ошибки / замеч.</dt>
+                <dd>
+                  {item.total_errors ?? 0} / {item.total_warnings ?? 0}
+                </dd>
+              </>
+            )}
           </>
         )}
         {item.checked && item.human_verified_at && (
@@ -245,6 +258,7 @@ export default function KnowledgeBasePage({
   const [verifyingKey, setVerifyingKey] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<KnowledgeBaseItem | null>(null);
   const [deleteStep, setDeleteStep] = useState<1 | 2 | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const list = useQuery({
     queryKey: ["knowledge-base", query, filter, page],
@@ -295,17 +309,27 @@ export default function KnowledgeBasePage({
   function startDelete(item: KnowledgeBaseItem) {
     setDeleteTarget(item);
     setDeleteStep(1);
+    setDeleteError(null);
   }
 
   function closeDeleteDialog() {
     if (remove.isPending) return;
     setDeleteTarget(null);
     setDeleteStep(null);
+    setDeleteError(null);
   }
 
   async function confirmDelete() {
     if (!deleteTarget) return;
-    await remove.mutateAsync(deleteTarget.key);
+    setDeleteError(null);
+    try {
+      await remove.mutateAsync(deleteTarget.key);
+    } catch (exc) {
+      const detail =
+        (exc as { response?: { data?: { detail?: string } } }).response?.data?.detail ??
+        (exc as Error).message;
+      setDeleteError(typeof detail === "string" && detail.trim() ? detail : "Не удалось удалить запись");
+    }
   }
 
   return (
@@ -419,6 +443,7 @@ export default function KnowledgeBasePage({
           item={deleteTarget}
           step={deleteStep}
           deleting={remove.isPending}
+          error={deleteError}
           onClose={closeDeleteDialog}
           onContinue={() => setDeleteStep(2)}
           onConfirm={() => void confirmDelete()}

@@ -11,6 +11,7 @@ import StatsPage from "@/features/eskd/pages/StatsPage";
 import type { AppTab } from "@/features/eskd/navigation";
 import { APP_TABS } from "@/features/eskd/navigation";
 import type { MarkingOpenIntent } from "@/features/eskd/types/markingOpen";
+import ModelStatusIndicator from "@/features/eskd/components/ModelStatusIndicator";
 import subNavStyles from "@/features/eskd/components/EskdSubNav.module.css";
 
 export default function EskdAgent() {
@@ -43,18 +44,21 @@ export default function EskdAgent() {
 
   return (
     <div className={subNavStyles.workspace}>
-      <nav className={subNavStyles.tabs} aria-label="Разделы ESKD Agent">
-        {APP_TABS.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            className={`${subNavStyles.tab} ${tab === item.id ? subNavStyles.tabActive : ""}`}
-            onClick={() => setTab(item.id)}
-          >
-            {item.label}
-          </button>
-        ))}
-      </nav>
+      <div className={subNavStyles.tabsBar}>
+        <nav className={subNavStyles.tabs} aria-label="Разделы ESKD Agent">
+          {APP_TABS.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className={`${subNavStyles.tab} ${tab === item.id ? subNavStyles.tabActive : ""}`}
+              onClick={() => setTab(item.id)}
+            >
+              {item.label}
+            </button>
+          ))}
+        </nav>
+        <ModelStatusIndicator />
+      </div>
 
       <div className={tab === "check" ? styles.panel : styles.panelHidden}>
         <EskdAgentPage openCheckRunId={checkRunId} onOpenCheckHandled={clearCheckRunIntent} />

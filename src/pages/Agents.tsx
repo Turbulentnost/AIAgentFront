@@ -14,6 +14,7 @@ const AGENT_ILLUSTRATION = "/agent-catalog-illustration.png";
 const ND_CONTROL_AGENT_ROUTE = "/agents/nd-control";
 const INCOMING_MAIL_ROUTE = "/agents/incoming-mail";
 const INCOMING_MAIL_DISPLAY_NAME = "Агент по входящей корреспонденции";
+const ESKD_DISPLAY_NAME = "Агент проверки конструкторской документации";
 const ESKD_AGENT_ROUTE = "/agents/eskd";
 
 const INCOMING_MAIL_CATALOG_AGENT: AgentAccess = {
@@ -34,7 +35,7 @@ const INCOMING_MAIL_CATALOG_AGENT: AgentAccess = {
 
 const ESKD_CATALOG_AGENT: AgentAccess = {
   id: "catalog-eskd_agent",
-  name: "ESKD Agent",
+  name: ESKD_DISPLAY_NAME,
   slug: "eskd_agent",
   purpose:
     "Проверка конструкторской документации по ЕСКД: загрузка чертежей, анализ ИИ, разметка, база знаний и журнал интеграций.",
@@ -54,8 +55,14 @@ function withIncomingMailDisplayName(agents: AgentAccess[]) {
   );
 }
 
+function withEskdDisplayName(agents: AgentAccess[]) {
+  return agents.map((agent) =>
+    isEskdAgent(agent) ? { ...agent, name: ESKD_DISPLAY_NAME } : agent
+  );
+}
+
 function mergePinnedCatalogAgents(agents: AgentAccess[]) {
-  let normalized = withIncomingMailDisplayName(agents);
+  let normalized = withEskdDisplayName(withIncomingMailDisplayName(agents));
   if (!normalized.some(isIncomingMailAgent)) {
     normalized = [INCOMING_MAIL_CATALOG_AGENT, ...normalized];
   }

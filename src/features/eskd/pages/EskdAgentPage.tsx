@@ -14,6 +14,7 @@ import { fetchCheckRunDetail } from "@/features/eskd/api/history";
 import { EskdAnalysisView, itemToAnalysisData } from "@/features/eskd/components/EskdAnalysisView";
 import type { EskdCheckResponse, EskdItemReport, PageMode } from "@/features/eskd/types/eskd";
 import { detailToCheckResponse } from "@/features/eskd/utils/checkRunDetail";
+import { filterUserFacingRemarks } from "@/features/eskd/utils/internalValidation";
 import { parseLiveJson } from "@/features/eskd/utils/parseLiveJson";
 import layout from "@/features/eskd/styles/pageLayout.module.css";
 import styles from "./EskdAgentPage.module.css";
@@ -69,6 +70,11 @@ export default function EskdAgentPage({
   const modelOffline = health.data?.model?.reachable === false;
 
   const hasCachedResult = Boolean(files.length === 1 && existingLookup?.found);
+
+  const packageErrors = useMemo(
+    () => filterUserFacingRemarks(result?.package_errors),
+    [result?.package_errors]
+  );
 
   const canRun =
     (files.length === 1 && !lookupPending && (modelReady || hasCachedResult)) ||
@@ -579,16 +585,16 @@ export default function EskdAgentPage({
             </pre>
           </article>
         ))}
-        {result?.package_errors && result.package_errors.length > 0 && (
+        {packageErrors.length > 0 && (
           <article className={`card ${styles.resultCard} ${styles.packageCard}`}>
             <div className={styles.resultHead}>
               <h3>Проверка комплекта (cross-page)</h3>
-              <span className={`statusPill ${result.package_errors.some((e) => e.severity === "error") ? "err" : "warn"}`}>
-                {result.package_errors.length} замеч.
+              <span className={`statusPill ${packageErrors.some((e) => e.severity === "error") ? "err" : "warn"}`}>
+                {packageErrors.length} замеч.
               </span>
             </div>
             <ul className={styles.packageList}>
-              {result.package_errors.map((item, idx) => (
+              {packageErrors.map((item, idx) => (
                 <li
                   key={`${item.code}-${idx}`}
                   className={item.severity === "error" ? styles.packageError : styles.packageWarning}
