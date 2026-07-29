@@ -21,8 +21,16 @@ export const PURCHASE_MANAGER_AGENT_SLUG = "purchase_manager_agent";
 export const PURCHASE_MANAGER_AGENT_PATH = "/agents/purchase-manager";
 export const OMTO_SUPPORT_MANAGER_AGENT_SLUG = "omto_support_manager_agent";
 export const OMTO_SUPPORT_MANAGER_AGENT_PATH = "/agents/omto-support-manager";
+export const OTK_HEAD_AGENT_SLUG = "otk_head_agent";
+export const OTK_HEAD_AGENT_PATH = "/agents/otk-head";
 export const QUALITY_ENGINEER_AGENT_SLUG = "quality_engineer_agent";
 export const QUALITY_ENGINEER_AGENT_PATH = "/agents/quality-engineer";
+export const QUALITY_DEPUTY_DIRECTOR_AGENT_SLUG = "quality_deputy_director_agent";
+export const QUALITY_DEPUTY_DIRECTOR_AGENT_PATH = "/agents/quality-deputy-director";
+export const QUALITY_KPI_AGENT_SLUG = "quality_kpi_agent";
+export const QUALITY_KPI_AGENT_PATH = "/agents/quality-kpi";
+export const ESKD_AGENT_SLUG = "eskd_agent";
+export const ESKD_AGENT_PATH = "/agents/eskd";
 export const AGENT_LAUNCH_MORPH_MS = 520;
 
 function agentKey(agent: Pick<AgentAccess, "slug"> & Partial<Pick<AgentAccess, "name" | "purpose">>): string {
@@ -93,8 +101,24 @@ export function isOmtoSupportManagerAgent(agent: Pick<AgentAccess, "slug">): boo
   return agent.slug === OMTO_SUPPORT_MANAGER_AGENT_SLUG;
 }
 
+export function isOtkHeadAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === OTK_HEAD_AGENT_SLUG;
+}
+
 export function isQualityEngineerAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === QUALITY_ENGINEER_AGENT_SLUG;
+}
+
+export function isQualityDeputyDirectorAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === QUALITY_DEPUTY_DIRECTOR_AGENT_SLUG;
+}
+
+export function isQualityKpiAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === QUALITY_KPI_AGENT_SLUG;
+}
+
+export function isEskdAgent(agent: Pick<AgentAccess, "slug">): boolean {
+  return agent.slug === ESKD_AGENT_SLUG || agent.slug === "eskd-agent";
 }
 
 export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolean {
@@ -108,7 +132,11 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isWarehouseComplexChiefAgent(agent) ||
     isPurchaseManagerAgent(agent) ||
     isOmtoSupportManagerAgent(agent) ||
+    isOtkHeadAgent(agent) ||
     isQualityEngineerAgent(agent) ||
+    isQualityDeputyDirectorAgent(agent) ||
+    isQualityKpiAgent(agent) ||
+    isEskdAgent(agent) ||
     isProcurementAgent(agent)
   );
 }
@@ -168,9 +196,33 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
       state: { from: "agent-launch" as const }
     };
   }
+  if (isOtkHeadAgent(agent)) {
+    return {
+      path: OTK_HEAD_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
   if (isQualityEngineerAgent(agent)) {
     return {
       path: QUALITY_ENGINEER_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isQualityDeputyDirectorAgent(agent)) {
+    return {
+      path: QUALITY_DEPUTY_DIRECTOR_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isQualityKpiAgent(agent)) {
+    return {
+      path: QUALITY_KPI_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isEskdAgent(agent)) {
+    return {
+      path: ESKD_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }

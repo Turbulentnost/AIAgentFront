@@ -7,7 +7,11 @@ import WarehousePickerAgent from "@/pages/WarehousePickerAgent";
 import WarehouseComplexChiefAgent from "@/pages/WarehouseComplexChiefAgent";
 import ProcurementManagerAgent from "@/pages/ProcurementManagerAgent";
 import OmtoSupportManagerAgent from "@/pages/OmtoSupportManagerAgent";
+import OtkHeadAgent from "@/pages/OtkHeadAgent";
+import QualityDeputyDirectorAgent from "@/pages/QualityDeputyDirectorAgent";
 import QualityEngineerAgent from "@/pages/QualityEngineerAgent";
+import QualityKpiAgent from "@/pages/QualityKpiAgent";
+import EskdAgent from "@/pages/EskdAgent";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import { isIncomingMailPublic } from "./auth/standaloneIncomingMail";
@@ -62,7 +66,11 @@ export default function App() {
       <Route path="/agents/purchase-manager" element={<ProtectedRoute><Layout title="ИИ-агент менеджера по закупкам"><ProcurementManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/procurement-manager" element={<Navigate to="/agents/purchase-manager" replace />} />
       <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/otk-head" element={<ProtectedRoute><Layout title="Начальник ОТК"><OtkHeadAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Работник ОТК"><QualityEngineerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/quality-deputy-director" element={<ProtectedRoute><Layout title="ЗДК"><QualityDeputyDirectorAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/quality-kpi" element={<ProtectedRoute><Layout title="Агент качества (KPI)"><QualityKpiAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/eskd" element={<ProtectedRoute><Layout title="ESKD Agent"><EskdAgent /></Layout></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

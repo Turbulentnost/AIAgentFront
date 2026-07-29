@@ -6,6 +6,7 @@ import { useAuth } from "@/auth/AuthContext";
 import {
   getAgentRoleBadge,
   hasDedicatedLaunchPage,
+  isEskdAgent,
   navigateToAgentLaunch
 } from "@/utils/agentLaunch";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
@@ -18,6 +19,8 @@ const AGENT_ILLUSTRATION = "/agent-catalog-illustration.png";
 const ND_CONTROL_AGENT_ROUTE = "/agents/nd-control";
 const INCOMING_MAIL_ROUTE = "/agents/incoming-mail";
 const INCOMING_MAIL_DISPLAY_NAME = "Агент по входящей корреспонденции";
+const ESKD_DISPLAY_NAME = "Агент проверки конструкторской документации";
+const ESKD_AGENT_ROUTE = "/agents/eskd";
 
 const INCOMING_MAIL_CATALOG_AGENT: AgentAccess = {
   id: "catalog-incoming_correspondence_agent",
@@ -35,16 +38,43 @@ const INCOMING_MAIL_CATALOG_AGENT: AgentAccess = {
   can_configure: false
 };
 
+const ESKD_CATALOG_AGENT: AgentAccess = {
+  id: "catalog-eskd_agent",
+  name: ESKD_DISPLAY_NAME,
+  slug: "eskd_agent",
+  purpose:
+    "Проверка конструкторской документации по ЕСКД: загрузка чертежей, анализ ИИ, разметка, база знаний и журнал интеграций.",
+  status: "active",
+  created_at: "2026-01-01T00:00:00.000Z",
+  updated_at: "2026-01-01T00:00:00.000Z",
+  access_level: "run",
+  can_run: true,
+  can_view_results: true,
+  can_approve: false,
+  can_configure: false
+};
+
 function withIncomingMailDisplayName(agents: AgentAccess[]) {
   return agents.map((agent) =>
     isIncomingMailAgent(agent) ? { ...agent, name: INCOMING_MAIL_DISPLAY_NAME } : agent
   );
 }
 
+function withEskdDisplayName(agents: AgentAccess[]) {
+  return agents.map((agent) =>
+    isEskdAgent(agent) ? { ...agent, name: ESKD_DISPLAY_NAME } : agent
+  );
+}
+
 function mergePinnedCatalogAgents(agents: AgentAccess[]) {
-  const normalized = withIncomingMailDisplayName(agents);
-  if (normalized.some(isIncomingMailAgent)) return normalized;
-  return [INCOMING_MAIL_CATALOG_AGENT, ...normalized];
+  let normalized = withEskdDisplayName(withIncomingMailDisplayName(agents));
+  if (!normalized.some(isIncomingMailAgent)) {
+    normalized = [INCOMING_MAIL_CATALOG_AGENT, ...normalized];
+  }
+  if (!normalized.some(isEskdAgent)) {
+    normalized = [ESKD_CATALOG_AGENT, ...normalized];
+  }
+  return normalized;
 }
 
 function isNdControlAgent(agent: AgentAccess) {
@@ -70,6 +100,7 @@ function isIncomingMailAgent(agent: AgentAccess) {
 function getAgentRoute(agent: AgentAccess) {
   if (isNdControlAgent(agent)) return ND_CONTROL_AGENT_ROUTE;
   if (isIncomingMailAgent(agent)) return INCOMING_MAIL_ROUTE;
+  if (isEskdAgent(agent)) return ESKD_AGENT_ROUTE;
   return null;
 }
 
