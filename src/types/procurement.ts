@@ -146,6 +146,21 @@ export interface ProcurementCaseSummary {
   picker_workspace_archived_at?: string | null;
   picker_action_at?: string | null;
   picker_critical_acknowledged_at?: string | null;
+  /** Complex chief workspace (non-MU2); dashboard may also mirror these into picker_*. */
+  complex_bucket?: "success" | "attention" | "critical" | null;
+  complex_bucket_reason?: string | null;
+  complex_work_status?: "processing" | "awaiting_action" | "completed" | "archived" | null;
+  complex_decision_kind?:
+    | "none"
+    | "stock_confirmation"
+    | "deficit_confirmation"
+    | "discrepancy_return"
+    | "critical_acknowledgement"
+    | null;
+  complex_invoked_at?: string | null;
+  complex_workspace_archived_at?: string | null;
+  complex_action_at?: string | null;
+  complex_critical_acknowledged_at?: string | null;
   purchase_manager_bucket?: "success" | "attention" | "critical" | null;
   purchase_manager_bucket_reason?: string | null;
   purchase_manager_work_status?:
@@ -180,6 +195,9 @@ export interface ProductionPreparationEngineerAction {
 export type WarehousePickerAction = ProductionPreparationEngineerAction;
 export type WarehousePickerCaseDetail = ProcurementCaseDetail;
 export type WarehousePickerDashboard = ProcurementDashboard;
+export type WarehouseComplexChiefAction = WarehousePickerAction;
+export type WarehouseComplexChiefCaseDetail = WarehousePickerCaseDetail;
+export type WarehouseComplexChiefDashboard = WarehousePickerDashboard;
 
 export interface WarehousePickerPosition {
   line_id: string;

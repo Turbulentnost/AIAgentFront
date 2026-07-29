@@ -9,9 +9,19 @@ import {
   qualityDeputyDirectorApi,
   qualityEngineerApi,
   qualityKpiApi,
+  warehouseComplexChiefApi,
   warehousePickerApi
 } from "@/api/endpoints";
 import type { ProcurementDashboardView } from "@/types/procurement";
+
+const WAREHOUSE_PICKER_SLUG = "warehouse_picker_agent";
+const WAREHOUSE_COMPLEX_CHIEF_SLUG = "warehouse_complex_chief_agent";
+
+function warehouseAvailabilityApi(agentSlug: string) {
+  return agentSlug === WAREHOUSE_COMPLEX_CHIEF_SLUG
+    ? warehouseComplexChiefApi
+    : warehousePickerApi;
+}
 
 export function useProcurementPermissions() {
   return useQuery({
@@ -180,21 +190,22 @@ export function useProductionDispatcherAction(
   });
 }
 
-export function useWarehousePickerPermissions() {
+export function useWarehousePickerPermissions(agentSlug = WAREHOUSE_PICKER_SLUG) {
   return useQuery({
-    queryKey: ["procurement", "warehouse-picker", "permissions"],
-    queryFn: () => warehousePickerApi.permissions(),
+    queryKey: ["procurement", agentSlug, "permissions"],
+    queryFn: () => warehouseAvailabilityApi(agentSlug).permissions(),
     staleTime: 60_000
   });
 }
 
 export function useWarehousePickerDashboard(
   enabled: boolean,
-  view: "active" | "archive" = "active"
+  view: "active" | "archive" = "active",
+  agentSlug = WAREHOUSE_PICKER_SLUG
 ) {
   return useQuery({
-    queryKey: ["procurement", "warehouse-picker", "dashboard", view],
-    queryFn: () => warehousePickerApi.getDashboard(view),
+    queryKey: ["procurement", agentSlug, "dashboard", view],
+    queryFn: () => warehouseAvailabilityApi(agentSlug).getDashboard(view),
     enabled,
     refetchInterval: (query) => {
       if (view === "archive") return 30000;
@@ -206,10 +217,14 @@ export function useWarehousePickerDashboard(
   });
 }
 
-export function useWarehousePickerCase(caseId: string | null, enabled: boolean) {
+export function useWarehousePickerCase(
+  caseId: string | null,
+  enabled: boolean,
+  agentSlug = WAREHOUSE_PICKER_SLUG
+) {
   return useQuery({
-    queryKey: ["procurement", "warehouse-picker", "case", caseId],
-    queryFn: () => warehousePickerApi.getCase(caseId!),
+    queryKey: ["procurement", agentSlug, "case", caseId],
+    queryFn: () => warehouseAvailabilityApi(agentSlug).getCase(caseId!),
     enabled: Boolean(caseId) && enabled,
     refetchInterval: (query) =>
       query.state.data?.picker_work_status === "processing" ? 8000 : false
@@ -217,14 +232,16 @@ export function useWarehousePickerCase(caseId: string | null, enabled: boolean) 
 }
 
 export function useWarehousePickerAction(
-  action: "confirm_conclusion" | "acknowledge_critical"
+  action: "confirm_conclusion" | "acknowledge_critical",
+  agentSlug = WAREHOUSE_PICKER_SLUG
 ) {
   const queryClient = useQueryClient();
+  const api = warehouseAvailabilityApi(agentSlug);
   return useMutation({
     mutationFn: (payload: { caseId: string; action?: string }) =>
       action === "confirm_conclusion"
-        ? warehousePickerApi.confirmConclusion(payload.caseId, payload.action)
-        : warehousePickerApi.acknowledgeCritical(payload.caseId),
+        ? api.confirmConclusion(payload.caseId, payload.action)
+        : api.acknowledgeCritical(payload.caseId),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ["procurement"] });
     }

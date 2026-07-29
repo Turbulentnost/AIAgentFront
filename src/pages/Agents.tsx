@@ -3,7 +3,11 @@ import { Camera, Edit3, FolderOpen, Users } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
-import { hasDedicatedLaunchPage, navigateToAgentLaunch } from "@/utils/agentLaunch";
+import {
+  getAgentRoleBadge,
+  hasDedicatedLaunchPage,
+  navigateToAgentLaunch
+} from "@/utils/agentLaunch";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { AgentAccessEditor } from "@/components/AgentAccessEditor";
 import { FormSelect } from "@/components/form-controls";
@@ -288,6 +292,7 @@ function RecommendedAgentCard({
   const { user } = useAuth();
   const isAdmin = Boolean(user?.is_superuser);
   const capability = getCapabilityLabel(agent);
+  const roleBadge = getAgentRoleBadge(agent);
 
   const stopPropagation = (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -317,6 +322,7 @@ function RecommendedAgentCard({
           <AgentStatusBadge status={agent.status} />
           <AgentIconArt agent={agent} variant="compact" />
           <h3 className={styles.compactTitle}>{agent.name}</h3>
+          {roleBadge ? <span className={styles.roleBadge}>{roleBadge}</span> : null}
           <div className={styles.compactMeta}>
             <span className={styles.compactMetaRow}>
               <FolderOpen size={12} strokeWidth={2} aria-hidden="true" />
@@ -363,6 +369,7 @@ function AgentCard({
   onOpen?: (event: React.MouseEvent<HTMLElement>) => void;
 }) {
   const capability = getCapabilityLabel(agent);
+  const roleBadge = getAgentRoleBadge(agent);
   const description =
     agent.purpose?.trim() ||
     "Корпоративный ИИ-агент платформы для автоматизации типовых задач подразделения.";
@@ -388,6 +395,7 @@ function AgentCard({
         <AgentStatusBadge status={agent.status} />
         <AgentIconArt agent={agent} variant="compact" />
         <h3 className={styles.compactTitle}>{agent.name}</h3>
+        {roleBadge ? <span className={styles.roleBadge}>{roleBadge}</span> : null}
         <div className={styles.compactMeta}>
           <span className={styles.compactMetaRow}>
             <FolderOpen size={12} strokeWidth={2} aria-hidden="true" />
@@ -426,6 +434,7 @@ function AgentCard({
           <h2 className={styles.agentTitle}>{agent.name}</h2>
           <AgentStatusBadge status={agent.status} />
         </div>
+        {roleBadge ? <span className={styles.roleBadge}>{roleBadge}</span> : null}
         <p className={styles.agentDescription}>{description}</p>
         <div className={styles.agentMeta}>
           <span className={styles.agentUsage}>

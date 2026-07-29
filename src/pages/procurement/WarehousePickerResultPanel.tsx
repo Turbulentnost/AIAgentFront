@@ -17,8 +17,18 @@ import { useWarehousePickerAction } from "@/hooks/useProcurementDashboard";
 import { caseTitle, formatDate, formatDateTime } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
-type Props = { detail: WarehousePickerCaseDetail };
+type Props = {
+  detail: WarehousePickerCaseDetail;
+  agentSlug?: string;
+  scopeLabel?: string;
+  roleAccountLabel?: string;
+  archivedConclusionAgentLabel?: string;
+};
 type ResultTab = "overview" | "calculation" | "sources" | "issues";
+
+const PICKER_AGENT_SLUG = "warehouse_picker_agent";
+const COMPLEX_CHIEF_AGENT_SLUG = "warehouse_complex_chief_agent";
+const WAREHOUSE_OUTPUT_AGENTS = new Set([PICKER_AGENT_SLUG, COMPLEX_CHIEF_AGENT_SLUG]);
 
 function quantity(value?: string | number | null): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -92,14 +102,22 @@ function stringList(value: unknown): string[] {
   return value.map(String).map((item) => item.trim()).filter(Boolean);
 }
 
-function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | null {
+function outputFrom(
+  detail: WarehousePickerCaseDetail,
+  roleNoun = "комплектовщика"
+): WarehousePickerOutput | null {
   const latest = (detail.latest_result as { output_data?: unknown; agent_id?: string } | null)
     ?.output_data;
   const latestAgent = (detail.latest_result as { agent_id?: string } | null)?.agent_id;
-  const stored = detail.case_metadata?.warehouse_picker_output;
+  const stored =
+    detail.case_metadata?.warehouse_picker_output ||
+    detail.case_metadata?.warehouse_complex_output;
   const candidate =
     (stored && typeof stored === "object" ? stored : null) ||
-    (latestAgent === "warehouse_picker_agent" && latest && typeof latest === "object"
+    (latestAgent &&
+    WAREHOUSE_OUTPUT_AGENTS.has(latestAgent) &&
+    latest &&
+    typeof latest === "object"
       ? latest
       : null) ||
     (latest && typeof latest === "object" && !(
@@ -239,9 +257,9 @@ function outputFrom(detail: WarehousePickerCaseDetail): WarehousePickerOutput | 
   const purchasingCount = positions.filter((item) => item.already_being_purchased).length;
   const coverageSummary =
     coverageStatus === "full"
-      ? "Закупка у комплектовщика не требуется: все позиции уже в заказах поставщику."
+      ? `Закупка у ${roleNoun} не требуется: все позиции уже в заказах поставщику.`
       : coverageStatus === "partial" && purchasingCount
-        ? `Ведется закупка по ${purchasingCount} из ${positions.length} позиций. Непокрытый дефицит остаётся у комплектовщика.`
+        ? `Ведется закупка по ${purchasingCount} из ${positions.length} позиций. Непокрытый дефицит остаётся у ${roleNoun}.`
         : "";
   const coverageNextStep =
     coverageStatus === "full"
@@ -448,12 +466,21 @@ function BasisOverview({
   );
 }
 
-export function WarehousePickerResultPanel({ detail }: Props) {
+export function WarehousePickerResultPanel({
+  detail,
+  agentSlug = PICKER_AGENT_SLUG,
+  scopeLabel = "Монтажный участок №2",
+  roleAccountLabel = "кладовщика-комплектовщика",
+  archivedConclusionAgentLabel = "ИИ-агентом по закупке"
+}: Props) {
   const [activeTab, setActiveTab] = useState<ResultTab>("overview");
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
-  const output = useMemo(() => outputFrom(detail), [detail]);
-  const confirmMutation = useWarehousePickerAction("confirm_conclusion");
-  const ackMutation = useWarehousePickerAction("acknowledge_critical");
+  const output = useMemo(
+    () => outputFrom(detail, roleAccountLabel),
+    [detail, roleAccountLabel]
+  );
+  const confirmMutation = useWarehousePickerAction("confirm_conclusion", agentSlug);
+  const ackMutation = useWarehousePickerAction("acknowledge_critical", agentSlug);
   const positions = output?.positions ?? [];
   const decisionKind =
     detail.picker_decision_kind ||
@@ -590,7 +617,7 @@ export function WarehousePickerResultPanel({ detail }: Props) {
               {headerBadge.text}
             </span>
           </div>
-          <p>Заключение по складскому наличию · Монтажный участок №2</p>
+          <p>Заключение по складскому наличию · {scopeLabel}</p>
         </div>
         <div className={styles.lastCalculation}>
           <span>Последний расчёт</span>
@@ -609,8 +636,8 @@ export function WarehousePickerResultPanel({ detail }: Props) {
                   "Кейс в архиве оркестратора"}
               </strong>
               <span>
-                Заключение кладовщика не формировалось: основание закрыто до обработки
-                ИИ-агентом по закупке.
+                Заключение не формировалось: основание закрыто до обработки{" "}
+                {archivedConclusionAgentLabel}.
               </span>
             </div>
           </div>
@@ -828,7 +855,7 @@ export function WarehousePickerResultPanel({ detail }: Props) {
             <div className={styles.engineerSectionCard}>
               <h4>Правило остатков</h4>
               <article className={styles.specificationHighlight}>
-                <span>Учёт для кладовщика-комплектовщика</span>
+                <span>Учёт для {roleAccountLabel}</span>
                 <strong>Склад кейса + назначение</strong>
                 <small>
                   В покрытие идёт только остаток на складе документа. Товар под чужим

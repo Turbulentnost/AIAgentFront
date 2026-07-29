@@ -15,6 +15,8 @@ export const PRODUCTION_DISPATCHER_AGENT_SLUG = "production_dispatcher_agent";
 export const PRODUCTION_DISPATCHER_AGENT_PATH = "/agents/production-dispatcher";
 export const WAREHOUSE_PICKER_AGENT_SLUG = "warehouse_picker_agent";
 export const WAREHOUSE_PICKER_AGENT_PATH = "/agents/warehouse-picker";
+export const WAREHOUSE_COMPLEX_CHIEF_AGENT_SLUG = "warehouse_complex_chief_agent";
+export const WAREHOUSE_COMPLEX_CHIEF_AGENT_PATH = "/agents/warehouse-complex-chief";
 export const PURCHASE_MANAGER_AGENT_SLUG = "purchase_manager_agent";
 export const PURCHASE_MANAGER_AGENT_PATH = "/agents/purchase-manager";
 export const OMTO_SUPPORT_MANAGER_AGENT_SLUG = "omto_support_manager_agent";
@@ -68,6 +70,21 @@ export function isWarehousePickerAgent(
   return agent.slug === WAREHOUSE_PICKER_AGENT_SLUG;
 }
 
+export function isWarehouseComplexChiefAgent(
+  agent: Pick<AgentAccess, "slug">
+): boolean {
+  return agent.slug === WAREHOUSE_COMPLEX_CHIEF_AGENT_SLUG;
+}
+
+/** Role badge when several agents share the display name «ИИ-агент по закупкам». */
+export function getAgentRoleBadge(
+  agent: Pick<AgentAccess, "slug">
+): string | null {
+  if (isProcurementAgent(agent)) return "Оркестратор";
+  if (isWarehouseComplexChiefAgent(agent)) return "Начальник складского комплекса";
+  return null;
+}
+
 export function isPurchaseManagerAgent(agent: Pick<AgentAccess, "slug">): boolean {
   return agent.slug === PURCHASE_MANAGER_AGENT_SLUG;
 }
@@ -88,6 +105,7 @@ export function hasDedicatedLaunchPage(agent: Pick<AgentAccess, "slug">): boolea
     isIncomingCorrespondenceAgent(agent) ||
     isProductionDispatcherAgent(agent) ||
     isWarehousePickerAgent(agent) ||
+    isWarehouseComplexChiefAgent(agent) ||
     isPurchaseManagerAgent(agent) ||
     isOmtoSupportManagerAgent(agent) ||
     isQualityEngineerAgent(agent) ||
@@ -129,6 +147,12 @@ export function getAgentLaunchTarget(agent: Pick<AgentAccess, "slug" | "id" | "n
   if (isWarehousePickerAgent(agent)) {
     return {
       path: WAREHOUSE_PICKER_AGENT_PATH,
+      state: { from: "agent-launch" as const }
+    };
+  }
+  if (isWarehouseComplexChiefAgent(agent)) {
+    return {
+      path: WAREHOUSE_COMPLEX_CHIEF_AGENT_PATH,
       state: { from: "agent-launch" as const }
     };
   }

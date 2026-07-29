@@ -19,6 +19,7 @@ import { agentsApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import {
   AGENT_LAUNCH_MORPH_MS,
+  getAgentRoleBadge,
   hasDedicatedLaunchPage,
   INCOMING_CORRESPONDENCE_AGENT_PATH,
   isMeetingAgent,
@@ -121,6 +122,7 @@ function getAgentLaunchIcon(agent: AgentAccess): QuickLaunchAgent["icon"] {
 /** Ролевые агенты закупок/ОТК — выше общих, иначе на дашборде их «съедают» первые 3. */
 const QUICK_LAUNCH_PRIORITY_SLUGS = [
   "procurement_logistics_agent",
+  "warehouse_complex_chief_agent",
   "quality_engineer_agent",
   "warehouse_picker_agent",
   "purchase_manager_agent",
@@ -304,6 +306,7 @@ export default function Dashboard() {
               if (isHiddenByMorph) return null;
 
               const showAgentIcon = Boolean(agent.icon_url) && !brokenIconIds.has(agent.id);
+              const roleBadge = getAgentRoleBadge(agent);
 
               return (
                 <article
@@ -332,7 +335,7 @@ export default function Dashboard() {
                         {agentStatusLabels[agent.status]}
                       </span>
                     </div>
-                    <p>{agent.purpose || agent.slug}</p>
+                    <p>{roleBadge || agent.purpose || agent.slug}</p>
                     {isIncomingCorrespondenceAgent(agent) && agent.can_run ? (
                       <Link to={INCOMING_CORRESPONDENCE_AGENT_PATH}>Запустить</Link>
                     ) : (

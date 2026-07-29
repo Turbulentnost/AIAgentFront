@@ -186,16 +186,28 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
   const selectedParallelBranch =
     parallel.branches.find((branch) => branch.id === selectedStage) ||
     (parallel.continuation?.id === selectedStage ? parallel.continuation : null);
+  const warehouseWorkStatus =
+    currentState?.current_agent_id === "warehouse_complex_chief_agent"
+      ? detail.complex_work_status || detail.picker_work_status
+      : detail.picker_work_status;
   const orchestratorStatusLabel =
     currentState?.current_agent_id === "warehouse_picker_agent"
-      ? detail.picker_work_status === "processing"
+      ? warehouseWorkStatus === "processing"
         ? "Комплектовщик выполняет расчёт"
-        : detail.picker_work_status === "awaiting_action"
+        : warehouseWorkStatus === "awaiting_action"
           ? "Ожидает решения комплектовщика"
-          : detail.picker_work_status === "completed"
+          : warehouseWorkStatus === "completed"
             ? "Комплектовщик передал результат"
             : STATUS_LABELS[detail.status] ?? detail.status
-      : STATUS_LABELS[detail.status] ?? detail.status;
+      : currentState?.current_agent_id === "warehouse_complex_chief_agent"
+        ? warehouseWorkStatus === "processing"
+          ? "Начальник складского комплекса выполняет расчёт"
+          : warehouseWorkStatus === "awaiting_action"
+            ? "Ожидает решения начальника складского комплекса"
+            : warehouseWorkStatus === "completed"
+              ? "Начальник складского комплекса передал результат"
+              : STATUS_LABELS[detail.status] ?? detail.status
+        : STATUS_LABELS[detail.status] ?? detail.status;
 
   const toggleDataRow = (lineId: string) => {
     setExpandedDataRows((current) => {

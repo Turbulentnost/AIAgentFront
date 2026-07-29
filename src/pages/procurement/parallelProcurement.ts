@@ -1,6 +1,7 @@
 import type { ProcurementCaseDetail, WarehousePickerPosition } from "@/types/procurement";
 
 export const PICKER_AGENT_ID = "warehouse_picker_agent";
+export const COMPLEX_CHIEF_AGENT_ID = "warehouse_complex_chief_agent";
 export const PURCHASE_MANAGER_AGENT_ID = "purchase_manager_agent";
 export const QUALITY_ENGINEER_AGENT_ID = "quality_engineer_agent";
 
@@ -70,6 +71,21 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
   const otkHandedOff = Boolean(detail.case_metadata?.otk_handed_off_at);
   const otkStarted = Boolean(detail.case_metadata?.otk_started_at) || otkHandedOff;
   const pickerAssigned = assigned.includes(PICKER_AGENT_ID);
+  const complexAssigned = assigned.includes(COMPLEX_CHIEF_AGENT_ID);
+  const warehouseAssigned = pickerAssigned || complexAssigned;
+  const warehouseAgentId = complexAssigned ? COMPLEX_CHIEF_AGENT_ID : PICKER_AGENT_ID;
+  const warehouseWorkStatus = complexAssigned
+    ? detail.complex_work_status || detail.picker_work_status
+    : detail.picker_work_status;
+  const warehouseArchivedAt = complexAssigned
+    ? detail.complex_workspace_archived_at || detail.picker_workspace_archived_at
+    : detail.picker_workspace_archived_at;
+  const warehouseDecisionKind = complexAssigned
+    ? detail.complex_decision_kind || detail.picker_decision_kind
+    : detail.picker_decision_kind;
+  const warehouseLabel = complexAssigned
+    ? "Начальник складского комплекса"
+    : "Кладовщик-комплектовщик";
   const managerAssigned =
     assigned.includes(PURCHASE_MANAGER_AGENT_ID) ||
     Boolean(detail.purchase_manager_invoked_at) ||
@@ -80,11 +96,8 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
     detail.current_agent_id === QUALITY_ENGINEER_AGENT_ID ||
     otkStarted;
   const pickerActive =
-    pickerAssigned &&
-    isRoleWorkspaceActive(
-      detail.picker_work_status,
-      detail.picker_workspace_archived_at
-    );
+    warehouseAssigned &&
+    isRoleWorkspaceActive(warehouseWorkStatus, warehouseArchivedAt);
   const managerActive =
     managerAssigned &&
     !otkHandedOff &&
@@ -105,10 +118,12 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
     if (pickerActive) {
       branches.push({
         id: "branch_picker",
-        agentId: PICKER_AGENT_ID,
-        label: "Кладовщик-комплектовщик",
-        status: detail.picker_work_status === "processing" ? "running" : "running",
-        summary: "Непокрытый дефицит остаётся у комплектовщика"
+        agentId: warehouseAgentId,
+        label: warehouseLabel,
+        status: warehouseWorkStatus === "processing" ? "running" : "running",
+        summary: complexAssigned
+          ? "Непокрытый дефицит остаётся у начальника складского комплекса"
+          : "Непокрытый дефицит остаётся у комплектовщика"
       });
     }
     if (managerActive) {
@@ -162,15 +177,14 @@ export function detectParallelProcurement(detail: ProcurementCaseDetail): {
           : "Контроль заказов поставщику"
     };
   } else if (!active && pickerActive) {
-    // Только комплектовщик: показываем его как текущий этап маршрута.
+    // Только складской агент: показываем его как текущий этап маршрута.
     continuation = {
       id: "branch_picker",
-      agentId: PICKER_AGENT_ID,
-      label: "Кладовщик-комплектовщик",
-      status:
-        detail.picker_work_status === "processing" ? "running" : "running",
+      agentId: warehouseAgentId,
+      label: warehouseLabel,
+      status: warehouseWorkStatus === "processing" ? "running" : "running",
       summary:
-        detail.picker_decision_kind === "deficit_confirmation"
+        warehouseDecisionKind === "deficit_confirmation"
           ? "Ожидает подтверждения дефицита / выдачи"
           : "Проверка наличия и дефицита по складу кейса"
     };
@@ -212,7 +226,9 @@ export function uncoveredPickerPositions(
       .filter(Boolean)
   );
 
-  const pickerOutput = asRecord(detail.case_metadata?.warehouse_picker_output);
+  const pickerOutput =
+    asRecord(detail.case_metadata?.warehouse_picker_output) ||
+    asRecord(detail.case_metadata?.warehouse_complex_output);
   const pickerPositions = Array.isArray(pickerOutput?.positions)
     ? (pickerOutput.positions as Array<Record<string, unknown>>)
     : [];
@@ -272,7 +288,9 @@ export function parallelSupplierOrderRows(
     ? (coverage.positions as Array<Record<string, unknown>>)
     : [];
   const unitByLine = new Map<string, string>();
-  const pickerOutput = asRecord(detail.case_metadata?.warehouse_picker_output);
+  const pickerOutput =
+    asRecord(detail.case_metadata?.warehouse_picker_output) ||
+    asRecord(detail.case_metadata?.warehouse_complex_output);
   const pickerPositions = Array.isArray(pickerOutput?.positions)
     ? (pickerOutput.positions as WarehousePickerPosition[])
     : [];

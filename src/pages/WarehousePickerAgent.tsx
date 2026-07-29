@@ -21,9 +21,19 @@ import { CaseListPanel } from "./procurement/CaseListPanel";
 import { WarehousePickerResultPanel } from "./procurement/WarehousePickerResultPanel";
 import styles from "./ProcurementAgent.module.css";
 
-const AGENT_ID = "warehouse_picker_agent";
 type Bucket = "success" | "attention" | "critical";
 type AttentionSection = "processing" | "awaiting";
+
+export type WarehouseAvailabilityWorkspaceConfig = {
+  agentId: string;
+  title: string;
+  subtitle: string;
+  forbiddenText: string;
+  listTitle: string;
+  scopeLabel: string;
+  roleAccountLabel: string;
+  archivedConclusionAgentLabel: string;
+};
 
 const BUCKETS: Array<{
   id: Bucket;
@@ -51,16 +61,43 @@ const BUCKETS: Array<{
   }
 ];
 
-export default function WarehousePickerAgent() {
+export const WAREHOUSE_PICKER_WORKSPACE: WarehouseAvailabilityWorkspaceConfig = {
+  agentId: "warehouse_picker_agent",
+  title: "ИИ-агент по закупке",
+  subtitle: "Для кладовщика-комплектовщика · Монтажный участок №2",
+  forbiddenText: "Рабочее место доступно только кладовщику-комплектовщику.",
+  listTitle: "Заказы МУ №2",
+  scopeLabel: "Монтажный участок №2",
+  roleAccountLabel: "кладовщика-комплектовщика",
+  archivedConclusionAgentLabel: "ИИ-агентом по закупке"
+};
+
+export const WAREHOUSE_COMPLEX_CHIEF_WORKSPACE: WarehouseAvailabilityWorkspaceConfig = {
+  agentId: "warehouse_complex_chief_agent",
+  title: "ИИ-агент по закупкам",
+  subtitle: "Начальник складского комплекса · заказы материалов кроме МУ №2",
+  forbiddenText: "Рабочее место доступно только начальнику складского комплекса.",
+  listTitle: "Заказы материалов",
+  scopeLabel: "кроме МУ №2",
+  roleAccountLabel: "начальника складского комплекса",
+  archivedConclusionAgentLabel: "ИИ-агентом по закупкам"
+};
+
+export function WarehouseAvailabilityWorkspace({
+  config
+}: {
+  config: WarehouseAvailabilityWorkspaceConfig;
+}) {
+  const { agentId } = config;
   const [searchParams, setSearchParams] = useSearchParams();
   const [documentSearch, setDocumentSearch] = useState("");
   const [searchMessage, setSearchMessage] = useState("");
-  const permissionsQuery = useWarehousePickerPermissions();
+  const permissionsQuery = useWarehousePickerPermissions(agentId);
   const canAccess =
-    permissionsQuery.data?.accessible_role_agents?.includes(AGENT_ID) ?? false;
+    permissionsQuery.data?.accessible_role_agents?.includes(agentId) ?? false;
   const activeView = searchParams.get("view") === "archive" ? "archive" : "active";
-  const activeDashboardQuery = useWarehousePickerDashboard(canAccess, "active");
-  const archiveDashboardQuery = useWarehousePickerDashboard(canAccess, "archive");
+  const activeDashboardQuery = useWarehousePickerDashboard(canAccess, "active", agentId);
+  const archiveDashboardQuery = useWarehousePickerDashboard(canAccess, "archive", agentId);
   const dashboardQuery = activeView === "archive" ? archiveDashboardQuery : activeDashboardQuery;
   const cases = useMemo(
     () => dashboardQuery.data?.groups.flatMap((group) => group.cases) ?? [],
@@ -122,7 +159,7 @@ export default function WarehousePickerAgent() {
     [cases]
   );
   const selectedCaseId = searchParams.get("case") || "";
-  const detailQuery = useWarehousePickerCase(selectedCaseId || null, canAccess);
+  const detailQuery = useWarehousePickerCase(selectedCaseId || null, canAccess, agentId);
 
   useEffect(() => {
     if (!bucketCases.length) {
@@ -233,7 +270,7 @@ export default function WarehousePickerAgent() {
       <div className={styles.page}>
         <div className={styles.forbidden}>
           <AlertTriangle size={18} />
-          Рабочее место доступно только кладовщику-комплектовщику.
+          {config.forbiddenText}
         </div>
       </div>
     );
@@ -243,8 +280,8 @@ export default function WarehousePickerAgent() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h2>ИИ-агент по закупке</h2>
-          <p>Для кладовщика-комплектовщика · Монтажный участок №2</p>
+          <h2>{config.title}</h2>
+          <p>{config.subtitle}</p>
         </div>
       </div>
 
@@ -374,7 +411,7 @@ export default function WarehousePickerAgent() {
             selectedCaseId={selectedCaseId}
             showArchiveMeta={activeView === "archive"}
             showPickerMeta
-            title={activeView === "archive" ? "Архив" : "Заказы МУ №2"}
+            title={activeView === "archive" ? "Архив" : config.listTitle}
           />
         )}
 
@@ -395,9 +432,19 @@ export default function WarehousePickerAgent() {
             </div>
           </section>
         ) : (
-          <WarehousePickerResultPanel detail={detailQuery.data} />
+          <WarehousePickerResultPanel
+            agentSlug={agentId}
+            archivedConclusionAgentLabel={config.archivedConclusionAgentLabel}
+            detail={detailQuery.data}
+            roleAccountLabel={config.roleAccountLabel}
+            scopeLabel={config.scopeLabel}
+          />
         )}
       </div>
     </div>
   );
+}
+
+export default function WarehousePickerAgent() {
+  return <WarehouseAvailabilityWorkspace config={WAREHOUSE_PICKER_WORKSPACE} />;
 }

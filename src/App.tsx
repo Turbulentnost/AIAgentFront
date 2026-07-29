@@ -4,6 +4,7 @@ import TasksAgent from "@/pages/TasksAgent";
 import ProcurementAgent from "@/pages/ProcurementAgent";
 import ProductionDispatcherAgent from "@/pages/ProductionDispatcherAgent";
 import WarehousePickerAgent from "@/pages/WarehousePickerAgent";
+import WarehouseComplexChiefAgent from "@/pages/WarehouseComplexChiefAgent";
 import PurchaseManagerAgent from "@/pages/PurchaseManagerAgent";
 import OmtoSupportManagerAgent from "@/pages/OmtoSupportManagerAgent";
 import QualityEngineerAgent from "@/pages/QualityEngineerAgent";
@@ -57,6 +58,7 @@ export default function App() {
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="ИИ-агент по закупкам"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-dispatcher" element={<ProtectedRoute><Layout title="ИИ-агент диспетчера производства"><ProductionDispatcherAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/warehouse-picker" element={<ProtectedRoute><Layout title="ИИ-агент по закупке"><WarehousePickerAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/warehouse-complex-chief" element={<ProtectedRoute><Layout title="ИИ-агент по закупкам"><WarehouseComplexChiefAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/purchase-manager" element={<ProtectedRoute><Layout title="ИИ-агент менеджера по закупкам"><PurchaseManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Работник ОТК"><QualityEngineerAgent /></Layout></ProtectedRoute>} />
