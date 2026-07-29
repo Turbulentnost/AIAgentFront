@@ -152,7 +152,7 @@ export default function ProcurementAgent() {
       <div className={styles.page}>
         <div className={styles.forbidden}>
           <AlertTriangle size={18} />
-          Оркестратор закупок доступен только администратору системы.
+          ИИ-агент по закупкам доступен только администратору системы.
         </div>
       </div>
     );
@@ -162,7 +162,7 @@ export default function ProcurementAgent() {
     <div className={styles.page}>
       <div className={styles.header}>
         <div>
-          <h2>Оркестратор закупок</h2>
+          <h2>ИИ-агент по закупкам</h2>
           <p>
             Актуальные основания и кейсы в обработке синхронизируются каждые 30 минут · только
             чтение

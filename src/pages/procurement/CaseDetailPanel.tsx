@@ -186,6 +186,16 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
   const selectedParallelBranch =
     parallel.branches.find((branch) => branch.id === selectedStage) ||
     (parallel.continuation?.id === selectedStage ? parallel.continuation : null);
+  const orchestratorStatusLabel =
+    currentState?.current_agent_id === "warehouse_picker_agent"
+      ? detail.picker_work_status === "processing"
+        ? "Комплектовщик выполняет расчёт"
+        : detail.picker_work_status === "awaiting_action"
+          ? "Ожидает решения комплектовщика"
+          : detail.picker_work_status === "completed"
+            ? "Комплектовщик передал результат"
+            : STATUS_LABELS[detail.status] ?? detail.status
+      : STATUS_LABELS[detail.status] ?? detail.status;
 
   const toggleDataRow = (lineId: string) => {
     setExpandedDataRows((current) => {
@@ -219,21 +229,21 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
         </div>
         <div className={styles.lastCalculation}>
           <span>Состояние оркестратора</span>
-          <strong>{STATUS_LABELS[detail.status] ?? detail.status}</strong>
+          <strong>{orchestratorStatusLabel}</strong>
         </div>
       </div>
 
       {mode === "bases" ? <div className={styles.detailGrid}>
         <div>
           <span>Текущий статус</span>
-          <strong>{STATUS_LABELS[detail.status] ?? detail.status}</strong>
+          <strong>{orchestratorStatusLabel}</strong>
         </div>
         <div>
           <span>Исполнитель</span>
           <strong>
             {currentState?.current_agent_label ||
               detail.current_agent_name ||
-              "Оркестратор закупок"}
+              "ИИ-агент по закупкам"}
           </strong>
         </div>
         {currentState?.wait_status ? (
@@ -559,7 +569,7 @@ export function CaseDetailPanel({ detail, sourceLabel, mode }: Props) {
               </div>
               <div>
                 <span>Состояние агента</span>
-                <strong>{STATUS_LABELS[detail.status] ?? detail.status}</strong>
+                <strong>{orchestratorStatusLabel}</strong>
               </div>
               {currentState?.task_status ? (
                 <div>

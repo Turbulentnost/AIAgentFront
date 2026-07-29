@@ -54,7 +54,7 @@ export default function App() {
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/incoming-mail" element={<IncomingMailRoute />} />
-      <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="ИИ-агент по закупкам"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-dispatcher" element={<ProtectedRoute><Layout title="ИИ-агент диспетчера производства"><ProductionDispatcherAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/warehouse-picker" element={<ProtectedRoute><Layout title="ИИ-агент по закупке"><WarehousePickerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/purchase-manager" element={<ProtectedRoute><Layout title="ИИ-агент менеджера по закупкам"><PurchaseManagerAgent /></Layout></ProtectedRoute>} />
