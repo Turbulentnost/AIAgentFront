@@ -84,7 +84,7 @@ import {
 } from "./SearchAlarmClock";
 import styles from "./ProcurementManagerAgent.module.css";
 
-const AGENT_ID = "procurement_logistics_agent";
+const AGENT_ID = "purchase_manager_agent";
 type Tab = "suppliers" | "estimate" | "quotes" | "order" | "delivery";
 type ConfirmAction =
   | { type: "supplier"; supplier: Supplier }
