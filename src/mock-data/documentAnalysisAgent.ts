@@ -27,7 +27,8 @@ export const documentAnalysisAgentSubtitle =
 
 export const documentAnalysisAcceptedExtensions = [
   ".xlsx",
-  ".xlsm"
+  ".xlsm",
+  ".xls"
 ] as const;
 
 export function isAcceptedAnalysisFile(file: File): boolean {

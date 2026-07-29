@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronUp,
   CloudUpload,
+  Download,
   FileSearch,
   FileSpreadsheet,
   Loader2,
@@ -57,7 +58,9 @@ const analysisStages = [
   "Считаем контрольные точки логистики",
   "Считаем прогнозируемый остаток по сумме планов",
   "Считаем обеспечение по дням из детального графика",
-  "Формируем result.xlsx (помесячное и по дням)"
+  "Считаем обеспеченность изделий по месяцам (сборка из материалов)",
+  "Формируем план заказов по месяцам (дата и количество)",
+  "Формируем result.xlsx (помесячное, по дням, обеспеченность и план заказов)"
 ] as const;
 
 /** Файлы в чеклисте до анализа (спеки/цены — на backend в data/aveon). */
@@ -566,6 +569,10 @@ function downloadBase64Excel(base64: string, filename: string): void {
   const blob = new Blob([bytes], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   });
+  downloadBlob(blob, filename);
+}
+
+function downloadBlob(blob: Blob, filename: string): void {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
@@ -574,8 +581,24 @@ function downloadBase64Excel(base64: string, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
+/** Показать файл в проводнике Windows. */
+async function openLocalFile(file: File): Promise<void> {
+  await agentsApi.revealAveonFileInExplorer(file);
+}
+
+type AveonTemplateItem = {
+  key: string;
+  role: string;
+  title: string;
+  filename: string;
+  description: string;
+};
+
 function extractAnalyzeError(error: unknown): string {
   if (isAxiosError(error)) {
+    if (error.code === "ERR_CANCELED" || error.name === "CanceledError") {
+      return "";
+    }
     const detail = error.response?.data?.detail;
     if (typeof detail === "string" && detail.trim()) {
       return detail.trim();
@@ -598,6 +621,9 @@ function extractAnalyzeError(error: unknown): string {
     if (error.response?.status === 401) {
       return "Сессия истекла. Войдите в систему снова.";
     }
+    if (error.code === "ECONNABORTED" || /timeout/i.test(error.message)) {
+      return "Сервер не успел ответить. Повторите распознавание файлов.";
+    }
     if (!error.response) {
       return "Нет связи с сервером. Убедитесь, что backend запущен.";
     }
@@ -606,6 +632,36 @@ function extractAnalyzeError(error: unknown): string {
     return error.message;
   }
   return "Не удалось выполнить анализ";
+}
+
+function isRequestCanceled(error: unknown): boolean {
+  return isAxiosError(error) && (error.code === "ERR_CANCELED" || error.name === "CanceledError");
+}
+
+function formatAnalysisTimestamp(value?: string | null): string {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) {
+    return new Intl.DateTimeFormat("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    })
+      .format(new Date())
+      .replace(",", "");
+  }
+  return new Intl.DateTimeFormat("ru-RU", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  })
+    .format(date)
+    .replace(",", "");
 }
 
 export default function DocumentAnalysisAgent() {
@@ -621,11 +677,17 @@ export default function DocumentAnalysisAgent() {
     asOf: string | null;
     stages: LogisticsRiskStageView[];
   } | null>(null);
+  const [shiftAssignment, setShiftAssignment] = useState<{
+    fileName: string;
+    fileBase64: string;
+  } | null>(null);
   const [selectedRiskStageKey, setSelectedRiskStageKey] = useState("");
   const [riskItemFilter, setRiskItemFilter] = useState<RiskItemFilter>("all");
   const [flippedRiskTile, setFlippedRiskTile] = useState<RiskItemFilter | null>(null);
   const [virtualRiskFilter, setVirtualRiskFilter] = useState<RiskItemFilter | null>(null);
   const [openSupplierKeys, setOpenSupplierKeys] = useState<Set<string>>(() => new Set());
+  const [riskDashboardOpen, setRiskDashboardOpen] = useState(false);
+  const [riskPointsOpen, setRiskPointsOpen] = useState(false);
   const riskStageContentRef = useRef<HTMLDivElement>(null);
   const lastRealStageKeyRef = useRef("");
   const [stagesCompact, setStagesCompact] = useState(false);
@@ -634,8 +696,14 @@ export default function DocumentAnalysisAgent() {
   const [rolesSource, setRolesSource] = useState<string | null>(null);
   const [isClassifyingRoles, setIsClassifyingRoles] = useState(false);
   const [checklistFace, setChecklistFace] = useState<ChecklistPanelFace>("files");
+  const [templatesOpen, setTemplatesOpen] = useState(false);
+  const [templates, setTemplates] = useState<AveonTemplateItem[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(false);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const templatesMenuRef = useRef<HTMLDivElement>(null);
   const stagesSectionRef = useRef<HTMLDivElement>(null);
   const classifyRequestIdRef = useRef(0);
+  const classifyAbortRef = useRef<AbortController | null>(null);
   const stagedFilesRef = useRef(stagedFiles);
   const filesFingerprintRef = useRef("");
   const isAnalyzingRef = useRef(false);
@@ -693,7 +761,87 @@ export default function DocumentAnalysisAgent() {
     return states;
   }, [presentRequiredRoles, rolesSettled, stagedFiles.length]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void agentsApi
+      .getAveonDashboardLatest()
+      .then((snapshot) => {
+        if (cancelled || !snapshot) return;
+        // при повторном заходе — только дашборд; этапы и сменное задание только после нового анализа
+        setLogisticsRisks(snapshot.logisticsRisks);
+        setLastAnalysisAt(formatAnalysisTimestamp(snapshot.analyzedAt));
+      })
+      .catch(() => {
+        // нет сохранённого дашборда — обычный пустой старт
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    void agentsApi
+      .listAveonTemplates()
+      .then((items) => {
+        if (!cancelled) setTemplates(items);
+      })
+      .catch(() => {
+        if (!cancelled) setTemplates([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!templatesOpen) return;
+    const onPointerDown = (event: MouseEvent) => {
+      if (!templatesMenuRef.current?.contains(event.target as Node)) {
+        setTemplatesOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setTemplatesOpen(false);
+    };
+    document.addEventListener("mousedown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [templatesOpen]);
+
+  const downloadTemplate = useCallback(async (item: AveonTemplateItem) => {
+    setTemplatesLoading(true);
+    setTemplatesError(null);
+    try {
+      const response = await agentsApi.downloadAveonTemplate(item.key);
+      downloadBlob(response.data, item.filename);
+      setTemplatesOpen(false);
+    } catch {
+      setTemplatesError("Не удалось скачать шаблон. Проверьте доступ к API.");
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
+  const downloadAllTemplates = useCallback(async () => {
+    setTemplatesLoading(true);
+    setTemplatesError(null);
+    try {
+      const response = await agentsApi.downloadAllAveonTemplatesZip();
+      downloadBlob(response.data, "шаблоны_авион.zip");
+      setTemplatesOpen(false);
+    } catch {
+      setTemplatesError("Не удалось скачать архив шаблонов. Проверьте доступ к API.");
+    } finally {
+      setTemplatesLoading(false);
+    }
+  }, []);
+
   const addFiles = useCallback((files: FileList | File[]) => {
+    if (isAnalyzingRef.current) return;
     const incoming = Array.from(files);
     if (!incoming.length) return;
 
@@ -772,13 +920,15 @@ export default function DocumentAnalysisAgent() {
     filesFingerprintRef.current = filesFingerprint;
 
     if (!filesFingerprint) {
+      classifyAbortRef.current?.abort();
+      classifyAbortRef.current = null;
       setRolesSource(null);
       setIsClassifyingRoles(false);
       setChecklistFace("files");
       return;
     }
 
-    // Новые/изменённые файлы → переворот обратно к чеклисту обязательных ролей
+    // Новые/изменённые файлы → чеклист ролей; дашборд прошлого анализа оставляем до нового прогона
     if (
       previousFingerprint &&
       previousFingerprint !== filesFingerprint &&
@@ -788,15 +938,22 @@ export default function DocumentAnalysisAgent() {
       setStagesCompact(false);
       setStagesInlineHidden(false);
       setStagesOverlayOpen(false);
-      setLastAnalysisAt(null);
-      setLogisticsRisks(null);
       setError(null);
     }
 
+    // Во время полного анализа не дергаем classify — иначе гонка запросов и ложный «нет связи».
+    if (isAnalyzingRef.current) {
+      return;
+    }
+
     const requestId = ++classifyRequestIdRef.current;
+    classifyAbortRef.current?.abort();
+    const abortController = new AbortController();
+    classifyAbortRef.current = abortController;
+
     const timer = window.setTimeout(async () => {
       const filesSnapshot = stagedFilesRef.current.map((item) => item.file);
-      if (!filesSnapshot.length) return;
+      if (!filesSnapshot.length || isAnalyzingRef.current) return;
 
       setIsClassifyingRoles(true);
       setStagedFiles((current) =>
@@ -806,12 +963,37 @@ export default function DocumentAnalysisAgent() {
         }))
       );
 
+      const runClassify = () =>
+        agentsApi.classifyAveonExcel(filesSnapshot, { signal: abortController.signal });
+
       try {
-        const result = await agentsApi.classifyAveonExcel(filesSnapshot);
-        if (requestId !== classifyRequestIdRef.current) return;
+        let result: Awaited<ReturnType<typeof agentsApi.classifyAveonExcel>>;
+        try {
+          result = await runClassify();
+        } catch (firstError) {
+          if (isRequestCanceled(firstError) || abortController.signal.aborted) {
+            return;
+          }
+          // Один повтор при обрыве связи после длинного analyze (proxy/keep-alive).
+          const canRetry =
+            isAxiosError(firstError) &&
+            !firstError.response &&
+            firstError.code !== "ERR_CANCELED";
+          if (!canRetry) throw firstError;
+          await new Promise((resolve) => window.setTimeout(resolve, 400));
+          if (requestId !== classifyRequestIdRef.current || abortController.signal.aborted) {
+            return;
+          }
+          result = await runClassify();
+        }
+
+        if (requestId !== classifyRequestIdRef.current || abortController.signal.aborted) {
+          return;
+        }
 
         const roleByName = new Map(result.roles.map((entry) => [entry.filename, entry.role]));
         setRolesSource(result.source);
+        setError(null);
         setStagedFiles((current) =>
           current.map((item) => ({
             ...item,
@@ -819,9 +1001,17 @@ export default function DocumentAnalysisAgent() {
             roleStatus: roleByName.has(item.file.name) ? ("ready" as const) : ("error" as const)
           }))
         );
-      } catch {
-        if (requestId !== classifyRequestIdRef.current) return;
+      } catch (caughtError) {
+        if (
+          requestId !== classifyRequestIdRef.current ||
+          abortController.signal.aborted ||
+          isRequestCanceled(caughtError)
+        ) {
+          return;
+        }
         setRolesSource(null);
+        const message = extractAnalyzeError(caughtError);
+        if (message) setError(message);
         setStagedFiles((current) =>
           current.map((item) => ({
             ...item,
@@ -837,12 +1027,21 @@ export default function DocumentAnalysisAgent() {
 
     return () => {
       window.clearTimeout(timer);
+      abortController.abort();
+      if (classifyAbortRef.current === abortController) {
+        classifyAbortRef.current = null;
+      }
       classifyRequestIdRef.current += 1;
     };
   }, [filesFingerprint]);
 
   const handleAnalyze = useCallback(async () => {
     if (!stagedFiles.length || isAnalyzing || !requiredFilesValid) return;
+
+    classifyAbortRef.current?.abort();
+    classifyAbortRef.current = null;
+    classifyRequestIdRef.current += 1;
+    setIsClassifyingRoles(false);
 
     setChecklistFace("stages");
     setIsAnalyzing(true);
@@ -851,8 +1050,7 @@ export default function DocumentAnalysisAgent() {
     setStagesCompact(false);
     setStagesInlineHidden(false);
     setStagesOverlayOpen(false);
-    setLastAnalysisAt(null);
-    setLogisticsRisks(null);
+    // предыдущий дашборд остаётся на экране до прихода нового результата
     const stageTimer = window.setInterval(() => {
       setActiveStageIndex((current) => Math.min(current + 1, analysisStages.length - 1));
     }, 1200);
@@ -952,20 +1150,27 @@ export default function DocumentAnalysisAgent() {
       } else {
         console.log("result.xlsx не сформирован");
       }
-
-      const formatted = new Intl.DateTimeFormat("ru-RU", {
-        day: "2-digit",
-        month: "2-digit",
-        year: "numeric",
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit"
-      }).format(new Date());
+      if (result.shiftAssignmentFileBase64) {
+        setShiftAssignment({
+          fileName: result.shiftAssignmentFileName,
+          fileBase64: result.shiftAssignmentFileBase64
+        });
+        console.log(
+          `Сменное задание готово (скачивание по кнопке): ${result.shiftAssignmentFileName}`
+        );
+      } else {
+        setShiftAssignment(null);
+        console.log("сменное задание не сформировано");
+      }
 
       setLogisticsRisks(result.logisticsRisks);
-      setLastAnalysisAt(formatted.replace(",", ""));
+      setRiskDashboardOpen(true);
+      setRiskPointsOpen(true);
+      setLastAnalysisAt(
+        formatAnalysisTimestamp(result.dashboardAnalyzedAt ?? null)
+      );
     } catch (caughtError) {
-      setError(extractAnalyzeError(caughtError));
+      setError(extractAnalyzeError(caughtError) || "Не удалось выполнить анализ");
       setChecklistFace("files");
       setActiveStageIndex(0);
     } finally {
@@ -1293,15 +1498,19 @@ export default function DocumentAnalysisAgent() {
             <h2 className={styles.panelTitle}>Файлы для анализа</h2>
             <p className={styles.panelHint}>
               Перетащите документы в область ниже или выберите их вручную. Поддерживаются {acceptedHint}.
+              Нет своих файлов — скачайте шаблоны, заполните и загрузите обратно.
             </p>
           </div>
 
           <div
-            className={`${styles.dropZone} ${isDragOver ? styles.dropZoneDragOver : ""}`}
-            onDragEnter={handleDragEnter}
-            onDragLeave={handleDragLeave}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop}
+            className={`${styles.dropZone} ${isDragOver ? styles.dropZoneDragOver : ""} ${
+              isAnalyzing ? styles.dropZoneDisabled : ""
+            }`}
+            onDragEnter={isAnalyzing ? undefined : handleDragEnter}
+            onDragLeave={isAnalyzing ? undefined : handleDragLeave}
+            onDragOver={isAnalyzing ? undefined : handleDragOver}
+            onDrop={isAnalyzing ? undefined : handleDrop}
+            aria-disabled={isAnalyzing}
           >
             {isDragOver ? (
               <div className={styles.dropOverlay} aria-hidden="true">
@@ -1323,13 +1532,14 @@ export default function DocumentAnalysisAgent() {
           </div>
 
           <div className={styles.uploadActions}>
-            <label className={styles.fileButton}>
+            <label className={`${styles.fileButton} ${isAnalyzing ? styles.fileButtonDisabled : ""}`}>
               Выбрать файлы
               <input
                 ref={fileInputRef}
                 type="file"
                 multiple
                 accept={documentAnalysisAcceptedExtensions.join(",")}
+                disabled={isAnalyzing}
                 onChange={(event) => {
                   if (event.target.files?.length) {
                     addFiles(event.target.files);
@@ -1338,6 +1548,54 @@ export default function DocumentAnalysisAgent() {
                 }}
               />
             </label>
+            <div className={styles.templatesWrap} ref={templatesMenuRef}>
+              <button
+                type="button"
+                className={styles.secondaryButton}
+                onClick={() => setTemplatesOpen((open) => !open)}
+                disabled={templatesLoading}
+                aria-expanded={templatesOpen}
+                aria-haspopup="menu"
+              >
+                {templatesLoading ? (
+                  <Loader2 size={16} strokeWidth={2.2} aria-hidden="true" className={styles.spin} />
+                ) : (
+                  <Download size={16} strokeWidth={2.2} aria-hidden="true" />
+                )}
+                Скачать шаблоны
+                <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
+              </button>
+              {templatesOpen ? (
+                <div className={styles.templatesMenu} role="menu">
+                  <button
+                    type="button"
+                    className={styles.templatesMenuItem}
+                    role="menuitem"
+                    onClick={() => void downloadAllTemplates()}
+                    disabled={templatesLoading || !templates.length}
+                  >
+                    <strong>Все шаблоны (ZIP)</strong>
+                    <span>4 файла одним архивом</span>
+                  </button>
+                  {templates.map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      className={styles.templatesMenuItem}
+                      role="menuitem"
+                      onClick={() => void downloadTemplate(item)}
+                      disabled={templatesLoading}
+                    >
+                      <strong>{item.title}</strong>
+                      <span>{item.description}</span>
+                    </button>
+                  ))}
+                  {!templates.length ? (
+                    <p className={styles.templatesMenuEmpty}>Шаблоны пока недоступны на сервере</p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
             <button
               type="button"
               className={styles.primaryButton}
@@ -1373,17 +1631,16 @@ export default function DocumentAnalysisAgent() {
                   classifyRequestIdRef.current += 1;
                   setStagedFiles([]);
                   setError(null);
-                  setLastAnalysisAt(null);
-                  setLogisticsRisks(null);
+                  // дашборд прошлого анализа не сбрасываем — только очередь файлов
                   setSelectedRiskStageKey("");
                   setRiskItemFilter("all");
                   setOpenSupplierKeys(new Set());
-                  setStagesCompact(false);
-                  setStagesInlineHidden(false);
+                  setStagesCompact(Boolean(lastAnalysisAt));
+                  setStagesInlineHidden(Boolean(lastAnalysisAt));
                   setStagesOverlayOpen(false);
                   setRolesSource(null);
                   setIsClassifyingRoles(false);
-                  setChecklistFace("files");
+                  setChecklistFace(lastAnalysisAt ? "stages" : "files");
                 }}
                 disabled={isAnalyzing}
               >
@@ -1395,6 +1652,11 @@ export default function DocumentAnalysisAgent() {
           {error ? (
             <p className={styles.errorText} role="alert">
               {error}
+            </p>
+          ) : null}
+          {templatesError ? (
+            <p className={styles.errorText} role="alert">
+              {templatesError}
             </p>
           ) : null}
 
@@ -1420,19 +1682,50 @@ export default function DocumentAnalysisAgent() {
                           type="button"
                           className={styles.removeButton}
                           aria-label={`Удалить ${item.file.name}`}
-                          onClick={() =>
-                            setStagedFiles((current) => current.filter((entry) => entry.id !== item.id))
-                          }
+                          onClick={(event) => {
+                            event.preventDefault();
+                            event.stopPropagation();
+                            setStagedFiles((current) => current.filter((entry) => entry.id !== item.id));
+                          }}
                         >
                           <Trash2 size={13} strokeWidth={2.2} aria-hidden="true" />
                         </button>
                       ) : null}
-                      <span className={styles.fileIcon}>
-                        <FileSpreadsheet size={30} strokeWidth={1.8} aria-hidden="true" />
-                      </span>
+                      <button
+                        type="button"
+                        className={styles.fileOpenButton}
+                        aria-label={`Показать в проводнике: ${item.file.name}`}
+                        title={`Показать в проводнике: ${item.file.name}`}
+                        onClick={() => {
+                          void openLocalFile(item.file).catch((error) => {
+                            console.error("Не удалось открыть проводник", error);
+                            window.alert(
+                              "Не удалось открыть проводник. Проверьте, что backend запущен на этой же Windows-машине."
+                            );
+                          });
+                        }}
+                      >
+                        <span className={styles.fileIcon}>
+                          <FileSpreadsheet size={30} strokeWidth={1.8} aria-hidden="true" />
+                        </span>
+                      </button>
                     </div>
                     <div className={styles.fileMeta}>
-                      <strong title={item.file.name}>{item.file.name}</strong>
+                      <button
+                        type="button"
+                        className={styles.fileNameButton}
+                        title={`Показать в проводнике: ${item.file.name}`}
+                        onClick={() => {
+                          void openLocalFile(item.file).catch((error) => {
+                            console.error("Не удалось открыть проводник", error);
+                            window.alert(
+                              "Не удалось открыть проводник. Проверьте, что backend запущен на этой же Windows-машине."
+                            );
+                          });
+                        }}
+                      >
+                        <strong>{item.file.name}</strong>
+                      </button>
                       <span>{formatBytes(item.file.size)}</span>
                       {item.roleStatus === "loading" || item.roleStatus === "pending" ? (
                         <span className={styles.fileRoleBadgePending}>определяем роль…</span>
@@ -1477,6 +1770,32 @@ export default function DocumentAnalysisAgent() {
           </div>
 
           {sessionStatusBadge}
+
+          {shiftAssignment ? (
+            <div className={styles.shiftAssignmentBlock}>
+              <button
+                type="button"
+                className={styles.shiftAssignmentButton}
+                onClick={() =>
+                  downloadBase64Excel(
+                    shiftAssignment.fileBase64,
+                    shiftAssignment.fileName
+                  )
+                }
+              >
+                <Download size={18} aria-hidden />
+                <span className={styles.shiftAssignmentButtonText}>
+                  <span className={styles.shiftAssignmentButtonLabel}>
+                    Скачать сменное задание
+                  </span>
+                  <span className={styles.shiftAssignmentButtonMeta}>
+                    для менеджера по закупкам
+                  </span>
+                </span>
+                <FileSpreadsheet size={18} aria-hidden />
+              </button>
+            </div>
+          ) : null}
 
           <div className={styles.stagesSection} ref={stagesSectionRef}>
             {showInlineStages ? (
@@ -1594,311 +1913,447 @@ export default function DocumentAnalysisAgent() {
             </span>
           </div>
 
-          <div className={styles.riskAnalyticsBlock}>
-            <div className={styles.riskAnalyticsRow}>
-              <div className={styles.riskAnalyticsTiles} role="group" aria-label="Сводка по контрольным точкам">
-                {RISK_TILES.map((tile) => {
-                  const isFlipped = flippedRiskTile === tile.filter;
-                  const isVirtualActive =
-                    virtualRiskFilter === tile.filter &&
-                    selectedRiskStageKey === virtualStageKey(tile.filter);
-                  const isStageFilterActive =
-                    !isVirtualStageSelected && riskItemFilter === tile.filter;
-                  const isTileActive = isVirtualActive || isStageFilterActive || isFlipped;
-                  const toneClass =
-                    tile.tone === "danger"
-                      ? styles.riskAnalyticsTileDanger
-                      : tile.tone === "success"
-                        ? styles.riskAnalyticsTileSuccess
-                        : tile.tone === "critical"
-                          ? styles.riskAnalyticsTileCritical
-                          : "";
-                  const iconToneClass =
-                    tile.tone === "danger"
-                      ? styles.riskAnalyticsTileIconDanger
-                      : tile.tone === "success"
-                        ? styles.riskAnalyticsTileIconSuccess
-                        : tile.tone === "critical"
-                          ? styles.riskAnalyticsTileIconCritical
-                          : "";
-                  const Icon =
-                    tile.filter === "all"
-                      ? Package
-                      : tile.filter === "at_risk"
-                        ? AlertTriangle
-                        : tile.filter === "on_track"
-                          ? ShieldCheck
-                          : Siren;
-
-                  return (
-                    <div
-                      key={tile.filter}
-                      className={styles.riskTileFlipScene}
-                      onContextMenu={(event) => handleRiskTileRightClick(event, tile.filter)}
-                    >
-                      <div
-                        className={`${styles.riskTileFlipCard} ${
-                          isFlipped ? styles.riskTileFlipCardFlipped : ""
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceFront} ${toneClass} ${
-                            isTileActive ? styles.riskAnalyticsTileActive : ""
-                          }`}
-                          aria-pressed={isVirtualActive || isStageFilterActive}
-                          aria-label={`${tile.label}: ${riskTileValues[tile.filter]}. ЛКМ — фильтр, ПКМ — сводка`}
-                          onClick={() => handleRiskTileLeftClick(tile.filter)}
-                          onContextMenu={(event) => handleRiskTileRightClick(event, tile.filter)}
-                        >
-                          <span
-                            className={`${styles.riskAnalyticsTileIcon} ${iconToneClass}`}
-                            aria-hidden="true"
-                          >
-                            <Icon size={24} strokeWidth={2} />
-                          </span>
-                          <span className={styles.riskAnalyticsTileBody}>
-                            <span className={styles.riskAnalyticsTileLabel}>{tile.label}</span>
-                            <strong className={styles.riskAnalyticsTileValue}>
-                              {riskTileValues[tile.filter]}
-                            </strong>
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceBack} ${toneClass} ${
-                            isVirtualActive || isStageFilterActive
-                              ? styles.riskAnalyticsTileActive
-                              : ""
-                          }`}
-                          aria-pressed={isVirtualActive || isStageFilterActive}
-                          aria-label={`${tile.label}: ЛКМ — фильтр, ПКМ — вернуть лицо`}
-                          onClick={() => handleRiskTileLeftClick(tile.filter)}
-                          onContextMenu={(event) => handleRiskTileRightClick(event, tile.filter)}
-                        >
-                          <span className={styles.riskTileBackContent}>
-                            <span className={styles.riskTileBackTitle}>{tile.backTitle}</span>
-                            <span className={styles.riskTileBackRule}>{tile.backRule}</span>
-                            <span className={styles.riskTileBackMeta}>
-                              Сейчас: {riskTileValues[tile.filter]} из {globalRiskStats.total}
-                            </span>
-                            <span className={styles.riskTileBackHint}>{tile.backHint}</span>
-                          </span>
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-
-              <div className={styles.riskDoughnutPanel} aria-label="Соотношение успевающих и под риском">
-                <RiskDoughnutChart
-                  onTrack={globalRiskStats.onTrack}
-                  atRisk={globalRiskStats.atRisk}
-                  total={globalRiskStats.total}
-                  onSelectFilter={(filter) => {
-                    setRiskItemFilter(filter);
-                    setFlippedRiskTile(null);
-                    if (isVirtualStageSelected) {
-                      setVirtualRiskFilter(null);
-                      if (logisticsRisks.stages.length) {
-                        setSelectedRiskStageKey(
-                          lastRealStageKeyRef.current ||
-                            getDefaultRiskStageKey(logisticsRisks.stages)
-                        );
-                      }
-                    }
-                  }}
-                />
-              </div>
-            </div>
-            <p className={styles.riskAnalyticsHint}>
-              Клик правой кнопкой мыши открывает сводку по плитке.
-            </p>
-          </div>
-
-          <nav className={styles.riskStageNav} aria-label="Стадии логистики">
-            {logisticsRisks.stages.map((stage, index) => {
-              const isSelected = stage.key === selectedRiskStageKey;
-              const hasItems = stage.items.length > 0;
-              const navLabel = RISK_STAGE_NAV_LABELS[stage.key] ?? stage.label;
-              return (
-                <button
-                  key={stage.key}
-                  type="button"
-                  className={`${styles.riskStageNavBadge} ${
-                    isSelected ? styles.riskStageNavBadgeActive : ""
-                  } ${hasItems ? styles.riskStageNavBadgeHasItems : styles.riskStageNavBadgeMuted}`}
-                  aria-pressed={isSelected}
-                  title={stage.label}
-                  onClick={() => handleRiskStageBadgeClick(stage.key)}
-                >
-                  <span className={styles.riskStageNavIndex}>{index + 1}</span>
-                  <span className={styles.riskStageNavLabel}>{navLabel}</span>
-                  <span className={styles.riskStageNavCount}>{stage.items.length}</span>
-                </button>
-              );
-            })}
-            {virtualRiskFilter ? (
-              <div className={styles.riskStageNavVirtualWrap}>
-                <button
-                  type="button"
-                  className={`${styles.riskStageNavBadge} ${styles.riskStageNavBadgeVirtual} ${
-                    selectedRiskStageKey === virtualStageKey(virtualRiskFilter)
-                      ? styles.riskStageNavBadgeActive
-                      : ""
-                  } ${styles.riskStageNavBadgeHasItems}`}
-                  aria-pressed={selectedRiskStageKey === virtualStageKey(virtualRiskFilter)}
-                  title={`${VIRTUAL_STAGE_LABELS[virtualRiskFilter]} · по всем стадиям`}
-                  onClick={() => handleRiskStageBadgeClick(virtualStageKey(virtualRiskFilter))}
-                >
-                  <span className={styles.riskStageNavIndex}>
-                    {logisticsRisks.stages.length + 1}
-                  </span>
-                  <span className={styles.riskStageNavLabel}>
-                    {VIRTUAL_STAGE_LABELS[virtualRiskFilter]}
-                  </span>
-                  <span className={styles.riskStageNavCount}>
-                    {filterRiskItems(allStageItems, virtualRiskFilter).length}
-                  </span>
-                </button>
-                <button
-                  type="button"
-                  className={styles.riskStageNavDismiss}
-                  aria-label="Закрыть временный бадж"
-                  onClick={dismissVirtualRiskStage}
-                >
-                  ×
-                </button>
-              </div>
-            ) : null}
-          </nav>
-
-          {selectedRiskStage ? (
-            <div
-              ref={riskStageContentRef}
-              className={`${styles.riskStageContent} ${
-                selectedRiskStage.items.length > 0 ? styles.riskStageContentAlert : ""
-              } ${isVirtualStageSelected ? styles.riskStageContentVirtual : ""}`}
+          <div
+            className={`${styles.riskAccordion} ${
+              riskDashboardOpen ? styles.riskAccordionOpen : ""
+            }`}
+          >
+            <button
+              type="button"
+              className={styles.riskAccordionToggle}
+              aria-expanded={riskDashboardOpen}
+              aria-controls="risk-dashboard-panel"
+              id="risk-dashboard-toggle"
+              onClick={() => setRiskDashboardOpen((open) => !open)}
             >
-              <div className={styles.riskStageSummary}>
-                <strong>
-                  {isVirtualStageSelected
-                    ? `${selectedRiskStage.label} · все стадии`
-                    : selectedRiskStage.label}
-                </strong>
-                <span>
-                  {selectedRiskStage.items.length > 0
-                    ? isVirtualStageSelected || riskItemFilter === "all"
-                      ? `${selectedRiskStage.items.length} номенклатур`
-                      : `${filteredStageItems.length} из ${selectedRiskStage.items.length} номенклатур`
-                    : "на сегодня пусто"}
+              <ChevronDown
+                className={styles.riskAccordionChevron}
+                size={18}
+                strokeWidth={2.2}
+                aria-hidden="true"
+              />
+              <span className={styles.riskAccordionMain}>
+                <span className={styles.riskAccordionLabel}>Дашборд</span>
+                <span className={styles.riskAccordionMeta}>
+                  Плитки и диаграмма ·{" "}
+                  {logisticsRiskTotal > 0 ? `${logisticsRiskTotal} позиций` : "без срабатываний"}
                 </span>
-              </div>
+              </span>
+              <span className={styles.riskAccordionAction}>
+                {riskDashboardOpen ? "Скрыть" : "Показать"}
+              </span>
+            </button>
+            <div
+              id="risk-dashboard-panel"
+              className={styles.riskAccordionPanel}
+              role="region"
+              aria-labelledby="risk-dashboard-toggle"
+              aria-hidden={!riskDashboardOpen}
+              inert={!riskDashboardOpen ? true : undefined}
+            >
+              <div className={styles.riskAccordionPanelInner}>
+                <div className={styles.riskAnalyticsBlock}>
+                  <div className={styles.riskAnalyticsRow}>
+                    <div
+                      className={styles.riskAnalyticsTiles}
+                      role="group"
+                      aria-label="Сводка по контрольным точкам"
+                    >
+                      {RISK_TILES.map((tile) => {
+                        const isFlipped = flippedRiskTile === tile.filter;
+                        const isVirtualActive =
+                          virtualRiskFilter === tile.filter &&
+                          selectedRiskStageKey === virtualStageKey(tile.filter);
+                        const isStageFilterActive =
+                          !isVirtualStageSelected && riskItemFilter === tile.filter;
+                        const isTileActive =
+                          isVirtualActive || isStageFilterActive || isFlipped;
+                        const toneClass =
+                          tile.tone === "danger"
+                            ? styles.riskAnalyticsTileDanger
+                            : tile.tone === "success"
+                              ? styles.riskAnalyticsTileSuccess
+                              : tile.tone === "critical"
+                                ? styles.riskAnalyticsTileCritical
+                                : "";
+                        const iconToneClass =
+                          tile.tone === "danger"
+                            ? styles.riskAnalyticsTileIconDanger
+                            : tile.tone === "success"
+                              ? styles.riskAnalyticsTileIconSuccess
+                              : tile.tone === "critical"
+                                ? styles.riskAnalyticsTileIconCritical
+                                : "";
+                        const Icon =
+                          tile.filter === "all"
+                            ? Package
+                            : tile.filter === "at_risk"
+                              ? AlertTriangle
+                              : tile.filter === "on_track"
+                                ? ShieldCheck
+                                : Siren;
 
-              {filteredStageItems.length > 0 ? (
-                <div className={styles.riskSupplierList}>
-                  {selectedStageSupplierGroups.map((group) => {
-                    const isOpen = openSupplierKeys.has(group.key);
-                    const panelId = `risk-supplier-${toDomId(selectedRiskStage.key)}-${toDomId(group.key)}`;
-
-                    return (
-                      <div
-                        key={group.key}
-                        className={`${styles.riskSupplierGroup} ${
-                          isOpen ? styles.riskSupplierGroupOpen : ""
-                        }`}
-                      >
-                        <button
-                          type="button"
-                          id={`${panelId}-toggle`}
-                          className={styles.riskSupplierToggle}
-                          aria-expanded={isOpen}
-                          aria-controls={panelId}
-                          onClick={() => toggleSupplierGroup(group.key)}
-                        >
-                          <ChevronDown
-                            className={styles.riskSupplierChevron}
-                            size={16}
-                            strokeWidth={2.2}
-                            aria-hidden="true"
-                          />
-                          <span className={styles.riskSupplierName} title={group.label}>
-                            {group.label}
-                          </span>
-                          <span className={styles.riskSupplierCount}>
-                            {group.items.length} поз.
-                          </span>
-                        </button>
-
-                        {isOpen ? (
-                          <ul
-                            id={panelId}
-                            className={styles.riskItemList}
-                            role="region"
-                            aria-labelledby={`${panelId}-toggle`}
+                        return (
+                          <div
+                            key={tile.filter}
+                            className={styles.riskTileFlipScene}
+                            onContextMenu={(event) =>
+                              handleRiskTileRightClick(event, tile.filter)
+                            }
                           >
-                            {group.items.map((item) => (
-                              <li
-                                key={`${selectedRiskStage.key}-${group.key}-${item.nomenclature}-${item.moscowDate}-${item.sheet}`}
-                                className={`${styles.riskItem} ${riskLevelClass(item.riskLevel)}`}
-                                style={
-                                  {
-                                    "--risk-hue": String(Math.round((item.riskRatio ?? 0) * 120))
-                                  } as CSSProperties
+                            <div
+                              className={`${styles.riskTileFlipCard} ${
+                                isFlipped ? styles.riskTileFlipCardFlipped : ""
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceFront} ${toneClass} ${
+                                  isTileActive ? styles.riskAnalyticsTileActive : ""
+                                }`}
+                                aria-pressed={isVirtualActive || isStageFilterActive}
+                                aria-label={`${tile.label}: ${riskTileValues[tile.filter]}. ЛКМ — фильтр, ПКМ — сводка`}
+                                onClick={() => handleRiskTileLeftClick(tile.filter)}
+                                onContextMenu={(event) =>
+                                  handleRiskTileRightClick(event, tile.filter)
                                 }
                               >
-                                <div className={styles.riskItemMain}>
-                                  <strong title={item.nomenclature}>{item.nomenclature}</strong>
-                                  <span className={styles.riskItemCountdown}>
-                                    {formatDaysRemaining(item.daysRemaining)}
-                                    {item.windowEnd
-                                      ? ` · крайняя дата ${formatRuDate(item.windowEnd)}`
-                                      : ""}
+                                <span
+                                  className={`${styles.riskAnalyticsTileIcon} ${iconToneClass}`}
+                                  aria-hidden="true"
+                                >
+                                  <Icon size={24} strokeWidth={2} />
+                                </span>
+                                <span className={styles.riskAnalyticsTileBody}>
+                                  <span className={styles.riskAnalyticsTileLabel}>
+                                    {tile.label}
                                   </span>
-                                </div>
-                                <div className={styles.riskItemMeta}>
-                                  <span
-                                    className={styles.riskMeter}
-                                    title={`Уровень риска: ${item.riskLevel}, запас по сроку ${(item.riskRatio * 100).toFixed(0)}%`}
+                                  <strong className={styles.riskAnalyticsTileValue}>
+                                    {riskTileValues[tile.filter]}
+                                  </strong>
+                                </span>
+                              </button>
+                              <button
+                                type="button"
+                                className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceBack} ${toneClass} ${
+                                  isVirtualActive || isStageFilterActive
+                                    ? styles.riskAnalyticsTileActive
+                                    : ""
+                                }`}
+                                aria-pressed={isVirtualActive || isStageFilterActive}
+                                aria-label={`${tile.label}: ЛКМ — фильтр, ПКМ — вернуть лицо`}
+                                onClick={() => handleRiskTileLeftClick(tile.filter)}
+                                onContextMenu={(event) =>
+                                  handleRiskTileRightClick(event, tile.filter)
+                                }
+                              >
+                                <span className={styles.riskTileBackContent}>
+                                  <span className={styles.riskTileBackTitle}>
+                                    {tile.backTitle}
+                                  </span>
+                                  <span className={styles.riskTileBackRule}>
+                                    {tile.backRule}
+                                  </span>
+                                  <span className={styles.riskTileBackMeta}>
+                                    Сейчас: {riskTileValues[tile.filter]} из{" "}
+                                    {globalRiskStats.total}
+                                  </span>
+                                  <span className={styles.riskTileBackHint}>
+                                    {tile.backHint}
+                                  </span>
+                                </span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div
+                      className={styles.riskDoughnutPanel}
+                      aria-label="Соотношение успевающих и под риском"
+                    >
+                      <RiskDoughnutChart
+                        onTrack={globalRiskStats.onTrack}
+                        atRisk={globalRiskStats.atRisk}
+                        total={globalRiskStats.total}
+                        onSelectFilter={(filter) => {
+                          setRiskItemFilter(filter);
+                          setFlippedRiskTile(null);
+                          if (isVirtualStageSelected) {
+                            setVirtualRiskFilter(null);
+                            if (logisticsRisks.stages.length) {
+                              setSelectedRiskStageKey(
+                                lastRealStageKeyRef.current ||
+                                  getDefaultRiskStageKey(logisticsRisks.stages)
+                              );
+                            }
+                          }
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <p className={styles.riskAnalyticsHint}>
+                    Клик правой кнопкой мыши открывает сводку по плитке.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div
+            className={`${styles.riskAccordion} ${
+              riskPointsOpen ? styles.riskAccordionOpen : ""
+            }`}
+          >
+            <button
+              type="button"
+              className={styles.riskAccordionToggle}
+              aria-expanded={riskPointsOpen}
+              aria-controls="risk-points-panel"
+              id="risk-points-toggle"
+              onClick={() => setRiskPointsOpen((open) => !open)}
+            >
+              <ChevronDown
+                className={styles.riskAccordionChevron}
+                size={18}
+                strokeWidth={2.2}
+                aria-hidden="true"
+              />
+              <span className={styles.riskAccordionMain}>
+                <span className={styles.riskAccordionLabel}>Контрольные точки</span>
+                <span className={styles.riskAccordionMeta}>
+                  {logisticsRisks.stages.length} стадий ·{" "}
+                  {logisticsRiskTotal > 0 ? `${logisticsRiskTotal} позиций` : "пусто на сегодня"}
+                </span>
+              </span>
+              <span className={styles.riskAccordionAction}>
+                {riskPointsOpen ? "Скрыть" : "Показать"}
+              </span>
+            </button>
+            <div
+              id="risk-points-panel"
+              className={styles.riskAccordionPanel}
+              role="region"
+              aria-labelledby="risk-points-toggle"
+              aria-hidden={!riskPointsOpen}
+              inert={!riskPointsOpen ? true : undefined}
+            >
+              <div className={styles.riskAccordionPanelInner}>
+                <div className={styles.riskPointsBody}>
+                  <nav className={styles.riskStageNav} aria-label="Стадии логистики">
+                    {logisticsRisks.stages.map((stage, index) => {
+                      const isSelected = stage.key === selectedRiskStageKey;
+                      const hasItems = stage.items.length > 0;
+                      const navLabel = RISK_STAGE_NAV_LABELS[stage.key] ?? stage.label;
+                      return (
+                        <button
+                          key={stage.key}
+                          type="button"
+                          className={`${styles.riskStageNavBadge} ${
+                            isSelected ? styles.riskStageNavBadgeActive : ""
+                          } ${
+                            hasItems
+                              ? styles.riskStageNavBadgeHasItems
+                              : styles.riskStageNavBadgeMuted
+                          }`}
+                          aria-pressed={isSelected}
+                          title={stage.label}
+                          onClick={() => handleRiskStageBadgeClick(stage.key)}
+                        >
+                          <span className={styles.riskStageNavIndex}>{index + 1}</span>
+                          <span className={styles.riskStageNavLabel}>{navLabel}</span>
+                          <span className={styles.riskStageNavCount}>{stage.items.length}</span>
+                        </button>
+                      );
+                    })}
+                    {virtualRiskFilter ? (
+                      <div className={styles.riskStageNavVirtualWrap}>
+                        <button
+                          type="button"
+                          className={`${styles.riskStageNavBadge} ${styles.riskStageNavBadgeVirtual} ${
+                            selectedRiskStageKey === virtualStageKey(virtualRiskFilter)
+                              ? styles.riskStageNavBadgeActive
+                              : ""
+                          } ${styles.riskStageNavBadgeHasItems}`}
+                          aria-pressed={
+                            selectedRiskStageKey === virtualStageKey(virtualRiskFilter)
+                          }
+                          title={`${VIRTUAL_STAGE_LABELS[virtualRiskFilter]} · по всем стадиям`}
+                          onClick={() =>
+                            handleRiskStageBadgeClick(virtualStageKey(virtualRiskFilter))
+                          }
+                        >
+                          <span className={styles.riskStageNavIndex}>
+                            {logisticsRisks.stages.length + 1}
+                          </span>
+                          <span className={styles.riskStageNavLabel}>
+                            {VIRTUAL_STAGE_LABELS[virtualRiskFilter]}
+                          </span>
+                          <span className={styles.riskStageNavCount}>
+                            {filterRiskItems(allStageItems, virtualRiskFilter).length}
+                          </span>
+                        </button>
+                        <button
+                          type="button"
+                          className={styles.riskStageNavDismiss}
+                          aria-label="Закрыть временный бадж"
+                          onClick={dismissVirtualRiskStage}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ) : null}
+                  </nav>
+
+                  {selectedRiskStage ? (
+                    <div
+                      ref={riskStageContentRef}
+                      className={`${styles.riskStageContent} ${
+                        selectedRiskStage.items.length > 0
+                          ? styles.riskStageContentAlert
+                          : ""
+                      } ${isVirtualStageSelected ? styles.riskStageContentVirtual : ""}`}
+                    >
+                      <div className={styles.riskStageSummary}>
+                        <strong>
+                          {isVirtualStageSelected
+                            ? `${selectedRiskStage.label} · все стадии`
+                            : selectedRiskStage.label}
+                        </strong>
+                        <span>
+                          {selectedRiskStage.items.length > 0
+                            ? isVirtualStageSelected || riskItemFilter === "all"
+                              ? `${selectedRiskStage.items.length} номенклатур`
+                              : `${filteredStageItems.length} из ${selectedRiskStage.items.length} номенклатур`
+                            : "на сегодня пусто"}
+                        </span>
+                      </div>
+
+                      {filteredStageItems.length > 0 ? (
+                        <div className={styles.riskSupplierList}>
+                          {selectedStageSupplierGroups.map((group) => {
+                            const isOpen = openSupplierKeys.has(group.key);
+                            const panelId = `risk-supplier-${toDomId(selectedRiskStage.key)}-${toDomId(group.key)}`;
+
+                            return (
+                              <div
+                                key={group.key}
+                                className={`${styles.riskSupplierGroup} ${
+                                  isOpen ? styles.riskSupplierGroupOpen : ""
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  id={`${panelId}-toggle`}
+                                  className={styles.riskSupplierToggle}
+                                  aria-expanded={isOpen}
+                                  aria-controls={panelId}
+                                  onClick={() => toggleSupplierGroup(group.key)}
+                                >
+                                  <ChevronDown
+                                    className={styles.riskSupplierChevron}
+                                    size={16}
+                                    strokeWidth={2.2}
                                     aria-hidden="true"
                                   />
-                                  <span title={`Количество: ${item.quantity} шт.`}>
-                                    <span className={styles.riskItemMetaLabel}>Кол-во</span>
-                                    {item.quantity.toLocaleString("ru-RU")} шт.
+                                  <span
+                                    className={styles.riskSupplierName}
+                                    title={group.label}
+                                  >
+                                    {group.label}
                                   </span>
-                                  <span title={`Примерная дата поставки в Москву: ${formatRuDate(item.moscowDate)}`}>
-                                    <span className={styles.riskItemMetaLabel}>В Москву</span>
-                                    {formatRuDate(item.moscowDate)}
+                                  <span className={styles.riskSupplierCount}>
+                                    {group.items.length} поз.
                                   </span>
-                                  <span title={`Лист графика отгрузок: ${item.sheet}`}>
-                                    <span className={styles.riskItemMetaLabel}>Лист</span>
-                                    {item.sheet}
-                                  </span>
-                                </div>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : null}
-                      </div>
-                    );
-                  })}
+                                </button>
+
+                                {isOpen ? (
+                                  <ul
+                                    id={panelId}
+                                    className={styles.riskItemList}
+                                    role="region"
+                                    aria-labelledby={`${panelId}-toggle`}
+                                  >
+                                    {group.items.map((item) => (
+                                      <li
+                                        key={`${selectedRiskStage.key}-${group.key}-${item.nomenclature}-${item.moscowDate}-${item.sheet}`}
+                                        className={`${styles.riskItem} ${riskLevelClass(item.riskLevel)}`}
+                                        style={
+                                          {
+                                            "--risk-hue": String(
+                                              Math.round((item.riskRatio ?? 0) * 120)
+                                            )
+                                          } as CSSProperties
+                                        }
+                                      >
+                                        <div className={styles.riskItemMain}>
+                                          <strong title={item.nomenclature}>
+                                            {item.nomenclature}
+                                          </strong>
+                                          <span className={styles.riskItemCountdown}>
+                                            {formatDaysRemaining(item.daysRemaining)}
+                                            {item.windowEnd
+                                              ? ` · крайняя дата ${formatRuDate(item.windowEnd)}`
+                                              : ""}
+                                          </span>
+                                        </div>
+                                        <div className={styles.riskItemMeta}>
+                                          <span
+                                            className={styles.riskMeter}
+                                            title={`Уровень риска: ${item.riskLevel}, запас по сроку ${(item.riskRatio * 100).toFixed(0)}%`}
+                                            aria-hidden="true"
+                                          />
+                                          <span title={`Количество: ${item.quantity} шт.`}>
+                                            <span className={styles.riskItemMetaLabel}>
+                                              Кол-во
+                                            </span>
+                                            {item.quantity.toLocaleString("ru-RU")} шт.
+                                          </span>
+                                          <span
+                                            title={`Примерная дата поставки в Москву: ${formatRuDate(item.moscowDate)}`}
+                                          >
+                                            <span className={styles.riskItemMetaLabel}>
+                                              В Москву
+                                            </span>
+                                            {formatRuDate(item.moscowDate)}
+                                          </span>
+                                          <span title={`Лист графика отгрузок: ${item.sheet}`}>
+                                            <span className={styles.riskItemMetaLabel}>
+                                              Лист
+                                            </span>
+                                            {item.sheet}
+                                          </span>
+                                        </div>
+                                      </li>
+                                    ))}
+                                  </ul>
+                                ) : null}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : selectedRiskStage.items.length > 0 ? (
+                        <p className={styles.riskEmptyState}>
+                          {riskItemFilter === "at_risk"
+                            ? "На этой стадии нет позиций под риском."
+                            : riskItemFilter === "on_track"
+                              ? "На этой стадии все позиции под риском — успевающих нет."
+                              : riskItemFilter === "critical"
+                                ? "На этой стадии нет критичных позиций (крайний день / просрочка)."
+                                : "Нет позиций по выбранному фильтру."}
+                        </p>
+                      ) : (
+                        <p className={styles.riskEmptyState}>
+                          На этой стадии сегодня нет срабатываний.
+                        </p>
+                      )}
+                    </div>
+                  ) : null}
                 </div>
-              ) : selectedRiskStage.items.length > 0 ? (
-                <p className={styles.riskEmptyState}>
-                  {riskItemFilter === "at_risk"
-                    ? "На этой стадии нет позиций под риском."
-                    : riskItemFilter === "on_track"
-                      ? "На этой стадии все позиции под риском — успевающих нет."
-                      : riskItemFilter === "critical"
-                        ? "На этой стадии нет критичных позиций (крайний день / просрочка)."
-                        : "Нет позиций по выбранному фильтру."}
-                </p>
-              ) : (
-                <p className={styles.riskEmptyState}>На этой стадии сегодня нет срабатываний.</p>
-              )}
+              </div>
             </div>
-          ) : null}
+          </div>
         </section>
       ) : null}
     </div>

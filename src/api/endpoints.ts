@@ -267,7 +267,39 @@ export const agentsApi = {
     formData.append("file", file);
     return apiClient.post<Agent>(`/agents/${agentId}/icon`, formData).then((r) => r.data);
   },
-  classifyAveonExcel: (files: File[]) => {
+  listAveonTemplates: () =>
+    apiClient
+      .get<{
+        templates: Array<{
+          key: string;
+          role: string;
+          title: string;
+          filename: string;
+          description: string;
+        }>;
+      }>("/agents/document-analysis/templates")
+      .then((r) => r.data.templates ?? []),
+
+  downloadAveonTemplate: (templateKey: string) =>
+    apiClient.get<Blob>(`/agents/document-analysis/templates/${encodeURIComponent(templateKey)}`, {
+      responseType: "blob"
+    }),
+
+  downloadAllAveonTemplatesZip: () =>
+    apiClient.get<Blob>("/agents/document-analysis/templates/all.zip", {
+      responseType: "blob"
+    }),
+
+  /** Показать файл в проводнике Windows (backend: explorer /select). */
+  revealAveonFileInExplorer: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient
+      .post<{ ok: boolean; path: string }>("/agents/document-analysis/reveal-in-explorer", formData)
+      .then((r) => r.data);
+  },
+
+  classifyAveonExcel: (files: File[], options?: { signal?: AbortSignal }) => {
     const formData = new FormData();
     files.forEach((file) => formData.append("files", file));
     return longRunningApiClient
@@ -275,7 +307,8 @@ export const agentsApi = {
         source: string;
         roles: Array<{ filename: string; role: string }>;
       }>("/agents/document-analysis/classify-excel", formData, {
-        timeout: 120000
+        timeout: 60000,
+        signal: options?.signal
       })
       .then((r) => ({
         source: r.data.source,
@@ -332,6 +365,9 @@ export const agentsApi = {
         };
         file_name: string;
         file_base64: string | null;
+        shift_assignment_file_name?: string;
+        shift_assignment_file_base64?: string | null;
+        dashboard_analyzed_at?: string | null;
       }>("/agents/document-analysis/analyze-excel", formData, {
         timeout: 600000
       })
@@ -371,9 +407,72 @@ export const agentsApi = {
           }))
         },
         fileName: r.data.file_name || "result.xlsx",
-        fileBase64: r.data.file_base64
+        fileBase64: r.data.file_base64,
+        shiftAssignmentFileName:
+          r.data.shift_assignment_file_name || "сменное_задание_закупки.xlsx",
+        shiftAssignmentFileBase64: r.data.shift_assignment_file_base64 ?? null,
+        dashboardAnalyzedAt: r.data.dashboard_analyzed_at ?? null
       }));
-  }
+  },
+
+  getAveonDashboardLatest: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        snapshot: {
+          analyzed_at: string;
+          logistics_risks: {
+            as_of: string | null;
+            stages: Array<{
+              key: string;
+              label: string;
+              items: Array<{
+                nomenclature: string;
+                supplier: string | null;
+                quantity: number;
+                moscow_date: string;
+                milestone_date: string;
+                sheet: string;
+                window_start: string;
+                window_end: string;
+                days_remaining: number;
+                risk_ratio: number;
+                risk_level: string;
+              }>;
+            }>;
+          };
+        } | null;
+      }>("/agents/document-analysis/dashboard-latest")
+      .then((r) => {
+        if (!r.data.ok || !r.data.snapshot) return null;
+        const snap = r.data.snapshot;
+        return {
+          analyzedAt: snap.analyzed_at,
+          logisticsRisks: {
+            asOf: snap.logistics_risks?.as_of ?? null,
+            stages: (snap.logistics_risks?.stages ?? []).map((stage) => ({
+              key: stage.key,
+              label: stage.label,
+              items: (stage.items ?? []).map((item) => ({
+                nomenclature: item.nomenclature,
+                supplier: item.supplier,
+                quantity: item.quantity,
+                moscowDate: item.moscow_date,
+                milestoneDate: item.milestone_date,
+                sheet: item.sheet,
+                windowStart: item.window_start ?? "",
+                windowEnd: item.window_end ?? item.milestone_date ?? "",
+                daysRemaining: item.days_remaining ?? 0,
+                riskRatio: item.risk_ratio ?? 0,
+                riskLevel: item.risk_level ?? "critical"
+              }))
+            }))
+          }
+        };
+      }),
+
+  clearAveonDashboardLatest: () =>
+    apiClient.delete<{ ok: boolean; removed: boolean }>("/agents/document-analysis/dashboard-latest").then((r) => r.data)
 };
 export const rolesApi = {
   list: () => apiClient.get<Role[]>("/roles").then((r) => r.data)
