@@ -1556,9 +1556,9 @@ export default function IncomingMail() {
               className={`${styles.secondaryButton} ${viewMode === "table" ? styles.viewModeActive : ""}`}
               onClick={handleToggleViewMode}
               aria-pressed={viewMode === "table"}
-              title="Переключить табличный вид «Таняфикация»"
+              title="Переключить режим «Вид 1С»"
             >
-              Таняфикация
+              Вид 1С
             </button>
             <span className={styles.agentBadge}>
               <Sparkles size={14} strokeWidth={2.2} aria-hidden="true" />
@@ -1657,7 +1657,7 @@ export default function IncomingMail() {
         >
           {viewMode === "table" ? (
             <div className={styles.tableToolbar}>
-              <h2 className={styles.tableToolbarTitle}>Таняфикация</h2>
+              <h2 className={styles.tableToolbarTitle}>Вид 1С</h2>
               <input
                 type="search"
                 className={styles.tableToolbarSearch}
