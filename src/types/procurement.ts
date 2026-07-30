@@ -29,6 +29,53 @@ export interface ProcurementCasePosition {
   cancelled: boolean;
 }
 
+export type MaterialCoverageSource =
+  | "supplier_order"
+  | "transfer_order"
+  | "mixed"
+  | "none";
+
+export interface TransferOrderCoverageDocument {
+  transfer_order_1c_ref?: string | null;
+  transfer_order_number?: string | null;
+  order_date?: string | null;
+  order_status?: string | null;
+  warehouse_from_1c_ref?: string | null;
+  warehouse_to_1c_ref?: string | null;
+  quantity?: string | number | null;
+}
+
+export interface MaterialOrderCoveragePosition {
+  line_id: string;
+  nomenclature_id: string;
+  nomenclature_name?: string | null;
+  characteristic_id?: string | null;
+  requested_quantity: string | number;
+  supplier_ordered_quantity: string | number;
+  transfer_ordered_quantity: string | number;
+  covered_quantity: string | number;
+  remaining_quantity: string | number;
+  coverage_source: MaterialCoverageSource;
+  purchasing: boolean;
+  transferring: boolean;
+  fully_covered: boolean;
+  supplier_orders?: WarehousePickerPosition["supplier_orders"];
+  transfer_orders?: TransferOrderCoverageDocument[];
+}
+
+export interface MaterialOrderCoverage {
+  schema_version: string;
+  coverage_status: "none" | "partial" | "full";
+  covered_positions: number;
+  positions_count: number;
+  checked_at?: string | null;
+  calculated_at?: string | null;
+  summary?: string | null;
+  positions: MaterialOrderCoveragePosition[];
+  transfer_orders?: Array<Record<string, unknown>>;
+  supplier_orders?: Array<Record<string, unknown>>;
+}
+
 export interface ProcurementCaseEvent {
   id: string;
   event_type: string;
@@ -106,7 +153,10 @@ export interface ProcurementCaseSummary {
   required_date?: string | null;
   deadline_at?: string | null;
   positions_count: number;
+  created_at?: string | null;
   updated_at?: string | null;
+  coverage_checked_at?: string | null;
+  last_actualized_at?: string | null;
   summary?: string | null;
   requires_human_review: boolean;
   closed_at?: string | null;
@@ -178,6 +228,8 @@ export interface ProcurementCaseSummary {
   purchase_manager_workspace_archived_at?: string | null;
   purchase_manager_action_at?: string | null;
   purchase_manager_critical_acknowledged_at?: string | null;
+  supplier_coverage_status?: "none" | "partial" | "full" | null;
+  coverage_sources?: MaterialCoverageSource[];
   omto_bucket?: "success" | "attention" | "critical" | null;
   omto_bucket_reason?: string | null;
 }
@@ -223,6 +275,7 @@ export interface WarehousePickerPosition {
   assignment_name?: string | null;
   formulas?: Record<string, string>;
   already_being_purchased?: boolean;
+  already_being_transferred?: boolean;
   supplier_order_numbers?: string[];
   ordered_quantity?: string | number | null;
   supplier_name?: string | null;
@@ -233,6 +286,11 @@ export interface WarehousePickerPosition {
     supplier_name?: string | null;
     arrival_date?: string | null;
   }>;
+  transfer_order_numbers?: string[];
+  transfer_ordered_quantity?: string | number | null;
+  coverage_remaining_quantity?: string | number | null;
+  coverage_source?: MaterialCoverageSource;
+  transfer_orders?: TransferOrderCoverageDocument[];
   excluded_supply?: Array<{
     supply_id?: string;
     source_type?: string;

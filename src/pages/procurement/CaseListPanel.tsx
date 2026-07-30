@@ -1,4 +1,8 @@
 import type { ProcurementCaseSummary } from "@/types/procurement";
+import {
+  effectiveActualizedAt,
+  materialCoverageLabel
+} from "@/utils/materialCoverage";
 import { caseTitle, STATUS_LABELS } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
@@ -113,7 +117,7 @@ export function CaseListPanel({
             showPickerMeta &&
             item.picker_bucket === "success" &&
             workStatus === "completed"
-              ? "Ведется закупка"
+              ? materialCoverageLabel(item.coverage_sources)
               : null;
           const statusText = coverageStatus
             ? coverageStatus
@@ -152,9 +156,23 @@ export function CaseListPanel({
                   </span>
                 </span>
                 <span className={styles.caseFact}>
-                  <span className={styles.caseFactLabel}>Дата</span>
+                  <span className={styles.caseFactLabel}>Документ</span>
                   <span className={styles.caseFactValue}>
                     {formatCaseListDateTime(item.source_date)}
+                  </span>
+                </span>
+                <span className={styles.caseFact}>
+                  <span className={styles.caseFactLabel}>Сформирован</span>
+                  <span className={styles.caseFactValue}>
+                    {formatCaseListDateTime(item.created_at)}
+                  </span>
+                </span>
+                <span className={styles.caseFact}>
+                  <span className={styles.caseFactLabel}>Обновлён</span>
+                  <span className={styles.caseFactValue}>
+                    {formatCaseListDateTime(
+                      effectiveActualizedAt(item)
+                    )}
                   </span>
                 </span>
                 {showDispatcherMeta && item.dispatcher_stream ? (

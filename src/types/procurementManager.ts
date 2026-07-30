@@ -241,7 +241,12 @@ export interface FulfillmentStatusUpdatePayload {
   fulfillment_status: FulfillmentStatus;
   idempotency_key?: string;
 }
-export type CoverageSource = "warehouse" | "supplier" | "mixed" | "none";
+export type CoverageSource =
+  | "warehouse"
+  | "supplier"
+  | "transfer_order"
+  | "mixed"
+  | "none";
 
 export interface UsedSupplierPart {
   supplier_id: string;

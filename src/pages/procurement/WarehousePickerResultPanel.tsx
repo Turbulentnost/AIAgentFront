@@ -14,6 +14,7 @@ import type {
   WarehousePickerPosition
 } from "@/types/procurement";
 import { useWarehousePickerAction } from "@/hooks/useProcurementDashboard";
+import { coverageDocumentNumbers } from "@/utils/materialCoverage";
 import { caseTitle, formatDate, formatDateTime } from "@/utils/procurementDashboard";
 import styles from "../ProcurementAgent.module.css";
 
@@ -62,6 +63,21 @@ function purchasingBadgeText(position: WarehousePickerPosition): string {
   return parts.join(" · ");
 }
 
+function transferBadgeText(position: WarehousePickerPosition): string {
+  const parts = ["Заказ на перемещение"];
+  if (
+    position.transfer_ordered_quantity !== null &&
+    position.transfer_ordered_quantity !== undefined &&
+    position.transfer_ordered_quantity !== ""
+  ) {
+    parts.push(withUnit(position.transfer_ordered_quantity, position.unit));
+  }
+  if (position.transfer_order_numbers?.length) {
+    parts.push(`№ ${position.transfer_order_numbers.join(", ")}`);
+  }
+  return parts.join(" · ");
+}
+
 function formatArrivalDate(value?: string | null): string {
   if (!value) return "—";
   const stamp = value.slice(0, 10);
@@ -84,6 +100,27 @@ function primarySupplierOrder(position: WarehousePickerPosition) {
       position.requested_quantity,
     supplier: first?.supplier_name || position.supplier_name || "—",
     arrival: formatArrivalDate(first?.arrival_date || position.arrival_date)
+  };
+}
+
+function primaryTransferOrder(position: WarehousePickerPosition) {
+  const first = position.transfer_orders?.find(
+    (item) => item.transfer_order_number || item.quantity != null
+  );
+  return {
+    number:
+      first?.transfer_order_number ||
+      position.transfer_order_numbers?.[0] ||
+      "—",
+    quantity:
+      first?.quantity ??
+      position.transfer_ordered_quantity ??
+      position.requested_quantity,
+    route:
+      [first?.warehouse_from_1c_ref, first?.warehouse_to_1c_ref]
+        .filter(Boolean)
+        .join(" → ") || "Межскладское перемещение",
+    date: formatArrivalDate(first?.order_date)
   };
 }
 
@@ -129,10 +166,13 @@ function outputFrom(
   if (!candidate || typeof candidate !== "object") return null;
   const raw = candidate as Record<string, unknown>;
   if (!Array.isArray(raw.positions)) return null;
+  const rawCoverage =
+    detail.case_metadata?.material_order_coverage ||
+    detail.case_metadata?.supplier_order_coverage;
   const coverage =
-    detail.case_metadata?.supplier_order_coverage &&
-    typeof detail.case_metadata.supplier_order_coverage === "object"
-      ? (detail.case_metadata.supplier_order_coverage as Record<string, unknown>)
+    rawCoverage &&
+    typeof rawCoverage === "object"
+      ? (rawCoverage as Record<string, unknown>)
       : null;
   const coveragePositions = Array.isArray(coverage?.positions)
     ? (coverage.positions as Array<Record<string, unknown>>)
@@ -152,6 +192,9 @@ function outputFrom(
     const coverageOrders = Array.isArray(coveragePosition?.supplier_orders)
       ? (coveragePosition.supplier_orders as Array<Record<string, unknown>>)
       : [];
+    const coverageTransfers = Array.isArray(coveragePosition?.transfer_orders)
+      ? (coveragePosition.transfer_orders as Array<Record<string, unknown>>)
+      : [];
     const supplierOrderNumbers = Array.from(new Set([
       ...stringList(
       position.supplier_order_numbers ?? position.linked_supplier_order_numbers
@@ -165,6 +208,26 @@ function outputFrom(
         position.already_in_purchase ??
         coveragePosition?.purchasing ??
         supplierOrderNumbers.length
+    );
+    const transferOrderNumbers = Array.from(
+      new Set([
+        ...stringList(position.transfer_order_numbers),
+        ...coverageTransfers
+          .map((item) => String(item.transfer_order_number || item.number || "").trim())
+          .filter(Boolean)
+      ])
+    );
+    const alreadyBeingTransferred = Boolean(
+      position.already_being_transferred ??
+        coveragePosition?.transferring ??
+        transferOrderNumbers.length
+    );
+    const fullyCovered = Boolean(
+      coveragePosition?.fully_covered ??
+        (numeric(
+          coveragePosition?.remaining_quantity as string | number | null | undefined
+        ) === 0 &&
+          (alreadyBeingPurchased || alreadyBeingTransferred))
     );
     const orderedFromOrders = coverageOrders.reduce(
       (sum, item) => sum + numeric(item.quantity as string | number | null | undefined),
@@ -217,20 +280,28 @@ function outputFrom(
       factual_quantity: pickQty(position, "factual_quantity") ?? 0,
       available_for_issue: pickQty(position, "available_for_issue", "confirmed_available") ?? 0,
       confirmed_available: pickQty(position, "confirmed_available") ?? 0,
-      confirmed_deficit: alreadyBeingPurchased
+      confirmed_deficit: fullyCovered
         ? 0
         : pickQty(position, "confirmed_deficit", "net_requirement") ?? 0,
       quantity_to_issue: pickQty(position, "quantity_to_issue") ?? 0,
-      quantity_to_purchase: alreadyBeingPurchased
+      quantity_to_purchase: fullyCovered
         ? 0
         : pickQty(position, "quantity_to_purchase") ?? 0,
       reserved_other_quantity: pickQty(position, "reserved_other_quantity") ?? 0,
       has_discrepancy: Boolean(position.has_discrepancy),
-      outcome: alreadyBeingPurchased
-        ? "covered_by_supplier_order"
+      outcome: fullyCovered
+        ? alreadyBeingPurchased && alreadyBeingTransferred
+          ? "covered_by_mixed_orders"
+          : alreadyBeingTransferred
+            ? "covered_by_transfer_order"
+            : "covered_by_supplier_order"
         : String(position.outcome || ""),
-      recommendation: alreadyBeingPurchased
-        ? "Ведется закупка по заказу поставщику."
+      recommendation: fullyCovered
+        ? alreadyBeingPurchased && alreadyBeingTransferred
+          ? "Позиция перекрыта заказом поставщику и перемещением."
+          : alreadyBeingTransferred
+            ? "Позиция перекрыта заказом на перемещение."
+            : "Ведется закупка по заказу поставщику."
         : String(position.recommendation || ""),
       warehouse_name: (position.warehouse_name as string | null) || null,
       assignment_name: (position.assignment_name as string | null) || null,
@@ -240,11 +311,36 @@ function outputFrom(
           ? (position.formulas as Record<string, string>)
           : {},
       already_being_purchased: alreadyBeingPurchased,
+      already_being_transferred: alreadyBeingTransferred,
       supplier_order_numbers: supplierOrderNumbers,
       ordered_quantity: orderedQuantity,
       supplier_name: supplierName,
       arrival_date: arrivalDate,
       supplier_orders: supplierOrders,
+      transfer_order_numbers: transferOrderNumbers,
+      transfer_ordered_quantity:
+        pickQty(coveragePosition || {}, "transfer_ordered_quantity") ??
+        pickQty(position, "transfer_ordered_quantity"),
+      coverage_remaining_quantity:
+        pickQty(coveragePosition || {}, "remaining_quantity") ??
+        pickQty(position, "coverage_remaining_quantity"),
+      coverage_source: String(
+        coveragePosition?.coverage_source || position.coverage_source || "none"
+      ) as WarehousePickerPosition["coverage_source"],
+      transfer_orders: coverageTransfers.map((item) => ({
+        transfer_order_1c_ref:
+          String(item.transfer_order_1c_ref || item.ref || "").trim() || null,
+        transfer_order_number:
+          String(item.transfer_order_number || item.number || "").trim() || null,
+        order_date: String(item.order_date || item.date || "").trim() || null,
+        order_status: String(item.order_status || item.status || "").trim() || null,
+        warehouse_from_1c_ref:
+          String(item.warehouse_from_1c_ref || item.warehouseFromRef || "").trim() ||
+          null,
+        warehouse_to_1c_ref:
+          String(item.warehouse_to_1c_ref || item.warehouseToRef || "").trim() || null,
+        quantity: (item.quantity as string | number | null | undefined) ?? null
+      })),
       excluded_supply: Array.isArray(position.excluded_supply)
         ? (position.excluded_supply as WarehousePickerPosition["excluded_supply"])
         : []
@@ -254,16 +350,20 @@ function outputFrom(
     raw.conclusion && typeof raw.conclusion === "object"
       ? (raw.conclusion as Record<string, unknown>)
       : {};
-  const purchasingCount = positions.filter((item) => item.already_being_purchased).length;
+  const coveredByDocumentsCount = positions.filter(
+    (item) =>
+      numeric(item.coverage_remaining_quantity) === 0 &&
+      (item.already_being_purchased || item.already_being_transferred)
+  ).length;
   const coverageSummary =
     coverageStatus === "full"
-      ? `Закупка у ${roleNoun} не требуется: все позиции уже в заказах поставщику.`
-      : coverageStatus === "partial" && purchasingCount
-        ? `Ведется закупка по ${purchasingCount} из ${positions.length} позиций. Непокрытый дефицит остаётся у ${roleNoun}.`
+      ? `Работа ${roleNoun} завершена: все позиции перекрыты закупками и/или перемещениями.`
+      : coverageStatus === "partial" && coveredByDocumentsCount
+        ? `Перекрыто ${coveredByDocumentsCount} из ${positions.length} позиций. Непокрытый дефицит остаётся у ${roleNoun}.`
         : "";
   const coverageNextStep =
     coverageStatus === "full"
-      ? "Контролировать исполнение заказов поставщику."
+      ? "Контролировать исполнение заказов поставщику и перемещений."
       : coverageStatus === "partial"
         ? "Подтвердить только непокрытый дефицит для передачи на закупку."
         : "";
@@ -300,6 +400,8 @@ const OUTCOME_LABELS: Record<string, string> = {
   partial_issue: "Обеспечено частично",
   deficit_confirmed: "Требуется закупка",
   covered_by_supplier_order: "Ведется закупка",
+  covered_by_transfer_order: "Ведется перемещение",
+  covered_by_mixed_orders: "Закупка + перемещение",
   discrepancy_return: "Возврат из-за расхождений",
   fully_available: "Полностью обеспечено",
   clarification_required: "Требуется уточнение"
@@ -316,7 +418,13 @@ const EXCLUSION_LABELS: Record<string, string> = {
 };
 
 function outcomeTone(position: WarehousePickerPosition): "success" | "warning" | "danger" {
-  if (position.already_being_purchased || position.outcome === "covered_by_supplier_order") {
+  if (
+    position.already_being_purchased ||
+    position.already_being_transferred ||
+    position.outcome === "covered_by_supplier_order" ||
+    position.outcome === "covered_by_transfer_order" ||
+    position.outcome === "covered_by_mixed_orders"
+  ) {
     return "success";
   }
   if (position.outcome === "discrepancy_return") return "danger";
@@ -620,8 +728,17 @@ export function WarehousePickerResultPanel({
           <p>Заключение по складскому наличию · {scopeLabel}</p>
         </div>
         <div className={styles.lastCalculation}>
-          <span>Последний расчёт</span>
-          <strong>{formatDateTime(output?.calculated_at)}</strong>
+          <span>Сформирован</span>
+          <strong>{formatDateTime(detail.created_at)}</strong>
+          <span>Последнее обновление</span>
+          <strong>
+            {formatDateTime(
+              detail.last_actualized_at ||
+                detail.coverage_checked_at ||
+                output?.calculated_at ||
+                detail.updated_at
+            )}
+          </strong>
         </div>
       </div>
 
@@ -882,6 +999,11 @@ export function WarehousePickerResultPanel({
                         {purchasingBadgeText(position)}
                       </span>
                     ) : null}
+                    {position.already_being_transferred ? (
+                      <span className={styles.alreadyPurchasingIndicator}>
+                        {transferBadgeText(position)}
+                      </span>
+                    ) : null}
                   </div>
                   <div>
                     <span>Потребность</span>
@@ -970,6 +1092,9 @@ export function WarehousePickerResultPanel({
                 const purchase = position.already_being_purchased
                   ? primarySupplierOrder(position)
                   : null;
+                const transfer = position.already_being_transferred
+                  ? primaryTransferOrder(position)
+                  : null;
                 return (
                   <div className={styles.calculationItem} key={position.line_id}>
                     <button
@@ -988,31 +1113,50 @@ export function WarehousePickerResultPanel({
                           {position.already_being_purchased ? (
                             <em className={styles.alreadyPurchasingIndicator}>Ведется закупка</em>
                           ) : null}
+                          {position.already_being_transferred ? (
+                            <em className={styles.alreadyPurchasingIndicator}>
+                              Ведется перемещение
+                            </em>
+                          ) : null}
                         </span>
                       </span>
                       <span>
                         <strong>{position.assignment_name || "Без назначения"}</strong>
                         <small>{position.warehouse_name || detail.warehouse_name || "Склад кейса"}</small>
                       </span>
-                      {purchase ? (
+                      {purchase || transfer ? (
                         <>
                           <span>
-                            <strong>{purchase.number}</strong>
-                            <small>заказ поставщику</small>
+                            <strong>
+                              {coverageDocumentNumbers(
+                                purchase ? [purchase.number] : [],
+                                transfer ? [transfer.number] : []
+                              )}
+                            </strong>
+                            <small>
+                              {purchase && transfer
+                                ? "заказ поставщику / перемещение"
+                                : purchase
+                                  ? "заказ поставщику"
+                                  : "заказ на перемещение"}
+                            </small>
                           </span>
                           <span>
                             <strong className={styles.metricCovered}>
-                              {withUnit(purchase.quantity, position.unit)}
+                              {withUnit(
+                                numeric(purchase?.quantity) + numeric(transfer?.quantity),
+                                position.unit
+                              )}
                             </strong>
-                            <small>заказано</small>
+                            <small>перекрыто документами</small>
                           </span>
                           <span>
-                            <strong>{purchase.supplier}</strong>
-                            <small>поставщик</small>
+                            <strong>{purchase?.supplier || transfer?.route || "—"}</strong>
+                            <small>{purchase ? "поставщик" : "маршрут перемещения"}</small>
                           </span>
                           <span>
-                            <strong>{purchase.arrival}</strong>
-                            <small>дата прибытия</small>
+                            <strong>{purchase?.arrival || transfer?.date || "—"}</strong>
+                            <small>дата документа / прибытия</small>
                           </span>
                         </>
                       ) : (

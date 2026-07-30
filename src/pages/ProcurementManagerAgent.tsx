@@ -1377,6 +1377,8 @@ type CoverageSourceDisplay = {
 const COVERAGE_SOURCE_LABEL_RU: Record<string, string> = {
   warehouse: "склад",
   supplier: "поставщик",
+  supplier_order: "заказ поставщику",
+  transfer_order: "перемещение",
   mixed: "смешанный",
   none: "нет"
 };
@@ -2631,6 +2633,17 @@ export default function ProcurementManagerAgent() {
                   </small>
                   <small className={styles.requiredDate}>
                     Срок поставки: {formatDate(requiredDate)}
+                  </small>
+                  <small>
+                    Сформирован: {formatDateTime(item.created_at)}
+                  </small>
+                  <small>
+                    Обновлён:{" "}
+                    {formatDateTime(
+                      item.last_actualized_at ||
+                        item.coverage_checked_at ||
+                        item.updated_at
+                    )}
                   </small>
                   {item.summary ? <small>{item.summary}</small> : null}
                 </button>
