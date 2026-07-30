@@ -1202,6 +1202,41 @@ function averageRating(supplier: Supplier): number | null {
   return Math.round((parts.reduce((sum, value) => sum + value, 0) / parts.length) * 100) / 100;
 }
 
+
+function cleanSupplierSearchQuery(raw: string | null | undefined): string {
+  let value = String(raw || "").trim();
+  if (!value) return "";
+  // Drop trailing stock markers: (P), (M), and Cyrillic equivalents.
+  value = value
+    .replace(/\s*[(\uFF08]\s*[PpMm\u041F\u043F\u041C\u043C]\s*[)\uFF09]\s*$/u, "")
+    .trim();
+  value = value
+    .replace(/\s+/g, " ")
+    .replace(/^[\-\u00B7,;\s]+|[\-\u00B7,;\s]+$/g, "");
+  if (value.length > 90) value = value.slice(0, 90).trim();
+  return value;
+}
+
+function supplierMetricChips(supplier: Supplier): string[] {
+  const chips: string[] = [];
+  if (supplier.city) chips.push(supplier.city);
+  const rating = supplier.rating ?? averageRating(supplier);
+  if (rating != null && Number(rating) > 0) {
+    chips.push("оценка " + String(rating));
+  }
+  const cost = supplier.approx_cost ?? supplier.unit_price;
+  if (cost != null && Number(cost) > 0) {
+    chips.push(Number(cost).toLocaleString("ru-RU") + " ₽");
+  }
+  const quality = Number(supplier.quality_rating);
+  const delivery = Number(supplier.delivery_rating);
+  const commercial = Number(supplier.commercial_rating);
+  if (quality > 0) chips.push("качество " + String(quality));
+  if (delivery > 0) chips.push("доставка " + String(delivery));
+  if (commercial > 0) chips.push("коммерч. " + String(commercial));
+  return chips;
+}
+
 /** Host without www for web supplier cards (chipdip.ru). */
 function hostnameFromUrl(url: string | null | undefined): string | null {
   const raw = (url || "").trim();
@@ -1374,9 +1409,35 @@ type CoverageSourceDisplay = {
   supplier_parts?: UsedSupplierPart[] | null;
 };
 
+
+function caseMatchesSearch(
+  item: ProcurementManagerCaseSummary,
+  query: string
+): boolean {
+  const q = query.trim().toLowerCase();
+  if (!q) return true;
+  const haystacks = [
+    item.search_text,
+    item.source_number,
+    item.summary,
+    ...(item.nomenclature_names ?? []),
+    ...(item.nomenclature_ids ?? []),
+    ...(item.supplier_order_numbers ?? []),
+    ...((item.supplier_orders ?? []).map((order) => order.supplier_order_number || "")),
+    ...((item.order_coverage?.lines ?? []).flatMap((line) => [
+      line.nomenclature_name || "",
+      line.nomenclature_id || ""
+    ]))
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+  return haystacks.includes(q);
+}
+
 const COVERAGE_SOURCE_LABEL_RU: Record<string, string> = {
   warehouse: "склад",
-  supplier: "поставщик",
+  supplier: "заказ поставщику",
   supplier_order: "заказ поставщику",
   transfer_order: "перемещение",
   mixed: "смешанный",
@@ -1578,6 +1639,10 @@ export default function ProcurementManagerAgent() {
   >({});
   /** Case id whose force_web search is in flight (UI loading/thoughts are scoped to this). */
   const [searchingCaseId, setSearchingCaseId] = useState<string | null>(null);
+  /** When set, only this nomenclature key is being searched (per-position search). */
+  const [searchingNomenclatureKey, setSearchingNomenclatureKey] = useState<string | null>(
+    null
+  );
   /** Idempotency/operation id for polling real Qwen progress while search runs. */
   const [searchOperationId, setSearchOperationId] = useState<string | null>(null);
   /** Soft deadline fired while HTTP may still hang on a stuck browser/Qwen cancel. */
@@ -1592,6 +1657,7 @@ export default function ProcurementManagerAgent() {
   const [syncNotice, setSyncNotice] = useState<string | null>(null);
   const [showAllPositions, setShowAllPositions] = useState(false);
   const [queueView, setQueueView] = useState<"all" | FulfillmentStatus>("all");
+  const [queueSearch, setQueueSearch] = useState("");
   const [scheduleEdit, setScheduleEdit] = useState<{
     lineId: string;
     leadDays: string;
@@ -1618,10 +1684,14 @@ export default function ProcurementManagerAgent() {
   const cases = useMemo(() => {
     return allCases.filter((item) => {
       const status = deriveFulfillment(item).status;
-      if (queueView === "all") return status !== "completed";
-      return status === queueView;
+      if (queueView === "all") {
+        if (status === "completed") return false;
+      } else if (status !== queueView) {
+        return false;
+      }
+      return caseMatchesSearch(item, queueSearch);
     });
-  }, [allCases, queueView]);
+  }, [allCases, queueSearch, queueView]);
 
   const queueCounts = useMemo(() => {
     const counts: Record<string, number> = { all: 0 };
@@ -1703,6 +1773,194 @@ export default function ProcurementManagerAgent() {
 
   const searchInfo = caseId ? searchInfoByCase[caseId] ?? null : null;
   const searchPendingForCase = Boolean(caseId && searchingCaseId === caseId);
+
+  const startManualSupplierSearch = (
+    targets?: Array<{
+      nomenclature_id?: string | null;
+      nomenclature_name?: string | null;
+      query?: string | null;
+    }>
+  ) => {
+    if (!caseId) {
+      setActionNotice("Выберите заказ слева, затем найдите поставщиков.");
+      return;
+    }
+    try {
+      if (searchAbortRef.current) {
+        searchAbortRef.current.abort();
+        searchAbortRef.current = null;
+      }
+      const abort = new AbortController();
+      searchAbortRef.current = abort;
+      searchRequestCaseRef.current = caseId;
+      setSearchingCaseId(caseId);
+      setSearchStalled(false);
+      const operationKey = key(
+        targets?.length === 1
+          ? `supplier-search-nom-${targets[0].nomenclature_id || targets[0].nomenclature_name || "one"}`
+          : "supplier-search-manual"
+      );
+      setSearchOperationId(operationKey);
+      const budgetSeconds = clampSearchTimerSeconds(searchTimerSeconds);
+      searchTimerExpiredRef.current = false;
+      const cleanedTargets = (targets || [])
+        .map((item) => {
+          const name = String(item.nomenclature_name || "").trim();
+          const id = String(item.nomenclature_id || "").trim();
+          const query =
+            cleanSupplierSearchQuery(item.query || name) || name || id;
+          if (!query) return null;
+          return {
+            nomenclature_id: id || null,
+            nomenclature_name: name || query,
+            query
+          };
+        })
+        .filter(Boolean) as Array<{
+        nomenclature_id?: string | null;
+        nomenclature_name?: string | null;
+        query: string;
+      }>;
+      const scopeLabel =
+        cleanedTargets.length === 1
+          ? cleanedTargets[0].nomenclature_name || cleanedTargets[0].query
+          : cleanedTargets.length > 1
+            ? `${cleanedTargets.length} номенклатур`
+            : "все позиции заказа";
+      setSearchingNomenclatureKey(
+        cleanedTargets.length === 1
+          ? cleanedTargets[0].nomenclature_name || cleanedTargets[0].query
+          : null
+      );
+      setActionNotice(
+        `Веб-поиск: ${scopeLabel} · лимит ${formatSearchTimer(budgetSeconds)}`
+      );
+      const requestedCaseId = caseId;
+      searchSuppliers.mutate(
+        {
+          caseId: requestedCaseId,
+          payload: {
+            idempotency_key: operationKey,
+            allow_web_fallback: true,
+            force_web: true,
+            mode: "manual_web",
+            timeout_seconds: budgetSeconds,
+            limit: cleanedTargets.length === 1 ? 12 : 8,
+            ...(cleanedTargets.length ? { nomenclatures: cleanedTargets } : {})
+          },
+          signal: abort.signal
+        },
+        {
+          onSuccess: (result: SupplierSearchResult) => {
+            if (abort.signal.aborted || searchAbortRef.current !== abort) {
+              return;
+            }
+            setSearchInfoByCase((prev) => {
+              const previous = prev[requestedCaseId];
+              let nextNomResults = result.nomenclature_results ?? [];
+              if (
+                cleanedTargets.length === 1 &&
+                previous?.nomenclatureResults?.length
+              ) {
+                const targetKey = (
+                  cleanedTargets[0].nomenclature_id ||
+                  cleanedTargets[0].nomenclature_name ||
+                  cleanedTargets[0].query
+                ).toLowerCase();
+                const merged = [...previous.nomenclatureResults];
+                const incoming = nextNomResults[0];
+                if (incoming) {
+                  const idx = merged.findIndex((row) => {
+                    const rowKey = (
+                      row.nomenclature_id ||
+                      row.nomenclature_name ||
+                      row.query ||
+                      ""
+                    ).toLowerCase();
+                    return (
+                      rowKey === targetKey ||
+                      rowKey.includes(targetKey) ||
+                      targetKey.includes(rowKey)
+                    );
+                  });
+                  if (idx >= 0) merged[idx] = incoming;
+                  else merged.push(incoming);
+                  nextNomResults = merged;
+                }
+              }
+              return {
+                ...prev,
+                [requestedCaseId]: {
+                  query: result.query,
+                  sources: result.sources_used,
+                  web: result.web_fallback_used,
+                  nomenclatureResults: nextNomResults
+                }
+              };
+            });
+            if (caseIdRef.current !== requestedCaseId) return;
+            if (result.status === "failed" || result.message) {
+              setActionNotice(
+                result.message ||
+                  "Веб-поиск не вернул поставщиков. Проверьте браузер (Edge/Chrome)."
+              );
+            } else if (
+              !(result.suppliers?.length || result.nomenclature_results?.length)
+            ) {
+              setActionNotice("Веб-поиск завершён без результатов по номенклатуре.");
+            } else {
+              const count =
+                result.nomenclature_results?.reduce(
+                  (sum, row) => sum + (row.suppliers?.length || 0),
+                  0
+                ) ??
+                result.suppliers?.length ??
+                0;
+              setActionNotice(
+                `Найдено карточек: ${count}` +
+                  (result.nomenclature_results?.length
+                    ? ` · позиций: ${result.nomenclature_results.length}`
+                    : "")
+              );
+            }
+          },
+          onError: (err) => {
+            if (isRequestAborted(err)) {
+              if (searchTimerExpiredRef.current) return;
+              setActionNotice("Поиск остановлен (запрос отменён).");
+              return;
+            }
+            if (caseIdRef.current !== requestedCaseId) return;
+            setActionNotice(
+              mutationError([{ error: err }]) || "Ошибка веб-поиска поставщиков"
+            );
+          },
+          onSettled: () => {
+            if (searchAbortRef.current !== abort) return;
+            searchAbortRef.current = null;
+            setSearchingCaseId((current) =>
+              current === requestedCaseId ? null : current
+            );
+            setSearchingNomenclatureKey(null);
+            setSearchOperationId((current) =>
+              current === operationKey ? null : current
+            );
+            if (searchRequestCaseRef.current === requestedCaseId) {
+              searchRequestCaseRef.current = null;
+            }
+          }
+        }
+      );
+    } catch (err) {
+      setSearchingCaseId(null);
+      setSearchingNomenclatureKey(null);
+      setActionNotice(
+        err instanceof Error ? err.message : "Сбой обработчика «Найти поставщиков»"
+      );
+    }
+  };
+
+
 
   useEffect(() => {
     if (!searchPendingForCase) {
@@ -1838,6 +2096,57 @@ export default function ProcurementManagerAgent() {
     }
     return ordered;
   }, [nomenclatureResultsRaw, positions]);
+
+  const nomenclatureBrowseRows = useMemo(() => {
+    type Row = {
+      key: string;
+      nomenclature_id?: string | null;
+      nomenclature_name?: string | null;
+      query: string;
+      suppliers: Supplier[];
+      sources_used: string[];
+      web_fallback_used: boolean;
+      hasResults: boolean;
+    };
+    const byKey = new Map<string, Row>();
+    for (const row of nomenclatureResults) {
+      const key = String(
+        row.nomenclature_id || row.nomenclature_name || row.query || ""
+      ).trim();
+      if (!key) continue;
+      byKey.set(key.toLowerCase(), {
+        key,
+        nomenclature_id: row.nomenclature_id,
+        nomenclature_name: row.nomenclature_name,
+        query: row.query || cleanSupplierSearchQuery(row.nomenclature_name) || key,
+        suppliers: row.suppliers || [],
+        sources_used: row.sources_used || [],
+        web_fallback_used: Boolean(row.web_fallback_used),
+        hasResults: true
+      });
+    }
+    for (const position of positions) {
+      const name = String(position.nomenclature_name || "").trim();
+      const id = String(position.nomenclature_id || "").trim();
+      const key = id || name;
+      if (!key) continue;
+      const norm = key.toLowerCase();
+      if (byKey.has(norm)) continue;
+      byKey.set(norm, {
+        key,
+        nomenclature_id: id || null,
+        nomenclature_name: name || id,
+        query: cleanSupplierSearchQuery(name) || name || id,
+        suppliers: [],
+        sources_used: [],
+        web_fallback_used: false,
+        hasResults: false
+      });
+    }
+    return Array.from(byKey.values());
+  }, [nomenclatureResults, positions]);
+
+
   const searchThoughtQuery = useMemo(
     () => supplierSearchQueryLabel(positions),
     [positions]
@@ -2576,6 +2885,16 @@ export default function ProcurementManagerAgent() {
               <RefreshCw size={15} />
             </button>
           </div>
+          <div className={styles.queueSearch}>
+            <Search size={15} />
+            <input
+              aria-label="Поиск по номенклатуре, заказу материалов или ЗП"
+              onChange={(event) => setQueueSearch(event.target.value)}
+              placeholder="Номенклатура, НП..., ЗП..."
+              type="search"
+              value={queueSearch}
+            />
+          </div>
           <div className={styles.queueTabs} role="tablist" aria-label="Статусы заказов">
             {QUEUE_FILTERS.map((filter) => (
               <button
@@ -2646,6 +2965,18 @@ export default function ProcurementManagerAgent() {
                     )}
                   </small>
                   {item.summary ? <small>{item.summary}</small> : null}
+                  {(item.supplier_order_numbers?.length ||
+                    item.supplier_orders?.length) ? (
+                    <small className={styles.muted}>
+                      ЗП: {(
+                        item.supplier_order_numbers?.length
+                          ? item.supplier_order_numbers
+                          : (item.supplier_orders ?? [])
+                              .map((order) => order.supplier_order_number)
+                              .filter(Boolean)
+                      ).join(", ")}
+                    </small>
+                  ) : null}
                 </button>
               );
             })}
@@ -3246,9 +3577,14 @@ export default function ProcurementManagerAgent() {
           <div className={styles.empty}>Выберите заказ, чтобы работать с действиями.</div>
         ) : (
           <>
-            <div className={styles.card}>
-              <div className={styles.row}>
-                <strong>Агент поиска / оценки / заказа</strong>
+            <div className={styles.agentPanel}>
+              <div className={styles.agentPanelHeader}>
+                <div>
+                  <strong>Агент поиска и заказа</strong>
+                  <p className={styles.muted}>
+                    Поиск поставщиков, оценка КП и оформление заказа по выбранному кейсу
+                  </p>
+                </div>
                 <span className={styles.badge}>
                   {agentStageLabel(
                     agentStatus?.stage || workspace.agent_stage,
@@ -3256,21 +3592,29 @@ export default function ProcurementManagerAgent() {
                   )}
                 </span>
               </div>
-              <p>
-                Статус:{" "}
-                {agentStatusLabel(
-                  agentStatus?.status || workspace.lifecycle_state,
-                  "—"
-                )}{" "}
-                · кандидаты: {agentStatus?.candidates_count ?? suppliers.length} ·
-                согласование:{" "}
-                {agentStatus?.paused_for_human || workspace.paused_for_human
-                  ? interruptLabel(agentStatus?.interrupt_type, "ожидает")
-                  : "нет"}
-              </p>
+              <div className={styles.agentMetaRow}>
+                <span className={styles.agentMetaChip}>
+                  {agentStatusLabel(
+                    agentStatus?.status || workspace.lifecycle_state,
+                    "ожидание"
+                  )}
+                </span>
+                <span className={styles.agentMetaChip}>
+                  кандидаты: {agentStatus?.candidates_count ?? suppliers.length}
+                </span>
+                <span className={styles.agentMetaChip}>
+                  согласование:{" "}
+                  {agentStatus?.paused_for_human || workspace.paused_for_human
+                    ? interruptLabel(agentStatus?.interrupt_type, "ожидает")
+                    : "нет"}
+                </span>
+                {(agentStatus?.comparison || comparison) ? (
+                  <span className={styles.agentMetaChip}>Сравнение КП: готово</span>
+                ) : null}
+              </div>
               {topSuppliersPreview.length ? (
-                <p>
-                  Оптимизация топ-3:{" "}
+                <p className={styles.agentTopLine}>
+                  Топ-3:{" "}
                   {topSuppliersPreview
                     .map((offer) => {
                       const rank =
@@ -3288,29 +3632,6 @@ export default function ProcurementManagerAgent() {
                     .join(" · ")}
                 </p>
               ) : null}
-              {(agentStatus?.comparison || comparison) && (
-                <p>
-                  Сравнение КП:{" "}
-                  {(agentStatus?.comparison || comparison)?.recommended_quote_id ||
-                    "готово"}
-                </p>
-              )}
-              {(agentStatus?.rfq_draft || workspace.rfq_drafts?.[0]) && (
-                <p>
-                  ЗКП:{" "}
-                  {agentStatus?.rfq_draft?.subject ||
-                    workspace.rfq_drafts?.[0]?.subject ||
-                    "черновик"}
-                </p>
-              )}
-              {(agentStatus?.purchase_order_draft || poDrafts[0]) && (
-                <p>
-                  Заказ:{" "}
-                  {agentStatus?.purchase_order_draft?.subject ||
-                    poDrafts[0]?.subject ||
-                    "черновик"}
-                </p>
-              )}
               <div className={styles.agentControls}>
                 <div className={styles.actions}>
                   <button
@@ -3400,6 +3721,7 @@ export default function ProcurementManagerAgent() {
                       searchAbortRef.current = null;
                     }
                     setSearchingCaseId(null);
+                    setSearchingNomenclatureKey(null);
                     setSearchOperationId(null);
                     searchRequestCaseRef.current = null;
                     setSearchStalled(false);
@@ -3414,7 +3736,9 @@ export default function ProcurementManagerAgent() {
                   <Loader2 className={styles.spin} size={15} />
                   {runAgent.isPending
                     ? "Агент выполняется… не закрывайте страницу."
-                    : "Веб-поиск поставщиков выполняется…"}
+                    : searchingNomenclatureKey
+                      ? `Поиск по номенклатуре «${searchingNomenclatureKey}»…`
+                      : "Веб-поиск поставщиков выполняется…"}
                 </div>
               ) : null}
               {actionNotice ? <div className={styles.notice}>{actionNotice}</div> : null}
@@ -3441,127 +3765,36 @@ export default function ProcurementManagerAgent() {
             {tab === "suppliers" ? (
               <>
                 <div className={styles.searchControls}>
-                  <button
-                    className={styles.primary}
-                    disabled={searchPendingForCase || !caseId}
-                    onClick={() => {
-                      if (!caseId) {
-                        setActionNotice("Выберите заказ слева, затем найдите поставщиков.");
-                        return;
+                  <div className={styles.searchControlsCopy}>
+                    <strong>Поставщики по номенклатуре</strong>
+                    <p className={styles.muted}>
+                      Ищите отдельно по каждой позиции — так быстрее и точнее, чем по всему заказу сразу.
+                    </p>
+                  </div>
+                  <div className={styles.actions}>
+                    <button
+                      className={styles.secondary}
+                      disabled={searchPendingForCase || !caseId || !nomenclatureBrowseRows.length}
+                      onClick={() =>
+                        startManualSupplierSearch(
+                          nomenclatureBrowseRows.map((row) => ({
+                            nomenclature_id: row.nomenclature_id,
+                            nomenclature_name: row.nomenclature_name,
+                            query: row.query
+                          }))
+                        )
                       }
-                      try {
-                        if (searchAbortRef.current) {
-                          searchAbortRef.current.abort();
-                          searchAbortRef.current = null;
-                        }
-                        const abort = new AbortController();
-                        searchAbortRef.current = abort;
-                        searchRequestCaseRef.current = caseId;
-                        setSearchingCaseId(caseId);
-                        setSearchStalled(false);
-                        const operationKey = key("supplier-search-manual");
-                        setSearchOperationId(operationKey);
-                        const budgetSeconds = clampSearchTimerSeconds(searchTimerSeconds);
-                        searchTimerExpiredRef.current = false;
-                        setActionNotice(
-                          `Веб-поиск поставщиков… лимит ${formatSearchTimer(budgetSeconds)} (до 3 страниц, SERP + Qwen).`
-                        );
-                        const requestedCaseId = caseId;
-                        searchSuppliers.mutate(
-                          {
-                            caseId: requestedCaseId,
-                            payload: {
-                              idempotency_key: operationKey,
-                              allow_web_fallback: true,
-                              force_web: true,
-                              mode: "manual_web",
-                              timeout_seconds: budgetSeconds
-                            },
-                            signal: abort.signal
-                          },
-                          {
-                            onSuccess: (result: SupplierSearchResult) => {
-                              // Ignore aborted / superseded responses (case switch or newer search).
-                              if (abort.signal.aborted || searchAbortRef.current !== abort) {
-                                return;
-                              }
-                              setSearchInfoByCase((prev) => ({
-                                ...prev,
-                                [requestedCaseId]: {
-                                  query: result.query,
-                                  sources: result.sources_used,
-                                  web: result.web_fallback_used,
-                                  nomenclatureResults: result.nomenclature_results ?? []
-                                }
-                              }));
-                              if (caseIdRef.current !== requestedCaseId) return;
-                              if (result.status === "failed" || result.message) {
-                                setActionNotice(
-                                  result.message ||
-                                    "Веб-поиск не вернул поставщиков. Проверьте браузер (Edge/Chrome)."
-                                );
-                              } else if (
-                                !(result.suppliers?.length || result.nomenclature_results?.length)
-                              ) {
-                                setActionNotice(
-                                  "Веб-поиск завершён без результатов по номенклатуре."
-                                );
-                              } else {
-                                setActionNotice(
-                                  `Найдено поставщиков: ${result.suppliers?.length ?? 0}` +
-                                    (result.nomenclature_results?.length
-                                      ? ` · позиций: ${result.nomenclature_results.length}`
-                                      : "")
-                                );
-                              }
-                            },
-                            onError: (err) => {
-                              if (isRequestAborted(err)) {
-                                if (searchTimerExpiredRef.current) return;
-                                setActionNotice("Поиск остановлен (запрос отменён).");
-                                return;
-                              }
-                              if (caseIdRef.current !== requestedCaseId) return;
-                              setActionNotice(
-                                mutationError([{ error: err }]) ||
-                                  "Ошибка веб-поиска поставщиков"
-                              );
-                            },
-                            onSettled: () => {
-                              // Only the active request may clear loading; a superseded
-                              // search must not stop the newer one for the same case.
-                              if (searchAbortRef.current !== abort) return;
-                              searchAbortRef.current = null;
-                              setSearchingCaseId((current) =>
-                                current === requestedCaseId ? null : current
-                              );
-                              setSearchOperationId((current) =>
-                                current === operationKey ? null : current
-                              );
-                              if (searchRequestCaseRef.current === requestedCaseId) {
-                                searchRequestCaseRef.current = null;
-                              }
-                            }
-                          }
-                        );
-                      } catch (err) {
-                        setSearchingCaseId(null);
-                        setActionNotice(
-                          err instanceof Error
-                            ? err.message
-                            : "Сбой обработчика «Найти поставщиков»"
-                        );
-                      }
-                    }}
-                    type="button"
-                  >
-                    {searchPendingForCase ? (
-                      <Loader2 className={styles.spin} size={15} />
-                    ) : (
-                      <Search size={15} />
-                    )}{" "}
-                    Найти поставщиков
-                  </button>
+                      type="button"
+                      title="Запустит веб-поиск по всем позициям кейса"
+                    >
+                      {searchPendingForCase && !searchingNomenclatureKey ? (
+                        <Loader2 className={styles.spin} size={15} />
+                      ) : (
+                        <Search size={15} />
+                      )}{" "}
+                      Найти по всем
+                    </button>
+                  </div>
                 </div>
                 <SupplierSearchThoughts
                   key={`${caseId}:${searchOperationId ?? "idle"}`}
@@ -3610,14 +3843,14 @@ export default function ProcurementManagerAgent() {
                 ) : null}
                 {!suppliersQuery.isPending &&
                 !suppliersQuery.isError &&
-                !nomenclatureResults.length &&
+                !nomenclatureBrowseRows.length &&
                 !suppliers.length &&
                 !searchPendingForCase ? (
-                  <div className={styles.empty}>Кандидаты не найдены.</div>
+                  <div className={styles.empty}>В заказе нет позиций для поиска.</div>
                 ) : null}
-                {nomenclatureResults.length ? (
+                {nomenclatureBrowseRows.length ? (
                   <div className={styles.nomenclatureStack}>
-                    {nomenclatureResults.map((nom, nomIndex) => {
+                    {nomenclatureBrowseRows.map((nom, nomIndex) => {
                       const title =
                         nom.nomenclature_name ||
                         nom.nomenclature_id ||
@@ -3627,117 +3860,136 @@ export default function ProcurementManagerAgent() {
                         nom.nomenclature_name ||
                         nom.query ||
                         String(nomIndex);
-                      const queryLabel = (nom.query || "").trim();
+                      const queryLabel = cleanSupplierSearchQuery(nom.query || title);
                       const showQuery =
                         Boolean(queryLabel) &&
                         queryLabel.toLowerCase() !== String(title || "").trim().toLowerCase();
+                      const searchingThis =
+                        searchPendingForCase &&
+                        searchingNomenclatureKey != null &&
+                        (searchingNomenclatureKey.toLowerCase() ===
+                          String(title || "").toLowerCase() ||
+                          searchingNomenclatureKey.toLowerCase() ===
+                            queryLabel.toLowerCase());
+                      const webSuppliers = (nom.suppliers || []).filter(
+                        (item) => item.source === "web"
+                      );
+                      const otherSuppliers = (nom.suppliers || []).filter(
+                        (item) => item.source !== "web"
+                      );
+                      const visibleSuppliers = webSuppliers.length
+                        ? webSuppliers
+                        : otherSuppliers;
                       return (
                         <section
                           className={styles.nomenclatureCard}
                           key={`${nomIndex}:${nomKey}`}
                         >
                           <div className={styles.nomenclatureHeader}>
-                            <div>
+                            <div className={styles.nomenclatureTitleBlock}>
                               <h4>{title}</h4>
                               {showQuery ? (
                                 <p className={styles.nomenclatureQuery}>
                                   Запрос: {queryLabel}
                                 </p>
                               ) : null}
+                              <p className={styles.nomenclatureStats}>
+                                {(nom.sources_used || [])
+                                  .map(sourceBadgeLabel)
+                                  .join(", ") ||
+                                  (nom.hasResults
+                                    ? "источники не указаны"
+                                    : "поиск ещё не запускался")}
+                                {visibleSuppliers.length
+                                  ? ` · найдено: ${visibleSuppliers.length}`
+                                  : ""}
+                              </p>
                             </div>
-                            <span className={styles.badge}>
-                              {(nom.sources_used || [])
-                                .map(sourceBadgeLabel)
-                                .join(", ") || "нет источников"}
-                              {nom.web_fallback_used &&
-                              !(nom.sources_used || []).includes("web")
-                                ? " · веб"
-                                : ""}
-                            </span>
+                            <button
+                              className={styles.primary}
+                              disabled={searchPendingForCase || !caseId}
+                              onClick={() =>
+                                startManualSupplierSearch([
+                                  {
+                                    nomenclature_id: nom.nomenclature_id,
+                                    nomenclature_name: nom.nomenclature_name || title,
+                                    query: queryLabel || title
+                                  }
+                                ])
+                              }
+                              type="button"
+                            >
+                              {searchingThis ? (
+                                <Loader2 className={styles.spin} size={15} />
+                              ) : (
+                                <Search size={15} />
+                              )}{" "}
+                              {nom.hasResults ? "Искать снова" : "Найти поставщиков"}
+                            </button>
                           </div>
-                          {(() => {
-                            // Manual «Найти поставщиков»: show only live web cards.
-                            const webSuppliers = (nom.suppliers || []).filter(
-                              (item) => item.source === "web"
-                            );
-                            if (!webSuppliers.length) {
-                              return (
-                                <div className={styles.empty}>
-                                  Веб-поставщики по этой позиции не найдены.
-                                </div>
-                              );
-                            }
-                            return (
+                          {searchingThis ? (
+                            <div className={styles.notice} role="status">
+                              <Loader2 className={styles.spin} size={15} /> Идёт поиск по этой
+                              номенклатуре…
+                            </div>
+                          ) : null}
+                          {!visibleSuppliers.length ? (
+                            <div className={styles.empty}>
+                              {nom.hasResults
+                                ? "По этой позиции поставщики не найдены."
+                                : "Нажмите «Найти поставщиков», чтобы запустить веб-поиск только для этой позиции."}
+                            </div>
+                          ) : (
                             <div className={styles.supplierGrid}>
-                              {webSuppliers.map((supplier) => {
+                              {visibleSuppliers.map((supplier) => {
                                 const link =
                                   supplier.url ||
                                   supplier.contacts?.website ||
                                   null;
-                                const cost =
-                                  supplier.approx_cost ?? supplier.unit_price ?? null;
-                                const rating =
-                                  supplier.rating ??
-                                  averageRating(supplier) ??
-                                  null;
+                                const host = hostnameFromUrl(link);
+                                const chips = supplierMetricChips(supplier);
                                 return (
-                                  <div
-                                    className={`${styles.card} ${
+                                  <article
+                                    className={`${styles.supplierCard} ${
                                       selectedSupplierIds.includes(supplier.supplier_id)
                                         ? styles.cardSelected
                                         : ""
                                     }`}
                                     key={`${nomKey}:${supplier.supplier_id}`}
                                   >
-                                    <div className={styles.row}>
+                                    <div className={styles.supplierCardTop}>
                                       <strong>{supplierDisplayName(supplier)}</strong>
                                       <span className={styles.badge}>
                                         {sourceBadgeLabel(supplier.source)}
                                       </span>
-                                      {supplier.abc_class ? (
-                                        <span
-                                          className={`${styles.badge} ${
-                                            supplier.abc_class === "A"
-                                              ? styles.badgeAbcA
-                                              : supplier.abc_class === "B"
-                                                ? styles.badgeAbcB
-                                                : styles.badgeAbcC
-                                          }`}
-                                          title="ABC-класс по объёму закупок за 12 мес."
-                                        >
-                                          ABC {supplier.abc_class}
-                                        </span>
-                                      ) : null}
                                     </div>
                                     {link ? (
-                                      <p>
-                                        <a
-                                          className={styles.supplierLink}
-                                          href={link}
-                                          rel="noopener noreferrer"
-                                          target="_blank"
-                                        >
-                                          ссылка
-                                        </a>
-                                      </p>
+                                      <a
+                                        className={styles.supplierLink}
+                                        href={link}
+                                        rel="noopener noreferrer"
+                                        target="_blank"
+                                      >
+                                        {host || "открыть сайт"}
+                                      </a>
                                     ) : (
-                                      <p className={styles.muted}>Ссылка не указана</p>
+                                      <span className={styles.muted}>Ссылка не указана</span>
                                     )}
-                                    <p>
-                                      Город: {supplier.city || "—"} · оценка:{" "}
-                                      {rating != null ? String(rating) : "—"} · примерная
-                                      стоимость:{" "}
-                                      {cost != null
-                                        ? `${Number(cost).toLocaleString("ru-RU")} ₽`
-                                        : "—"}
-                                    </p>
-                                    <p className={styles.muted}>
-                                      Качество {supplier.quality_rating} · доставка{" "}
-                                      {supplier.delivery_rating} · коммерческий{" "}
-                                      {supplier.commercial_rating}
-                                    </p>
+                                    {chips.length ? (
+                                      <div className={styles.supplierChipRow}>
+                                        {chips.map((chip) => (
+                                          <span className={styles.supplierChip} key={chip}>
+                                            {chip}
+                                          </span>
+                                        ))}
+                                      </div>
+                                    ) : (
+                                      <p className={styles.muted}>
+                                        Город, оценка и цена пока не извлечены — откройте ссылку.
+                                      </p>
+                                    )}
                                     <div className={styles.actions}>
-                                      <label>
+                                      <label className={styles.supplierCheck}>
                                         <input
                                           checked={selectedSupplierIds.includes(
                                             supplier.supplier_id
@@ -3756,15 +4008,14 @@ export default function ProcurementManagerAgent() {
                                         }
                                         type="button"
                                       >
-                                        Согласовать выбор
+                                        Согласовать
                                       </button>
                                     </div>
-                                  </div>
+                                  </article>
                                 );
                               })}
                             </div>
-                            );
-                          })()}
+                          )}
                         </section>
                       );
                     })}

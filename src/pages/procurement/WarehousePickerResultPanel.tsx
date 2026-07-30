@@ -781,8 +781,16 @@ export function WarehousePickerResultPanel({
             <AlertTriangle size={16} />
           )}
           <div>
-            <strong>{output.summary}</strong>
-            <span>{output.recommended_next_step}</span>
+            <strong>
+              {isArchived && detail.picker_bucket_reason
+                ? detail.picker_bucket_reason
+                : output.summary}
+            </strong>
+            <span>
+              {isArchived
+                ? "Складская роль закрыта после журнала предъявления ТМЦ и передачи ОТК."
+                : output.recommended_next_step}
+            </span>
           </div>
         </div>
       )}

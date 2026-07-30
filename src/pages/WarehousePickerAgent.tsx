@@ -44,7 +44,7 @@ const BUCKETS: Array<{
   {
     id: "success",
     label: "Успешные",
-    description: "Наличие подтверждено, кейс передан в ОМТО",
+    description: "Позиции перекрыты — контроль закупок и перемещений",
     icon: CheckCircle2
   },
   {
@@ -404,7 +404,7 @@ export function WarehouseAvailabilityWorkspace({
             cases={bucketCases}
             emptyText={
               activeView === "archive"
-                ? "Архивных кейсов нет."
+                ? "В архиве нет кейсов, переданных ОТК по журналу ТМЦ."
                 : "В выбранном разделе кейсов нет."
             }
             onSelect={selectCase}

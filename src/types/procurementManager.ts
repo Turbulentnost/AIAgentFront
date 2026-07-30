@@ -244,9 +244,20 @@ export interface FulfillmentStatusUpdatePayload {
 export type CoverageSource =
   | "warehouse"
   | "supplier"
+  | "supplier_order"
   | "transfer_order"
   | "mixed"
   | "none";
+
+export interface LinkedSupplierOrder {
+  supplier_order_1c_ref?: string | null;
+  supplier_order_number?: string | null;
+  order_date?: string | null;
+  order_status?: string | null;
+  supplier_name?: string | null;
+  arrival_date?: string | null;
+  is_definite?: boolean | null;
+}
 
 export interface UsedSupplierPart {
   supplier_id: string;
@@ -294,6 +305,8 @@ export interface OrderCoverageStatus {
   covered_quantity?: string;
   deficit_quantity?: string;
   lines?: OrderCoverageLine[];
+  supplier_orders?: LinkedSupplierOrder[];
+  orchestrator_coverage_status?: "none" | "partial" | "full" | string | null;
 }
 
 export interface MaterialAllocationSummary {
@@ -446,6 +459,11 @@ export interface ProcurementManagerCaseSummary extends ProcurementCaseSummary {
   recommendation?: RecommendationRecord | null;
   order_coverage?: OrderCoverageStatus | null;
   coverage?: OrderCoverageStatus | null;
+  supplier_orders?: LinkedSupplierOrder[] | null;
+  nomenclature_names?: string[] | null;
+  nomenclature_ids?: string[] | null;
+  supplier_order_numbers?: string[] | null;
+  search_text?: string | null;
   fulfillment_status?: FulfillmentStatus | null;
   fulfillment_label?: string | null;
   fulfillment_tone?: FulfillmentTone | string | null;

@@ -129,8 +129,12 @@ export function CaseListPanel({
               ? PICKER_DECISION_LABELS[item.picker_decision_kind]
               : null;
           const note =
-            showArchiveMeta && item.closed_reason_label
-              ? item.closed_reason_label
+            showArchiveMeta
+              ? item.closed_reason_label ||
+                reason ||
+                (workStatus === "archived"
+                  ? "Передано ОТК по журналу предъявления ТМЦ."
+                  : null)
               : reason;
           const isSelected = item.id === selectedCaseId;
 
