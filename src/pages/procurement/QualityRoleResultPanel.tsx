@@ -40,8 +40,22 @@ function resolveSampleRule(output: QualityRoleOutput | null): QualitySampleRule 
 
 function sampleBasisLabel(basis?: string | null) {
   switch (basis) {
+    case "3pct":
+      return "3% партии";
+    case "5pct":
+      return "5% партии";
     case "10pct":
       return "10% партии";
+    case "15pct":
+      return "15% партии";
+    case "20pct":
+      return "20% партии";
+    case "30pct":
+      return "30% партии";
+    case "50pct":
+      return "50% партии";
+    case "100pct":
+      return "100% партии";
     case "1pct_rating":
       return "1% (макс. рейтинг поставщика)";
     case "per_package":

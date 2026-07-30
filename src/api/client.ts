@@ -1,4 +1,4 @@
-import axios from "axios";
+import axios, { type InternalAxiosRequestConfig } from "axios";
 import { isSkipAuth } from "@/auth/skipAuth";
 import { API_BASE_URL } from "./config";
 
@@ -7,7 +7,7 @@ export const apiClient = axios.create({ baseURL: API_BASE_URL, timeout: 30000 })
 /** Долгие операции (LLM в конструкторе агентов и т.п.). */
 export const longRunningApiClient = axios.create({ baseURL: API_BASE_URL, timeout: 600000 });
 
-function attachAuthHeader(config: { headers: { Authorization?: string } }) {
+function attachAuthHeader(config: InternalAxiosRequestConfig): InternalAxiosRequestConfig {
   if (isSkipAuth()) return config;
   const token = localStorage.getItem("access_token");
   if (token) config.headers.Authorization = `Bearer ${token}`;

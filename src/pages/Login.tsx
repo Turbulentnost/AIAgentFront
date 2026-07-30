@@ -14,9 +14,11 @@ import {
   UserRound
 } from "lucide-react";
 import { AxiosError } from "axios";
-import { Navigate, useNavigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { AuthProfileError } from "@/auth/errors";
+import { isDevAutoLoginEnabled } from "@/auth/devAutoLogin";
+import { isSkipAuth } from "@/auth/skipAuth";
 import ThemeToggle from "@/components/ThemeToggle";
 import styles from "./Login.module.css";
 
@@ -75,6 +77,8 @@ const languages: { code: LanguageCode; label: string; icon: string }[] = [
 export default function Login() {
   const navigate = useNavigate();
   const { isAuthenticated, login, loginWith1C } = useAuth();
+  const skipAuth = isSkipAuth();
+  const devAutoLoginEnabled = isDevAutoLoginEnabled();
   const emailId = useId();
   const fioId = useId();
   const passwordId = useId();
@@ -96,7 +100,8 @@ export default function Login() {
   const submitInFlight = useRef(false);
   const currentLanguage = languages.find((language) => language.code === selectedLanguage) ?? languages[0];
 
-  if (isAuthenticated) return <Navigate to="/" replace />;
+  // Dev: VITE_SKIP_AUTH — сразу в приложение, без email/пароля / «контроля доступа».
+  if (skipAuth || isAuthenticated) return <Navigate to="/" replace />;
 
   function getCorporateLoginError(err: unknown): string {
     if (err instanceof AxiosError) {
@@ -498,6 +503,16 @@ export default function Login() {
             ) : null}
 
             {error && <div className={styles.errorMessage}>{error}</div>}
+
+            {devAutoLoginEnabled ? (
+              <p className={styles.corporateHint}>
+                Dev:{" "}
+                <Link to="/auth/dev-login?redirect=/agents/procurement-manager">
+                  войти без заполнения формы
+                </Link>{" "}
+                (VITE_DEV_AUTO_LOGIN / VITE_SKIP_AUTH)
+              </p>
+            ) : null}
 
             <button className={styles.submitButton} disabled={isSubmitting} type="submit">
               {isSubmitting

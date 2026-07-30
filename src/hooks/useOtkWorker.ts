@@ -1,6 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { otkApi } from "@/api/endpoints";
 import {
+  mergeCardPreferCachedLines,
+  mergeDetailCacheAfterLinePatch
+} from "@/pages/otk/otkCardMerge";
+import {
   mapPresentation,
   mapWorker,
   toLineCreate,
@@ -10,7 +14,7 @@ import {
   type OtkShipmentLineUi
 } from "@/pages/otk/otkMappers";
 
-const otkKeys = {
+export const otkKeys = {
   all: ["otk"] as const,
   list: () => [...otkKeys.all, "list"] as const,
   detail: (id: string) => [...otkKeys.all, "detail", id] as const
@@ -35,7 +39,10 @@ export function useOtkPresentation(presentationId: string | null) {
   return useQuery({
     queryKey: otkKeys.detail(presentationId ?? ""),
     queryFn: async () => mapPresentation(await otkApi.getPresentation(presentationId!)),
-    enabled: Boolean(presentationId)
+    enabled: Boolean(presentationId),
+    // Local card is authoritative while editing; a focus-refetch that started
+    // before a category PATCH can otherwise snap sample % back after save.
+    refetchOnWindowFocus: false
   });
 }
 
@@ -50,7 +57,11 @@ export function useOtkUpdatePresentation() {
       patch: Partial<OtkPresentationCardUi>;
     }) => mapPresentation(await otkApi.updatePresentation(presentationId, toPresentationUpdate(patch))),
     onSuccess: (card) => {
-      queryClient.setQueryData(otkKeys.detail(card.id), card);
+      queryClient.setQueryData(
+        otkKeys.detail(card.id),
+        (prev: OtkPresentationCardUi | undefined) =>
+          mergeCardPreferCachedLines(prev, card)
+      );
       void queryClient.invalidateQueries({ queryKey: otkKeys.list() });
     }
   });
@@ -67,7 +78,11 @@ export function useOtkAddLine() {
       line: Partial<OtkShipmentLineUi>;
     }) => mapPresentation(await otkApi.addLine(presentationId, toLineCreate(line))),
     onSuccess: (card) => {
-      queryClient.setQueryData(otkKeys.detail(card.id), card);
+      queryClient.setQueryData(
+        otkKeys.detail(card.id),
+        (prev: OtkPresentationCardUi | undefined) =>
+          mergeCardPreferCachedLines(prev, card)
+      );
       void queryClient.invalidateQueries({ queryKey: otkKeys.list() });
     }
   });
@@ -86,11 +101,25 @@ export function useOtkUpdateLine() {
       patch: Partial<OtkShipmentLineUi>;
     }) =>
       mapPresentation(await otkApi.updateLine(presentationId, lineId, toLineUpdate(patch))),
-    onSuccess: (card) => {
-      queryClient.setQueryData(otkKeys.detail(card.id), card);
+    onSuccess: () => {
+      // Detail cache is updated by the caller only when the per-line epoch still
+      // matches — otherwise a slower older PATCH would revive the previous category.
       void queryClient.invalidateQueries({ queryKey: otkKeys.list() });
     }
   });
+}
+
+/** Apply a line-PATCH card into the detail cache (epoch-checked by caller). */
+export function writeOtkDetailCache(
+  queryClient: ReturnType<typeof useQueryClient>,
+  card: OtkPresentationCardUi,
+  patchedLineId: string
+) {
+  queryClient.setQueryData(
+    otkKeys.detail(card.id),
+    (prev: OtkPresentationCardUi | undefined) =>
+      mergeDetailCacheAfterLinePatch(prev, card, patchedLineId)
+  );
 }
 
 export function useOtkDeleteLine() {
@@ -104,7 +133,11 @@ export function useOtkDeleteLine() {
       lineId: string;
     }) => mapPresentation(await otkApi.deleteLine(presentationId, lineId)),
     onSuccess: (card) => {
-      queryClient.setQueryData(otkKeys.detail(card.id), card);
+      queryClient.setQueryData(
+        otkKeys.detail(card.id),
+        (prev: OtkPresentationCardUi | undefined) =>
+          mergeCardPreferCachedLines(prev, card)
+      );
       void queryClient.invalidateQueries({ queryKey: otkKeys.list() });
     }
   });

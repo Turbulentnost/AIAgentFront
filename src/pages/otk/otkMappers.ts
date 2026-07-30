@@ -41,6 +41,7 @@ export function mapLine(api: OtkShipmentLineApi): OtkShipmentLineUi {
     qtyFact: Number(api.qty_fact) || 0,
     category: normalizeTmcCategory(api.category),
     supplierQualityRating: api.supplier_quality_rating ?? null,
+    accepted: Boolean(api.accepted),
     sampleRule: sampleRuleFromApi(api.sample_rule)
   };
 }
@@ -50,6 +51,8 @@ export function mapPresentation(api: OtkPresentationCardApi): OtkPresentationCar
     id: api.id,
     organization: api.organization,
     purchaseOrder: api.purchase_order,
+    projectCode: api.project_code ?? null,
+    projectName: api.project_name ?? null,
     supplier: api.supplier,
     counterparty: api.counterparty,
     warehouse: api.warehouse,
@@ -71,6 +74,8 @@ export function toPresentationUpdate(
   const out: OtkPresentationUpdateApi = {};
   if (patch.organization !== undefined) out.organization = patch.organization;
   if (patch.purchaseOrder !== undefined) out.purchase_order = patch.purchaseOrder;
+  if (patch.projectCode !== undefined) out.project_code = patch.projectCode;
+  if (patch.projectName !== undefined) out.project_name = patch.projectName;
   if (patch.supplier !== undefined) out.supplier = patch.supplier;
   if (patch.counterparty !== undefined) out.counterparty = patch.counterparty;
   if (patch.warehouse !== undefined) out.warehouse = patch.warehouse;
@@ -97,7 +102,8 @@ export function toLineCreate(line: Partial<OtkShipmentLineUi>): OtkShipmentLineC
     qty_upd: line.qtyUpd ?? 0,
     qty_fact: line.qtyFact ?? 0,
     category: normalizeTmcCategory(line.category ?? "other"),
-    supplier_quality_rating: line.supplierQualityRating ?? null
+    supplier_quality_rating: line.supplierQualityRating ?? null,
+    accepted: Boolean(line.accepted)
   };
 }
 
@@ -112,5 +118,6 @@ export function toLineUpdate(patch: Partial<OtkShipmentLineUi>): OtkShipmentLine
   if (patch.supplierQualityRating !== undefined) {
     out.supplier_quality_rating = patch.supplierQualityRating;
   }
+  if (patch.accepted !== undefined) out.accepted = Boolean(patch.accepted);
   return out;
 }

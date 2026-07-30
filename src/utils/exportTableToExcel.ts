@@ -27,6 +27,9 @@ export function exportTableToExcel(
   const link = document.createElement("a");
   link.href = url;
   link.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  link.style.display = "none";
+  document.body.appendChild(link);
   link.click();
-  URL.revokeObjectURL(url);
+  link.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1_000);
 }

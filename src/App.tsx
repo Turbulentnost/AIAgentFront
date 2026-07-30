@@ -6,6 +6,7 @@ import ProductionDispatcherAgent from "@/pages/ProductionDispatcherAgent";
 import WarehousePickerAgent from "@/pages/WarehousePickerAgent";
 import WarehouseComplexChiefAgent from "@/pages/WarehouseComplexChiefAgent";
 import ProcurementManagerAgent from "@/pages/ProcurementManagerAgent";
+import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEngineerAgent";
 import OmtoSupportManagerAgent from "@/pages/OmtoSupportManagerAgent";
 import OtkHeadAgent from "@/pages/OtkHeadAgent";
 import QualityDeputyDirectorAgent from "@/pages/QualityDeputyDirectorAgent";
@@ -27,6 +28,7 @@ import KnowledgeBaseCreate from "./pages/KnowledgeBaseCreate";
 import Documents from "./pages/Documents";
 import Monitoring from "./pages/Monitoring";
 import Login from "./pages/Login";
+import DevLogin from "./pages/DevLogin";
 import Profile from "./pages/Profile";
 import ProfileEdit from "./pages/ProfileEdit";
 import Users from "./pages/Users";
@@ -53,6 +55,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/dev-login" element={<DevLogin />} />
       <Route path="/" element={<ProtectedRoute><Layout title="Дашборд"><Dashboard /></Layout></ProtectedRoute>} />
       <Route path="/agents" element={<ProtectedRoute><Layout title="Агенты"><Agents /></Layout></ProtectedRoute>} />
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
@@ -65,6 +68,7 @@ export default function App() {
       <Route path="/agents/warehouse-complex-chief" element={<ProtectedRoute><Layout title="ИИ-агент по закупкам"><WarehouseComplexChiefAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/purchase-manager" element={<ProtectedRoute><Layout title="ИИ-агент менеджера по закупкам"><ProcurementManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/procurement-manager" element={<Navigate to="/agents/purchase-manager" replace />} />
+      <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="Инженер по подготовке производства"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/omto-support-manager" element={<ProtectedRoute><Layout title="Менеджер по сопровождению ОМТО"><OmtoSupportManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/otk-head" element={<ProtectedRoute><Layout title="Начальник ОТК"><OtkHeadAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/quality-engineer" element={<ProtectedRoute><Layout title="Работник ОТК"><QualityEngineerAgent /></Layout></ProtectedRoute>} />

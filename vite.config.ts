@@ -2,7 +2,8 @@ import { fileURLToPath, URL } from "node:url";
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
-const DEFAULT_API_SERVER = "http://192.168.1.157:5454";
+// Local AIAgentBack. Office :5454 lacks procurement manager agent/run routes.
+const DEFAULT_API_SERVER = "http://127.0.0.1:8002";
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
@@ -19,6 +20,7 @@ export default defineConfig(({ mode }) => {
       }
     },
     server: {
+      allowedHosts: true,
       host: "0.0.0.0",
       port: 5173,
       strictPort: true,

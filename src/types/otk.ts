@@ -39,6 +39,7 @@ export interface OtkShipmentLineApi {
   qty_fact: number;
   category: OtkTmcCategoryApi | string;
   supplier_quality_rating?: number | string | null;
+  accepted?: boolean;
   sample_rule?: OtkSampleRuleApi | null;
 }
 
@@ -46,6 +47,8 @@ export interface OtkPresentationCardApi {
   id: string;
   organization: string;
   purchase_order: string;
+  project_code?: string | null;
+  project_name?: string | null;
   supplier: string;
   counterparty: string;
   warehouse: string;
@@ -69,7 +72,11 @@ export interface OtkPresentationSummaryApi {
   due_at: string;
   status: OtkPresentationStatus;
   lines_count: number;
+  /** True when ≥1 line and every line has accepted=true. */
+  all_accepted?: boolean;
   executor_id: string;
+  project_code?: string | null;
+  project_name?: string | null;
 }
 
 export interface OtkPresentationListApi {
@@ -82,6 +89,8 @@ export interface OtkPresentationListApi {
 export interface OtkPresentationUpdateApi {
   organization?: string;
   purchase_order?: string;
+  project_code?: string | null;
+  project_name?: string | null;
   supplier?: string;
   counterparty?: string;
   warehouse?: string;
@@ -103,6 +112,7 @@ export interface OtkShipmentLineCreateApi {
   qty_fact?: number;
   category?: OtkTmcCategoryApi | string;
   supplier_quality_rating?: number | string | null;
+  accepted?: boolean;
 }
 
 export interface OtkShipmentLineUpdateApi {
@@ -113,6 +123,7 @@ export interface OtkShipmentLineUpdateApi {
   qty_fact?: number;
   category?: OtkTmcCategoryApi | string;
   supplier_quality_rating?: number | string | null;
+  accepted?: boolean;
 }
 
 export interface OtkWriteTo1CResultApi {

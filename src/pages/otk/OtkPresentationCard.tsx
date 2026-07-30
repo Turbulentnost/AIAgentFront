@@ -1,5 +1,6 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { OtkPresentationCard, OtkWorker } from "./mockData";
+import { isEffectivelyCompleted, urgencyColor } from "./otkPresentationUi";
 import styles from "./OtkWorker.module.css";
 
 type Props = {
@@ -27,18 +28,14 @@ function fromDateTimeLocalValue(value: string) {
   return date.toISOString();
 }
 
-type FieldTone = "default" | "sand";
-
 type FieldProps = {
   label: string;
-  tone?: FieldTone;
   children: ReactNode;
 };
 
-function Field({ label, tone = "default", children }: FieldProps) {
-  const toneClass = tone === "sand" ? styles.fieldSand : "";
+function Field({ label, children }: FieldProps) {
   return (
-    <label className={`${styles.field} ${toneClass}`.trim()} data-tone={tone}>
+    <label className={styles.field}>
       <span>{label}</span>
       {children}
     </label>
@@ -48,16 +45,14 @@ function Field({ label, tone = "default", children }: FieldProps) {
 function TextField({
   label,
   value,
-  tone,
   onChange
 }: {
   label: string;
   value: string;
-  tone?: FieldTone;
   onChange: (value: string) => void;
 }) {
   return (
-    <Field label={label} tone={tone}>
+    <Field label={label}>
       <input
         className={styles.fieldControl}
         type="text"
@@ -80,26 +75,18 @@ export function OtkPresentationCardView({ card, workers, onChange }: Props) {
         <TextField
           label="Заказ поставщику"
           value={card.purchaseOrder}
-          tone="sand"
           onChange={(purchaseOrder) => onChange({ purchaseOrder })}
         />
         <div className={styles.fieldGroup}>
           <TextField
-            label="Поставщик"
-            value={card.supplier}
-            tone="sand"
-            onChange={(supplier) => onChange({ supplier })}
+            label="Код проекта"
+            value={card.projectCode ?? ""}
+            onChange={(projectCode) => onChange({ projectCode })}
           />
           <TextField
-            label="Контрагент"
-            value={card.counterparty}
-            tone="sand"
-            onChange={(counterparty) => onChange({ counterparty })}
-          />
-          <TextField
-            label="Склад"
-            value={card.warehouse}
-            onChange={(warehouse) => onChange({ warehouse })}
+            label="Проект"
+            value={card.projectName ?? ""}
+            onChange={(projectName) => onChange({ projectName })}
           />
         </div>
       </div>
@@ -149,14 +136,42 @@ export function OtkPresentationCardView({ card, workers, onChange }: Props) {
             ))}
           </select>
         </Field>
-        <Field label="Срок исполнения">
+        <label
+          className={`${styles.field} ${styles.fieldDue}`}
+          style={
+            {
+              "--otk-due-color": urgencyColor(card.dueAt, {
+                muted: isEffectivelyCompleted(card)
+              })
+            } as CSSProperties
+          }
+        >
+          <span>Срок исполнения</span>
           <input
             className={styles.fieldControl}
             type="datetime-local"
             value={toDateTimeLocalValue(card.dueAt)}
             onChange={(e) => onChange({ dueAt: fromDateTimeLocalValue(e.target.value) })}
           />
-        </Field>
+        </label>
+      </div>
+
+      <div className={`${styles.fieldGroup} ${styles.headerSupplierRow}`}>
+        <TextField
+          label="Поставщик"
+          value={card.supplier}
+          onChange={(supplier) => onChange({ supplier })}
+        />
+        <TextField
+          label="Контрагент"
+          value={card.counterparty}
+          onChange={(counterparty) => onChange({ counterparty })}
+        />
+        <TextField
+          label="Склад"
+          value={card.warehouse}
+          onChange={(warehouse) => onChange({ warehouse })}
+        />
       </div>
     </div>
   );

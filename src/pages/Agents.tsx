@@ -183,6 +183,9 @@ function buildUsageMap(tasks: Task[]) {
 
 const PRIORITY_RECOMMENDED_SLUGS = new Set([
   "quality_engineer_agent",
+  "quality_deputy_director_agent",
+  "quality_kpi_agent",
+  "procurement_logistics_agent",
   "nd_control_agent",
   "incoming_correspondence_agent",
   "purchase_manager_agent"

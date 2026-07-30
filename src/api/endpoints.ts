@@ -1002,6 +1002,8 @@ export const healthApi = {
 };
 export const authApi = {
   login: (payload: LoginPayload) => apiClient.post<TokenResponse>("/auth/login", payload).then((r) => r.data),
+  /** Local/dev only: JWT without password (requires DEV_AUTO_LOGIN on backend). */
+  devAutoLogin: () => apiClient.post<TokenResponse>("/auth/dev-auto-login").then((r) => r.data),
   loginWith1C: (payload: { fio: string; password: string }) =>
     longRunningApiClient.post<OneCLoginResponse>("/auth/onec/login", payload).then((r) => r.data),
   getOneCSession: () => apiClient.get<OneCSession>("/auth/onec/session").then((r) => r.data),
