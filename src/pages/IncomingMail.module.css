@@ -3,6 +3,12 @@
   padding-right: calc(52px + max(0px, calc(100vw - 100%)));
 }
 
+:global(.content:has([data-incoming-mail-page][data-table-layout="true"]:not([data-table-mode="true"]))) {
+  padding: 8px 12px 12px;
+  max-width: none;
+  width: 100%;
+}
+
 :global(.content:has([data-incoming-mail-page][data-table-mode="true"])) {
   padding: 8px 12px 12px;
   max-width: none;
@@ -13,6 +19,13 @@
 .page {
   --layout-gap: 16px;
   --columns-top-offset: 40px;
+  --request-item-block-size: 84px;
+  --request-list-item-gap: 6px;
+  --request-list-visible-min-items: 4;
+  --request-list-viewport-min: calc(
+    var(--request-list-visible-min-items) * var(--request-item-block-size)
+    + (var(--request-list-visible-min-items) - 1) * var(--request-list-item-gap)
+  );
 
   display: grid;
   gap: var(--layout-gap);
@@ -66,6 +79,7 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  margin-left: auto;
   padding: 8px 12px;
   border-radius: 999px;
   background: var(--color-accent-soft);
@@ -73,6 +87,94 @@
   font-size: 12px;
   font-weight: 700;
   white-space: nowrap;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.headerActions .secondaryButton {
+  text-decoration: none;
+}
+
+.pageTableLayout {
+  --drawer-width: min(520px, 40vw);
+  width: 100%;
+  max-width: none;
+  --columns-top-offset: 0;
+  --layout-gap: 10px;
+  min-height: calc(100vh - 64px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-gap);
+  padding-bottom: 8px;
+}
+
+.pageTableLayout .headerRow h1 {
+  font-size: 18px;
+}
+
+.pageTableLayout.pageDrawerOpen .requestsCardTable {
+  margin-right: var(--drawer-width);
+  transition: margin-right 0.22s ease-out;
+}
+
+.pageTableLayout .layoutTableFull {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  margin-top: 0;
+  width: 100%;
+}
+
+.pageTableLayout .layoutTableFull .detailDrawer {
+  display: none;
+}
+
+.pageTableLayout .layoutTableFull .detailDrawer.detailDrawerVisible {
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 120;
+  width: var(--drawer-width);
+  background: var(--color-surface, #fff);
+  border-left: 1px solid var(--color-border, #e5e7eb);
+  box-shadow: -6px 0 28px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+  animation: detailDrawerSlideIn 0.22s ease-out;
+}
+
+.pageTableLayout .layoutTableFull .detailDrawerVisible .contentCard {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 14px 16px;
+  background: transparent;
+}
+
+.pageTableLayout .requestsCardTable {
+  background: var(--color-surface, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  box-shadow: none;
+}
+
+.pageTableLayout .tableHost {
+  background: transparent;
+}
+
+.pageTableLayout .tableToolbar {
+  padding: 4px 2px 6px;
+  border-bottom: 1px solid var(--color-border, #e5e7eb);
+}
+
+.pageTableLayout .reviewHotbar {
+  padding: 4px 2px 8px;
+  border-bottom: 1px dashed var(--color-border, #e5e7eb);
 }
 
 .headerActions {
@@ -342,6 +444,10 @@
   color: var(--tanya-pink-accent);
 }
 
+.pageTableMode .layoutTableFull .detailDrawerVisible .fileListToggle {
+  color: var(--tanya-pink-accent);
+}
+
 .pageTableMode .layoutTableFull .detailDrawerVisible .detailText {
   color: var(--color-text);
 }
@@ -412,6 +518,23 @@
   align-items: center;
   gap: 8px;
   padding-bottom: 2px;
+}
+
+.tableToolbarPrimary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tableToolbarDates {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .tableToolbarTitle {
@@ -639,6 +762,7 @@
   border-radius: 12px;
   background: var(--color-surface);
   box-shadow: var(--shadow-lg);
+  color: var(--color-text);
 }
 
 .statLabel {
@@ -648,6 +772,7 @@
 }
 
 .statValue {
+  display: block;
   color: var(--summary-title-color);
   font-size: 22px;
   font-weight: 800;
@@ -655,6 +780,7 @@
 }
 
 .statHint {
+  display: block;
   color: var(--summary-label-color);
   font-size: 12px;
   line-height: 1.35;
@@ -682,7 +808,59 @@
 }
 
 .pipelineCard {
+  --pipeline-gap: clamp(2px, 1.4vw, 12px);
+  --pipeline-node-max: 104px;
+  --pipeline-index-size: clamp(18px, 2.5vw, 28px);
+  --pipeline-title-size: clamp(8px, 1.2vw, 12px);
+  --pipeline-hint-size: clamp(7px, 1vw, 10px);
+  --pipeline-arrow-size: clamp(8px, 1.2vw, 16px);
+  --pipeline-item-padding-y: clamp(4px, 1vw, 10px);
+  --pipeline-item-padding-x: clamp(2px, 0.8vw, 8px);
+  --pipeline-item-min-height: clamp(40px, 8vw, 74px);
   min-width: 0;
+}
+
+.pipelineCollapsible {
+  display: grid;
+  gap: var(--layout-gap);
+  min-width: 0;
+}
+
+.pipelineCollapsible > summary {
+  list-style: none;
+}
+
+.pipelineCollapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.pipelineSummary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+  cursor: pointer;
+  user-select: none;
+}
+
+.pipelineSummaryTitle {
+  color: var(--summary-section-title-color);
+  font-size: var(--summary-section-title-size);
+  font-weight: var(--summary-section-title-weight);
+}
+
+.pipelineSummaryMeta {
+  overflow: hidden;
+  flex: 1 1 auto;
+  min-width: 0;
+  color: var(--color-muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .summaryCard h2 {
@@ -705,12 +883,25 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
   gap: 10px;
 }
 
 .requestsToolbar h2 {
+  order: 1;
   margin: 0;
+}
+
+.requestsToolbar .iconButton {
+  order: 2;
+  margin-left: auto;
+}
+
+.requestsToolbarSearch {
+  order: 3;
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
 }
 
 .tabs {
@@ -745,7 +936,81 @@
   color: var(--color-primary-text);
 }
 
+button.tab {
+  background: transparent;
+  color: var(--color-muted);
+  font: inherit;
+}
+
+button.tabActive {
+  background: var(--color-info-surface);
+  color: var(--color-primary-text);
+}
+
+button.clearFiltersButton {
+  background: transparent;
+  color: var(--color-primary-text);
+  font: inherit;
+}
+
+button.iconButton {
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
+}
+
+button.primaryButton {
+  background: var(--nav-button-primary-bg);
+  color: var(--nav-button-primary-text);
+  font: inherit;
+}
+
+button.ghostButton {
+  background: transparent;
+  color: var(--color-primary-text);
+  font: inherit;
+}
+
+button.spamButton {
+  font: inherit;
+}
+
 .filtersRow {
+  display: grid;
+  gap: 8px;
+}
+
+.filtersCollapsible {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.filtersCollapsible > summary {
+  list-style: none;
+}
+
+.filtersCollapsible > summary::-webkit-details-marker {
+  display: none;
+}
+
+.filtersSummary {
+  display: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 8px;
+  background: var(--color-hover);
+  color: var(--color-primary-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  user-select: none;
+}
+
+.filtersCollapsibleBody {
   display: grid;
   gap: 8px;
 }
@@ -878,6 +1143,17 @@
   cursor: not-allowed;
 }
 
+.secondaryButton.viewModeActive {
+  border: 2px solid var(--color-primary);
+  background: var(--color-accent-soft);
+  color: var(--color-primary-text);
+  font-weight: 800;
+}
+
+.secondaryButtonLabelShort {
+  display: none;
+}
+
 .iconButton {
   display: inline-flex;
   align-items: center;
@@ -920,11 +1196,15 @@
 
 .requestList {
   display: grid;
-  gap: 6px;
+  gap: var(--request-list-item-gap, 6px);
   min-height: 0;
   max-height: min(52vh, 560px);
   overflow: auto;
   transition: opacity 0.15s ease;
+}
+
+.page:not(.pageTableLayout):not(.pageTableMode) .requestList {
+  width: 100%;
 }
 
 .requestListFetching {
@@ -933,16 +1213,27 @@
 }
 
 .requestItem {
+  appearance: none;
+  box-sizing: border-box;
   display: grid;
-  gap: 3px;
+  gap: 6px;
   width: 100%;
-  padding: 8px 10px;
+  min-height: var(--request-item-block-size, 84px);
+  margin: 0;
+  padding: 10px 12px;
   border: 1px solid var(--color-border-subtle);
-  border-radius: 8px;
+  border-radius: 10px;
   background: var(--color-surface);
+  color: var(--color-text);
+  font: inherit;
   text-align: left;
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+button.requestItem {
+  background: var(--color-surface);
+  color: var(--color-text);
 }
 
 .requestItem:hover {
@@ -954,13 +1245,27 @@
   background: var(--color-info-surface);
 }
 
+button.requestItemActive {
+  background: var(--color-info-surface);
+  color: var(--color-text);
+}
+
+button.requestItem:hover {
+  background: var(--color-hover);
+}
+
+button.requestItemActive:hover {
+  background: var(--color-info-surface);
+}
+
 .requestSubject {
+  display: block;
   overflow: hidden;
   min-width: 0;
   color: var(--color-text);
   font-size: 12px;
   font-weight: 700;
-  line-height: 1.3;
+  line-height: 1.35;
   white-space: nowrap;
   -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5em), transparent 100%);
   mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 1.5em), transparent 100%);
@@ -970,11 +1275,12 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
 }
 
 .requestSender {
+  display: block;
   overflow: hidden;
   flex: 1;
   min-width: 0;
@@ -986,6 +1292,7 @@
 }
 
 .requestDate {
+  display: block;
   flex: 0 0 auto;
   color: var(--color-muted);
   font-size: 10px;
@@ -993,6 +1300,7 @@
 }
 
 .statusBadgeCompact {
+  justify-self: flex-start;
   align-self: flex-start;
   min-height: 22px;
   padding: 2px 8px;
@@ -1007,6 +1315,7 @@
   align-items: start;
   margin-top: var(--columns-top-offset);
 }
+
 
 .requestsCard {
   grid-area: requests;
@@ -1026,14 +1335,21 @@
 .pipelineList {
   width: 100%;
   min-width: 0;
-  overflow-x: auto;
-  scrollbar-width: thin;
 }
 
-.pipelineRows {
+.pipelineGrid {
   display: flex;
   flex-direction: column;
-  gap: var(--layout-gap);
+  align-items: center;
+  gap: 2px;
+  width: 100%;
+}
+
+.pipelineGridRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   width: 100%;
 }
 
@@ -1041,47 +1357,49 @@
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  justify-content: center;
-  gap: var(--layout-gap);
+  gap: var(--pipeline-gap);
   width: 100%;
-}
-
-.pipelineSegment {
-  display: flex;
-  flex: 0 0 auto;
-  align-items: center;
-  gap: var(--layout-gap);
+  min-width: 0;
 }
 
 .pipelineNode {
   display: flex;
-  flex: 0 0 auto;
+  flex: 1 1 0;
+  min-width: 0;
   align-items: center;
   justify-content: center;
 }
 
 .pipelineArrowBetween {
   display: flex;
-  flex: 0 0 auto;
+  flex: 0 0 var(--pipeline-arrow-size);
   align-items: center;
   justify-content: center;
+  width: var(--pipeline-arrow-size);
   color: var(--color-muted);
   pointer-events: none;
 }
 
+.pipelineArrowBetween svg {
+  width: 100%;
+  height: auto;
+}
+
 .pipelineItem {
   display: flex;
-  flex: 0 0 auto;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  gap: clamp(2px, 0.8vw, 6px);
   box-sizing: border-box;
-  width: 104px;
-  height: 74px;
-  padding: 10px 8px;
+  width: 100%;
+  max-width: var(--pipeline-node-max);
+  min-width: 0;
+  min-height: var(--pipeline-item-min-height);
+  height: auto;
+  padding: var(--pipeline-item-padding-y) var(--pipeline-item-padding-x);
   border: 1px solid transparent;
-  border-radius: 10px;
+  border-radius: clamp(6px, 1.2vw, 10px);
   text-align: center;
 }
 
@@ -1105,13 +1423,18 @@
 .pipelineIndex {
   display: grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: var(--pipeline-index-size);
+  height: var(--pipeline-index-size);
   border-radius: 999px;
   background: var(--color-gray-soft);
   color: var(--color-muted);
-  font-size: 12px;
+  font-size: clamp(9px, 1.4vw, 12px);
   font-weight: 700;
+}
+
+.pipelineIndex svg {
+  width: clamp(10px, 1.8vw, 14px);
+  height: clamp(10px, 1.8vw, 14px);
 }
 
 .pipelineItemDone .pipelineIndex {
@@ -1123,7 +1446,7 @@
   display: block;
   overflow: hidden;
   color: var(--color-text);
-  font-size: 12px;
+  font-size: var(--pipeline-title-size);
   font-weight: 700;
   line-height: 1.25;
   text-overflow: ellipsis;
@@ -1134,7 +1457,7 @@
   display: block;
   overflow: hidden;
   color: var(--color-muted);
-  font-size: 10px;
+  font-size: var(--pipeline-hint-size);
   line-height: 1.3;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1279,6 +1602,20 @@
 .fileList {
   display: grid;
   gap: 8px;
+}
+
+.fileListToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
 }
 
 .fileRow {
@@ -1661,19 +1998,12 @@
     align-items: stretch;
   }
 
-  .agentBadge {
-    align-self: flex-start;
-  }
-
-  .layout {
+  /* Cards view only: requests | content on top, summary full width below */
+  .page:not(.pageTableLayout):not(.pageTableMode) .layout {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
     grid-template-areas:
-      "requests summary"
-      "content content";
-  }
-
-  .requestList {
-    max-height: 320px;
+      "requests content"
+      "summary summary";
   }
 
   .pageTableMode .layout,
@@ -1686,28 +2016,18 @@
 }
 
 @media (max-width: 640px) {
-  .pageTableMode {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 56px);
-    grid-template-columns: none;
-    grid-template-areas: none;
-    grid-template-rows: none;
-  }
-
-  .pageTableMode .layoutTableFull {
-    display: flex;
-  }
-
+  .pageTableLayout.pageDrawerOpen .requestsCardTable,
   .pageTableMode.pageDrawerOpen .requestsCardTable {
     margin-right: 0;
   }
 
+  .pageTableLayout .layoutTableFull .detailDrawer.detailDrawerVisible,
   .pageTableMode .layoutTableFull .detailDrawer.detailDrawerVisible {
     width: min(100vw, 520px);
   }
 
-  .page {
+  /* Cards-only mobile grid — must not apply to table view (pageTableLayout) */
+  .page:not(.pageTableLayout):not(.pageTableMode) {
     --layout-gap: 12px;
     --columns-top-offset: 0;
 
@@ -1720,9 +2040,10 @@
     grid-template-areas:
       "header header"
       "stats stats"
-      "pipeline requests"
-      "summary summary"
-      "content content";
+      "pipeline pipeline"
+      "requests requests"
+      "content content"
+      "summary summary";
   }
 
   .header {
@@ -1734,91 +2055,19 @@
   }
 
   .statCard {
-    padding: 10px 8px;
-  }
-
-  .statLabel {
-    font-size: 10px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .statValue {
-    font-size: 18px;
+    padding: 10px;
   }
 
   .pipelineCard {
     grid-area: pipeline;
-    display: flex;
-    flex-direction: column;
-    align-self: stretch;
-    min-height: 0;
-    height: 100%;
     padding: 10px;
   }
 
   .pipelineCard h2 {
-    font-size: 11px;
+    font-size: 12px;
   }
 
-  .pipelineList {
-    flex: 1;
-    min-height: 0;
-  }
-
-  .pipelineRows {
-    flex: 1 1 0;
-    justify-content: flex-start;
-    min-height: 0;
-  }
-
-  .pipelineRow {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .pipelineSegment {
-    flex-direction: column;
-    width: 100%;
-  }
-
-  .pipelineNode {
-    flex: 0 0 auto;
-    width: 100%;
-  }
-
-  .pipelineArrowBetween {
-    display: none;
-  }
-
-  .pipelineItem {
-    flex-direction: row;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    height: auto;
-    min-height: 52px;
-    padding: 8px;
-    text-align: left;
-  }
-
-  .pipelineIndex {
-    flex: 0 0 auto;
-    width: 24px;
-    height: 24px;
-    font-size: 11px;
-  }
-
-  .pipelineTitle {
-    font-size: 11px;
-  }
-
-  .pipelineHint {
-    font-size: 9px;
-  }
-
-  .layout {
+  .page:not(.pageTableLayout):not(.pageTableMode) .layout {
     display: contents;
   }
 
@@ -1845,17 +2094,13 @@
 
   .requestList {
     flex: 1;
-    min-height: 0;
-    max-height: none;
+    min-height: var(--request-list-viewport-min);
+    max-height: min(56vh, 540px);
     overflow-y: auto;
   }
 
   .requestItem {
-    padding: 6px 8px;
-  }
-
-  .requestSubject {
-    font-size: 11px;
+    padding: 10px 12px;
   }
 
   .contentCard {
@@ -1866,25 +2111,634 @@
     grid-area: summary;
   }
 
+  .page.pageTableLayout,
   .page.pageTableMode {
     display: flex;
     flex-direction: column;
+    width: 100%;
+    max-width: none;
+    min-height: calc(100vh - 56px);
     grid-template-columns: unset;
     grid-template-areas: unset;
     grid-template-rows: unset;
   }
 
+  .pageTableLayout .layout,
+  .pageTableLayout .layoutTableFull,
   .pageTableMode .layout,
   .pageTableMode .layoutTableFull {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
   }
 
+  .pageTableLayout .requestsCard,
+  .pageTableLayout .requestsCardTable,
   .pageTableMode .requestsCard,
   .pageTableMode .requestsCardTable {
     grid-area: unset;
     height: auto;
     flex: 1;
     min-height: 0;
+    width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  :global(.content:has([data-incoming-mail-page]:not([data-table-layout="true"]))) {
+    padding: 8px 10px 12px;
+  }
+
+  .page {
+    --layout-gap: 12px;
+    --columns-top-offset: 0;
+    width: 100%;
+    padding-bottom: 16px;
+  }
+
+  .headerRow {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .headerRow h1 {
+    font-size: 20px;
+  }
+
+  .headerRow p {
+    font-size: 12px;
+    line-height: 1.4;
+  }
+
+  .headerActions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .secondaryButtonLabelFull {
+    display: none;
+  }
+
+  .secondaryButtonLabelShort {
+    display: inline;
+  }
+
+  .statsRow {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px;
+    overflow: visible;
+  }
+
+  .statCard {
+    flex: unset;
+    min-width: 0;
+    padding: 6px 8px;
+    gap: 1px;
+    border-radius: 8px;
+    box-shadow: none;
+  }
+
+  .statCard:nth-child(4) {
+    grid-column: auto;
+  }
+
+  .statCard:nth-child(5) {
+    grid-column: span 2;
+  }
+
+  .statLabel {
+    font-size: 9px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .statValue {
+    display: block;
+    font-size: 15px;
+    font-variant-numeric: tabular-nums;
+    line-height: 1.15;
+  }
+
+  .statHint {
+    display: block;
+    font-size: 9px;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .pipelineCard {
+    padding: 8px 10px;
+    gap: 6px;
+  }
+
+  .pipelineCollapsible {
+    gap: 8px;
+  }
+
+  .pipelineSummary {
+    padding: 2px 0 4px;
+  }
+
+  .pipelineSummary::after {
+    content: "▾";
+    flex-shrink: 0;
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1;
+    transition: transform 0.15s ease;
+  }
+
+  .pipelineCollapsible[open] > .pipelineSummary::after {
+    transform: rotate(180deg);
+  }
+
+  .pipelineSummaryTitle {
+    font-size: 13px;
+  }
+
+  .pipelineSummaryMeta {
+    display: inline;
+    font-size: 10px;
+  }
+
+  .pipelineList {
+    padding-top: 4px;
+  }
+
+  .pipelineGrid {
+    gap: 4px;
+  }
+
+  .pipelineGridRow {
+    display: grid;
+    grid-template-columns: minmax(0, 104px) 12px minmax(0, 104px) 12px;
+    justify-content: center;
+    align-items: center;
+    column-gap: 6px;
+    width: fit-content;
+    max-width: 100%;
+    margin-inline: auto;
+  }
+
+  .pipelineGridRow .pipelineNode {
+    flex: unset;
+    width: 100%;
+    max-width: 104px;
+    min-width: 0;
+  }
+
+  .pipelineGridRow .pipelineItem {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    width: 100%;
+    max-width: none;
+    min-height: 58px;
+    height: 100%;
+    padding: 6px 4px;
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .pipelineGridRow .pipelineIndex {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    font-size: 9px;
+  }
+
+  .pipelineGridRow .pipelineIndex svg {
+    width: 10px;
+    height: 10px;
+  }
+
+  .pipelineGridRow .pipelineBody {
+    flex: 1;
+    min-width: 0;
+    width: 100%;
+    text-align: center;
+  }
+
+  .pipelineGridRow .pipelineTitle {
+    font-size: 11px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .pipelineGridRow .pipelineHint {
+    display: -webkit-box;
+    font-size: 9px;
+    line-height: 1.25;
+    white-space: normal;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+  }
+
+  .pipelineArrowHorizontal,
+  .pipelineArrowRowEnd {
+    display: flex;
+    flex: 0 0 12px;
+    width: 12px;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-muted);
+  }
+
+  .pipelineArrowHorizontal svg,
+  .pipelineArrowRowEnd svg {
+    width: 12px;
+    height: 12px;
+  }
+
+  .layout {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "requests"
+      "content"
+      "summary";
+    margin-top: 0;
+  }
+
+  .requestsCard,
+  .summaryCard {
+    padding: 10px;
+    gap: 8px;
+  }
+
+  .requestsCard {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .requestsToolbar {
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .requestsToolbar h2 {
+    order: 1;
+    flex: 0 0 auto;
+    font-size: 13px;
+    white-space: nowrap;
+  }
+
+  .requestsToolbarSearch {
+    order: 2;
+    flex: 1 1 auto;
+    width: auto;
+    min-height: 32px;
+    padding: 5px 8px;
+    font-size: 14px;
+  }
+
+  .requestsToolbar .iconButton {
+    order: 3;
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
+
+  .filtersSummary {
+    display: flex;
+  }
+
+  .filtersSummary::after {
+    content: "▾";
+    color: var(--color-muted);
+    font-size: 12px;
+    line-height: 1;
+    transition: transform 0.15s ease;
+  }
+
+  .filtersCollapsible[open] > .filtersSummary::after {
+    transform: rotate(180deg);
+  }
+
+  .dateFilters {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+  }
+
+  .dateInput {
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+  }
+
+  .clearFiltersButton {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .contentCard {
+    padding: 10px;
+  }
+
+  .requestList {
+    flex: 1 1 auto;
+    min-height: var(--request-list-viewport-min);
+    max-height: min(56vh, 540px);
+  }
+
+  .requestItem {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .requestSubject {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    white-space: normal;
+    font-size: 13px;
+    line-height: 1.35;
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .requestItemSub {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
+
+  .requestSender {
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .tabs {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 6px;
+  }
+
+  .tab {
+    min-height: 34px;
+    padding: 6px 10px;
+  }
+
+  .filtersRow {
+    gap: 10px;
+  }
+
+  .recipientFilters {
+    gap: 8px;
+  }
+
+  .searchInput,
+  .dateInput {
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .requestsToolbarSearch {
+    min-height: 32px;
+    font-size: 14px;
+  }
+
+  .iconButton {
+    min-width: 40px;
+    min-height: 40px;
+  }
+
+  :global(.content:has([data-incoming-mail-page][data-table-layout="true"])) {
+    padding: 0;
+    padding-right: 0;
+    max-width: none;
+    width: 100%;
+  }
+
+  .page.pageTableLayout,
+  .page.pageTableMode {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    gap: 0;
+    min-height: calc(100dvh - 52px);
+    padding-bottom: 0;
+    grid-template-columns: unset;
+    grid-template-areas: unset;
+    grid-template-rows: unset;
+  }
+
+  .pageTableLayout .layoutTableFull,
+  .pageTableMode .layoutTableFull {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    margin-top: 0;
+  }
+
+  .pageTableLayout .headerRow,
+  .pageTableMode .headerRow {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .pageTableLayout .headerActions,
+  .pageTableMode .headerActions {
+    width: auto;
+    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pageTableLayout .header,
+  .pageTableMode .header {
+    padding: 8px 10px 4px;
+  }
+
+  .pageTableLayout.pageDrawerOpen .requestsCardTable,
+  .pageTableMode.pageDrawerOpen .requestsCardTable {
+    margin-right: 0;
+  }
+
+  .pageTableLayout .layoutTableFull .detailDrawer.detailDrawerVisible,
+  .pageTableMode .layoutTableFull .detailDrawer.detailDrawerVisible {
+    width: 100%;
+    max-width: 100vw;
+  }
+
+  .pageTableLayout .requestsCardTable,
+  .pageTableMode .requestsCardTable {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+    padding: 4px 0 0;
+    gap: 6px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .pageTableLayout .tableHost,
+  .pageTableMode .tableHost {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
+  }
+
+  .pageTableLayout .tableToolbar,
+  .pageTableMode .tableToolbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 0 8px 8px;
+  }
+
+  .pageTableLayout .tableToolbarTitle,
+  .pageTableMode .tableToolbarTitle {
+    display: none;
+  }
+
+  .pageTableLayout .tableToolbarPrimary,
+  .pageTableMode .tableToolbarPrimary {
+    width: 100%;
+  }
+
+  .pageTableLayout .tableToolbarSearch,
+  .pageTableMode .tableToolbarSearch {
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    max-width: none;
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .pageTableLayout .tableToolbarDates,
+  .pageTableMode .tableToolbarDates {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    align-items: center;
+    gap: 6px;
+    width: 100%;
+  }
+
+  .pageTableLayout .tableToolbarDate,
+  .pageTableMode .tableToolbarDate {
+    width: 100%;
+    max-width: none;
+    min-height: 40px;
+    font-size: 16px;
+  }
+
+  .pageTableLayout .tableToolbarDates .clearFiltersButton,
+  .pageTableMode .tableToolbarDates .clearFiltersButton {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .pageTableLayout .tableToolbarTabs,
+  .pageTableMode .tableToolbarTabs {
+    width: 100%;
+    flex-wrap: wrap;
+    overflow-x: visible;
+    gap: 6px;
+  }
+
+  .pageTableLayout .tableToolbarTabs .tab,
+  .pageTableMode .tableToolbarTabs .tab {
+    min-height: 34px;
+  }
+
+  .pageTableLayout .reviewHotbar,
+  .pageTableMode .reviewHotbar {
+    padding: 0 8px 6px;
+    flex-wrap: wrap;
+  }
+
+  .pageTableLayout .listFetchingBar,
+  .pageTableMode .listFetchingBar {
+    margin: 0 8px;
+  }
+}
+
+@media (min-width: 769px) {
+  /* Cards view: contentCard drives row height; requestsCard stretches to match */
+  .page:not(.pageTableLayout):not(.pageTableMode) .layout {
+    align-items: stretch;
+  }
+
+  .page:not(.pageTableLayout):not(.pageTableMode) .contentCard {
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .page:not(.pageTableLayout):not(.pageTableMode) .summaryCard {
+    align-self: start;
+  }
+
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard {
+    display: flex;
+    flex-direction: column;
+    grid-row: 1;
+    align-self: start;
+    min-width: 0;
+  }
+
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .requestsToolbar,
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .filtersRow,
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .tabs,
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .listFetchingBar,
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .emptyStateCompact {
+    flex-shrink: 0;
+  }
+
+  .page:not(.pageTableLayout):not(.pageTableMode) .requestList {
+    flex: 1;
+    min-height: var(--request-list-viewport-min);
+    max-height: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+}
+
+@media (min-width: 769px) {
+  .pipelineSummary {
+    cursor: default;
+    pointer-events: none;
+  }
+
+  .pipelineSummary::after {
+    display: none;
+  }
+
+  .pipelineSummaryMeta {
+    display: none;
+  }
+
+  .filtersSummary {
+    display: none;
+  }
+
+  .filtersCollapsibleBody {
+    display: contents;
   }
 }

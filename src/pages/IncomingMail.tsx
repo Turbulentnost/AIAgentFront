@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   keepPreviousData,
   useInfiniteQuery,
@@ -24,6 +24,11 @@ import {
   Sparkles
 } from "lucide-react";
 import { Link } from "react-router-dom";
+import {
+  INCOMING_CORRESPONDENCE_1C_PATH,
+  INCOMING_CORRESPONDENCE_1C_SECRET_PATH,
+  INCOMING_CORRESPONDENCE_AGENT_PATH
+} from "@/utils/agentLaunch";
 import { emailMessagesApi } from "@/api/endpoints";
 import { FormAutocomplete, FormSelect } from "@/components/form-controls";
 import controlStyles from "@/components/form-controls/form-controls.module.css";
@@ -39,13 +44,12 @@ import IncomingMailTable, {
 
 const AGENT_TITLE = "Входящая корреспонденция";
 const PAGE_SIZE = 50;
+const ATTACHMENTS_VISIBLE_LIMIT = 3;
 const SEARCH_DEBOUNCE_MS = 450;
-const VIEW_MODE_STORAGE_KEY = "incoming-mail-view-mode";
-const AGENT_DESCRIPTION =
-  "ИИ-агент обрабатывает входящую почту: фильтрует спам, определяет отправителя и отдел, формирует обзор и создаёт задачу в 1С:ERP.";
+const AGENT_DESCRIPTION = "Фильтрует спам, определяет отдел и создаёт задачу в 1С:ERP.";
 
 type StatusFilter = "all" | EmailMessageStatus;
-type ViewMode = "cards" | "table";
+type ViewMode = "cards" | "table" | "table-secret";
 
 const REVIEW_STATE_TABS: Array<{
   id: OperatorReviewStateFilter;
@@ -57,15 +61,6 @@ const REVIEW_STATE_TABS: Array<{
   { id: "corrected", label: "Доработанные", tone: "corrected" },
   { id: "pending", label: "Непроверенные", tone: "pending" }
 ];
-
-function readStoredViewMode(): ViewMode {
-  try {
-    const value = localStorage.getItem(VIEW_MODE_STORAGE_KEY);
-    return value === "table" ? "table" : "cards";
-  } catch {
-    return "cards";
-  }
-}
 
 const STATUS_TABS: Array<{ id: StatusFilter; label: string }> = [
   { id: "all", label: "Все" },
@@ -101,55 +96,6 @@ const PIPELINE_STEPS = [
   { id: "create_erp_task", label: "1С", hint: "Задача в ERP" },
   { id: "finalize", label: "Финал", hint: "Запись в БД" }
 ] as const;
-
-const PIPELINE_BLOCK_WIDTH = 104;
-const PIPELINE_ARROW_WIDTH = 16;
-const PIPELINE_GAP = 16;
-const PIPELINE_CARD_PADDING_X = 32;
-const PIPELINE_WIDTH_SAFETY_BUFFER = 16;
-
-function pipelineRowWidth(blockCount: number): number {
-  if (blockCount <= 0) return 0;
-  const arrowCount = blockCount - 1;
-  const segmentCount = blockCount;
-  const rowGapCount = segmentCount - 1;
-  const segmentGapCount = arrowCount;
-  return (
-    blockCount * PIPELINE_BLOCK_WIDTH +
-    arrowCount * PIPELINE_ARROW_WIDTH +
-    rowGapCount * PIPELINE_GAP +
-    segmentGapCount * PIPELINE_GAP
-  );
-}
-
-function maxBlocksPerRow(containerWidth: number): number {
-  const availableWidth = Math.floor(containerWidth) - PIPELINE_WIDTH_SAFETY_BUFFER;
-  if (availableWidth < PIPELINE_BLOCK_WIDTH) return 1;
-
-  for (let count = PIPELINE_STEPS.length; count >= 1; count -= 1) {
-    if (pipelineRowWidth(count) <= availableWidth) return count;
-  }
-  return 1;
-}
-
-function estimateInitialPipelineMaxPerRow(): number {
-  if (typeof window === "undefined") return 4;
-  const contentPadding = 104;
-  const estimatedListWidth =
-    Math.min(1380, window.innerWidth - contentPadding) - PIPELINE_CARD_PADDING_X;
-  return maxBlocksPerRow(estimatedListWidth);
-}
-
-function splitBalancedRows(total: number, maxPerRow: number): number[] {
-  if (total <= maxPerRow) return [total];
-
-  let rowCount = Math.ceil(total / maxPerRow);
-  while (rowCount > 1 && total % rowCount === 1) rowCount += 1;
-
-  const base = Math.floor(total / rowCount);
-  const extra = total % rowCount;
-  return Array.from({ length: rowCount }, (_, index) => base + (index < extra ? 1 : 0));
-}
 
 function extractError(error: unknown): string {
   if (isAxiosError(error)) {
@@ -560,6 +506,31 @@ function pipelineIndexForStatus(status: EmailMessageStatus): number {
   return PIPELINE_STEPS.length - 1;
 }
 
+const REQUEST_LIST_VIEWPORT_MIN_FALLBACK_PX = 354;
+
+function readRequestListViewportMinPx(listEl: HTMLElement): number {
+  const minHeight = getComputedStyle(listEl).minHeight;
+  const parsed = Number.parseFloat(minHeight);
+  if (!Number.isNaN(parsed) && parsed > 0) return Math.round(parsed);
+  return REQUEST_LIST_VIEWPORT_MIN_FALLBACK_PX;
+}
+
+function useMediaMinWidth(minWidth: number): boolean {
+  const [matches, setMatches] = useState(
+    () => typeof window !== "undefined" && window.matchMedia(`(min-width: ${minWidth}px)`).matches
+  );
+
+  useEffect(() => {
+    const media = window.matchMedia(`(min-width: ${minWidth}px)`);
+    const listener = () => setMatches(media.matches);
+    media.addEventListener("change", listener);
+    listener();
+    return () => media.removeEventListener("change", listener);
+  }, [minWidth]);
+
+  return matches;
+}
+
 function canChangeDepartment(status: EmailMessageStatus): boolean {
   return (
     status === "awaiting_human" ||
@@ -655,7 +626,14 @@ function messageTableDateTime(message: EmailMessage): number {
   return Number.isNaN(time) ? 0 : time;
 }
 
-export default function IncomingMail() {
+type IncomingMailProps = {
+  viewMode: ViewMode;
+};
+
+export default function IncomingMail({ viewMode }: IncomingMailProps) {
+  const isTableView = viewMode !== "cards";
+  const isSecretTable = viewMode === "table-secret";
+  const isWidePipeline = useMediaMinWidth(769);
   const queryClient = useQueryClient();
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [dateFrom, setDateFrom] = useState("");
@@ -663,7 +641,6 @@ export default function IncomingMail() {
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [infoRecipientOnly, setInfoRecipientOnly] = useState(false);
-  const [viewMode, setViewMode] = useState<ViewMode>(() => readStoredViewMode());
   const [reviewStateFilter, setReviewStateFilter] = useState<OperatorReviewStateFilter>("all");
   const [tableDateSort, setTableDateSort] = useState<TableDateSort>("asc");
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -676,6 +653,7 @@ export default function IncomingMail() {
   const [debouncedContractorSearch, setDebouncedContractorSearch] = useState("");
   const [partnerSuggestionsOpen, setPartnerSuggestionsOpen] = useState(true);
   const [emailBodyExpanded, setEmailBodyExpanded] = useState(false);
+  const [attachmentsExpanded, setAttachmentsExpanded] = useState(false);
   const [emailBodyText, setEmailBodyText] = useState<string | null>(null);
   const [emailBodyLoading, setEmailBodyLoading] = useState(false);
   const [emailBodyError, setEmailBodyError] = useState<string | null>(null);
@@ -692,8 +670,10 @@ export default function IncomingMail() {
   const [previewingAttachmentIndex, setPreviewingAttachmentIndex] = useState<number | null>(null);
   const attachmentPreviewLoadIdRef = useRef(0);
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
-  const pipelineListRef = useRef<HTMLDivElement>(null);
   const listSentinelRef = useRef<HTMLDivElement>(null);
+  const requestListRef = useRef<HTMLDivElement>(null);
+  const contentCardRef = useRef<HTMLElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
   const tableScrollSnapshotRef = useRef<{ scrollTop: number; scrollHeight: number } | null>(null);
   const tableScrollToBottomRef = useRef(true);
@@ -701,16 +681,6 @@ export default function IncomingMail() {
   const hitlFormRef = useRef<HTMLDivElement>(null);
   const attachmentsSectionRef = useRef<HTMLDivElement>(null);
   const attachmentsFocusRef = useRef<string | null>(null);
-  const [pipelineMaxPerRow, setPipelineMaxPerRow] = useState<number>(estimateInitialPipelineMaxPerRow);
-
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(VIEW_MODE_STORAGE_KEY, viewMode);
-    } catch {
-      /* ignore */
-    }
-  }, [viewMode]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(searchQuery.trim()), SEARCH_DEBOUNCE_MS);
@@ -733,7 +703,7 @@ export default function IncomingMail() {
     attachmentPreviewLoading || attachmentPreview != null || attachmentPreviewError != null;
 
   useEffect(() => {
-    if (viewMode !== "table" || !selectedId || attachmentPreviewVisible) return;
+    if (!isTableView || !selectedId || attachmentPreviewVisible) return;
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
@@ -742,7 +712,7 @@ export default function IncomingMail() {
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [viewMode, selectedId, attachmentPreviewVisible]);
+  }, [isTableView, selectedId, attachmentPreviewVisible]);
 
   useEffect(() => {
     if (!attachmentPreviewVisible) return;
@@ -896,10 +866,10 @@ export default function IncomingMail() {
   }, [listFilters]);
 
   useEffect(() => {
-    if (viewMode === "table") {
+    if (isTableView) {
       tableScrollToBottomRef.current = true;
     }
-  }, [viewMode]);
+  }, [isTableView]);
 
   useEffect(() => {
     if (!selectedId || messagesQuery.isFetching || messagesQuery.isPlaceholderData) return;
@@ -909,7 +879,7 @@ export default function IncomingMail() {
   }, [messages, selectedId, messagesQuery.isFetching, messagesQuery.isPlaceholderData]);
 
   useEffect(() => {
-    if (viewMode !== "table") return;
+    if (!isTableView) return;
 
     const scrollEl = tableScrollRef.current;
     if (!scrollEl || messagesQuery.isLoading || messagesQuery.isPlaceholderData) return;
@@ -938,7 +908,7 @@ export default function IncomingMail() {
       tableScrollToTopRef.current = false;
     }
   }, [
-    viewMode,
+    isTableView,
     tableMessages,
     tableDateSort,
     messagesQuery.isLoading,
@@ -947,7 +917,7 @@ export default function IncomingMail() {
   ]);
 
   useEffect(() => {
-    if (viewMode === "table") return;
+    if (isTableView) return;
     const sentinel = listSentinelRef.current;
     if (!sentinel || !hasMore) return;
 
@@ -973,8 +943,18 @@ export default function IncomingMail() {
     messagesQuery.isFetchingNextPage,
     messagesQuery.fetchNextPage,
     loadedCount,
-    viewMode
+    isTableView
   ]);
+
+  useEffect(() => {
+    if (isTableView || !selectedId) return;
+    const root = requestListRef.current;
+    if (!root) return;
+    const active = root.querySelector(`.${styles.requestItemActive}`);
+    if (active instanceof HTMLElement) {
+      active.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [selectedId, isTableView, groupedMessages]);
 
   const selectedDetailQuery = useQuery({
     queryKey: ["email-messages", "detail", selectedId],
@@ -997,12 +977,12 @@ export default function IncomingMail() {
       return null;
     }
 
-    if (viewMode === "table" || !messages.length) return null;
+    if (isTableView || !messages.length) return null;
     const first = messages[0];
     return detail && detail.id === first.id ? { ...first, ...detail } : first;
-  }, [messages, selectedId, selectedDetailQuery.data, viewMode]);
+  }, [messages, selectedId, selectedDetailQuery.data, isTableView]);
 
-  const tableDrawerOpen = viewMode === "table" && selectedId != null;
+  const tableDrawerOpen = isTableView && selectedId != null;
 
   useEffect(() => {
     if (!selectedMessage) return;
@@ -1021,8 +1001,10 @@ export default function IncomingMail() {
     const openAttachmentsView = attachmentsFocusRef.current === selectedMessage.id;
     if (openAttachmentsView) {
       setEmailBodyExpanded(true);
+      setAttachmentsExpanded(true);
     } else {
       setEmailBodyExpanded(false);
+      setAttachmentsExpanded(false);
     }
     setEmailBodyText(null);
     setEmailBodyLoading(false);
@@ -1043,36 +1025,6 @@ export default function IncomingMail() {
       attachmentsSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 120);
   }, [selectedMessage?.id, selectedDetailQuery.isFetching, selectedDetailQuery.dataUpdatedAt]);
-
-  useEffect(() => {
-    const element = pipelineListRef.current;
-    if (!element) return;
-
-    const updateLayout = () => {
-      setPipelineMaxPerRow(maxBlocksPerRow(element.getBoundingClientRect().width));
-    };
-
-    updateLayout();
-    const observer = new ResizeObserver(updateLayout);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-
-  const pipelineRows = useMemo(() => {
-    const rowSizes = splitBalancedRows(PIPELINE_STEPS.length, pipelineMaxPerRow);
-    const rows: Array<{ steps: (typeof PIPELINE_STEPS)[number][]; startIndex: number }> = [];
-    let offset = 0;
-
-    for (const size of rowSizes) {
-      rows.push({
-        steps: PIPELINE_STEPS.slice(offset, offset + size),
-        startIndex: offset
-      });
-      offset += size;
-    }
-
-    return rows;
-  }, [pipelineMaxPerRow]);
 
   const departmentOptions = useMemo(
     () =>
@@ -1200,9 +1152,96 @@ export default function IncomingMail() {
           ? "Сохраняем решение human-in-the-loop…"
           : null;
 
+  useEffect(() => {
+    if (isTableView || !isWidePipeline) {
+      const listEl = requestListRef.current;
+      if (listEl) listEl.style.maxHeight = "";
+      return;
+    }
+
+    let rafId = 0;
+
+    const sync = () => {
+      const listEl = requestListRef.current;
+      const anchorEl = saveButtonRef.current ?? contentCardRef.current;
+      if (!listEl || !anchorEl) return;
+
+      const listTop = listEl.getBoundingClientRect().top;
+      const anchorBottom = anchorEl.getBoundingClientRect().bottom;
+      const minViewportPx = readRequestListViewportMinPx(listEl);
+      const anchorHeight = Math.round(anchorBottom - listTop);
+      const maxH = Math.max(minViewportPx, anchorHeight);
+      listEl.style.maxHeight = `${maxH}px`;
+    };
+
+    const scheduleSync = () => {
+      cancelAnimationFrame(rafId);
+      rafId = requestAnimationFrame(() => {
+        rafId = requestAnimationFrame(sync);
+      });
+    };
+
+    scheduleSync();
+    const ro = new ResizeObserver(scheduleSync);
+    const listEl = requestListRef.current;
+    const contentEl = contentCardRef.current;
+    const requestsCardEl = listEl?.closest(`.${styles.requestsCard}`);
+    if (listEl) ro.observe(listEl);
+    if (contentEl) ro.observe(contentEl);
+    if (requestsCardEl instanceof HTMLElement) ro.observe(requestsCardEl);
+    window.addEventListener("resize", scheduleSync);
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro.disconnect();
+      window.removeEventListener("resize", scheduleSync);
+      if (listEl) listEl.style.maxHeight = "";
+    };
+  }, [
+    isTableView,
+    isWidePipeline,
+    selectedMessage?.id,
+    selectedMessage?.status,
+    emailBodyExpanded,
+    attachmentsExpanded,
+    groupedMessages.length,
+    feedback,
+    processingLabel
+  ]);
+
   const pipelineProgress = selectedMessage
     ? pipelineIndexForStatus(selectedMessage.status)
     : -1;
+
+  const pipelineStepRows = useMemo(() => {
+    const rows: Array<(typeof PIPELINE_STEPS)[number][]> = [];
+    for (let index = 0; index < PIPELINE_STEPS.length; index += 2) {
+      rows.push(PIPELINE_STEPS.slice(index, index + 2));
+    }
+    return rows;
+  }, []);
+
+  const renderPipelineStep = (step: (typeof PIPELINE_STEPS)[number], index: number) => {
+    const done = selectedMessage ? index <= pipelineProgress : false;
+    const active = selectedMessage ? index === pipelineProgress : false;
+
+    return (
+      <div className={styles.pipelineNode}>
+        <div
+          className={`${styles.pipelineItem} ${done ? styles.pipelineItemDone : ""} ${
+            active ? styles.pipelineItemActive : ""
+          }`}
+        >
+          <span className={styles.pipelineIndex}>
+            {done ? <CheckCircle2 strokeWidth={2.2} aria-hidden="true" /> : index + 1}
+          </span>
+          <span className={styles.pipelineBody}>
+            <span className={styles.pipelineTitle}>{step.label}</span>
+            <span className={styles.pipelineHint}>{step.hint}</span>
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   function handleRefreshList() {
     void messagesQuery.refetch();
@@ -1263,6 +1302,7 @@ export default function IncomingMail() {
     if (isSameMessage) {
       attachmentsFocusRef.current = null;
       setEmailBodyExpanded(true);
+      setAttachmentsExpanded(true);
       void loadEmailBodyIfMissing(message);
       scrollToAttachmentsSection();
     }
@@ -1281,10 +1321,6 @@ export default function IncomingMail() {
 
   function handleCloseDrawer() {
     setSelectedId(null);
-  }
-
-  function handleToggleViewMode() {
-    setViewMode((current) => (current === "cards" ? "table" : "cards"));
   }
 
   function handleTableOperatorApprove(message: EmailMessage) {
@@ -1534,41 +1570,55 @@ export default function IncomingMail() {
 
   return (
     <div
-      className={`${styles.page} ${viewMode === "table" ? styles.pageTableMode : ""} ${
-        tableDrawerOpen ? styles.pageDrawerOpen : ""
-      }`}
+      className={`${styles.page} ${isTableView ? styles.pageTableLayout : ""} ${
+        isSecretTable ? styles.pageTableMode : ""
+      } ${tableDrawerOpen ? styles.pageDrawerOpen : ""}`}
       data-incoming-mail-page
-      data-table-mode={viewMode === "table" ? "true" : undefined}
+      data-table-layout={isTableView ? "true" : undefined}
+      data-table-mode={isSecretTable ? "true" : undefined}
     >
       <header className={styles.header}>
-        <Link to="/agents" className={styles.backLink}>
+        <Link
+          to={isTableView ? INCOMING_CORRESPONDENCE_AGENT_PATH : "/agents"}
+          className={styles.backLink}
+        >
           <ArrowLeft size={14} strokeWidth={2.2} aria-hidden="true" />
-          Каталог агентов
+          {isTableView ? "Входящая корреспонденция" : "Каталог агентов"}
         </Link>
         <div className={styles.headerRow}>
           <div>
-            <h1>{AGENT_TITLE}</h1>
-            {viewMode !== "table" ? <p>{AGENT_DESCRIPTION}</p> : null}
+            <h1>{isTableView ? "Вид 1С" : AGENT_TITLE}</h1>
+            {!isTableView ? <p>{AGENT_DESCRIPTION}</p> : null}
           </div>
           <div className={styles.headerActions}>
-            <button
-              type="button"
-              className={`${styles.secondaryButton} ${viewMode === "table" ? styles.viewModeActive : ""}`}
-              onClick={handleToggleViewMode}
-              aria-pressed={viewMode === "table"}
-              title="Переключить режим «Вид 1С»"
-            >
-              Вид 1С
-            </button>
-            <span className={styles.agentBadge}>
+            {!isSecretTable ? (
+              <Link
+                to={
+                  viewMode === "table"
+                    ? INCOMING_CORRESPONDENCE_AGENT_PATH
+                    : INCOMING_CORRESPONDENCE_1C_PATH
+                }
+                className={`${styles.secondaryButton} ${viewMode === "table" ? styles.viewModeActive : ""}`}
+                aria-current={viewMode === "table" ? "page" : undefined}
+                title={viewMode === "table" ? "Вернуться к карточному виду" : "Открыть табличный вид 1С"}
+              >
+                Вид 1С
+              </Link>
+            ) : (
+              <Link to={INCOMING_CORRESPONDENCE_1C_PATH} className={styles.secondaryButton}>
+                <span className={styles.secondaryButtonLabelFull}>Вернуться на обычный вид 1С</span>
+                <span className={styles.secondaryButtonLabelShort}>Обычный вид 1С</span>
+              </Link>
+            )}
+            <Link to={INCOMING_CORRESPONDENCE_1C_SECRET_PATH} className={styles.agentBadge}>
               <Sparkles size={14} strokeWidth={2.2} aria-hidden="true" />
               agent_pochta · v0.2
-            </span>
+            </Link>
           </div>
         </div>
       </header>
 
-      {viewMode !== "table" ? (
+      {!isTableView ? (
       <section className={styles.statsRow} aria-label="Сводка по письмам">
         <article className={styles.statCard}>
           <span className={styles.statLabel}>Всего писем</span>
@@ -1601,71 +1651,105 @@ export default function IncomingMail() {
       </section>
       ) : null}
 
-      {viewMode === "cards" ? (
+      {!isTableView ? (
       <section className={styles.pipelineCard} aria-label="Граф обработки">
-        <h2>Граф агента</h2>
-        <div className={styles.pipelineList} ref={pipelineListRef}>
-          <div className={styles.pipelineRows}>
-            {pipelineRows.map((row) => (
-              <div key={row.startIndex} className={styles.pipelineRow}>
-                {row.steps.map((step, columnIndex) => {
-                  const index = row.startIndex + columnIndex;
-                  const done = selectedMessage ? index <= pipelineProgress : false;
-                  const active = selectedMessage ? index === pipelineProgress : false;
+        <details className={styles.pipelineCollapsible} open={isWidePipeline || undefined}>
+          <summary className={styles.pipelineSummary}>
+            <span className={styles.pipelineSummaryTitle}>Граф агента</span>
+            <span className={styles.pipelineSummaryMeta}>
+              {selectedMessage
+                ? `${pipelineProgress + 1}/${PIPELINE_STEPS.length} · ${PIPELINE_STEPS[pipelineProgress]?.label ?? "—"}`
+                : `${PIPELINE_STEPS.length} шагов`}
+            </span>
+          </summary>
+          <div className={styles.pipelineList}>
+            {isWidePipeline ? (
+              <div className={styles.pipelineRow}>
+                {PIPELINE_STEPS.map((step, index) => (
+                  <Fragment key={step.id}>
+                    {index > 0 ? (
+                      <span className={styles.pipelineArrowBetween} aria-hidden="true">
+                        <ChevronRight strokeWidth={2.2} />
+                      </span>
+                    ) : null}
+                    {renderPipelineStep(step, index)}
+                  </Fragment>
+                ))}
+              </div>
+            ) : (
+              <div className={styles.pipelineGrid}>
+                {pipelineStepRows.map((pair, rowIndex) => {
+                  const lastIndexInRow = rowIndex * 2 + pair.length - 1;
                   return (
-                    <div key={step.id} className={styles.pipelineSegment}>
-                      {columnIndex > 0 ? (
-                        <span className={styles.pipelineArrowBetween} aria-hidden="true">
-                          <ChevronRight size={16} strokeWidth={2.2} />
+                    <div key={pair[0]?.id ?? rowIndex} className={styles.pipelineGridRow}>
+                      {pair.map((step, columnIndex) => {
+                        const index = rowIndex * 2 + columnIndex;
+                        return (
+                          <Fragment key={step.id}>
+                            {columnIndex > 0 ? (
+                              <span
+                                className={`${styles.pipelineArrowBetween} ${styles.pipelineArrowHorizontal}`}
+                                aria-hidden="true"
+                              >
+                                <ChevronRight strokeWidth={2.2} />
+                              </span>
+                            ) : null}
+                            {renderPipelineStep(step, index)}
+                          </Fragment>
+                        );
+                      })}
+                      {lastIndexInRow < PIPELINE_STEPS.length - 1 ? (
+                        <span
+                          className={`${styles.pipelineArrowBetween} ${styles.pipelineArrowRowEnd}`}
+                          aria-hidden="true"
+                        >
+                          <ChevronRight strokeWidth={2.2} />
                         </span>
                       ) : null}
-                      <div className={styles.pipelineNode}>
-                        <div
-                          className={`${styles.pipelineItem} ${done ? styles.pipelineItemDone : ""} ${
-                            active ? styles.pipelineItemActive : ""
-                          }`}
-                        >
-                          <span className={styles.pipelineIndex}>
-                            {done ? (
-                              <CheckCircle2 size={14} strokeWidth={2.2} aria-hidden="true" />
-                            ) : (
-                              index + 1
-                            )}
-                          </span>
-                          <span className={styles.pipelineBody}>
-                            <span className={styles.pipelineTitle}>{step.label}</span>
-                            <span className={styles.pipelineHint}>{step.hint}</span>
-                          </span>
-                        </div>
-                      </div>
                     </div>
                   );
                 })}
               </div>
-            ))}
+            )}
           </div>
-        </div>
+        </details>
       </section>
       ) : null}
 
       <div
-        className={`${styles.layout} ${viewMode === "table" ? styles.layoutTableFull : ""}`}
+        className={`${styles.layout} ${isTableView ? styles.layoutTableFull : ""}`}
       >
         <aside
-          className={`${styles.requestsCard} ${viewMode === "table" ? styles.requestsCardTable : ""}`}
-          aria-label={viewMode === "table" ? "Таблица писем" : "Список писем"}
+          className={`${styles.requestsCard} ${isTableView ? styles.requestsCardTable : ""}`}
+          aria-label={isTableView ? "Таблица писем" : "Список писем"}
         >
-          {viewMode === "table" ? (
+          {isTableView ? (
             <div className={styles.tableToolbar}>
               <h2 className={styles.tableToolbarTitle}>Вид 1С</h2>
-              <input
-                type="search"
-                className={styles.tableToolbarSearch}
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                placeholder="Поиск…"
-                aria-label="Поиск по теме или отправителю"
-              />
+              <div className={styles.tableToolbarPrimary}>
+                <input
+                  type="search"
+                  className={styles.tableToolbarSearch}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder="Поиск…"
+                  aria-label="Поиск по теме или отправителю"
+                />
+                <button
+                  type="button"
+                  className={styles.iconButton}
+                  disabled={isListFetching}
+                  onClick={handleRefreshList}
+                  aria-label="Обновить список писем"
+                  title="Обновить"
+                >
+                  {isListFetching ? (
+                    <LoaderCircle size={16} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
+                  ) : (
+                    <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
               <button
                 type="button"
                 className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
@@ -1675,32 +1759,34 @@ export default function IncomingMail() {
               >
                 Только info
               </button>
-              <input
-                type="date"
-                className={styles.tableToolbarDate}
-                value={dateFrom}
-                onChange={(event) => setDateFrom(event.target.value)}
-                aria-label="Дата с"
-                title="Дата с"
-              />
-              <span className={styles.dateSeparator}>—</span>
-              <input
-                type="date"
-                className={styles.tableToolbarDate}
-                value={dateTo}
-                onChange={(event) => setDateTo(event.target.value)}
-                aria-label="Дата по"
-                title="Дата по"
-              />
-              {dateFrom || dateTo ? (
-                <button
-                  type="button"
-                  className={styles.clearFiltersButton}
-                  onClick={handleClearDateFilters}
-                >
-                  Сброс
-                </button>
-              ) : null}
+              <div className={styles.tableToolbarDates}>
+                <input
+                  type="date"
+                  className={styles.tableToolbarDate}
+                  value={dateFrom}
+                  onChange={(event) => setDateFrom(event.target.value)}
+                  aria-label="Дата с"
+                  title="Дата с"
+                />
+                <span className={styles.dateSeparator}>—</span>
+                <input
+                  type="date"
+                  className={styles.tableToolbarDate}
+                  value={dateTo}
+                  onChange={(event) => setDateTo(event.target.value)}
+                  aria-label="Дата по"
+                  title="Дата по"
+                />
+                {dateFrom || dateTo ? (
+                  <button
+                    type="button"
+                    className={styles.clearFiltersButton}
+                    onClick={handleClearDateFilters}
+                  >
+                    Сброс
+                  </button>
+                ) : null}
+              </div>
               <div className={styles.tableToolbarTabs} role="tablist" aria-label="Фильтр по статусу">
                 {STATUS_TABS.map((tab) => (
                   <button
@@ -1715,25 +1801,19 @@ export default function IncomingMail() {
                   </button>
                 ))}
               </div>
-              <button
-                type="button"
-                className={styles.iconButton}
-                disabled={isListFetching}
-                onClick={handleRefreshList}
-                aria-label="Обновить список писем"
-                title="Обновить"
-              >
-                {isListFetching ? (
-                  <LoaderCircle size={16} strokeWidth={2.2} className={styles.spin} aria-hidden="true" />
-                ) : (
-                  <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
-                )}
-              </button>
             </div>
           ) : (
             <>
               <div className={styles.requestsToolbar}>
                 <h2>Входящие письма</h2>
+                <input
+                  type="search"
+                  className={`${styles.searchInput} ${styles.requestsToolbarSearch}`}
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  placeholder={isWidePipeline ? "Поиск по теме или отправителю" : "Поиск…"}
+                  aria-label="Поиск по теме или отправителю"
+                />
                 <button
                   type="button"
                   className={styles.iconButton}
@@ -1751,53 +1831,50 @@ export default function IncomingMail() {
               </div>
 
               <div className={styles.filtersRow}>
-                <input
-                  type="search"
-                  className={styles.searchInput}
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  placeholder="Поиск по теме или отправителю"
-                  aria-label="Поиск по теме или отправителю"
-                />
-                <div className={styles.recipientFilters}>
-                  <button
-                    type="button"
-                    className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
-                    aria-pressed={infoRecipientOnly}
-                    onClick={() => setInfoRecipientOnly((value) => !value)}
-                    title="Показать письма, где получатель содержит info (info@turbo-don.ru и т.п.)"
-                  >
-                    Только info
-                  </button>
-                </div>
-                <div className={styles.dateFilters}>
-                  <input
-                    type="date"
-                    className={styles.dateInput}
-                    value={dateFrom}
-                    onChange={(event) => setDateFrom(event.target.value)}
-                    aria-label="Дата с"
-                    title="Дата с"
-                  />
-                  <span className={styles.dateSeparator}>—</span>
-                  <input
-                    type="date"
-                    className={styles.dateInput}
-                    value={dateTo}
-                    onChange={(event) => setDateTo(event.target.value)}
-                    aria-label="Дата по"
-                    title="Дата по"
-                  />
-                  {dateFrom || dateTo ? (
-                    <button
-                      type="button"
-                      className={styles.clearFiltersButton}
-                      onClick={handleClearDateFilters}
-                    >
-                      Сбросить даты
-                    </button>
-                  ) : null}
-                </div>
+                <details className={styles.filtersCollapsible} open={isWidePipeline || undefined}>
+                  <summary className={styles.filtersSummary}>Даты и получатель</summary>
+                  <div className={styles.filtersCollapsibleBody}>
+                    <div className={styles.recipientFilters}>
+                      <button
+                        type="button"
+                        className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
+                        aria-pressed={infoRecipientOnly}
+                        onClick={() => setInfoRecipientOnly((value) => !value)}
+                        title="Показать письма, где получатель содержит info (info@turbo-don.ru и т.п.)"
+                      >
+                        Только info
+                      </button>
+                    </div>
+                    <div className={styles.dateFilters}>
+                      <input
+                        type="date"
+                        className={styles.dateInput}
+                        value={dateFrom}
+                        onChange={(event) => setDateFrom(event.target.value)}
+                        aria-label="Дата с"
+                        title="Дата с"
+                      />
+                      <span className={styles.dateSeparator}>—</span>
+                      <input
+                        type="date"
+                        className={styles.dateInput}
+                        value={dateTo}
+                        onChange={(event) => setDateTo(event.target.value)}
+                        aria-label="Дата по"
+                        title="Дата по"
+                      />
+                      {dateFrom || dateTo ? (
+                        <button
+                          type="button"
+                          className={styles.clearFiltersButton}
+                          onClick={handleClearDateFilters}
+                        >
+                          Сбросить даты
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                </details>
               </div>
 
               <div className={styles.tabs} role="tablist" aria-label="Фильтр по статусу">
@@ -1830,7 +1907,7 @@ export default function IncomingMail() {
             ) : (
               <div className={styles.emptyStateCompact}>Писем по выбранному фильтру пока нет.</div>
             )
-          ) : viewMode === "table" ? (
+          ) : isTableView ? (
             <div className={styles.tableHost}>
             <div
               className={styles.reviewHotbar}
@@ -1897,6 +1974,7 @@ export default function IncomingMail() {
             </div>
           ) : (
             <div
+              ref={requestListRef}
               className={`${styles.requestList} ${isListDimmed ? styles.requestListFetching : ""}`}
             >
               {groupedMessages.map((group) => (
@@ -1961,12 +2039,12 @@ export default function IncomingMail() {
 
         <div
           className={
-            viewMode === "table"
+            isTableView
               ? `${styles.detailDrawer} ${tableDrawerOpen ? styles.detailDrawerVisible : ""}`
               : styles.detailDrawerInline
           }
         >
-        <main className={styles.contentCard}>
+        <main className={styles.contentCard} ref={contentCardRef}>
           {tableDrawerOpen && selectedMessage ? (
             <div className={styles.detailDrawerHeader}>
               <h2 className={styles.detailDrawerTitle}>{messagePreview(selectedMessage)}</h2>
@@ -2002,12 +2080,12 @@ export default function IncomingMail() {
           ) : null}
 
           {!selectedMessage ? (
-            viewMode === "table" ? null : (
+            isTableView ? null : (
             <div className={styles.emptyState}>Выберите письмо из списка слева.</div>
             )
           ) : (
             <>
-              {viewMode !== "table" ? (
+              {!isTableView ? (
               <div>
                 <h2>{messagePreview(selectedMessage)}</h2>
                 <p className={styles.contentIntro}>{formatMailHeaderLine(selectedMessage)}</p>
@@ -2109,67 +2187,89 @@ export default function IncomingMail() {
                 <div ref={attachmentsSectionRef} className={styles.detailBlock}>
                   <span className={styles.detailBlockTitle}>Вложенные файлы</span>
                   {(selectedMessage.attachments?.length ?? 0) > 0 ? (
-                    <div className={styles.fileList}>
-                      {selectedMessage.attachments!.map((att, idx) => {
-                        const index = attachmentIndex(att, idx);
-                        const sizeLabel = formatFileSize(att.size_bytes);
-                        const previewKind = attachmentPreviewKind(att);
-                        const isDownloading = downloadingAttachmentIndex === index;
-                        const isPreviewing = previewingAttachmentIndex === index;
-                        return (
-                          <div key={`${index}-${att.filename}`} className={styles.fileRow}>
-                            <div>
-                              <div className={styles.fileName}>{att.filename || `Файл ${index + 1}`}</div>
-                              {sizeLabel || att.mime_type ? (
-                                <div className={styles.fileMeta}>
-                                  {[sizeLabel, att.mime_type].filter(Boolean).join(" · ")}
+                    <>
+                      <div className={styles.fileList}>
+                        {selectedMessage
+                          .attachments!.map((att, idx) => ({ att, idx }))
+                          .slice(0, attachmentsExpanded ? undefined : ATTACHMENTS_VISIBLE_LIMIT)
+                          .map(({ att, idx }) => {
+                            const index = attachmentIndex(att, idx);
+                            const sizeLabel = formatFileSize(att.size_bytes);
+                            const previewKind = attachmentPreviewKind(att);
+                            const isDownloading = downloadingAttachmentIndex === index;
+                            const isPreviewing = previewingAttachmentIndex === index;
+                            return (
+                              <div key={`${index}-${att.filename}`} className={styles.fileRow}>
+                                <div>
+                                  <div className={styles.fileName}>{att.filename || `Файл ${index + 1}`}</div>
+                                  {sizeLabel || att.mime_type ? (
+                                    <div className={styles.fileMeta}>
+                                      {[sizeLabel, att.mime_type].filter(Boolean).join(" · ")}
+                                    </div>
+                                  ) : null}
                                 </div>
-                              ) : null}
-                            </div>
-                            <div className={styles.fileActions}>
-                              {previewKind ? (
-                                <button
-                                  type="button"
-                                  className={styles.primaryButton}
-                                  disabled={isBusy || isPreviewing}
-                                  onClick={() => void handlePreviewAttachment(att, idx)}
-                                >
-                                  {isPreviewing ? (
-                                    <LoaderCircle
-                                      size={16}
-                                      strokeWidth={2.2}
-                                      className={styles.spin}
-                                      aria-hidden="true"
-                                    />
-                                  ) : (
-                                    <Eye size={16} strokeWidth={2.2} aria-hidden="true" />
-                                  )}
-                                  Просмотр
-                                </button>
-                              ) : null}
-                              <button
-                                type="button"
-                                className={styles.secondaryButton}
-                                disabled={isBusy || downloadingAttachmentIndex != null || downloadingXml}
-                                onClick={() => void handleDownloadAttachment(att, idx)}
-                              >
-                                {isDownloading ? (
-                                  <LoaderCircle
-                                    size={16}
-                                    strokeWidth={2.2}
-                                    className={styles.spin}
-                                    aria-hidden="true"
-                                  />
-                                ) : (
-                                  <Download size={16} strokeWidth={2.2} aria-hidden="true" />
-                                )}
-                                Скачать
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
+                                <div className={styles.fileActions}>
+                                  {previewKind ? (
+                                    <button
+                                      type="button"
+                                      className={styles.primaryButton}
+                                      disabled={isBusy || isPreviewing}
+                                      onClick={() => void handlePreviewAttachment(att, idx)}
+                                    >
+                                      {isPreviewing ? (
+                                        <LoaderCircle
+                                          size={16}
+                                          strokeWidth={2.2}
+                                          className={styles.spin}
+                                          aria-hidden="true"
+                                        />
+                                      ) : (
+                                        <Eye size={16} strokeWidth={2.2} aria-hidden="true" />
+                                      )}
+                                      Просмотр
+                                    </button>
+                                  ) : null}
+                                  <button
+                                    type="button"
+                                    className={styles.secondaryButton}
+                                    disabled={isBusy || downloadingAttachmentIndex != null || downloadingXml}
+                                    onClick={() => void handleDownloadAttachment(att, idx)}
+                                  >
+                                    {isDownloading ? (
+                                      <LoaderCircle
+                                        size={16}
+                                        strokeWidth={2.2}
+                                        className={styles.spin}
+                                        aria-hidden="true"
+                                      />
+                                    ) : (
+                                      <Download size={16} strokeWidth={2.2} aria-hidden="true" />
+                                    )}
+                                    Скачать
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })}
+                      </div>
+                      {selectedMessage.attachments!.length > ATTACHMENTS_VISIBLE_LIMIT ? (
+                        <button
+                          type="button"
+                          className={styles.fileListToggle}
+                          aria-expanded={attachmentsExpanded}
+                          onClick={() => setAttachmentsExpanded((current) => !current)}
+                        >
+                          {attachmentsExpanded
+                            ? "Свернуть"
+                            : `ещё ${selectedMessage.attachments!.length - ATTACHMENTS_VISIBLE_LIMIT}`}
+                          {attachmentsExpanded ? (
+                            <ChevronUp size={16} strokeWidth={2.2} aria-hidden="true" />
+                          ) : (
+                            <ChevronDown size={16} strokeWidth={2.2} aria-hidden="true" />
+                          )}
+                        </button>
+                      ) : null}
+                    </>
                   ) : (selectedMessage.attachments_count ?? 0) > 0 ? (
                     <p className={styles.detailTextMuted}>
                       Список вложений недоступен ({selectedMessage.attachments_count})
@@ -2339,6 +2439,7 @@ export default function IncomingMail() {
                       )
                     ) : null}
                     <button
+                      ref={saveButtonRef}
                       type="button"
                       className={styles.primaryButton}
                       disabled={isBusy || !hitlDepartmentId}
@@ -2354,7 +2455,7 @@ export default function IncomingMail() {
           )}
         </main>
 
-        {viewMode !== "table" ? (
+        {!isTableView ? (
         <aside className={styles.summaryCard} aria-label="Сводка письма">
           <h2>Сводка</h2>
           {!selectedMessage ? (

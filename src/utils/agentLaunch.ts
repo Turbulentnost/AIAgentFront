@@ -9,6 +9,8 @@ export const TASKS_AGENT_SLUG = "tasks_agent";
 export const TASKS_AGENT_PATH = "/agents/tasks";
 export const INCOMING_CORRESPONDENCE_AGENT_SLUG = "incoming_correspondence_agent";
 export const INCOMING_CORRESPONDENCE_AGENT_PATH = "/agents/incoming-mail";
+export const INCOMING_CORRESPONDENCE_1C_PATH = "/agents/incoming-mail/1c";
+export const INCOMING_CORRESPONDENCE_1C_SECRET_PATH = "/agents/incoming-mail/1c/secret";
 export const PROCUREMENT_AGENT_SLUG = "procurement_logistics_agent";
 /** Catalog role card shown as «ИИ-агент менеджера по закупкам» (same workspace). */
 export const PURCHASE_MANAGER_AGENT_SLUG = "purchase_manager_agent";

@@ -1314,3 +1314,47 @@
   color: #9d174d;
 }
 
+@media (max-width: 768px) {
+  .tableWrapper {
+    width: 100%;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .tableBodyScroll {
+    overflow-x: auto;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: thin;
+  }
+
+  .tableBodyScroll::-webkit-scrollbar:horizontal {
+    height: 8px;
+    display: block;
+  }
+
+  .tableBodyScrollHasHScroll {
+    padding-bottom: 0;
+  }
+
+  .stickyHScrollTrack {
+    display: none !important;
+  }
+
+  .table {
+    min-width: 980px;
+  }
+
+  .footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .exportGroup {
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+}

@@ -37,10 +37,16 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
-function IncomingMailRoute() {
+function IncomingMailRoute({ viewMode }: { viewMode: "cards" | "table" | "table-secret" }) {
+  const title =
+    viewMode === "cards"
+      ? "Входящая корреспонденция"
+      : viewMode === "table-secret"
+        ? "Вид 1С — входящая корреспонденция"
+        : "Вид 1С — входящая корреспонденция";
   const page = (
-    <Layout title="Входящая корреспонденция">
-      <IncomingMail />
+    <Layout title={title}>
+      <IncomingMail viewMode={viewMode} />
     </Layout>
   );
   if (isIncomingMailPublic()) return page;
@@ -57,7 +63,9 @@ export default function App() {
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
-      <Route path="/agents/incoming-mail" element={<IncomingMailRoute />} />
+      <Route path="/agents/incoming-mail" element={<IncomingMailRoute viewMode="cards" />} />
+      <Route path="/agents/incoming-mail/1c" element={<IncomingMailRoute viewMode="table" />} />
+      <Route path="/agents/incoming-mail/1c/secret" element={<IncomingMailRoute viewMode="table-secret" />} />
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/procurement-manager" element={<ProtectedRoute><Layout title="Менеджер по закупкам"><ProcurementManagerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="Инженер по подготовке производства"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
