@@ -108,10 +108,6 @@
   padding-bottom: 8px;
 }
 
-.pageTableLayout .headerRow h1 {
-  font-size: 18px;
-}
-
 .pageTableLayout.pageDrawerOpen .requestsCardTable {
   margin-right: var(--drawer-width);
   transition: margin-right 0.22s ease-out;
@@ -224,8 +220,11 @@
 }
 
 .pageTableMode .headerRow h1 {
-  font-size: 18px;
   color: var(--tanya-pink-text);
+}
+
+.pageTableMode .headerRow p {
+  color: var(--tanya-pink-text-muted);
 }
 
 .pageTableMode .backLink {
@@ -947,6 +946,45 @@ button.tabActive {
   color: var(--color-primary-text);
 }
 
+.filtersPanel .tab {
+  background: var(--color-surface);
+}
+
+.filtersPanel .tabActive,
+.filtersPanel button.tabActive {
+  border-color: var(--color-border-accent);
+  background: var(--color-info-surface);
+  color: var(--color-primary-text);
+}
+
+.filtersPanel .tabActiveDone,
+.filtersPanel button.tabActiveDone {
+  border-color: var(--color-success);
+  background: var(--color-success-soft);
+  color: var(--color-success-text);
+}
+
+.filtersPanel .tabActiveSpam,
+.filtersPanel button.tabActiveSpam {
+  border-color: var(--color-danger-border);
+  background: var(--color-danger-soft);
+  color: var(--color-danger-text);
+}
+
+.filtersPanel .tabActiveReview,
+.filtersPanel button.tabActiveReview {
+  border-color: var(--color-warning);
+  background: var(--color-warning-surface);
+  color: var(--color-warning-dark);
+}
+
+.filtersPanel .tabActiveError,
+.filtersPanel button.tabActiveError {
+  border-color: var(--color-error-orange-border);
+  background: var(--color-error-orange-soft);
+  color: var(--color-error-orange-text);
+}
+
 button.clearFiltersButton {
   background: transparent;
   color: var(--color-primary-text);
@@ -978,6 +1016,17 @@ button.spamButton {
 .filtersRow {
   display: grid;
   gap: 8px;
+}
+
+.filtersPanel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--layout-gap);
+  padding: 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
 }
 
 .filtersCollapsible {
@@ -1012,11 +1061,21 @@ button.spamButton {
 
 .filtersCollapsibleBody {
   display: grid;
-  gap: 8px;
+  gap: var(--layout-gap);
+  min-width: 0;
 }
 
-.recipientFilters {
+.filtersLeftGroup {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.recipientFilter {
+  display: flex;
+  flex: 0 0 auto;
   flex-wrap: wrap;
   gap: 6px;
 }
@@ -1313,7 +1372,6 @@ button.requestItemActive:hover {
   grid-template-areas: "requests content summary";
   gap: var(--layout-gap);
   align-items: start;
-  margin-top: var(--columns-top-offset);
 }
 
 
@@ -1849,8 +1907,8 @@ button.requestItemActive:hover {
 }
 
 .statusError {
-  background: var(--color-danger-soft);
-  color: var(--color-danger-text);
+  background: var(--color-error-orange-soft);
+  color: var(--color-error-orange-text);
 }
 
 .confidenceBadge {
@@ -2041,9 +2099,16 @@ button.requestItemActive:hover {
       "header header"
       "stats stats"
       "pipeline pipeline"
+      "filters filters"
       "requests requests"
       "content content"
       "summary summary";
+  }
+
+  .filtersPanel {
+    grid-area: filters;
+    padding: 10px;
+    gap: var(--layout-gap);
   }
 
   .header {
@@ -2414,6 +2479,11 @@ button.requestItemActive:hover {
     margin-left: 0;
   }
 
+  .filtersPanel {
+    padding: 10px;
+    gap: var(--layout-gap);
+  }
+
   .filtersSummary {
     display: flex;
   }
@@ -2500,7 +2570,13 @@ button.requestItemActive:hover {
     gap: 10px;
   }
 
-  .recipientFilters {
+  .filtersLeftGroup {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--layout-gap);
+  }
+
+  .recipientFilter {
     gap: 8px;
   }
 
@@ -2549,22 +2625,6 @@ button.requestItemActive:hover {
     min-height: 0;
     width: 100%;
     margin-top: 0;
-  }
-
-  .pageTableLayout .headerRow,
-  .pageTableMode .headerRow {
-    flex-direction: row;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .pageTableLayout .headerActions,
-  .pageTableMode .headerActions {
-    width: auto;
-    margin-left: auto;
-    flex-wrap: wrap;
-    justify-content: flex-end;
   }
 
   .pageTableLayout .header,
@@ -2702,8 +2762,6 @@ button.requestItemActive:hover {
   }
 
   .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .requestsToolbar,
-  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .filtersRow,
-  .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .tabs,
   .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .listFetchingBar,
   .page:not(.pageTableLayout):not(.pageTableMode) .requestsCard .emptyStateCompact {
     flex-shrink: 0;
@@ -2739,6 +2797,42 @@ button.requestItemActive:hover {
   }
 
   .filtersCollapsibleBody {
-    display: contents;
+    display: block;
+  }
+
+  .filtersLeftGroup {
+    flex-direction: row;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .filtersPanel {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--layout-gap);
+  }
+
+  .filtersPanel .filtersRow {
+    flex: 0 1 auto;
+    min-width: 0;
+  }
+
+  .filtersPanel .filtersCollapsible {
+    display: block;
+    min-width: 0;
+  }
+
+  .filtersPanel .dateFilters {
+    flex: 0 1 auto;
+    flex-wrap: nowrap;
+  }
+
+  .filtersPanel .tabs {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin-left: auto;
+    justify-content: flex-end;
   }
 }

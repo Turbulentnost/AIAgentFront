@@ -35,6 +35,9 @@ color-scheme: dark;
   --color-amber-soft: rgba(210, 153, 34, 0.15);
   --color-violet-soft: rgba(163, 113, 247, 0.15);
   --color-orange-soft: rgba(219, 109, 40, 0.15);
+  --color-error-orange-soft: rgba(249, 115, 22, 0.18);
+  --color-error-orange-border: #f97316;
+  --color-error-orange-text: #fb923c;
   --color-gray-soft: rgba(139, 148, 158, 0.12);
 
   --color-success: #3fb950;
@@ -529,6 +532,9 @@ color-scheme: light;
   --color-amber-soft: #fff5e8;
   --color-violet-soft: #f2edff;
   --color-orange-soft: #fff4eb;
+  --color-error-orange-soft: #fff7ed;
+  --color-error-orange-border: #f97316;
+  --color-error-orange-text: #ea580c;
   --color-gray-soft: #f1f5f9;
 
   --color-success: #16a34a;

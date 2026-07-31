@@ -181,6 +181,22 @@ function statusTone(status: EmailMessageStatus): string {
   return styles.statusProgress;
 }
 
+function statusFilterTabActiveClass(tabId: StatusFilter, activeFilter: StatusFilter): string {
+  if (activeFilter !== tabId) return "";
+  switch (tabId) {
+    case "done":
+      return styles.tabActiveDone;
+    case "spam":
+      return styles.tabActiveSpam;
+    case "awaiting_human":
+      return styles.tabActiveReview;
+    case "error":
+      return styles.tabActiveError;
+    default:
+      return styles.tabActive;
+  }
+}
+
 function formatDate(value: string | null | undefined) {
   if (!value) return "—";
   const date = new Date(value);
@@ -672,6 +688,7 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
   const [feedback, setFeedback] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const listSentinelRef = useRef<HTMLDivElement>(null);
   const requestListRef = useRef<HTMLDivElement>(null);
+  const filtersPanelRef = useRef<HTMLElement>(null);
   const contentCardRef = useRef<HTMLElement>(null);
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const tableScrollRef = useRef<HTMLDivElement>(null);
@@ -1185,9 +1202,11 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
     const ro = new ResizeObserver(scheduleSync);
     const listEl = requestListRef.current;
     const contentEl = contentCardRef.current;
+    const filtersPanelEl = filtersPanelRef.current;
     const requestsCardEl = listEl?.closest(`.${styles.requestsCard}`);
     if (listEl) ro.observe(listEl);
     if (contentEl) ro.observe(contentEl);
+    if (filtersPanelEl) ro.observe(filtersPanelEl);
     if (requestsCardEl instanceof HTMLElement) ro.observe(requestsCardEl);
     window.addEventListener("resize", scheduleSync);
     return () => {
@@ -1578,17 +1597,14 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
       data-table-mode={isSecretTable ? "true" : undefined}
     >
       <header className={styles.header}>
-        <Link
-          to={isTableView ? INCOMING_CORRESPONDENCE_AGENT_PATH : "/agents"}
-          className={styles.backLink}
-        >
+        <Link to="/agents" className={styles.backLink}>
           <ArrowLeft size={14} strokeWidth={2.2} aria-hidden="true" />
-          {isTableView ? "Входящая корреспонденция" : "Каталог агентов"}
+          Каталог агентов
         </Link>
         <div className={styles.headerRow}>
           <div>
-            <h1>{isTableView ? "Вид 1С" : AGENT_TITLE}</h1>
-            {!isTableView ? <p>{AGENT_DESCRIPTION}</p> : null}
+            <h1>{AGENT_TITLE}</h1>
+            <p>{AGENT_DESCRIPTION}</p>
           </div>
           <div className={styles.headerActions}>
             {!isSecretTable ? (
@@ -1716,6 +1732,78 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
       </section>
       ) : null}
 
+      {!isTableView ? (
+        <section
+          ref={filtersPanelRef}
+          className={styles.filtersPanel}
+          aria-label="Фильтры писем"
+        >
+          <div className={styles.filtersRow}>
+            <details className={styles.filtersCollapsible} open={isWidePipeline || undefined}>
+              <summary className={styles.filtersSummary}>Даты и получатель</summary>
+              <div className={styles.filtersCollapsibleBody}>
+                <div className={styles.filtersLeftGroup}>
+                  <div className={styles.recipientFilter}>
+                    <button
+                      type="button"
+                      className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
+                      aria-pressed={infoRecipientOnly}
+                      onClick={() => setInfoRecipientOnly((value) => !value)}
+                      title="Показать письма, где получатель содержит info (info@turbo-don.ru и т.п.)"
+                    >
+                      Только info
+                    </button>
+                  </div>
+                  <div className={styles.dateFilters}>
+                    <input
+                      type="date"
+                      className={styles.dateInput}
+                      value={dateFrom}
+                      onChange={(event) => setDateFrom(event.target.value)}
+                      aria-label="Дата с"
+                      title="Дата с"
+                    />
+                    <span className={styles.dateSeparator}>—</span>
+                    <input
+                      type="date"
+                      className={styles.dateInput}
+                      value={dateTo}
+                      onChange={(event) => setDateTo(event.target.value)}
+                      aria-label="Дата по"
+                      title="Дата по"
+                    />
+                    {dateFrom || dateTo ? (
+                      <button
+                        type="button"
+                        className={styles.clearFiltersButton}
+                        onClick={handleClearDateFilters}
+                      >
+                        Сбросить даты
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div className={styles.tabs} role="tablist" aria-label="Фильтр по статусу">
+            {STATUS_TABS.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === tab.id}
+                className={`${styles.tab} ${statusFilterTabActiveClass(tab.id, statusFilter)}`}
+                onClick={() => setStatusFilter(tab.id)}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
       <div
         className={`${styles.layout} ${isTableView ? styles.layoutTableFull : ""}`}
       >
@@ -1828,68 +1916,6 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
                     <RefreshCw size={16} strokeWidth={2.2} aria-hidden="true" />
                   )}
                 </button>
-              </div>
-
-              <div className={styles.filtersRow}>
-                <details className={styles.filtersCollapsible} open={isWidePipeline || undefined}>
-                  <summary className={styles.filtersSummary}>Даты и получатель</summary>
-                  <div className={styles.filtersCollapsibleBody}>
-                    <div className={styles.recipientFilters}>
-                      <button
-                        type="button"
-                        className={`${styles.tab} ${infoRecipientOnly ? styles.tabActive : ""}`}
-                        aria-pressed={infoRecipientOnly}
-                        onClick={() => setInfoRecipientOnly((value) => !value)}
-                        title="Показать письма, где получатель содержит info (info@turbo-don.ru и т.п.)"
-                      >
-                        Только info
-                      </button>
-                    </div>
-                    <div className={styles.dateFilters}>
-                      <input
-                        type="date"
-                        className={styles.dateInput}
-                        value={dateFrom}
-                        onChange={(event) => setDateFrom(event.target.value)}
-                        aria-label="Дата с"
-                        title="Дата с"
-                      />
-                      <span className={styles.dateSeparator}>—</span>
-                      <input
-                        type="date"
-                        className={styles.dateInput}
-                        value={dateTo}
-                        onChange={(event) => setDateTo(event.target.value)}
-                        aria-label="Дата по"
-                        title="Дата по"
-                      />
-                      {dateFrom || dateTo ? (
-                        <button
-                          type="button"
-                          className={styles.clearFiltersButton}
-                          onClick={handleClearDateFilters}
-                        >
-                          Сбросить даты
-                        </button>
-                      ) : null}
-                    </div>
-                  </div>
-                </details>
-              </div>
-
-              <div className={styles.tabs} role="tablist" aria-label="Фильтр по статусу">
-                {STATUS_TABS.map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={statusFilter === tab.id}
-                    className={`${styles.tab} ${statusFilter === tab.id ? styles.tabActive : ""}`}
-                    onClick={() => setStatusFilter(tab.id)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
               </div>
             </>
           )}
