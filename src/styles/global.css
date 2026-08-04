@@ -55,7 +55,7 @@ main { min-width: 0; flex: 1; }
   box-shadow: var(--shadow-xs);
 }
 
-/* Tanyafication: pastel pink topbar when Incoming Mail is in table mode */
+/* Вид 1С: pastel pink topbar when Incoming Mail is in table mode */
 .shell:has(.content [data-incoming-mail-page][data-table-mode="true"]) {
   --tanya-pink-page: #fdf2f8;
   --tanya-pink-surface: #fce7f3;

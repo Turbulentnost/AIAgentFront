@@ -1330,7 +1330,7 @@ export const emailMessagesApi = {
         blob: response.data,
         filename: parseContentDispositionFilename(
           response.headers["content-disposition"],
-          `tanyafication_report_${period}.xlsx`
+          `vid_1c_report_${period}.xlsx`
         )
       }))
 };

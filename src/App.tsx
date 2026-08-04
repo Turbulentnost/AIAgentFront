@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import MeetingAgent from "@/pages/MeetingAgent";
 import TasksAgent from "@/pages/TasksAgent";
 import ProcurementAgent from "@/pages/ProcurementAgent";
+import ProcurementDepartments from "@/pages/ProcurementDepartments";
 import ProductionDispatcherAgent from "@/pages/ProductionDispatcherAgent";
 import WarehousePickerAgent from "@/pages/WarehousePickerAgent";
 import WarehouseComplexChiefAgent from "@/pages/WarehouseComplexChiefAgent";
@@ -41,10 +42,16 @@ function ProtectedRoute({ children }: { children: ReactNode }) {
   return children;
 }
 
-function IncomingMailRoute() {
+function IncomingMailRoute({ viewMode }: { viewMode: "cards" | "table" | "table-secret" }) {
+  const title =
+    viewMode === "cards"
+      ? "Входящая корреспонденция"
+      : viewMode === "table-secret"
+        ? "Вид 1С — входящая корреспонденция"
+        : "Вид 1С — входящая корреспонденция";
   const page = (
-    <Layout title="Входящая корреспонденция">
-      <IncomingMail />
+    <Layout title={title}>
+      <IncomingMail viewMode={viewMode} />
     </Layout>
   );
   if (isIncomingMailPublic()) return page;
@@ -61,8 +68,11 @@ export default function App() {
       <Route path="/agents/nd-control" element={<ProtectedRoute><Layout title="Контроль НД"><NdControlAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/meeting" element={<ProtectedRoute><Layout title="ИИ-агент: Планирование совещаний"><MeetingAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/tasks" element={<ProtectedRoute><Layout title="Агент контроля поручений"><TasksAgent /></Layout></ProtectedRoute>} />
-      <Route path="/agents/incoming-mail" element={<IncomingMailRoute />} />
+      <Route path="/agents/incoming-mail" element={<IncomingMailRoute viewMode="cards" />} />
+      <Route path="/agents/incoming-mail/1c" element={<IncomingMailRoute viewMode="table" />} />
+      <Route path="/agents/incoming-mail/1c/secret" element={<IncomingMailRoute viewMode="table-secret" />} />
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="ИИ-агент по закупкам"><ProcurementAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/procurement/departments" element={<ProtectedRoute><Layout title="ИИ-агенты по закупкам по должностям"><ProcurementDepartments /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-dispatcher" element={<ProtectedRoute><Layout title="ИИ-агент диспетчера производства"><ProductionDispatcherAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/warehouse-picker" element={<ProtectedRoute><Layout title="ИИ-агент по закупке"><WarehousePickerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/warehouse-complex-chief" element={<ProtectedRoute><Layout title="ИИ-агент по закупкам"><WarehouseComplexChiefAgent /></Layout></ProtectedRoute>} />
