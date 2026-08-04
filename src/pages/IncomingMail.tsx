@@ -764,16 +764,18 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
       return nextOffset < lastPage.total ? nextOffset : undefined;
     },
     placeholderData: keepPreviousData,
-    refetchInterval: 30_000,
-    staleTime: 10_000
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
   const statsQuery = useQuery({
     queryKey: ["email-messages", "stats", listFilters],
     queryFn: () => emailMessagesApi.stats(listFilters),
     placeholderData: keepPreviousData,
-    refetchInterval: 30_000,
-    staleTime: 10_000
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
+    staleTime: 30_000
   });
 
   const messages = useMemo(
@@ -1273,12 +1275,20 @@ export default function IncomingMail({ viewMode }: IncomingMailProps) {
   }
 
   const isSearchDebouncing = searchQuery.trim() !== debouncedSearch;
+  const hasListData = Boolean(messagesQuery.data?.pages.length);
+  const isListInitialLoading = messagesQuery.isLoading && !hasListData;
+  const isSilentListRefetch =
+    messagesQuery.isFetching &&
+    !messagesQuery.isFetchingNextPage &&
+    hasListData &&
+    !messagesQuery.isLoading;
   const isListQueryFetching =
-    messagesQuery.isFetching && !messagesQuery.isFetchingNextPage;
+    messagesQuery.isFetching && !messagesQuery.isFetchingNextPage && !isSilentListRefetch;
+  const isStatsInitialLoading = statsQuery.isLoading && !statsQuery.data;
   const isListBackgroundFetching =
-    isListQueryFetching || statsQuery.isFetching || isSearchDebouncing;
+    isSearchDebouncing || isListInitialLoading || isListQueryFetching || isStatsInitialLoading;
   const isListFetching = isListBackgroundFetching;
-  const isListDimmed = isListQueryFetching;
+  const isListDimmed = isListInitialLoading;
 
   function handleSelectMessage(message: EmailMessage) {
     setSelectedId(message.id);
