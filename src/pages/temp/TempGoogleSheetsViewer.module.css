@@ -1,0 +1,140 @@
+/* TEMP(Aveon Google Sheets viewer) — удалить вместе с TempGoogleSheetsViewer.tsx */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, #0b1220 55%, transparent);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1280px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: hidden;
+  background: var(--color-surface, #1a1d23);
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-border, #2a2f3a);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-text-strong, #f3f4f6);
+}
+
+.meta {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--color-text-secondary, #9ca3af);
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--color-text-secondary, #9ca3af);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 18px 18px;
+}
+
+.loadingState,
+.empty,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 14px;
+}
+
+.error {
+  color: #e85d4c;
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tableWrap {
+  max-height: calc(90vh - 120px);
+  overflow: auto;
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 8px;
+}
+
+.table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.table th,
+.table td {
+  max-width: 280px;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--color-border, #2a2f3a);
+  border-right: 1px solid color-mix(in srgb, var(--color-border, #2a2f3a) 70%, transparent);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  font-weight: 600;
+  color: var(--color-text-strong, #f3f4f6);
+  background: var(--color-surface-elevated, #22262f);
+}
+
+.table td {
+  color: var(--color-text, #d1d5db);
+}
+
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 6%, transparent);
+}

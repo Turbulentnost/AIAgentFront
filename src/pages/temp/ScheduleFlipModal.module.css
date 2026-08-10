@@ -1,0 +1,93 @@
+/* TEMP(Aveon schedule flip modal) — flip между сменным заданием и графиком отгрузок */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, #0b1220 55%, transparent);
+}
+
+.overlay[data-column-menu-portal] {
+  /* якорь для выпадающих меню колонок/фильтра внутри модалки */
+  position: fixed;
+}
+
+.overlayHidden {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.flipScene {
+  width: min(85vw, calc(100vw - 48px));
+  max-width: 100%;
+  perspective: 1400px;
+  perspective-origin: 50% 40%;
+}
+
+.flipCard {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform 0.45s cubic-bezier(0.4, 0.12, 0.2, 1);
+  will-change: transform;
+}
+
+.flipCardFlipped {
+  transform: rotateY(180deg);
+}
+
+.flipFaceFront,
+.flipFaceBack {
+  width: 100%;
+  min-width: 0;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+.flipFaceFront > *,
+.flipFaceBack > * {
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* Высота карточки = высота видимой стороны (не max из двух) */
+.flipFaceFront {
+  position: relative;
+  transform: rotateY(0deg);
+}
+
+.flipFaceBack {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  transform: rotateY(180deg);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.flipCardFlipped .flipFaceFront {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.flipCardFlipped .flipFaceBack {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flipCard {
+    transition-duration: 0.01ms;
+  }
+}

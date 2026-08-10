@@ -15,19 +15,41 @@ import {
   AlertTriangle,
   ArrowLeft,
   ChevronDown,
+  ChevronRight,
   ChevronUp,
   CloudUpload,
   Download,
   FileSearch,
   FileSpreadsheet,
+  Layers,
   Loader2,
   Package,
   ShieldCheck,
   Siren,
   Sparkles,
+  CheckCircle2,
+  Info,
   Trash2,
   Upload
 } from "lucide-react";
+import { TempOnecSyncHint } from "./temp/TempOnecSyncFreshness";
+import TempGoogleSheetsViewer from "./temp/TempGoogleSheetsViewer";
+import ScheduleFlipModal, { type ScheduleFlipFace } from "./temp/ScheduleFlipModal";
+import type { MergedShipmentStats } from "./temp/TempMergedShipmentViewer";
+import ShiftTaskBoard from "./temp/ShiftTaskBoard";
+import AvionDeveloperFeedbackWidget from "./temp/AvionDeveloperFeedbackWidget";
+import {
+  buildInitialResultTexts,
+  buildColIndexByHeader,
+  type ShiftResultEvalState,
+} from "./temp/shiftAssignmentProgress";
+import type { ShiftAssignmentMeta, ShiftAssignmentRowKind } from "./temp/shiftAssignmentTypes";
+import {
+  applyShiftManagerScopeToAssignment,
+  resolveShiftManagerScope,
+} from "./temp/shiftManagerAccess";
+import { useAuth } from "@/auth/AuthContext";
+import { useTempOnecSyncStatus } from "./temp/useTempOnecSyncStatus";
 import {
   documentAnalysisAcceptedExtensions,
   documentAnalysisAgentSubtitle,
@@ -35,57 +57,106 @@ import {
   mockDocumentAnalysisAgent
 } from "@/mock-data/documentAnalysisAgent";
 import { agentsApi } from "@/api/endpoints";
+import {
+  CoverageDashboard,
+  parseCoverageDashboard,
+  type CoverageDashboardPayload,
+  type ManagerCompletionDashboard
+} from "@/pages/temp/CoverageDashboard";
 import styles from "./DocumentAnalysisAgent.module.css";
 
 type FileRoleStatus = "pending" | "loading" | "ready" | "error";
+type ShipmentMergeStatus = "merging" | "done";
 
 interface StagedFile {
   id: string;
   file: File;
   role: string | null;
   roleStatus: FileRoleStatus;
+  /** Склеенный график отгрузок из нескольких исходников */
+  isMergedShipment?: boolean;
+  mergedSourceCount?: number;
+  mergeStatus?: ShipmentMergeStatus;
 }
 
+type ScheduleComparisonNotice = {
+  kind: "baseline" | "changed" | "unchanged";
+  fileName: string;
+  fileBase64: string;
+  months: string[];
+  message: string;
+  oldVersion: string;
+  newVersion: string;
+  cells: number;
+};
+
+type DetailedComparisonNotice = {
+  kind: "baseline" | "changed" | "unchanged";
+  fileName: string;
+  fileBase64: string;
+  dates: string[];
+  message: string;
+  oldVersion: string;
+  newVersion: string;
+  cells: number;
+};
+
 const analysisStages = [
-  "Передаём Excel-файлы на backend",
-  "Уточняем роли файлов",
-  "Извлекаем изделия из графика производства",
-  "Сопоставляем изделия со спецификациями",
-  "Собираем материалы спецификаций",
-  "Подставляем поставщика, цену и остатки",
-  "Считаем потребность по месяцам (Заказ / Опытные / Склад × План / Факт)",
-  "Считаем ожидаемые поступления из графика отгрузок",
-  "Считаем контрольные точки логистики",
-  "Считаем прогнозируемый остаток по сумме планов",
-  "Считаем обеспечение по дням из детального графика",
-  "Считаем обеспеченность изделий по месяцам (сборка из материалов)",
-  "Формируем план заказов по месяцам (дата и количество)",
-  "Формируем result.xlsx (помесячное, по дням, обеспеченность и план заказов)"
+  "Загружаем Excel и определяем роли файлов",
+  "Сопоставляем изделия, спецификации и материалы",
+  "Подставляем поставщика, цену и остатки из 1С",
+  "Считаем потребность, логистику и обеспеченность",
+  "Формируем план заказов и result.xlsx"
 ] as const;
 
-/** Файлы в чеклисте до анализа (спеки/цены — на backend в data/aveon). */
+function logAveonScheduleSnapshotStatus(): void {
+  void agentsApi
+    .getAveonScheduleSnapshotStatus()
+    .then((status) => {
+      if (!status?.ok) return;
+      const logPrefix = "[Aveon графики]";
+      if (status.has_production && status.production_filename) {
+        const version = status.production_version ? ` · v${status.production_version}` : "";
+        console.info(
+          `${logPrefix} старая версия графика производства (из БД): ${status.production_filename}${version}`
+        );
+      } else {
+        console.info(`${logPrefix} старая версия графика производства (из БД): не сохранена`);
+      }
+      if (status.has_detailed && status.detailed_schedules?.length) {
+        for (const item of status.detailed_schedules) {
+          if (!item.has_file || !item.filename) continue;
+          const version = item.version_label ? ` · v${item.version_label}` : "";
+          console.info(
+            `${logPrefix} старая версия детального графика за ${item.month} (из БД): ${item.filename}${version}`
+          );
+        }
+      } else {
+        console.info(`${logPrefix} старая версия детального графика (из БД): не сохранена`);
+      }
+    })
+    .catch(() => {
+      // snapshot недоступен — не мешаем работе агента
+    });
+}
+
+/** Файлы в чеклисте до анализа. Остатки и спецификации — из БД (синхронизация 1С). */
 const requiredFileRoles = [
   {
     role: "production_schedule",
-    label: "График производства",
-    hint: "месяцы → Заказ / Опытные / Склад × План / Факт",
+    label: "План производства",
+    hint: "месяцы → Заказ / Опытные / Склад × План / Факт · сравнение с сохранённой версией",
     required: true
   },
   {
     role: "detailed_production_schedule",
-    label: "Детальный график производства",
-    hint: "по дням / неделям → лист «обеспечение по дням»",
+    label: "План производства на месяц",
+    hint: "по дням / неделям · сравнение с сохранённой версией",
     required: false
   },
   {
-    role: "stock",
-    label: "Остатки",
-    hint: "номенклатура и остаток на складе",
-    required: true
-  },
-  {
     role: "shipment_schedule",
-    label: "График отгрузок",
+    label: "График получения комплектующих",
     hint: "даты поставок и логистика",
     required: true
   }
@@ -306,22 +377,6 @@ type RiskDoughnutChartProps = {
 
 type DoughnutSegmentKey = "on_track" | "at_risk";
 
-/** Угол от 12 часов по часовой, в радианах → смещение наружу. */
-function doughnutSegmentOffset(
-  startShare: number,
-  endShare: number,
-  distance: number
-): { x: number; y: number } {
-  if (endShare <= startShare || distance <= 0) {
-    return { x: 0, y: 0 };
-  }
-  const mid = ((startShare + endShare) / 2) * Math.PI * 2;
-  return {
-    x: Math.sin(mid) * distance,
-    y: -Math.cos(mid) * distance
-  };
-}
-
 /** Дуга кольца: start/end — доли круга [0..1] от 12 часов по часовой. */
 function doughnutArcPath(
   cx: number,
@@ -344,7 +399,6 @@ function RiskDoughnutChart({ onTrack, atRisk, total, onSelectFilter }: RiskDough
   const size = 156;
   const stroke = 16;
   const hoverStroke = 19;
-  const hoverPop = 9;
   const pad = 14;
   const radius = (size - stroke) / 2;
   const centerX = size / 2;
@@ -362,23 +416,13 @@ function RiskDoughnutChart({ onTrack, atRisk, total, onSelectFilter }: RiskDough
       ? `${styles.riskDoughnutCenterValue} ${styles.riskDoughnutCenterValueSuccess}`
       : `${styles.riskDoughnutCenterValue} ${styles.riskDoughnutCenterValueDanger}`;
 
-  const onTrackOffset =
-    hoveredSegment === "on_track"
-      ? doughnutSegmentOffset(0, onTrackShare, hoverPop)
-      : { x: 0, y: 0 };
-  const atRiskOffset =
-    hoveredSegment === "at_risk"
-      ? doughnutSegmentOffset(onTrackShare, 1, hoverPop)
-      : { x: 0, y: 0 };
-
   const renderSegment = (
     key: DoughnutSegmentKey,
     startShare: number,
     endShare: number,
     color: string,
     label: string,
-    count: number,
-    offset: { x: number; y: number }
+    count: number
   ) => {
     if (count <= 0 || endShare <= startShare) return null;
     const isHovered = hoveredSegment === key;
@@ -387,7 +431,6 @@ function RiskDoughnutChart({ onTrack, atRisk, total, onSelectFilter }: RiskDough
       <g
         key={key}
         className={styles.riskDoughnutSegment}
-        style={{ transform: `translate(${offset.x}px, ${offset.y}px)` }}
         onMouseEnter={() => setHoveredSegment(key)}
         onFocus={() => setHoveredSegment(key)}
         onClick={() => onSelectFilter?.(key)}
@@ -427,69 +470,53 @@ function RiskDoughnutChart({ onTrack, atRisk, total, onSelectFilter }: RiskDough
 
   return (
     <figure className={styles.riskDoughnutFigure}>
-      <svg
-        className={styles.riskDoughnutSvg}
-        width={size}
-        height={size}
-        viewBox={`${-pad} ${-pad} ${size + pad * 2} ${size + pad * 2}`}
-        role="img"
-        aria-labelledby="risk-doughnut-title risk-doughnut-desc"
-        onMouseLeave={() => setHoveredSegment(null)}
-      >
-        <title id="risk-doughnut-title">Доля позиций под риском</title>
-        <desc id="risk-doughnut-desc">
-          {total > 0
-            ? `Под риском ${atRisk} из ${total} позиций (${Math.round(atRiskShare * 100)}%). Успевают ${onTrack}.`
-            : "Нет позиций в контрольных точках."}
-        </desc>
-        <circle
-          cx={centerX}
-          cy={centerY}
-          r={radius}
-          fill="none"
-          stroke="var(--color-border)"
-          strokeWidth={stroke}
-          pointerEvents="none"
-        />
-        {renderSegment(
-          "on_track",
-          0,
-          onTrackShare,
-          "var(--color-success)",
-          "Успевают",
-          onTrack,
-          onTrackOffset
-        )}
-        {renderSegment(
-          "at_risk",
-          onTrackShare,
-          1,
-          "var(--color-danger)",
-          "Под риском",
-          atRisk,
-          atRiskOffset
-        )}
-        <text
-          x={centerX}
-          y={centerY - 4}
-          className={centerValueClass}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          pointerEvents="none"
+      <div className={styles.riskDoughnutChartWrap}>
+        <svg
+          className={styles.riskDoughnutSvg}
+          width={size}
+          height={size}
+          viewBox={`${-pad} ${-pad} ${size + pad * 2} ${size + pad * 2}`}
+          role="img"
+          aria-labelledby="risk-doughnut-title risk-doughnut-desc"
+          onMouseLeave={() => setHoveredSegment(null)}
         >
-          {centerPercent}
-        </text>
-        <text
-          x={centerX}
-          y={centerY + 14}
-          className={styles.riskDoughnutCenterLabel}
-          textAnchor="middle"
-          dominantBaseline="middle"
-          pointerEvents="none"
-        >
-          {centerLabel}
-        </text>
-      </svg>
+          <title id="risk-doughnut-title">Доля позиций под риском</title>
+          <desc id="risk-doughnut-desc">
+            {total > 0
+              ? `Под риском ${atRisk} из ${total} позиций (${Math.round(atRiskShare * 100)}%). Успевают ${onTrack}.`
+              : "Нет позиций в контрольных точках."}
+          </desc>
+          <circle
+            cx={centerX}
+            cy={centerY}
+            r={radius}
+            fill="none"
+            stroke="var(--color-border)"
+            strokeWidth={stroke}
+            pointerEvents="none"
+          />
+          {renderSegment(
+            "on_track",
+            0,
+            onTrackShare,
+            "var(--color-success)",
+            "Успевают",
+            onTrack
+          )}
+          {renderSegment(
+            "at_risk",
+            onTrackShare,
+            1,
+            "var(--color-danger)",
+            "Под риском",
+            atRisk
+          )}
+        </svg>
+        <div className={styles.riskDoughnutCenterOverlay} aria-hidden="true">
+          <strong className={centerValueClass}>{centerPercent}</strong>
+          <span>{centerLabel}</span>
+        </div>
+      </div>
       <figcaption className={styles.riskDoughnutLegend}>
         <button
           type="button"
@@ -523,9 +550,9 @@ function RiskDoughnutChart({ onTrack, atRisk, total, onSelectFilter }: RiskDough
 }
 
 const ROLE_LABELS: Record<string, string> = {
-  shipment_schedule: "график отгрузок",
-  production_schedule: "график производства",
-  detailed_production_schedule: "детальный график производства",
+  shipment_schedule: "график получения комплектующих",
+  production_schedule: "План производства",
+  detailed_production_schedule: "План производства на месяц",
   stock: "остатки",
   specification: "спецификация",
   other: "другое"
@@ -561,15 +588,47 @@ function stagedFilesFingerprint(files: StagedFile[]): string {
 }
 
 function downloadBase64Excel(base64: string, filename: string): void {
+  downloadBlob(fileToBlob(base64), filename);
+}
+
+function fileToBlob(base64: string): Blob {
   const binary = atob(base64);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
   }
-  const blob = new Blob([bytes], {
+  return new Blob([bytes], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   });
-  downloadBlob(blob, filename);
+}
+
+function fileFromBase64(base64: string, filename: string): File {
+  const blob = fileToBlob(base64);
+  return new File([blob], filename, { type: blob.type, lastModified: Date.now() });
+}
+
+function createMergedShipmentFile(base64: string, filename: string, sourceCount: number): StagedFile {
+  const file = fileFromBase64(base64, filename);
+  return {
+    id: `merged-shipment-${Date.now()}-${createStagedId()}`,
+    file,
+    role: "shipment_schedule",
+    roleStatus: "ready",
+    isMergedShipment: true,
+    mergedSourceCount: sourceCount,
+    mergeStatus: "done"
+  };
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return file.arrayBuffer().then((buffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (let index = 0; index < bytes.length; index += 1) {
+      binary += String.fromCharCode(bytes[index]);
+    }
+    return btoa(binary);
+  });
 }
 
 function downloadBlob(blob: Blob, filename: string): void {
@@ -585,14 +644,6 @@ function downloadBlob(blob: Blob, filename: string): void {
 async function openLocalFile(file: File): Promise<void> {
   await agentsApi.revealAveonFileInExplorer(file);
 }
-
-type AveonTemplateItem = {
-  key: string;
-  role: string;
-  title: string;
-  filename: string;
-  description: string;
-};
 
 function extractAnalyzeError(error: unknown): string {
   if (isAxiosError(error)) {
@@ -680,13 +731,45 @@ export default function DocumentAnalysisAgent() {
   const [shiftAssignment, setShiftAssignment] = useState<{
     fileName: string;
     fileBase64: string;
+    values: string[][];
+    rowPriorities: Array<"urgent" | "today" | "week" | null>;
+    rowKinds: ShiftAssignmentRowKind[];
+    meta: ShiftAssignmentMeta | null;
   } | null>(null);
+  const [taskBoard, setTaskBoard] = useState<{
+    values: string[][];
+    rowPriorities: Array<"urgent" | "today" | "week" | null>;
+    rowKinds: ShiftAssignmentRowKind[];
+    meta: ShiftAssignmentMeta | null;
+  } | null>(null);
+  const [scheduleFlipModalOpen, setScheduleFlipModalOpen] = useState(false);
+  const [scheduleFlipModalFace, setScheduleFlipModalFace] = useState<ScheduleFlipFace>("shift");
+  const [mergedShipmentSchedule, setMergedShipmentSchedule] = useState<{
+    fileName: string;
+    fileBase64: string;
+    values: string[][];
+    stats: MergedShipmentStats | null;
+    sourceCount: number;
+    changedCells: Array<{ row: number; col: number }>;
+  } | null>(null);
+  const [shiftResultTexts, setShiftResultTexts] = useState<Record<string, string>>({});
+  const [shiftResultEvals, setShiftResultEvals] = useState<Record<string, ShiftResultEvalState>>({});
+  const progressSkipSaveRef = useRef(true);
+  const [scheduleDiff, setScheduleDiff] = useState<ScheduleComparisonNotice | null>(null);
+  const [detailedDiff, setDetailedDiff] = useState<DetailedComparisonNotice | null>(null);
+  const [schedulePruneNotice, setSchedulePruneNotice] = useState<string | null>(null);
+  const [detailedPruneNotice, setDetailedPruneNotice] = useState<string | null>(null);
   const [selectedRiskStageKey, setSelectedRiskStageKey] = useState("");
   const [riskItemFilter, setRiskItemFilter] = useState<RiskItemFilter>("all");
   const [flippedRiskTile, setFlippedRiskTile] = useState<RiskItemFilter | null>(null);
   const [virtualRiskFilter, setVirtualRiskFilter] = useState<RiskItemFilter | null>(null);
   const [openSupplierKeys, setOpenSupplierKeys] = useState<Set<string>>(() => new Set());
-  const [riskDashboardOpen, setRiskDashboardOpen] = useState(false);
+  const [riskDashboardOpen, setRiskDashboardOpen] = useState(true);
+  const [coverageDashboard, setCoverageDashboard] = useState<CoverageDashboardPayload | null>(
+    null
+  );
+  const [managerCompletionDashboard, setManagerCompletionDashboard] =
+    useState<ManagerCompletionDashboard | null>(null);
   const [riskPointsOpen, setRiskPointsOpen] = useState(false);
   const riskStageContentRef = useRef<HTMLDivElement>(null);
   const lastRealStageKeyRef = useRef("");
@@ -695,12 +778,30 @@ export default function DocumentAnalysisAgent() {
   const [stagesOverlayOpen, setStagesOverlayOpen] = useState(false);
   const [rolesSource, setRolesSource] = useState<string | null>(null);
   const [isClassifyingRoles, setIsClassifyingRoles] = useState(false);
+  const [isMergingShipments, setIsMergingShipments] = useState(false);
+  const [isPruningSchedules, setIsPruningSchedules] = useState(false);
+  const [isPruningDetailedSchedules, setIsPruningDetailedSchedules] = useState(false);
+  const [onecManualSyncLoading, setOnecManualSyncLoading] = useState(false);
+  const [onecManualSyncMessage, setOnecManualSyncMessage] = useState<string | null>(null);
+  const [googleSheetsProbeLoading, setGoogleSheetsProbeLoading] = useState(false);
+  const [googleSheetsModalOpen, setGoogleSheetsModalOpen] = useState(false);
+  const [googleSheetsError, setGoogleSheetsError] = useState<string | null>(null);
+  const [googleSheetsTitle, setGoogleSheetsTitle] = useState("ИТЦ В РАБОТЕ");
+  const [googleSheetsSpreadsheetTitle, setGoogleSheetsSpreadsheetTitle] = useState<string | null>(null);
+  const [googleSheetsValues, setGoogleSheetsValues] = useState<string[][]>([]);
+  const [onecSyncRefreshToken, setOnecSyncRefreshToken] = useState(0);
+  const { stock: onecStockStatus, specs: onecSpecsStatus, loading: onecSyncStatusLoading } =
+    useTempOnecSyncStatus(onecSyncRefreshToken);
+  const [mergeSourceNames, setMergeSourceNames] = useState<string[]>([]);
+  const lastShipmentMergeKeyRef = useRef("");
+  const mergedShipmentHydratedKeyRef = useRef("");
+  const appliedShipmentDateChangeRef = useRef<Set<string>>(new Set());
+  const mergeInFlightRef = useRef(false);
+  const lastSchedulePruneKeyRef = useRef("");
+  const schedulePruneInFlightRef = useRef(false);
+  const lastDetailedPruneKeyRef = useRef("");
+  const detailedPruneInFlightRef = useRef(false);
   const [checklistFace, setChecklistFace] = useState<ChecklistPanelFace>("files");
-  const [templatesOpen, setTemplatesOpen] = useState(false);
-  const [templates, setTemplates] = useState<AveonTemplateItem[]>([]);
-  const [templatesLoading, setTemplatesLoading] = useState(false);
-  const [templatesError, setTemplatesError] = useState<string | null>(null);
-  const templatesMenuRef = useRef<HTMLDivElement>(null);
   const stagesSectionRef = useRef<HTMLDivElement>(null);
   const classifyRequestIdRef = useRef(0);
   const classifyAbortRef = useRef<AbortController | null>(null);
@@ -709,6 +810,41 @@ export default function DocumentAnalysisAgent() {
   const isAnalyzingRef = useRef(false);
   stagedFilesRef.current = stagedFiles;
   isAnalyzingRef.current = isAnalyzing;
+  const { user } = useAuth();
+  const managerScope = useMemo(() => resolveShiftManagerScope(user), [user]);
+
+  const visibleShiftAssignment = useMemo(() => {
+    if (!shiftAssignment) return null;
+    if (!managerScope) return shiftAssignment;
+    return applyShiftManagerScopeToAssignment(shiftAssignment, managerScope);
+  }, [shiftAssignment, managerScope]);
+
+  const visibleTaskBoard = useMemo(() => {
+    if (!taskBoard) return null;
+    if (!managerScope) return null;
+    return applyShiftManagerScopeToAssignment(taskBoard, managerScope);
+  }, [taskBoard, managerScope]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (managerScope) {
+      setManagerCompletionDashboard(null);
+      return () => {
+        cancelled = true;
+      };
+    }
+    void agentsApi
+      .getShiftCompletionDashboard()
+      .then((dashboard) => {
+        if (!cancelled) setManagerCompletionDashboard(dashboard);
+      })
+      .catch(() => {
+        if (!cancelled) setManagerCompletionDashboard(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [managerScope]);
 
   const acceptedHint = useMemo(
     () => documentAnalysisAcceptedExtensions.map((ext) => ext.replace(".", "").toUpperCase()).join(", "),
@@ -740,7 +876,12 @@ export default function DocumentAnalysisAgent() {
     [presentRequiredRoles]
   );
 
-  const requiredFilesValid = rolesSettled && missingRequiredRoles.length === 0;
+  const requiredFilesValid =
+    rolesSettled &&
+    !isMergingShipments &&
+    !isPruningSchedules &&
+    !isPruningDetailedSchedules &&
+    missingRequiredRoles.length === 0;
 
   const requiredFileRowStates = useMemo((): Record<string, RequiredFileRowState> => {
     const states: Record<string, RequiredFileRowState> = {};
@@ -762,32 +903,76 @@ export default function DocumentAnalysisAgent() {
   }, [presentRequiredRoles, rolesSettled, stagedFiles.length]);
 
   useEffect(() => {
+    logAveonScheduleSnapshotStatus();
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
+    progressSkipSaveRef.current = true;
     void agentsApi
       .getAveonDashboardLatest()
       .then((snapshot) => {
         if (cancelled || !snapshot) return;
-        // при повторном заходе — только дашборд; этапы и сменное задание только после нового анализа
         setLogisticsRisks(snapshot.logisticsRisks);
+        setCoverageDashboard(parseCoverageDashboard(snapshot.coverageDashboard));
         setLastAnalysisAt(formatAnalysisTimestamp(snapshot.analyzedAt));
+
+        if (snapshot.taskDashboard) {
+          const board = {
+            values: snapshot.taskDashboard.values,
+            rowPriorities: snapshot.taskDashboard.rowPriorities,
+            rowKinds: snapshot.taskDashboard.rowKinds,
+            meta: snapshot.taskDashboard.meta
+          };
+          setTaskBoard(board);
+          const savedTexts = snapshot.taskDashboard.resultTexts;
+          const savedEvals = snapshot.taskDashboard.resultEvals;
+          if (Object.keys(savedTexts).length > 0) {
+            setShiftResultTexts(savedTexts);
+          } else if (board.values.length > 0) {
+            const header = board.values[0] ?? [];
+            setShiftResultTexts(
+              buildInitialResultTexts(
+                board.values.slice(1),
+                board.rowKinds.slice(1),
+                buildColIndexByHeader(header)
+              )
+            );
+          }
+          setShiftResultEvals(savedEvals);
+          setRiskDashboardOpen(true);
+        }
+
+        if (snapshot.shiftAssignment && snapshot.taskDashboard) {
+          setShiftAssignment({
+            fileName: snapshot.shiftAssignment.fileName,
+            fileBase64: snapshot.shiftAssignment.fileBase64,
+            values: snapshot.taskDashboard.values,
+            rowPriorities: snapshot.taskDashboard.rowPriorities,
+            rowKinds: snapshot.taskDashboard.rowKinds,
+            meta: snapshot.taskDashboard.meta
+          });
+        }
+
+        if (snapshot.mergedShipmentSchedule) {
+          setMergedShipmentSchedule({
+            fileName: snapshot.mergedShipmentSchedule.fileName,
+            fileBase64: snapshot.mergedShipmentSchedule.fileBase64,
+            values: snapshot.mergedShipmentSchedule.values,
+            stats: snapshot.mergedShipmentSchedule.stats,
+            sourceCount: snapshot.mergedShipmentSchedule.sourceCount,
+            changedCells: snapshot.mergedShipmentSchedule.changedCells
+          });
+        }
       })
       .catch(() => {
         // нет сохранённого дашборда — обычный пустой старт
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-    void agentsApi
-      .listAveonTemplates()
-      .then((items) => {
-        if (!cancelled) setTemplates(items);
       })
-      .catch(() => {
-        if (!cancelled) setTemplates([]);
+      .finally(() => {
+        if (cancelled) return;
+        window.setTimeout(() => {
+          progressSkipSaveRef.current = false;
+        }, 1000);
       });
     return () => {
       cancelled = true;
@@ -795,48 +980,236 @@ export default function DocumentAnalysisAgent() {
   }, []);
 
   useEffect(() => {
-    if (!templatesOpen) return;
-    const onPointerDown = (event: MouseEvent) => {
-      if (!templatesMenuRef.current?.contains(event.target as Node)) {
-        setTemplatesOpen(false);
-      }
-    };
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setTemplatesOpen(false);
-    };
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [templatesOpen]);
+    if (!taskBoard?.values.length || progressSkipSaveRef.current) return;
+    const timer = window.setTimeout(() => {
+      void agentsApi
+        .saveShiftAssignmentProgress({
+          resultTexts: shiftResultTexts,
+          resultEvals: shiftResultEvals
+        })
+        .catch(() => {
+          // прогресс не критичен для UI
+        });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [taskBoard, shiftResultTexts, shiftResultEvals]);
 
-  const downloadTemplate = useCallback(async (item: AveonTemplateItem) => {
-    setTemplatesLoading(true);
-    setTemplatesError(null);
+  const openScheduleFlipModal = useCallback((face: ScheduleFlipFace) => {
+    setScheduleFlipModalFace(face);
+    setScheduleFlipModalOpen(true);
+  }, []);
+
+  const closeScheduleFlipModal = useCallback(() => {
+    setScheduleFlipModalOpen(false);
+  }, []);
+
+  const exportVisibleShiftAssignment = useCallback(() => {
+    if (!visibleShiftAssignment) return;
+    downloadBase64Excel(visibleShiftAssignment.fileBase64, visibleShiftAssignment.fileName);
+  }, [visibleShiftAssignment]);
+
+  const exportMergedShipmentSchedule = useCallback(() => {
+    if (!mergedShipmentSchedule) return;
+    downloadBase64Excel(mergedShipmentSchedule.fileBase64, mergedShipmentSchedule.fileName);
+  }, [mergedShipmentSchedule]);
+
+  const persistMergedShipmentSchedule = useCallback(
+    async (schedule: {
+      fileName: string;
+      fileBase64: string;
+      values: string[][];
+      stats: MergedShipmentStats | null;
+      sourceCount: number;
+      changedCells?: Array<{ row: number; col: number }>;
+    }) => {
+      const nextSchedule = {
+        ...schedule,
+        changedCells: schedule.changedCells ?? []
+      };
+      setMergedShipmentSchedule(nextSchedule);
+      try {
+        await agentsApi.saveMergedShipmentSnapshot({
+          fileName: nextSchedule.fileName,
+          fileBase64: nextSchedule.fileBase64,
+          previewValues: nextSchedule.values,
+          stats: nextSchedule.stats,
+          sourceCount: nextSchedule.sourceCount,
+          changedCells: nextSchedule.changedCells
+        });
+      } catch (caughtError) {
+        console.warn("Не удалось сохранить график отгрузок в snapshot:", caughtError);
+      }
+    },
+    []
+  );
+
+  const handleManagerResultEvaluated = useCallback(
+    async (
+      context: { taskType: string; problem: string; solution: string; nomenclature: string },
+      managerResult: string
+    ) => {
+      if (!mergedShipmentSchedule?.fileBase64) return;
+      const changeKey = [
+        context.taskType,
+        context.nomenclature,
+        context.problem.slice(0, 120),
+        managerResult
+      ].join("::");
+      if (appliedShipmentDateChangeRef.current.has(changeKey)) return;
+      try {
+        const response = await agentsApi.applyShipmentManagerDateChange({
+          fileName: mergedShipmentSchedule.fileName,
+          fileBase64: mergedShipmentSchedule.fileBase64,
+          taskType: context.taskType,
+          problem: context.problem,
+          solution: context.solution,
+          nomenclature: context.nomenclature,
+          managerResult
+        });
+        if (!response.applied || !response.file_base64 || !response.preview_values) {
+          console.info("[Aveon] дата графика отгрузок не изменена:", response.message);
+          return;
+        }
+        await persistMergedShipmentSchedule({
+          fileName: response.file_name || mergedShipmentSchedule.fileName,
+          fileBase64: response.file_base64,
+          values: response.preview_values,
+          stats: mergedShipmentSchedule.stats,
+          sourceCount: mergedShipmentSchedule.sourceCount,
+          changedCells: [
+            ...(mergedShipmentSchedule.changedCells ?? []),
+            ...(response.changed_cells ?? [])
+          ]
+        });
+        const nextFileName = response.file_name || mergedShipmentSchedule.fileName;
+        const nextFile = fileFromBase64(response.file_base64, nextFileName);
+        mergedShipmentHydratedKeyRef.current = `${nextFile.name}:${nextFile.size}:${nextFile.lastModified}`;
+        setStagedFiles((current) =>
+          current.map((item) =>
+            item.role === "shipment_schedule" && item.isMergedShipment
+              ? {
+                  ...item,
+                  file: nextFile,
+                  mergedSourceCount: item.mergedSourceCount ?? mergedShipmentSchedule.sourceCount
+                }
+              : item
+          )
+        );
+        appliedShipmentDateChangeRef.current.add(changeKey);
+        setScheduleFlipModalFace("shipment");
+      } catch (caughtError) {
+        console.warn("Не удалось применить изменение даты в графике отгрузок:", caughtError);
+      }
+    },
+    [mergedShipmentSchedule, persistMergedShipmentSchedule]
+  );
+
+  const scheduleFlipShiftProps = useMemo(
+    () =>
+      visibleShiftAssignment
+        ? {
+            loading: false,
+            error: null,
+            values: visibleShiftAssignment.values,
+            rowPriorities: visibleShiftAssignment.rowPriorities,
+            rowKinds: visibleShiftAssignment.rowKinds,
+            meta: visibleShiftAssignment.meta,
+            fileName: visibleShiftAssignment.fileName,
+            resultTexts: shiftResultTexts,
+            onResultTextsChange: setShiftResultTexts,
+            resultEvals: shiftResultEvals,
+            onResultEvalsChange: setShiftResultEvals,
+            onManagerResultEvaluated: handleManagerResultEvaluated,
+            onExport: exportVisibleShiftAssignment,
+          }
+        : null,
+    [
+      visibleShiftAssignment,
+      shiftResultTexts,
+      shiftResultEvals,
+      handleManagerResultEvaluated,
+      exportVisibleShiftAssignment,
+    ]
+  );
+
+  const scheduleFlipShipmentProps = useMemo(
+    () =>
+      mergedShipmentSchedule
+        ? {
+            values: mergedShipmentSchedule.values,
+            fileName: mergedShipmentSchedule.fileName,
+            fileBase64: mergedShipmentSchedule.fileBase64,
+            stats: mergedShipmentSchedule.stats,
+            sourceCount: mergedShipmentSchedule.sourceCount,
+            changedCells: mergedShipmentSchedule.changedCells,
+            onExport: exportMergedShipmentSchedule,
+          }
+        : null,
+    [mergedShipmentSchedule, exportMergedShipmentSchedule]
+  );
+
+  const handleOnecManualSync = useCallback(async () => {
+    setOnecManualSyncLoading(true);
+    setOnecManualSyncMessage(null);
     try {
-      const response = await agentsApi.downloadAveonTemplate(item.key);
-      downloadBlob(response.data, item.filename);
-      setTemplatesOpen(false);
-    } catch {
-      setTemplatesError("Не удалось скачать шаблон. Проверьте доступ к API.");
+      const result = await agentsApi.runAveonOnecSyncNow();
+      if (result.ok) {
+        setOnecManualSyncMessage("Выгрузка из 1С завершена успешно.");
+      } else if (result.status === "skipped_locked") {
+        setOnecManualSyncMessage("Синхронизация уже выполняется — дождитесь завершения.");
+      } else {
+        const stockMsg = result.stock?.message;
+        const specsMsg = result.resource_specs?.message;
+        setOnecManualSyncMessage(
+          stockMsg || specsMsg || "Не удалось выгрузить данные из 1С."
+        );
+      }
+      setOnecSyncRefreshToken((value) => value + 1);
+    } catch (caughtError) {
+      console.error("[Aveon 1С] ошибка ручной выгрузки", caughtError);
+      setOnecManualSyncMessage(extractAnalyzeError(caughtError) || "Ошибка выгрузки из 1С.");
     } finally {
-      setTemplatesLoading(false);
+      setOnecManualSyncLoading(false);
     }
   }, []);
 
-  const downloadAllTemplates = useCallback(async () => {
-    setTemplatesLoading(true);
-    setTemplatesError(null);
+  const handleGoogleSheetsProbe = useCallback(async () => {
+    const logPrefix = "[Aveon TEMP Google Sheets]";
+    setGoogleSheetsProbeLoading(true);
+    setGoogleSheetsModalOpen(true);
+    setGoogleSheetsError(null);
+    setGoogleSheetsValues([]);
+    setGoogleSheetsTitle("ИТЦ В РАБОТЕ");
+    setGoogleSheetsSpreadsheetTitle(null);
+    console.group(logPrefix);
+    console.log(`${logPrefix} loading sheet «ИТЦ В РАБОТЕ»…`);
+
     try {
-      const response = await agentsApi.downloadAllAveonTemplatesZip();
-      downloadBlob(response.data, "шаблоны_авион.zip");
-      setTemplatesOpen(false);
-    } catch {
-      setTemplatesError("Не удалось скачать архив шаблонов. Проверьте доступ к API.");
+      const result = await agentsApi.fetchAveonGoogleSheets();
+      const parsed = result.parsed;
+      const values = parsed?.values ?? [];
+      setGoogleSheetsTitle(parsed?.sheet_title || result.sheet_title || "ИТЦ В РАБОТЕ");
+      setGoogleSheetsSpreadsheetTitle(parsed?.spreadsheet_title ?? null);
+      setGoogleSheetsValues(values);
+      console.log(`${logPrefix} ok=`, result.ok);
+      console.log(`${logPrefix} sheet=`, parsed?.sheet_title, "rows=", parsed?.row_count);
+      console.log(`${logPrefix} preview=`, parsed?.preview_rows);
+      if (!values.length) {
+        setGoogleSheetsError("Лист пуст или данные не пришли");
+      }
+    } catch (caughtError) {
+      console.error(`${logPrefix} request failed`, caughtError);
+      let message = "Не удалось загрузить лист Google Sheets";
+      if (isAxiosError(caughtError)) {
+        const detail = caughtError.response?.data?.detail;
+        if (typeof detail === "string") message = detail;
+        console.error(`${logPrefix} axios status=`, caughtError.response?.status);
+        console.error(`${logPrefix} axios data=`, caughtError.response?.data);
+      }
+      setGoogleSheetsError(message);
     } finally {
-      setTemplatesLoading(false);
+      console.groupEnd();
+      setGoogleSheetsProbeLoading(false);
     }
   }, []);
 
@@ -939,6 +1312,10 @@ export default function DocumentAnalysisAgent() {
       setStagesInlineHidden(false);
       setStagesOverlayOpen(false);
       setError(null);
+      setScheduleDiff(null);
+      setDetailedDiff(null);
+      setSchedulePruneNotice(null);
+      setDetailedPruneNotice(null);
     }
 
     // Во время полного анализа не дергаем classify — иначе гонка запросов и ложный «нет связи».
@@ -1035,6 +1412,245 @@ export default function DocumentAnalysisAgent() {
     };
   }, [filesFingerprint]);
 
+  useEffect(() => {
+    if (!rolesSettled || isClassifyingRoles || isAnalyzingRef.current) {
+      return;
+    }
+
+    const shipmentItems = stagedFilesRef.current.filter(
+      (item) => item.role === "shipment_schedule" && !item.isMergedShipment
+    );
+    if (shipmentItems.length < 1) {
+      lastShipmentMergeKeyRef.current = "";
+      return;
+    }
+
+    const mergeKey = shipmentItems
+      .map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`)
+      .sort()
+      .join("|");
+    if (lastShipmentMergeKeyRef.current === mergeKey || mergeInFlightRef.current) {
+      return;
+    }
+    lastShipmentMergeKeyRef.current = mergeKey;
+    mergeInFlightRef.current = true;
+
+    const sourceNames = shipmentItems.map((item) => item.file.name);
+    setMergeSourceNames(sourceNames);
+    setIsMergingShipments(true);
+    setStagedFiles((current) =>
+      current.map((item) =>
+        item.role === "shipment_schedule" && !item.isMergedShipment
+          ? { ...item, mergeStatus: "merging" as const }
+          : item
+      )
+    );
+
+    void (async () => {
+      try {
+        const result = await agentsApi.mergeShipmentSchedules(shipmentItems.map((item) => item.file));
+        if (!result.ok || !result.file_base64 || !result.file_name) {
+          throw new Error(result.message || "Не удалось объединить графики отгрузок");
+        }
+        const merged = createMergedShipmentFile(
+          result.file_base64,
+          result.file_name,
+          shipmentItems.length
+        );
+        let previewValues = result.preview_values ?? [];
+        if (!previewValues.length) {
+          try {
+            const preview = await agentsApi.previewShipmentSchedule(merged.file);
+            previewValues = preview.preview_values ?? [];
+          } catch (previewError) {
+            console.warn("Preview графика отгрузок через API:", previewError);
+          }
+        }
+        mergedShipmentHydratedKeyRef.current = `${merged.file.name}:${merged.file.size}:${merged.file.lastModified}`;
+        await persistMergedShipmentSchedule({
+          fileName: result.file_name,
+          fileBase64: result.file_base64,
+          values: previewValues,
+          stats: (result.stats as MergedShipmentStats | undefined) ?? null,
+          sourceCount: shipmentItems.length
+        });
+        setStagedFiles((current) => [
+          ...current.filter((item) => item.role !== "shipment_schedule" || item.isMergedShipment),
+          merged
+        ]);
+        setError(null);
+      } catch (caughtError) {
+        console.error("Ошибка объединения графиков отгрузок:", caughtError);
+        const message = extractAnalyzeError(caughtError);
+        if (message) setError(message);
+        lastShipmentMergeKeyRef.current = "";
+        setStagedFiles((current) =>
+          current.map((item) =>
+            item.mergeStatus === "merging" ? { ...item, mergeStatus: undefined } : item
+          )
+        );
+      } finally {
+        mergeInFlightRef.current = false;
+        setIsMergingShipments(false);
+        setMergeSourceNames([]);
+      }
+    })();
+  }, [rolesSettled, isClassifyingRoles, filesFingerprint, persistMergedShipmentSchedule]);
+
+  useEffect(() => {
+    if (!rolesSettled || isClassifyingRoles || isAnalyzingRef.current) {
+      return;
+    }
+
+    const mergedItem = stagedFilesRef.current.find(
+      (item) => item.role === "shipment_schedule" && item.isMergedShipment
+    );
+    if (!mergedItem) {
+      mergedShipmentHydratedKeyRef.current = "";
+      return;
+    }
+
+    const hydrateKey = `${mergedItem.file.name}:${mergedItem.file.size}:${mergedItem.file.lastModified}`;
+    if (mergedShipmentHydratedKeyRef.current === hydrateKey) {
+      return;
+    }
+    mergedShipmentHydratedKeyRef.current = hydrateKey;
+
+    void (async () => {
+      try {
+        const [fileBase64, preview] = await Promise.all([
+          fileToBase64(mergedItem.file),
+          agentsApi.previewShipmentSchedule(mergedItem.file)
+        ]);
+        await persistMergedShipmentSchedule({
+          fileName: preview.file_name || mergedItem.file.name,
+          fileBase64,
+          values: preview.preview_values ?? [],
+          stats: {
+            nomenclature_total: Math.max((preview.preview_values ?? []).length - 1, 0)
+          },
+          sourceCount: mergedItem.mergedSourceCount ?? 0
+        });
+      } catch (caughtError) {
+        console.error("Не удалось подтянуть объединённый график отгрузок:", caughtError);
+        mergedShipmentHydratedKeyRef.current = "";
+      }
+    })();
+  }, [rolesSettled, isClassifyingRoles, filesFingerprint, persistMergedShipmentSchedule]);
+
+  useEffect(() => {
+    if (!rolesSettled || isClassifyingRoles || isAnalyzingRef.current) {
+      return;
+    }
+
+    const scheduleItems = stagedFilesRef.current.filter(
+      (item) => item.role === "production_schedule"
+    );
+    if (scheduleItems.length <= 1) {
+      lastSchedulePruneKeyRef.current = "";
+      setSchedulePruneNotice(null);
+      return;
+    }
+
+    const pruneKey = scheduleItems
+      .map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`)
+      .sort()
+      .join("|");
+    if (lastSchedulePruneKeyRef.current === pruneKey || schedulePruneInFlightRef.current) {
+      return;
+    }
+    lastSchedulePruneKeyRef.current = pruneKey;
+    schedulePruneInFlightRef.current = true;
+    setIsPruningSchedules(true);
+
+    void (async () => {
+      try {
+        const result = await agentsApi.pruneProductionSchedules(
+          scheduleItems.map((item) => item.file)
+        );
+        const removedNames = new Set((result.removed ?? []).map((item) => item.filename));
+        if (removedNames.size > 0) {
+          setStagedFiles((current) =>
+            current.filter(
+              (item) =>
+                item.role !== "production_schedule" || !removedNames.has(item.file.name)
+            )
+          );
+          setSchedulePruneNotice(
+            result.message || "Оставлена последняя версия; сравнение — с сохранённой в системе"
+          );
+        } else {
+          setSchedulePruneNotice(result.message || null);
+        }
+      } catch (caughtError) {
+        console.error("Ошибка отбора версий графика производства:", caughtError);
+        const message = extractAnalyzeError(caughtError);
+        if (message) setError(message);
+        lastSchedulePruneKeyRef.current = "";
+      } finally {
+        schedulePruneInFlightRef.current = false;
+        setIsPruningSchedules(false);
+      }
+    })();
+  }, [rolesSettled, isClassifyingRoles, filesFingerprint]);
+
+  useEffect(() => {
+    if (!rolesSettled || isClassifyingRoles || isAnalyzingRef.current) {
+      return;
+    }
+
+    const detailedItems = stagedFilesRef.current.filter(
+      (item) => item.role === "detailed_production_schedule"
+    );
+    if (detailedItems.length <= 1) {
+      lastDetailedPruneKeyRef.current = "";
+      setDetailedPruneNotice(null);
+      return;
+    }
+
+    const pruneKey = detailedItems
+      .map((item) => `${item.file.name}:${item.file.size}:${item.file.lastModified}`)
+      .sort()
+      .join("|");
+    if (lastDetailedPruneKeyRef.current === pruneKey || detailedPruneInFlightRef.current) {
+      return;
+    }
+    lastDetailedPruneKeyRef.current = pruneKey;
+    detailedPruneInFlightRef.current = true;
+    setIsPruningDetailedSchedules(true);
+
+    void (async () => {
+      try {
+        const result = await agentsApi.pruneDetailedSchedules(
+          detailedItems.map((item) => item.file)
+        );
+        const removedNames = new Set((result.removed ?? []).map((item) => item.filename));
+        if (removedNames.size > 0) {
+          setStagedFiles((current) =>
+            current.filter(
+              (item) =>
+                item.role !== "detailed_production_schedule" ||
+                !removedNames.has(item.file.name)
+            )
+          );
+          setDetailedPruneNotice(
+            result.message || "Оставлена последняя версия; сравнение — с сохранённой в системе"
+          );
+        } else {
+          setDetailedPruneNotice(result.message || null);
+        }
+      } catch (caughtError) {
+        console.error("Ошибка отбора версий детального графика:", caughtError);
+        const message = extractAnalyzeError(caughtError);
+        if (message) setError(message);
+        lastDetailedPruneKeyRef.current = "";
+      } finally {
+        detailedPruneInFlightRef.current = false;
+        setIsPruningDetailedSchedules(false);
+      }
+    })();
+  }, [rolesSettled, isClassifyingRoles, filesFingerprint]);
+
   const handleAnalyze = useCallback(async () => {
     if (!stagedFiles.length || isAnalyzing || !requiredFilesValid) return;
 
@@ -1046,6 +1662,14 @@ export default function DocumentAnalysisAgent() {
     setChecklistFace("stages");
     setIsAnalyzing(true);
     setError(null);
+    setScheduleDiff(null);
+    setDetailedDiff(null);
+    setShiftAssignment(null);
+    setTaskBoard(null);
+    setScheduleFlipModalOpen(false);
+    setShiftResultTexts({});
+    setShiftResultEvals({});
+    progressSkipSaveRef.current = true;
     setActiveStageIndex(0);
     setStagesCompact(false);
     setStagesInlineHidden(false);
@@ -1114,7 +1738,7 @@ export default function DocumentAnalysisAgent() {
         `Цены и поставщики: найдено для ${result.priceMatchedCount} из ${result.mergedNomenclaturesCount}`
       );
       const stockFilesLabel =
-        result.stockFiles.length > 0 ? result.stockFiles.join(", ") : "(файл остатков не найден)";
+        result.stockFiles.length > 0 ? result.stockFiles.join(", ") : "(остатки из БД 1С не найдены)";
       console.log(`Файл остатков: ${stockFilesLabel}`);
       console.log(
         `Остатки: найдено для ${result.stockMatchedCount} из ${result.mergedNomenclaturesCount}`
@@ -1150,25 +1774,108 @@ export default function DocumentAnalysisAgent() {
       } else {
         console.log("result.xlsx не сформирован");
       }
+      if (result.shiftAssignmentValues?.length) {
+        const board = {
+          values: result.shiftAssignmentValues,
+          rowPriorities: result.shiftAssignmentRowPriorities ?? [],
+          rowKinds: result.shiftAssignmentRowKinds ?? [],
+          meta: result.shiftAssignmentMeta
+        };
+        setTaskBoard(board);
+        const header = board.values[0] ?? [];
+        setShiftResultTexts(
+          buildInitialResultTexts(
+            board.values.slice(1),
+            board.rowKinds.slice(1),
+            buildColIndexByHeader(header)
+          )
+        );
+        setShiftResultEvals({});
+        progressSkipSaveRef.current = false;
+      } else {
+        setTaskBoard(null);
+        setShiftResultTexts({});
+        setShiftResultEvals({});
+      }
       if (result.shiftAssignmentFileBase64) {
         setShiftAssignment({
           fileName: result.shiftAssignmentFileName,
-          fileBase64: result.shiftAssignmentFileBase64
+          fileBase64: result.shiftAssignmentFileBase64,
+          values: result.shiftAssignmentValues ?? [],
+          rowPriorities: result.shiftAssignmentRowPriorities ?? [],
+          rowKinds: result.shiftAssignmentRowKinds ?? [],
+          meta: result.shiftAssignmentMeta
         });
+        setScheduleFlipModalOpen(false);
         console.log(
-          `Сменное задание готово (скачивание по кнопке): ${result.shiftAssignmentFileName}`
+          `Сменное задание готово (просмотр по кнопке): ${result.shiftAssignmentFileName}`
         );
       } else {
         setShiftAssignment(null);
+        setScheduleFlipModalOpen(false);
         console.log("сменное задание не сформировано");
       }
 
+      if (result.scheduleBaselineSaved) {
+        setScheduleDiff({
+          kind: "baseline",
+          fileName: result.scheduleDiffFileName,
+          fileBase64: "",
+          months: [],
+          message: result.scheduleDiffMessage,
+          oldVersion: result.scheduleDiffOldVersion,
+          newVersion: result.scheduleDiffNewVersion,
+          cells: 0
+        });
+      } else if (result.scheduleComparedWithSaved) {
+        setScheduleDiff({
+          kind: result.scheduleDiffHasChanges ? "changed" : "unchanged",
+          fileName: result.scheduleDiffFileName,
+          fileBase64: result.scheduleDiffFileBase64 ?? "",
+          months: result.scheduleDiffChangedMonths,
+          message: result.scheduleDiffMessage,
+          oldVersion: result.scheduleDiffOldVersion,
+          newVersion: result.scheduleDiffNewVersion,
+          cells: result.scheduleDiffChangedCells
+        });
+      } else {
+        setScheduleDiff(null);
+      }
+
+      if (result.detailedBaselineSaved) {
+        setDetailedDiff({
+          kind: "baseline",
+          fileName: result.detailedDiffFileName,
+          fileBase64: "",
+          dates: [],
+          message: result.detailedDiffMessage,
+          oldVersion: result.detailedDiffOldVersion,
+          newVersion: result.detailedDiffNewVersion,
+          cells: 0
+        });
+      } else if (result.detailedComparedWithSaved) {
+        setDetailedDiff({
+          kind: result.detailedDiffHasChanges ? "changed" : "unchanged",
+          fileName: result.detailedDiffFileName,
+          fileBase64: result.detailedDiffFileBase64 ?? "",
+          dates: result.detailedDiffChangedDates,
+          message: result.detailedDiffMessage,
+          oldVersion: result.detailedDiffOldVersion,
+          newVersion: result.detailedDiffNewVersion,
+          cells: result.detailedDiffChangedCells
+        });
+      } else {
+        setDetailedDiff(null);
+      }
+
       setLogisticsRisks(result.logisticsRisks);
+      setCoverageDashboard(parseCoverageDashboard(result.coverageDashboard));
       setRiskDashboardOpen(true);
-      setRiskPointsOpen(true);
+      setRiskPointsOpen(false);
       setLastAnalysisAt(
         formatAnalysisTimestamp(result.dashboardAnalyzedAt ?? null)
       );
+      logAveonScheduleSnapshotStatus();
     } catch (caughtError) {
       setError(extractAnalyzeError(caughtError) || "Не удалось выполнить анализ");
       setChecklistFace("files");
@@ -1457,14 +2164,14 @@ export default function DocumentAnalysisAgent() {
     if (!stagedFiles.length) {
       return <span className={styles.statusBadge}>Ожидает файлы</span>;
     }
-    if (!rolesSettled) {
+    if (!rolesSettled || isClassifyingRoles || isMergingShipments || isPruningSchedules || isPruningDetailedSchedules) {
       return (
         <span className={`${styles.statusBadge} ${styles.statusBadgeProgress}`}>
           Проверяем файлы
         </span>
       );
     }
-    if (!requiredFilesValid) {
+    if (missingRequiredRoles.length > 0) {
       return (
         <span className={`${styles.statusBadge} ${styles.statusBadgeDanger}`}>
           Не хватает файлов
@@ -1498,7 +2205,7 @@ export default function DocumentAnalysisAgent() {
             <h2 className={styles.panelTitle}>Файлы для анализа</h2>
             <p className={styles.panelHint}>
               Перетащите документы в область ниже или выберите их вручную. Поддерживаются {acceptedHint}.
-              Нет своих файлов — скачайте шаблоны, заполните и загрузите обратно.
+              При нескольких графиках производства остаются две последние версии — после анализа покажем расхождения планов.
             </p>
           </div>
 
@@ -1548,54 +2255,6 @@ export default function DocumentAnalysisAgent() {
                 }}
               />
             </label>
-            <div className={styles.templatesWrap} ref={templatesMenuRef}>
-              <button
-                type="button"
-                className={styles.secondaryButton}
-                onClick={() => setTemplatesOpen((open) => !open)}
-                disabled={templatesLoading}
-                aria-expanded={templatesOpen}
-                aria-haspopup="menu"
-              >
-                {templatesLoading ? (
-                  <Loader2 size={16} strokeWidth={2.2} aria-hidden="true" className={styles.spin} />
-                ) : (
-                  <Download size={16} strokeWidth={2.2} aria-hidden="true" />
-                )}
-                Скачать шаблоны
-                <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
-              </button>
-              {templatesOpen ? (
-                <div className={styles.templatesMenu} role="menu">
-                  <button
-                    type="button"
-                    className={styles.templatesMenuItem}
-                    role="menuitem"
-                    onClick={() => void downloadAllTemplates()}
-                    disabled={templatesLoading || !templates.length}
-                  >
-                    <strong>Все шаблоны (ZIP)</strong>
-                    <span>4 файла одним архивом</span>
-                  </button>
-                  {templates.map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      className={styles.templatesMenuItem}
-                      role="menuitem"
-                      onClick={() => void downloadTemplate(item)}
-                      disabled={templatesLoading}
-                    >
-                      <strong>{item.title}</strong>
-                      <span>{item.description}</span>
-                    </button>
-                  ))}
-                  {!templates.length ? (
-                    <p className={styles.templatesMenuEmpty}>Шаблоны пока недоступны на сервере</p>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
             <button
               type="button"
               className={styles.primaryButton}
@@ -1604,11 +2263,13 @@ export default function DocumentAnalysisAgent() {
               title={
                 !stagedFiles.length
                   ? "Загрузите обязательные файлы"
-                  : !rolesSettled
-                    ? "Дождитесь определения ролей"
-                    : !requiredFilesValid
-                      ? `Не хватает: ${missingRequiredRoles.map((item) => item.label).join(", ")}`
-                      : undefined
+                  : isMergingShipments
+                    ? "Дождитесь объединения графиков отгрузок"
+                    : !rolesSettled
+                      ? "Дождитесь определения ролей"
+                      : !requiredFilesValid
+                        ? `Не хватает: ${missingRequiredRoles.map((item) => item.label).join(", ")}`
+                        : undefined
               }
             >
               {isAnalyzing ? (
@@ -1640,6 +2301,20 @@ export default function DocumentAnalysisAgent() {
                   setStagesOverlayOpen(false);
                   setRolesSource(null);
                   setIsClassifyingRoles(false);
+                  setIsMergingShipments(false);
+                  setMergeSourceNames([]);
+                  lastShipmentMergeKeyRef.current = "";
+                  mergeInFlightRef.current = false;
+                  setIsPruningSchedules(false);
+                  lastSchedulePruneKeyRef.current = "";
+                  schedulePruneInFlightRef.current = false;
+                  setSchedulePruneNotice(null);
+                  setIsPruningDetailedSchedules(false);
+                  lastDetailedPruneKeyRef.current = "";
+                  detailedPruneInFlightRef.current = false;
+                  setDetailedPruneNotice(null);
+                  setScheduleDiff(null);
+                  setDetailedDiff(null);
                   setChecklistFace(lastAnalysisAt ? "stages" : "files");
                 }}
                 disabled={isAnalyzing}
@@ -1649,35 +2324,60 @@ export default function DocumentAnalysisAgent() {
             ) : null}
           </div>
 
+          {schedulePruneNotice ? (
+            <p className={styles.schedulePruneNotice} role="status">
+              {schedulePruneNotice}
+            </p>
+          ) : null}
+          {detailedPruneNotice ? (
+            <p className={styles.schedulePruneNotice} role="status">
+              {detailedPruneNotice}
+            </p>
+          ) : null}
+
           {error ? (
             <p className={styles.errorText} role="alert">
               {error}
             </p>
           ) : null}
-          {templatesError ? (
-            <p className={styles.errorText} role="alert">
-              {templatesError}
+          {stagedFiles.length ? (
+            <p className={styles.rolesHint}>
+              {isMergingShipments
+                ? `Объединяем графики отгрузок (${mergeSourceNames.length})…`
+                : isPruningSchedules
+                  ? "Отбираем 2 последние версии графика производства…"
+                  : isPruningDetailedSchedules
+                    ? "Отбираем 2 последние версии детального графика производства…"
+                    : isClassifyingRoles
+                      ? "Определяем роли файлов…"
+                      : rolesSource
+                        ? `Роли определены (${rolesSource === "lm_studio" ? "LM Studio" : "локально"}) — агент ещё не запущен`
+                        : "Роли появятся после распознавания файлов"}
             </p>
           ) : null}
 
-          {stagedFiles.length ? (
-            <p className={styles.rolesHint}>
-              {isClassifyingRoles
-                ? "Определяем роли файлов…"
-                : rolesSource
-                  ? `Роли определены (${rolesSource === "lm_studio" ? "LM Studio" : "локально"}) — агент ещё не запущен`
-                  : "Роли появятся после распознавания файлов"}
-            </p>
+          {isMergingShipments ? (
+            <div className={styles.shipmentMergeBanner} role="status" aria-live="polite">
+              <Loader2 size={16} className={styles.shipmentMergeSpinner} aria-hidden="true" />
+              <span>
+                Склеиваем {mergeSourceNames.length} файла графика отгрузок в один…
+              </span>
+            </div>
           ) : null}
 
           <div className={styles.fileList}>
             {stagedFiles.length ? (
               stagedFiles.map((item) => {
                 const roleLabel = item.role ? (ROLE_LABELS[item.role] ?? item.role) : null;
+                const isMergingCard = item.mergeStatus === "merging";
+                const isMergedCard = item.isMergedShipment;
                 return (
-                  <article key={item.id} className={styles.fileCard}>
+                  <article
+                    key={item.id}
+                    className={`${styles.fileCard} ${isMergingCard ? styles.fileCardMerging : ""} ${isMergedCard ? styles.fileCardMerged : ""}`}
+                  >
                     <div className={styles.fileIconWrap}>
-                      {!isAnalyzing ? (
+                      {!isAnalyzing && !isMergingShipments ? (
                         <button
                           type="button"
                           className={styles.removeButton}
@@ -1705,8 +2405,16 @@ export default function DocumentAnalysisAgent() {
                           });
                         }}
                       >
-                        <span className={styles.fileIcon}>
-                          <FileSpreadsheet size={30} strokeWidth={1.8} aria-hidden="true" />
+                        <span
+                          className={`${styles.fileIcon} ${isMergingCard ? styles.fileIconMerging : ""} ${isMergedCard ? styles.fileIconMerged : ""}`}
+                        >
+                          {isMergingCard ? (
+                            <Loader2 size={28} strokeWidth={2} className={styles.shipmentMergeSpinner} aria-hidden="true" />
+                          ) : isMergedCard ? (
+                            <Layers size={28} strokeWidth={1.8} aria-hidden="true" />
+                          ) : (
+                            <FileSpreadsheet size={30} strokeWidth={1.8} aria-hidden="true" />
+                          )}
                         </span>
                       </button>
                     </div>
@@ -1729,8 +2437,17 @@ export default function DocumentAnalysisAgent() {
                       <span>{formatBytes(item.file.size)}</span>
                       {item.roleStatus === "loading" || item.roleStatus === "pending" ? (
                         <span className={styles.fileRoleBadgePending}>определяем роль…</span>
+                      ) : item.mergeStatus === "merging" ? (
+                        <span className={styles.fileRoleBadgeMerging}>склеиваем…</span>
                       ) : item.roleStatus === "error" ? (
                         <span className={styles.fileRoleBadgeError}>роль не определена</span>
+                      ) : isMergedCard ? (
+                        <span
+                          className={styles.fileRoleBadgeMerged}
+                          title={`Объединено из ${item.mergedSourceCount ?? 0} файлов`}
+                        >
+                          объединённый график
+                        </span>
                       ) : roleLabel ? (
                         <span className={styles.fileRoleBadge} title={item.role ?? undefined}>
                           {roleLabel}
@@ -1771,31 +2488,247 @@ export default function DocumentAnalysisAgent() {
 
           {sessionStatusBadge}
 
-          {shiftAssignment ? (
+          <div className={styles.shiftAssignmentBlock}>
+            <div className={styles.tempSyncAction}>
+              <button
+                type="button"
+                className={styles.tempOdataPingButton}
+                disabled={onecManualSyncLoading}
+                onClick={() => void handleOnecManualSync()}
+              >
+                {onecManualSyncLoading
+                  ? "Выгрузка из 1С…"
+                  : "Выгрузить остатки и спецификации из 1С"}
+              </button>
+              <TempOnecSyncHint
+                stock={onecStockStatus}
+                specs={onecSpecsStatus}
+                loading={onecSyncStatusLoading || onecManualSyncLoading}
+              />
+              {onecManualSyncMessage ? (
+                <p className={styles.tempDebugHint} role="status">
+                  {onecManualSyncMessage}
+                </p>
+              ) : null}
+            </div>
+            <div className={styles.tempSyncAction}>
+              <button
+                type="button"
+                className={styles.tempOdataPingButton}
+                disabled={googleSheetsProbeLoading}
+                onClick={() => void handleGoogleSheetsProbe()}
+              >
+                {googleSheetsProbeLoading
+                  ? "Загрузка «ИТЦ В РАБОТЕ»…"
+                  : "TEMP: лист «ИТЦ В РАБОТЕ»"}
+              </button>
+              <p className={styles.tempDebugHint}>
+                Откроет временную модалку с таблицей из Google Sheets.
+              </p>
+            </div>
+          </div>
+
+          <TempGoogleSheetsViewer
+            open={googleSheetsModalOpen}
+            loading={googleSheetsProbeLoading}
+            error={googleSheetsError}
+            sheetTitle={googleSheetsTitle}
+            spreadsheetTitle={googleSheetsSpreadsheetTitle}
+            values={googleSheetsValues}
+            onClose={() => setGoogleSheetsModalOpen(false)}
+          />
+
+          {scheduleDiff ? (
+            <div className={styles.scheduleDiffBlock} role="status">
+              <div
+                className={`${styles.scheduleDiffNotice} ${
+                  scheduleDiff.kind === "baseline"
+                    ? styles.scheduleDiffNoticeBaseline
+                    : scheduleDiff.kind === "unchanged"
+                      ? styles.scheduleDiffNoticeNeutral
+                      : ""
+                }`}
+              >
+                {scheduleDiff.kind === "baseline" ? (
+                  <CheckCircle2 size={18} aria-hidden />
+                ) : scheduleDiff.kind === "unchanged" ? (
+                  <Info size={18} aria-hidden />
+                ) : (
+                  <AlertTriangle size={18} aria-hidden />
+                )}
+                <div className={styles.scheduleDiffNoticeText}>
+                  <strong>
+                    {scheduleDiff.kind === "baseline"
+                      ? "Базовая версия графика сохранена"
+                      : scheduleDiff.kind === "unchanged"
+                        ? "Изменений в плане производства нет"
+                        : "Изменился план производства"}
+                  </strong>
+                  <span>
+                    {scheduleDiff.message ||
+                      (scheduleDiff.kind === "changed"
+                        ? `Версии ${scheduleDiff.oldVersion} → ${scheduleDiff.newVersion}`
+                        : "")}
+                  </span>
+                  {scheduleDiff.kind === "changed" && scheduleDiff.months.length ? (
+                    <div className={styles.scheduleDiffMonths} aria-label="Месяцы с расхождениями">
+                      {scheduleDiff.months.map((month) => (
+                        <span key={month} className={styles.scheduleDiffMonthChip}>
+                          {month}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              {scheduleDiff.kind === "changed" && scheduleDiff.fileBase64 ? (
+                <button
+                  type="button"
+                  className={styles.scheduleDiffDownloadButton}
+                  onClick={() =>
+                    downloadBase64Excel(scheduleDiff.fileBase64, scheduleDiff.fileName)
+                  }
+                >
+                  <Download size={18} aria-hidden />
+                  <span className={styles.shiftAssignmentButtonText}>
+                    <span className={styles.shiftAssignmentButtonLabel}>
+                      Скачать файл с расхождениями
+                    </span>
+                    <span className={styles.shiftAssignmentButtonMeta}>
+                      было / стало{scheduleDiff.cells ? ` · ${scheduleDiff.cells} яч.` : ""}
+                    </span>
+                  </span>
+                  <FileSpreadsheet size={18} aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {detailedDiff ? (
+            <div className={styles.scheduleDiffBlock} role="status">
+              <div
+                className={`${styles.scheduleDiffNotice} ${
+                  detailedDiff.kind === "baseline"
+                    ? styles.scheduleDiffNoticeBaseline
+                    : detailedDiff.kind === "unchanged"
+                      ? styles.scheduleDiffNoticeNeutral
+                      : ""
+                }`}
+              >
+                {detailedDiff.kind === "baseline" ? (
+                  <CheckCircle2 size={18} aria-hidden />
+                ) : detailedDiff.kind === "unchanged" ? (
+                  <Info size={18} aria-hidden />
+                ) : (
+                  <AlertTriangle size={18} aria-hidden />
+                )}
+                <div className={styles.scheduleDiffNoticeText}>
+                  <strong>
+                    {detailedDiff.kind === "baseline"
+                      ? "Базовая версия детального графика сохранена"
+                      : detailedDiff.kind === "unchanged"
+                        ? "Изменений в детальном плане нет"
+                        : "Изменился детальный план производства"}
+                  </strong>
+                  <span>
+                    {detailedDiff.message ||
+                      (detailedDiff.kind === "changed"
+                        ? `Версии ${detailedDiff.oldVersion} → ${detailedDiff.newVersion}`
+                        : "")}
+                  </span>
+                  {detailedDiff.kind === "changed" && detailedDiff.dates.length ? (
+                    <div className={styles.scheduleDiffMonths} aria-label="Даты с расхождениями">
+                      {detailedDiff.dates.map((day) => (
+                        <span key={day} className={styles.scheduleDiffMonthChip}>
+                          {day}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+              {detailedDiff.kind === "changed" && detailedDiff.fileBase64 ? (
+                <button
+                  type="button"
+                  className={styles.scheduleDiffDownloadButton}
+                  onClick={() =>
+                    downloadBase64Excel(detailedDiff.fileBase64, detailedDiff.fileName)
+                  }
+                >
+                  <Download size={18} aria-hidden />
+                  <span className={styles.shiftAssignmentButtonText}>
+                    <span className={styles.shiftAssignmentButtonLabel}>
+                      Скачать файл с расхождениями
+                    </span>
+                    <span className={styles.shiftAssignmentButtonMeta}>
+                      было / стало{detailedDiff.cells ? ` · ${detailedDiff.cells} яч.` : ""}
+                    </span>
+                  </span>
+                  <FileSpreadsheet size={18} aria-hidden />
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {visibleShiftAssignment ? (
             <div className={styles.shiftAssignmentBlock}>
               <button
                 type="button"
                 className={styles.shiftAssignmentButton}
-                onClick={() =>
-                  downloadBase64Excel(
-                    shiftAssignment.fileBase64,
-                    shiftAssignment.fileName
-                  )
-                }
+                onClick={() => openScheduleFlipModal("shift")}
               >
-                <Download size={18} aria-hidden />
+                <FileSpreadsheet size={18} aria-hidden />
                 <span className={styles.shiftAssignmentButtonText}>
                   <span className={styles.shiftAssignmentButtonLabel}>
-                    Скачать сменное задание
+                    {managerScope ? "Мои задания" : "Сменное задание"}
                   </span>
                   <span className={styles.shiftAssignmentButtonMeta}>
-                    для менеджера по закупкам
+                    {visibleShiftAssignment.meta?.taskCount
+                      ? `${visibleShiftAssignment.meta.taskCount} заданий${
+                          managerScope ? "" : " · для менеджера по закупкам"
+                        }`
+                      : managerScope
+                        ? "открыть таблицу"
+                        : "для менеджера по закупкам"}
                   </span>
                 </span>
-                <FileSpreadsheet size={18} aria-hidden />
+                <ChevronRight size={18} aria-hidden />
               </button>
             </div>
           ) : null}
+
+          {mergedShipmentSchedule ? (
+            <div className={styles.shiftAssignmentBlock}>
+              <button
+                type="button"
+                className={styles.shiftAssignmentButton}
+                onClick={() => openScheduleFlipModal("shipment")}
+              >
+                <FileSpreadsheet size={18} aria-hidden />
+                <span className={styles.shiftAssignmentButtonText}>
+                  <span className={styles.shiftAssignmentButtonLabel}>
+                    График получения комплектующих
+                  </span>
+                  <span className={styles.shiftAssignmentButtonMeta}>
+                    объединённый ·{" "}
+                    {mergedShipmentSchedule.stats?.nomenclature_total ??
+                      Math.max(mergedShipmentSchedule.values.length - 1, 0)}{" "}
+                    номенклатур
+                  </span>
+                </span>
+                <ChevronRight size={18} aria-hidden />
+              </button>
+            </div>
+          ) : null}
+
+          <ScheduleFlipModal
+            open={scheduleFlipModalOpen}
+            face={scheduleFlipModalFace}
+            onFaceChange={setScheduleFlipModalFace}
+            onClose={closeScheduleFlipModal}
+            shift={scheduleFlipShiftProps}
+            shipment={scheduleFlipShipmentProps}
+          />
 
           <div className={styles.stagesSection} ref={stagesSectionRef}>
             {showInlineStages ? (
@@ -1897,7 +2830,62 @@ export default function DocumentAnalysisAgent() {
         </aside>
       </div>
 
-      {logisticsRisks ? (
+      {coverageDashboard ? (
+        <CoverageDashboard
+          dashboard={coverageDashboard}
+          formatDate={formatRuDate}
+          managerTasks={
+            visibleTaskBoard
+              ? {
+                  values: visibleTaskBoard.values,
+                  rowPriorities: visibleTaskBoard.rowPriorities,
+                  rowKinds: visibleTaskBoard.rowKinds,
+                  meta: visibleTaskBoard.meta,
+                  resultTexts: shiftResultTexts,
+                  resultEvals: shiftResultEvals,
+                  onResultTextsChange: setShiftResultTexts,
+                  onResultEvalsChange: setShiftResultEvals,
+                  onManagerResultEvaluated: handleManagerResultEvaluated,
+                  dashboardOpen: riskDashboardOpen,
+                  tasksOpen: riskPointsOpen,
+                  onDashboardOpenChange: setRiskDashboardOpen,
+                  onTasksOpenChange: setRiskPointsOpen,
+                  onOpenShiftModal: visibleShiftAssignment
+                    ? () => openScheduleFlipModal("shift")
+                    : undefined,
+                  onOpenShipmentModal: mergedShipmentSchedule
+                    ? () => openScheduleFlipModal("shipment")
+                    : undefined
+                }
+              : null
+          }
+          managerResults={!managerScope ? managerCompletionDashboard : null}
+        />
+      ) : null}
+
+      {visibleTaskBoard && !coverageDashboard ? (
+        <ShiftTaskBoard
+          values={visibleTaskBoard.values}
+          rowPriorities={visibleTaskBoard.rowPriorities}
+          rowKinds={visibleTaskBoard.rowKinds}
+          meta={visibleTaskBoard.meta}
+          resultTexts={shiftResultTexts}
+          resultEvals={shiftResultEvals}
+          onResultTextsChange={setShiftResultTexts}
+          onResultEvalsChange={setShiftResultEvals}
+          onManagerResultEvaluated={handleManagerResultEvaluated}
+          dashboardOpen={riskDashboardOpen}
+          tasksOpen={riskPointsOpen}
+          onDashboardOpenChange={setRiskDashboardOpen}
+          onTasksOpenChange={setRiskPointsOpen}
+          onOpenShiftModal={
+            visibleShiftAssignment ? () => openScheduleFlipModal("shift") : undefined
+          }
+          onOpenShipmentModal={
+            mergedShipmentSchedule ? () => openScheduleFlipModal("shipment") : undefined
+          }
+        />
+      ) : !coverageDashboard && logisticsRisks ? (
         <section className={styles.riskBoard} aria-label="Контрольные точки логистики">
           <div className={styles.riskBoardHeader}>
             <div>
@@ -2356,6 +3344,8 @@ export default function DocumentAnalysisAgent() {
           </div>
         </section>
       ) : null}
+
+      <AvionDeveloperFeedbackWidget user={user} />
     </div>
   );
 }

@@ -267,35 +267,23 @@ export const agentsApi = {
     formData.append("file", file);
     return apiClient.post<Agent>(`/agents/${agentId}/icon`, formData).then((r) => r.data);
   },
-  listAveonTemplates: () =>
-    apiClient
-      .get<{
-        templates: Array<{
-          key: string;
-          role: string;
-          title: string;
-          filename: string;
-          description: string;
-        }>;
-      }>("/agents/document-analysis/templates")
-      .then((r) => r.data.templates ?? []),
-
-  downloadAveonTemplate: (templateKey: string) =>
-    apiClient.get<Blob>(`/agents/document-analysis/templates/${encodeURIComponent(templateKey)}`, {
-      responseType: "blob"
-    }),
-
-  downloadAllAveonTemplatesZip: () =>
-    apiClient.get<Blob>("/agents/document-analysis/templates/all.zip", {
-      responseType: "blob"
-    }),
-
   /** Показать файл в проводнике Windows (backend: explorer /select). */
   revealAveonFileInExplorer: (file: File) => {
     const formData = new FormData();
     formData.append("file", file);
     return apiClient
       .post<{ ok: boolean; path: string }>("/agents/document-analysis/reveal-in-explorer", formData)
+      .then((r) => r.data);
+  },
+  sendAvionDeveloperFeedback: (message: string, files: File[]) => {
+    const formData = new FormData();
+    formData.append("message", message);
+    files.forEach((file) => formData.append("files", file));
+    return apiClient
+      .post<{ ok: boolean; message?: string }>(
+        "/agents/document-analysis/developer-feedback",
+        formData
+      )
       .then((r) => r.data);
   },
 
@@ -367,6 +355,39 @@ export const agentsApi = {
         file_base64: string | null;
         shift_assignment_file_name?: string;
         shift_assignment_file_base64?: string | null;
+        shift_assignment_values?: string[][];
+        shift_assignment_row_priorities?: Array<"urgent" | "today" | "week" | null>;
+        shift_assignment_row_kinds?: Array<"header" | "group" | "task" | "empty">;
+        shift_assignment_meta?: {
+          as_of?: string;
+          week_period?: string;
+          week_in_period?: boolean;
+          task_count?: number;
+          urgent_count?: number;
+          today_count?: number;
+          week_count?: number;
+        };
+        schedule_diff_has_changes?: boolean;
+        schedule_diff_changed_months?: string[];
+        schedule_diff_changed_cells?: number;
+        schedule_diff_file_name?: string;
+        schedule_diff_file_base64?: string | null;
+        schedule_diff_old_version?: string;
+        schedule_diff_new_version?: string;
+        schedule_diff_message?: string;
+        schedule_baseline_saved?: boolean;
+        schedule_compared_with_saved?: boolean;
+        detailed_diff_has_changes?: boolean;
+        detailed_diff_changed_dates?: string[];
+        detailed_diff_changed_cells?: number;
+        detailed_diff_file_name?: string;
+        detailed_diff_file_base64?: string | null;
+        detailed_diff_old_version?: string;
+        detailed_diff_new_version?: string;
+        detailed_diff_message?: string;
+        detailed_baseline_saved?: boolean;
+        detailed_compared_with_saved?: boolean;
+        coverage_dashboard?: unknown;
         dashboard_analyzed_at?: string | null;
       }>("/agents/document-analysis/analyze-excel", formData, {
         timeout: 600000
@@ -411,6 +432,43 @@ export const agentsApi = {
         shiftAssignmentFileName:
           r.data.shift_assignment_file_name || "сменное_задание_закупки.xlsx",
         shiftAssignmentFileBase64: r.data.shift_assignment_file_base64 ?? null,
+        shiftAssignmentValues: r.data.shift_assignment_values ?? [],
+        shiftAssignmentRowPriorities: r.data.shift_assignment_row_priorities ?? [],
+        shiftAssignmentRowKinds: r.data.shift_assignment_row_kinds ?? [],
+        shiftAssignmentMeta: r.data.shift_assignment_meta
+          ? {
+              asOf: r.data.shift_assignment_meta.as_of ?? "",
+              weekPeriod: r.data.shift_assignment_meta.week_period ?? "",
+              weekInPeriod: Boolean(r.data.shift_assignment_meta.week_in_period),
+              taskCount: r.data.shift_assignment_meta.task_count ?? 0,
+              urgentCount: r.data.shift_assignment_meta.urgent_count ?? 0,
+              todayCount: r.data.shift_assignment_meta.today_count ?? 0,
+              weekCount: r.data.shift_assignment_meta.week_count ?? 0
+            }
+          : null,
+        scheduleDiffHasChanges: Boolean(r.data.schedule_diff_has_changes),
+        scheduleDiffChangedMonths: r.data.schedule_diff_changed_months ?? [],
+        scheduleDiffChangedCells: r.data.schedule_diff_changed_cells ?? 0,
+        scheduleDiffFileName:
+          r.data.schedule_diff_file_name || "график_производства_изменения.xlsx",
+        scheduleDiffFileBase64: r.data.schedule_diff_file_base64 ?? null,
+        scheduleDiffOldVersion: r.data.schedule_diff_old_version ?? "",
+        scheduleDiffNewVersion: r.data.schedule_diff_new_version ?? "",
+        scheduleDiffMessage: r.data.schedule_diff_message ?? "",
+        scheduleBaselineSaved: Boolean(r.data.schedule_baseline_saved),
+        scheduleComparedWithSaved: Boolean(r.data.schedule_compared_with_saved),
+        detailedDiffHasChanges: Boolean(r.data.detailed_diff_has_changes),
+        detailedDiffChangedDates: r.data.detailed_diff_changed_dates ?? [],
+        detailedDiffChangedCells: r.data.detailed_diff_changed_cells ?? 0,
+        detailedDiffFileName:
+          r.data.detailed_diff_file_name || "детальный_график_изменения.xlsx",
+        detailedDiffFileBase64: r.data.detailed_diff_file_base64 ?? null,
+        detailedDiffOldVersion: r.data.detailed_diff_old_version ?? "",
+        detailedDiffNewVersion: r.data.detailed_diff_new_version ?? "",
+        detailedDiffMessage: r.data.detailed_diff_message ?? "",
+        detailedBaselineSaved: Boolean(r.data.detailed_baseline_saved),
+        detailedComparedWithSaved: Boolean(r.data.detailed_compared_with_saved),
+        coverageDashboard: r.data.coverage_dashboard ?? null,
         dashboardAnalyzedAt: r.data.dashboard_analyzed_at ?? null
       }));
   },
@@ -441,11 +499,51 @@ export const agentsApi = {
               }>;
             }>;
           };
+          task_dashboard?: {
+            values: string[][];
+            row_priorities: Array<"urgent" | "today" | "week" | null>;
+            row_kinds: Array<"header" | "group" | "task" | "empty">;
+            meta?: {
+              as_of?: string;
+              week_period?: string;
+              week_in_period?: boolean;
+              task_count?: number;
+              urgent_count?: number;
+              today_count?: number;
+              week_count?: number;
+            };
+            result_texts?: Record<string, string>;
+            result_evals?: Record<
+              string,
+              { status?: string; comment?: string; error?: string }
+            >;
+          } | null;
+          shift_assignment?: {
+            valid_date: string;
+            file_name: string;
+            file_base64: string;
+          } | null;
+          merged_shipment_schedule?: {
+            file_name: string;
+            file_base64: string;
+            values?: string[][];
+            stats?: {
+              nomenclature_total?: number;
+              date_columns?: number;
+              ingested_files?: string[];
+            };
+            source_count?: number;
+            changed_cells?: Array<{ row: number; col: number }>;
+          } | null;
+          coverage_dashboard?: unknown;
         } | null;
       }>("/agents/document-analysis/dashboard-latest")
       .then((r) => {
         if (!r.data.ok || !r.data.snapshot) return null;
         const snap = r.data.snapshot;
+        const taskDash = snap.task_dashboard;
+        const shiftSnap = snap.shift_assignment;
+        const shipmentSnap = snap.merged_shipment_schedule;
         return {
           analyzedAt: snap.analyzed_at,
           logisticsRisks: {
@@ -467,12 +565,649 @@ export const agentsApi = {
                 riskLevel: item.risk_level ?? "critical"
               }))
             }))
-          }
+          },
+          taskDashboard: taskDash?.values?.length
+            ? {
+                values: taskDash.values,
+                rowPriorities: taskDash.row_priorities ?? [],
+                rowKinds: taskDash.row_kinds ?? [],
+                meta: taskDash.meta
+                  ? {
+                      asOf: taskDash.meta.as_of ?? "",
+                      weekPeriod: taskDash.meta.week_period ?? "",
+                      weekInPeriod: Boolean(taskDash.meta.week_in_period),
+                      taskCount: taskDash.meta.task_count ?? 0,
+                      urgentCount: taskDash.meta.urgent_count ?? 0,
+                      todayCount: taskDash.meta.today_count ?? 0,
+                      weekCount: taskDash.meta.week_count ?? 0
+                    }
+                  : null,
+                resultTexts: taskDash.result_texts ?? {},
+                resultEvals: Object.fromEntries(
+                  Object.entries(taskDash.result_evals ?? {}).map(([key, value]) => [
+                    key,
+                    {
+                      status: value.status as
+                        | "resolved"
+                        | "partial"
+                        | "not_resolved"
+                        | undefined,
+                      comment: value.comment,
+                      error: value.error
+                    }
+                  ])
+                )
+              }
+            : null,
+          shiftAssignment: shiftSnap?.file_base64
+            ? {
+                fileName: shiftSnap.file_name,
+                fileBase64: shiftSnap.file_base64,
+                validDate: shiftSnap.valid_date
+              }
+            : null,
+          mergedShipmentSchedule: shipmentSnap?.file_base64
+            ? {
+                fileName: shipmentSnap.file_name,
+                fileBase64: shipmentSnap.file_base64,
+                values: shipmentSnap.values ?? [],
+                stats: shipmentSnap.stats ?? null,
+                sourceCount: shipmentSnap.source_count ?? 0,
+                changedCells: shipmentSnap.changed_cells ?? []
+              }
+            : null,
+          coverageDashboard: snap.coverage_dashboard ?? null
         };
       }),
 
   clearAveonDashboardLatest: () =>
-    apiClient.delete<{ ok: boolean; removed: boolean }>("/agents/document-analysis/dashboard-latest").then((r) => r.data)
+    apiClient.delete<{ ok: boolean; removed: boolean }>("/agents/document-analysis/dashboard-latest").then((r) => r.data),
+
+  /** TEMP(Aveon OData ping) — удалить вместе с кнопкой на странице агента */
+  tempAveonOdataPing: () =>
+    longRunningApiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        status_code: number | null;
+        url: string;
+        base?: string;
+        source?: string;
+        count?: number;
+        positive_count?: number;
+        negative_count?: number;
+        saved_count?: number;
+        db_count?: number;
+        db_match?: boolean;
+        sync_run_id?: string;
+        items?: Array<{
+          code: string;
+          name: string;
+          warehouse: string;
+          in_stock: number;
+          to_ship: number;
+          available: number;
+          nomenclature_key?: string;
+          warehouse_key?: string;
+        }>;
+      }>("/agents/document-analysis/temp-odata-ping")
+      .then((r) => r.data),
+
+  /** TEMP(Aveon resource specs) — удалить вместе с кнопкой на странице агента */
+  tempAveonResourceSpecsSync: () =>
+    longRunningApiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        folder_path?: string[];
+        folder_ref_key?: string;
+        count?: number;
+        materials_count?: number;
+        outputs_count?: number;
+        saved_specs?: number;
+        saved_materials?: number;
+        saved_outputs?: number;
+        db_specs?: number;
+        db_materials?: number;
+        db_outputs?: number;
+        db_match?: boolean;
+        sync_run_id?: string;
+        items?: Array<{
+          ref_key?: string;
+          code: string;
+          description: string;
+          status: string;
+          process_type?: string;
+          main_product_code?: string;
+          main_product: string;
+          main_product_qty?: number;
+          materials_count: number;
+          outputs_count: number;
+        }>;
+        materials?: Array<{
+          spec_code: string;
+          spec_name: string;
+          line: number;
+          code: string;
+          name: string;
+          qty: number;
+        }>;
+        outputs?: Array<{
+          spec_code: string;
+          spec_name: string;
+          line: number;
+          code: string;
+          name: string;
+          qty: number;
+        }>;
+      }>("/agents/document-analysis/temp-resource-specs-sync")
+      .then((r) => r.data),
+
+  /** TEMP(Aveon Google Sheets probe) — удалить вместе с кнопкой на странице агента */
+  tempAveonGoogleSheetsProbe: () =>
+    apiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        spreadsheet_id: string;
+        sheet_gid: string;
+        spreadsheet_url: string;
+        service_account_configured: boolean;
+        service_account_email: string | null;
+        copy_hint: string;
+        recommendations: string[];
+        api: {
+          name: string;
+          ok: boolean;
+          spreadsheet_id: string;
+          sheet_gid: string;
+          service_account_email: string | null;
+          elapsed_ms: number | null;
+          error: string | null;
+          hint: string | null;
+          parsed: Record<string, unknown> | null;
+        };
+        attempts: Array<{
+          name: string;
+          url?: string;
+          ok: boolean;
+          status_code?: number | null;
+          content_type?: string | null;
+          content_length?: number | null;
+          elapsed_ms: number | null;
+          final_url?: string | null;
+          redirects?: Array<{ status: number; url: string }>;
+          error: string | null;
+          hint: string | null;
+          body_preview?: string | null;
+          parsed: Record<string, unknown> | null;
+        }>;
+      }>("/agents/document-analysis/temp-google-sheets-probe")
+      .then((r) => r.data),
+
+  fetchAveonGoogleSheets: () =>
+    apiClient
+      .post<{
+        ok: boolean;
+        name: string;
+        spreadsheet_id: string;
+        sheet_gid: string | null;
+        sheet_title?: string;
+        service_account_email: string | null;
+        elapsed_ms: number | null;
+        hint: string | null;
+        error?: string | null;
+        parsed: {
+          format?: string;
+          spreadsheet_title?: string;
+          sheet_title?: string;
+          sheet_gid?: number | string;
+          row_count?: number;
+          column_count?: number;
+          preview_rows?: string[][];
+          values?: string[][];
+        } | null;
+      }>("/agents/document-analysis/google-sheets/fetch")
+      .then((r) => r.data),
+
+  getAveonGoogleSheetsStatus: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        configured: boolean;
+        service_account_email: string | null;
+        spreadsheet_id: string;
+        sheet_gid: string;
+      }>("/agents/document-analysis/google-sheets/status")
+      .then((r) => r.data),
+
+  getAveonOnecSyncStatus: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        stock: {
+          last_sync_at: string | null;
+          status: string | null;
+          saved_count: number;
+          db_count: number;
+          positive_count?: number;
+          negative_count?: number;
+          error_message?: string | null;
+        };
+        resource_specs: {
+          last_sync_at: string | null;
+          status: string | null;
+          specs_count: number;
+          materials_count: number;
+          outputs_count: number;
+          db_specs: number;
+          db_materials: number;
+          db_outputs: number;
+          error_message?: string | null;
+        };
+      }>("/agents/document-analysis/onec-sync-status")
+      .then((r) => r.data),
+
+  runAveonOnecSyncNow: () =>
+    apiClient
+      .post<{
+        ok: boolean;
+        status?: string;
+        stock?: { ok?: boolean; message?: string };
+        resource_specs?: { ok?: boolean; message?: string };
+      }>("/agents/document-analysis/onec-sync-now", null, { timeout: 600000 })
+      .then((r) => r.data),
+
+  getAveonScheduleSnapshotStatus: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        has_production: boolean;
+        has_detailed: boolean;
+        production_version: string;
+        production_filename: string;
+        production_saved_at: string;
+        detailed_version: string;
+        detailed_filename: string;
+        detailed_saved_at: string;
+        detailed_schedules: Array<{
+          month: string;
+          year: number;
+          month_num: number;
+          filename: string;
+          version_label: string;
+          saved_at: string;
+          has_file: boolean;
+        }>;
+      }>("/agents/document-analysis/schedule-snapshot-status")
+      .then((r) => r.data),
+
+  listAveonResourceSpecs: (params?: { status?: string; q?: string; limit?: number; offset?: number }) =>
+    apiClient
+      .get<{
+        ok: boolean;
+        total: number;
+        items: Array<{
+          ref_key: string;
+          code: string;
+          description: string;
+          status: string;
+          main_product_name: string;
+          materials_count: number;
+          outputs_count: number;
+        }>;
+      }>("/agents/document-analysis/resource-specs", { params })
+      .then((r) => r.data),
+
+  getAveonResourceSpec: (refKey: string) =>
+    apiClient
+      .get<{
+        ok: boolean;
+        spec: {
+          ref_key: string;
+          code: string;
+          description: string;
+          status: string;
+          main_product: { key: string; code: string; name: string; qty: number };
+          synced_at?: string | null;
+          materials: Array<{ code: string; name: string; qty: number; line_number: number }>;
+          outputs: Array<{ code: string; name: string; qty: number; line_number: number }>;
+        };
+      }>(`/agents/document-analysis/resource-specs/${encodeURIComponent(refKey)}`)
+      .then((r) => r.data),
+
+  mergeShipmentSchedules: (files: File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file);
+    }
+    return apiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        files: Array<{ name: string; size?: number }>;
+        file_name?: string;
+        file_base64?: string;
+        preview_values?: string[][];
+        stats?: Record<string, unknown>;
+      }>("/agents/document-analysis/merge-shipment-schedules", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 600_000
+      })
+      .then((r) => r.data);
+  },
+
+  previewShipmentSchedule: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient
+      .post<{
+        ok: boolean;
+        file_name: string;
+        preview_values: string[][];
+        row_count: number;
+      }>("/agents/document-analysis/shipment-schedule/preview", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000
+      })
+      .then((r) => r.data);
+  },
+
+  saveMergedShipmentSnapshot: (payload: {
+    fileName: string;
+    fileBase64: string;
+    previewValues: string[][];
+    stats?: Record<string, unknown> | null;
+    sourceCount?: number;
+    changedCells?: Array<{ row: number; col: number }>;
+  }) =>
+    apiClient
+      .post<{ ok: boolean }>("/agents/document-analysis/shipment-schedule/snapshot", {
+        file_name: payload.fileName,
+        file_base64: payload.fileBase64,
+        preview_values: payload.previewValues,
+        stats: payload.stats ?? {},
+        source_count: payload.sourceCount ?? 0,
+        changed_cells: payload.changedCells ?? []
+      })
+      .then((r) => r.data),
+
+  applyShipmentManagerDateChange: (payload: {
+    fileName: string;
+    fileBase64: string;
+    taskType: string;
+    problem: string;
+    solution: string;
+    nomenclature: string;
+    managerResult: string;
+  }) =>
+    apiClient
+      .post<{
+        ok: boolean;
+        applied: boolean;
+        message: string;
+        file_name?: string;
+        file_base64?: string;
+        preview_values?: string[][];
+        changed_cells?: Array<{ row: number; col: number }>;
+        change?: {
+          nomenclature: string;
+          original_date?: string;
+          new_date?: string;
+          quantity?: number;
+          remove_dates?: string[];
+          add_batches?: Array<{ date: string; quantity: number }>;
+        };
+      }>("/agents/document-analysis/shipment-schedule/apply-manager-date-change", {
+        file_name: payload.fileName,
+        file_base64: payload.fileBase64,
+        task_type: payload.taskType,
+        problem: payload.problem,
+        solution: payload.solution,
+        nomenclature: payload.nomenclature,
+        manager_result: payload.managerResult
+      }, { timeout: 120_000 })
+      .then((r) => r.data),
+
+  pruneProductionSchedules: (files: File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file);
+    }
+    return apiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        kept: Array<{ filename: string; version: number; version_label: string }>;
+        removed: Array<{ filename: string; version: number; version_label: string }>;
+      }>("/agents/document-analysis/prune-production-schedules", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000
+      })
+      .then((r) => r.data);
+  },
+
+  pruneDetailedSchedules: (files: File[]) => {
+    const formData = new FormData();
+    for (const file of files) {
+      formData.append("files", file);
+    }
+    return apiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        kept: Array<{ filename: string; version: number; version_label: string }>;
+        removed: Array<{ filename: string; version: number; version_label: string }>;
+      }>("/agents/document-analysis/prune-detailed-schedules", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 120_000
+      })
+      .then((r) => r.data);
+  },
+
+  evaluateShiftAssignmentResult: (payload: {
+    taskType: string;
+    problem: string;
+    solution: string;
+    nomenclature: string;
+    managerResult: string;
+  }) =>
+    apiClient
+      .post<{
+        status: "resolved" | "partial" | "not_resolved";
+        comment: string;
+        source: string;
+      }>("/agents/document-analysis/shift-assignment/evaluate-result", {
+        task_type: payload.taskType,
+        problem: payload.problem,
+        solution: payload.solution,
+        nomenclature: payload.nomenclature,
+        manager_result: payload.managerResult
+      }, { timeout: 120_000 })
+      .then((r) => ({
+        status: r.data.status,
+        comment: r.data.comment ?? "",
+        source: r.data.source ?? "lm_studio"
+      })),
+
+  suggestShiftAssignmentResult: (payload: {
+    taskType: string;
+    problem: string;
+    solution: string;
+    nomenclature: string;
+    draft: string;
+  }) =>
+    apiClient
+      .post<{
+        suggestion: string;
+        source: string;
+      }>("/agents/document-analysis/shift-assignment/suggest-result", {
+        task_type: payload.taskType,
+        problem: payload.problem,
+        solution: payload.solution,
+        nomenclature: payload.nomenclature,
+        draft: payload.draft
+      }, { timeout: 90_000 })
+      .then((r) => ({
+        suggestion: r.data.suggestion ?? "",
+        source: r.data.source ?? "lm_studio"
+      })),
+
+  saveShiftAssignmentProgress: (payload: {
+    resultTexts: Record<string, string>;
+    resultEvals: Record<
+      string,
+      { status?: string; comment?: string; error?: string; loading?: boolean }
+    >;
+  }) =>
+    apiClient
+      .post<{ ok: boolean }>("/agents/document-analysis/shift-assignment/progress", {
+        result_texts: payload.resultTexts,
+        result_evals: Object.fromEntries(
+          Object.entries(payload.resultEvals).map(([key, value]) => [
+            key,
+            {
+              status: value.status,
+              comment: value.comment,
+              error: value.error
+            }
+          ])
+        )
+      })
+      .then((r) => r.data),
+
+  completeShiftAssignment: (payload: {
+    reportDate: string;
+    managerName: string;
+    meta?: {
+      asOf?: string;
+      weekPeriod?: string;
+      weekInPeriod?: boolean;
+    } | null;
+    stats: {
+      total: number;
+      resolved: number;
+      incomplete: number;
+      partial: number;
+      notResolved: number;
+      active: number;
+    };
+    tasks: Array<{
+      key: string;
+      taskType: string;
+      nomenclature: string;
+      problem: string;
+      solution: string;
+      priority: string;
+      deadline: string;
+      deficit: string;
+      status: string;
+      resultText: string;
+      evalComment?: string;
+      reason?: string;
+    }>;
+    incompleteReasons: Record<string, string>;
+  }) =>
+    apiClient
+      .post<{
+        ok: boolean;
+        id: string;
+        sent_to: string;
+        email_sent_at?: string | null;
+      }>("/agents/document-analysis/shift-assignment/complete", {
+        report_date: payload.reportDate,
+        manager_name: payload.managerName,
+        meta: payload.meta
+          ? {
+              as_of: payload.meta.asOf,
+              week_period: payload.meta.weekPeriod,
+              week_in_period: payload.meta.weekInPeriod
+            }
+          : null,
+        stats: payload.stats,
+        tasks: payload.tasks.map((task) => ({
+          key: task.key,
+          task_type: task.taskType,
+          nomenclature: task.nomenclature,
+          problem: task.problem,
+          solution: task.solution,
+          priority: task.priority,
+          deadline: task.deadline,
+          deficit: task.deficit,
+          status: task.status,
+          result_text: task.resultText,
+          eval_comment: task.evalComment,
+          reason: task.reason
+        })),
+        incomplete_reasons: payload.incompleteReasons
+      })
+      .then((r) => r.data),
+
+  getShiftCompletionDashboard: (params?: { reportDate?: string }) =>
+    apiClient
+      .get<{
+        ok: boolean;
+        report_date: string;
+        summary: {
+          total: number;
+          resolved: number;
+          incomplete: number;
+          partial: number;
+          not_resolved: number;
+          active: number;
+          resolved_percent: number;
+        };
+        managers: Array<{
+          id: string;
+          manager_name: string;
+          report_date: string;
+          stats: {
+            total: number;
+            resolved: number;
+            incomplete: number;
+            partial: number;
+            not_resolved: number;
+            active: number;
+            resolved_percent: number;
+          };
+          tasks: Array<Record<string, unknown>>;
+          incomplete_tasks: Array<Record<string, unknown>>;
+          email_sent_to: string;
+          email_sent_at?: string | null;
+        }>;
+      }>("/agents/document-analysis/shift-assignment/completion-dashboard", {
+        params: params?.reportDate ? { report_date: params.reportDate } : undefined
+      })
+      .then((r) => ({
+        reportDate: r.data.report_date,
+        summary: {
+          total: r.data.summary.total ?? 0,
+          resolved: r.data.summary.resolved ?? 0,
+          incomplete: r.data.summary.incomplete ?? 0,
+          partial: r.data.summary.partial ?? 0,
+          notResolved: r.data.summary.not_resolved ?? 0,
+          active: r.data.summary.active ?? 0,
+          resolvedPercent: r.data.summary.resolved_percent ?? 0
+        },
+        managers: (r.data.managers ?? []).map((manager) => ({
+          id: manager.id,
+          managerName: manager.manager_name,
+          reportDate: manager.report_date,
+          stats: {
+            total: manager.stats.total ?? 0,
+            resolved: manager.stats.resolved ?? 0,
+            incomplete: manager.stats.incomplete ?? 0,
+            partial: manager.stats.partial ?? 0,
+            notResolved: manager.stats.not_resolved ?? 0,
+            active: manager.stats.active ?? 0,
+            resolvedPercent: manager.stats.resolved_percent ?? 0
+          },
+          tasks: manager.tasks ?? [],
+          incompleteTasks: manager.incomplete_tasks ?? [],
+          emailSentTo: manager.email_sent_to,
+          emailSentAt: manager.email_sent_at ?? null
+        }))
+      }))
 };
 export const rolesApi = {
   list: () => apiClient.get<Role[]>("/roles").then((r) => r.data)

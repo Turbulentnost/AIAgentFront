@@ -409,6 +409,93 @@
   transition: filter 0.15s ease, transform 0.15s ease;
 }
 
+.fileIconMerging {
+  color: var(--color-primary-text, #2563eb);
+  background: var(--color-primary-soft);
+  animation: shipmentMergePulse 1.1s ease-in-out infinite;
+}
+
+.fileIconMerged {
+  color: #1d7fc4;
+  background: color-mix(in srgb, var(--color-primary-soft) 65%, #38bdf8 35%);
+  box-shadow:
+    var(--shadow-sm),
+    0 0 0 2px color-mix(in srgb, #38bdf8 45%, transparent);
+}
+
+.fileCardMerging {
+  opacity: 0.92;
+}
+
+.fileCardMerged .fileMeta strong {
+  color: color-mix(in srgb, #1d7fc4 75%, var(--color-text-strong));
+}
+
+.shipmentMergeBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  color: var(--color-primary-text, #2563eb);
+  font-size: 12px;
+  line-height: 1.4;
+  background: var(--color-primary-soft);
+  border: 1px solid color-mix(in srgb, var(--color-primary-text, #2563eb) 18%, transparent);
+  border-radius: 10px;
+}
+
+.shipmentMergeSpinner {
+  flex-shrink: 0;
+  animation: spin 0.9s linear infinite;
+}
+
+.fileRoleBadgeMerging {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 20px;
+  margin: 4px auto 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-primary-text, #2563eb);
+  background: var(--color-primary-soft);
+}
+
+.fileRoleBadgeMerged {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
+  min-height: 20px;
+  margin: 4px auto 0;
+  padding: 2px 8px;
+  color: #1d7fc4;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.3;
+  background: color-mix(in srgb, var(--color-primary-soft) 70%, #38bdf8 30%);
+  border-radius: 999px;
+}
+
+@keyframes shipmentMergePulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.04);
+    filter: brightness(1.08);
+  }
+}
+
 .fileMeta {
   display: grid;
   gap: 2px;
@@ -639,7 +726,6 @@
   position: relative;
   transform-style: preserve-3d;
   transition: transform 0.72s cubic-bezier(0.4, 0.12, 0.2, 1);
-  will-change: transform;
 }
 
 .flipCardFlipped {
@@ -786,6 +872,178 @@
 
 .shiftAssignmentBlock {
   margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.schedulePruneNotice {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-primary-text) 10%, var(--color-surface-elevated));
+  border: 1px solid color-mix(in srgb, var(--color-primary-text) 28%, var(--color-border));
+  border-radius: var(--nav-button-radius);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.scheduleDiffBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.scheduleDiffNotice {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  color: #9c2f1a;
+  background: color-mix(in srgb, #e85d4c 12%, var(--color-surface-elevated));
+  border: 1px solid color-mix(in srgb, #e85d4c 35%, var(--color-border));
+  border-radius: var(--nav-button-radius);
+}
+
+.scheduleDiffNoticeBaseline {
+  color: var(--color-success-text, #2f9e64);
+  background: color-mix(in srgb, var(--color-success-soft, #e8f7ef) 72%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-success-text, #2f9e64) 35%, var(--color-border));
+}
+
+.scheduleDiffNoticeNeutral {
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-primary-soft) 70%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-primary-text) 28%, var(--color-border));
+}
+
+.scheduleDiffNoticeText {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.scheduleDiffNoticeText strong {
+  font-size: 14px;
+  color: var(--color-text-strong);
+}
+
+.scheduleDiffMonths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.scheduleDiffMonthChip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, #e85d4c 16%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, #e85d4c 30%, var(--color-border));
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scheduleDiffDownloadButton {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--nav-button-min-height);
+  padding: 12px 14px;
+  color: var(--color-text-strong);
+  text-align: left;
+  background: var(--color-surface-elevated);
+  border: 1px solid color-mix(in srgb, #e85d4c 40%, var(--color-border));
+  border-radius: var(--nav-button-radius);
+  font: inherit;
+  cursor: pointer;
+}
+
+.scheduleDiffDownloadButton:hover {
+  border-color: color-mix(in srgb, #e85d4c 55%, var(--color-border));
+  background: color-mix(in srgb, #e85d4c 8%, var(--color-surface-elevated));
+}
+
+.scheduleDiffDownloadButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, #e85d4c 55%, transparent);
+  outline-offset: 2px;
+}
+
+/* TEMP(Aveon OData ping) — удалить вместе с кнопкой */
+.tempOdataPingButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--nav-button-min-height);
+  padding: 10px 14px;
+  color: var(--color-text-strong);
+  text-align: center;
+  background: var(--color-surface-elevated);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--nav-button-radius);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tempOdataPingButton:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary-text) 30%, var(--color-border));
+}
+
+.tempOdataPingButton:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.tempSyncAction {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* TEMP(Aveon debug files) — удалить вместе с блоком */
+.tempDebugFilesBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tempDebugHiddenInput {
+  display: none;
+}
+
+.tempDebugHint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+}
+
+.tempDebugFileList {
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: 12px;
+  color: var(--color-text-strong);
+}
+
+.tempDebugFileList span {
+  color: var(--color-text-muted, #6b7280);
+}
+
+.tempDebugActions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .shiftAssignmentButton {
@@ -1181,6 +1439,102 @@
   gap: 12px;
 }
 
+.taskHorizonNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.taskHorizonPill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    box-shadow 0.18s ease,
+    transform 0.18s ease;
+}
+
+.taskHorizonPill:active:not(.taskHorizonPillActive) {
+  transform: scale(0.97);
+}
+
+.taskHorizonPill:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 2px;
+}
+
+.taskHorizonPillCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.taskHorizonPillUrgent {
+  color: var(--color-danger-text, #f87171);
+  border-color: color-mix(in srgb, var(--color-danger-text, #f87171) 44%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text, #f87171) 10%, var(--color-surface));
+}
+
+.taskHorizonPillUrgent .taskHorizonPillCount {
+  color: #fff;
+  background: color-mix(in srgb, var(--color-danger-text, #f87171) 78%, #000);
+}
+
+.taskHorizonPillUrgent:hover {
+  border-color: color-mix(in srgb, var(--color-danger-text, #f87171) 58%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text, #f87171) 16%, var(--color-surface));
+}
+
+.taskHorizonPillUrgent.taskHorizonPillActive {
+  color: #fecaca;
+  border-color: color-mix(in srgb, var(--color-danger-text, #f87171) 68%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text, #f87171) 24%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger-text, #f87171) 28%, transparent);
+}
+
+.taskHorizonPillWeek .taskHorizonPillCount {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-border) 55%, transparent);
+}
+
+.taskHorizonPillWeek:hover {
+  color: var(--color-text-strong);
+  border-color: color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+}
+
+.taskHorizonPillWeek.taskHorizonPillActive {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: var(--color-primary-soft);
+}
+
+.taskHorizonPillWeek.taskHorizonPillActive .taskHorizonPillCount {
+  color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 16%, var(--color-surface));
+}
+
 .riskTotalBadge {
   display: inline-flex;
   align-items: center;
@@ -1218,8 +1572,13 @@
 .riskTileFlipScene {
   height: 100%;
   min-height: 112px;
+  perspective: none;
+  perspective-origin: 50% 50%;
+}
+
+.riskTileFlipScene:has(.riskTileFlipCardFlipped) {
   perspective: 1100px;
-  perspective-origin: 50% 40%;
+  perspective-origin: 50% 50%;
 }
 
 .riskTileFlipCard {
@@ -1229,11 +1588,40 @@
   min-height: 112px;
   transform-style: preserve-3d;
   transition: transform 0.62s cubic-bezier(0.4, 0.12, 0.2, 1);
-  will-change: transform;
 }
 
 .riskTileFlipCardFlipped {
   transform: rotateY(180deg);
+}
+
+.riskTileFlipCard:not(.riskTileFlipCardFlipped) .riskTileFaceFront {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.riskTileFlipCard:not(.riskTileFlipCardFlipped) .riskTileFaceBack {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.riskTileFlipCardFlipped .riskTileFaceFront {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.riskTileFlipCardFlipped .riskTileFaceBack {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
 }
 
 /* Обе стороны в одной ячейке → высота = max(лицо, оборот), контент не режется */
@@ -1478,17 +1866,56 @@
   margin: 0;
 }
 
-.riskDoughnutSvg {
+.riskDoughnutChartWrap {
+  position: relative;
   flex-shrink: 0;
   width: 156px;
   height: 156px;
+}
+
+.riskDoughnutSvg {
+  display: block;
+  width: 100%;
+  height: 100%;
   overflow: visible;
+}
+
+.riskDoughnutCenterOverlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  gap: 2px;
+  text-align: center;
+  pointer-events: none;
+}
+
+.riskDoughnutCenterOverlay strong {
+  color: var(--color-text-strong);
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.riskDoughnutCenterOverlay .riskDoughnutCenterValueSuccess {
+  color: var(--color-success-text, var(--color-success));
+}
+
+.riskDoughnutCenterOverlay .riskDoughnutCenterValueDanger {
+  color: var(--color-danger-text, var(--color-danger));
+}
+
+.riskDoughnutCenterOverlay span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
 }
 
 .riskDoughnutSegment {
   cursor: pointer;
   outline: none;
-  transition: transform 0.18s ease;
 }
 
 .riskDoughnutSegment:focus-visible {
@@ -1933,8 +2360,20 @@
     grid-template-columns: 1fr;
   }
 
+  .taskHorizonNav {
+    gap: 6px;
+  }
+
   .riskAnalyticsRow {
     grid-template-columns: 1fr;
+  }
+
+  .taskDashboardSummary .riskAnalyticsRow {
+    grid-template-columns: 1fr;
+  }
+
+  .taskDashboardSummary .riskDoughnutPanel {
+    min-height: 180px;
   }
 
   .riskAnalyticsTiles {
@@ -1969,10 +2408,1778 @@
   .riskItemMeta {
     justify-content: flex-start;
   }
+
+  .coverageBoardHeader {
+    flex-direction: column;
+  }
+
+  .coverageDashboardControls {
+    justify-items: start;
+    width: 100%;
+  }
+
+  .coveragePeriodNav {
+    justify-content: flex-start;
+  }
+
+  .coverageToolbar {
+    justify-content: flex-start;
+    width: 100%;
+  }
 }
 
 @media (max-width: 560px) {
   .riskAnalyticsTiles {
     grid-template-columns: 1fr;
   }
+
+  .coverageAnalyticsTiles {
+    grid-template-columns: 1fr;
+  }
 }
+
+.taskBoardLinkButton {
+  padding: 0;
+  color: var(--color-primary-text);
+  font: inherit;
+  font-weight: 600;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.taskBoardLinkButton:hover {
+  color: var(--color-text-strong);
+}
+
+.taskItemList {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.taskTable {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.taskTable thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 5px 10px;
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-align: left;
+  text-transform: uppercase;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.taskTable thead th:last-child {
+  width: 72px;
+  text-align: right;
+}
+
+.taskTable thead th:nth-child(2) {
+  width: 118px;
+}
+
+.taskTable thead th:nth-child(3) {
+  width: 88px;
+}
+
+.taskTableRow {
+  transition: background 0.15s ease;
+}
+
+.taskTableRow:hover {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 5%, var(--color-surface));
+}
+
+.taskTableRow td {
+  padding: 6px 10px;
+  vertical-align: middle;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 72%, transparent);
+}
+
+.taskTableTaskCell {
+  min-width: 0;
+}
+
+.taskTableTaskMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.taskTableTitle {
+  overflow: hidden;
+  min-width: 0;
+  color: var(--color-text-strong);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskTableDeadlineCell,
+.taskTableDeficitCell {
+  white-space: nowrap;
+}
+
+.taskTableDeadline {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.taskTableDeficit {
+  color: var(--color-text-strong);
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.taskTableDeficitEmpty {
+  color: color-mix(in srgb, var(--color-text-secondary) 55%, transparent);
+  font-size: 11px;
+}
+
+.taskTableActionsCell {
+  width: 72px;
+}
+
+.taskTableActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.taskTableIconBtn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 6%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.taskTableIconBtn:hover {
+  color: #fff;
+  background: var(--color-primary, #2563eb);
+  border-color: color-mix(in srgb, var(--color-primary, #2563eb) 80%, #000);
+}
+
+.taskTableIconBtnGhost:hover {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 10%, transparent);
+  border-color: var(--color-border);
+}
+
+.taskTableSrOnly {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.taskStatusBadgeCompact {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+
+.riskStageContentCompact {
+  gap: 8px;
+  padding: 10px 12px 0;
+}
+
+.riskStageContentCompact .riskStageSummary strong {
+  font-size: 13px;
+}
+
+.riskStageContentCompact .riskStageSummary span {
+  font-size: 11px;
+}
+
+.taskItem {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 240px);
+  gap: 12px;
+  align-items: start;
+  padding: 10px 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.taskItem:hover,
+.taskItem:focus-within {
+  border-color: color-mix(in srgb, var(--color-primary-text, #60a5fa) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 4%, var(--color-surface));
+  box-shadow: 0 8px 24px color-mix(in srgb, #000 16%, transparent);
+}
+
+.taskItemBody {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.taskItemAside {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 8px;
+  min-height: 44px;
+}
+
+.taskItemResultBlock {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
+  width: 100%;
+}
+
+.taskItemResultPreview {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--color-text);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.taskItemHoverActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px;
+  opacity: 0;
+  transform: translateX(8px);
+  pointer-events: none;
+  transition:
+    opacity 0.18s ease,
+    transform 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.taskItem:hover .taskItemHoverActions,
+.taskItem:focus-within .taskItemHoverActions {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.taskItemActionBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.taskItemActionBtn:hover {
+  color: #fff;
+  background: var(--color-primary, #2563eb);
+  border-color: color-mix(in srgb, var(--color-primary, #2563eb) 80%, #000);
+}
+
+.taskItemActionBtnGhost {
+  color: var(--color-text-secondary);
+  background: transparent;
+}
+
+.taskItemActionBtnGhost:hover {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+  border-color: var(--color-border);
+}
+
+@media (hover: none) {
+  .taskItemHoverActions {
+    opacity: 1;
+    transform: none;
+    pointer-events: auto;
+  }
+}
+
+.taskItemMain {
+  display: grid;
+  gap: 4px;
+}
+
+.taskItemMain strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.taskItemSub {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.taskItemMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.taskItemResult {
+  display: none;
+}
+
+.taskStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.taskStatusSpinner {
+  animation: spin 0.9s linear infinite;
+}
+
+.taskStatusActive {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-secondary) 16%, transparent);
+}
+
+.taskStatusResolved {
+  color: var(--color-success-text, var(--color-success));
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+}
+
+.taskStatusPartial {
+  color: #a16207;
+  background: color-mix(in srgb, #facc15 20%, transparent);
+}
+
+.taskStatusNotResolved {
+  color: var(--color-danger-text, var(--color-danger));
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.coverageBoard {
+  margin-top: 16px;
+  padding: 16px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+}
+
+.coverageBoardHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.coverageBoardIntro {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.coverageModeLead {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+  transition:
+    border-color 0.24s ease,
+    background 0.24s ease,
+    box-shadow 0.24s ease;
+}
+
+.coverageModeLeadProducts {
+  border-color: color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 55%, var(--color-surface));
+}
+
+.coverageModeLeadNom {
+  border-color: color-mix(in srgb, #a78bfa 32%, var(--color-border));
+  background: color-mix(in srgb, #a78bfa 10%, var(--color-surface));
+}
+
+.coverageModeLeadIcon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-primary-soft) 80%, transparent);
+  border-radius: 10px;
+}
+
+.coverageModeLeadNom .coverageModeLeadIcon {
+  color: #c4b5fd;
+  background: color-mix(in srgb, #a78bfa 18%, transparent);
+}
+
+.coverageModeLeadTasks {
+  border-color: color-mix(in srgb, #f87171 32%, var(--color-border));
+  background: color-mix(in srgb, #f87171 10%, var(--color-surface));
+}
+
+.coverageModeLeadTasks .coverageModeLeadIcon {
+  color: #fca5a5;
+  background: color-mix(in srgb, #f87171 18%, transparent);
+}
+
+.coverageModeLeadTextWrap {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.coverageModeLeadTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.coverageModeLeadHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.coverageModeSwitch {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.coverageModeSwitchBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 11px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  background: transparent;
+  border: 0;
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    color 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.16s ease;
+}
+
+.coverageModeSwitchBtn:hover:not(.coverageModeSwitchBtnActive) {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 5%, transparent);
+}
+
+.coverageModeSwitchBtn:active {
+  transform: scale(0.97);
+}
+
+.coverageModeSwitchBtnActive {
+  color: var(--color-text-strong);
+  background: var(--color-surface-elevated);
+  box-shadow: 0 1px 4px color-mix(in srgb, #000 14%, transparent);
+}
+
+.coverageModeSwitchBtn:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 1px;
+}
+
+.coveragePeriodNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.coverageToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.coverageToolbarTasksOnly {
+  justify-content: flex-end;
+}
+
+.coverageToolbarDivider {
+  width: 1px;
+  height: 22px;
+  background: var(--color-border);
+}
+
+.coverageSideToggleBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    color 0.2s ease,
+    transform 0.18s ease;
+}
+
+.coverageSideToggleBtn svg {
+  flex-shrink: 0;
+  transition: transform 0.38s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.coverageSideToggleBtnActive svg {
+  transform: rotate(-180deg);
+}
+
+.coverageSideToggleBtn:active {
+  transform: scale(0.97);
+}
+
+.coverageSideToggleBtn:hover {
+  color: var(--color-text-strong);
+  border-color: color-mix(in srgb, var(--color-primary) 30%, var(--color-border));
+}
+
+.coverageSideToggleBtnActive {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: var(--color-primary-soft);
+}
+
+.coveragePeriodBtn {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    color 0.18s ease,
+    background 0.18s ease,
+    border-color 0.18s ease,
+    transform 0.18s ease;
+}
+
+.coveragePeriodBtn:active:not(.coveragePeriodBtnActive) {
+  transform: scale(0.97);
+}
+
+.coveragePeriodBtnActive {
+  color: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border));
+  background: var(--color-primary-soft);
+}
+
+.coverageDashboardControls {
+  display: grid;
+  justify-items: end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.coverageTileSummary {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.coverageTileSubLabel {
+  display: block;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+  color: var(--color-text-secondary);
+}
+
+.coverageAnalyticsTiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-items: start;
+  width: 100%;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFlipScene {
+  align-self: start;
+  min-height: 0;
+  height: auto;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFlipCard:not(.coverageSideFlipCard) {
+  min-height: 0;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFlipCard:not(.coverageSideFlipCard) .riskTileFaceFront {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFlipCard:not(.coverageSideFlipCard).riskTileFlipCardFlipped .riskTileFaceFront {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFlipCard:not(.coverageSideFlipCard) .riskTileFaceBack {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: auto;
+  overflow: hidden;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFlipCard:not(.coverageSideFlipCard).riskTileFlipCardFlipped .riskTileFaceBack {
+  position: relative;
+  overflow: visible;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.coverageSideCarouselViewport {
+  overflow: hidden;
+  width: 100%;
+}
+
+.coverageSideCarouselPanel {
+  width: 100%;
+  min-width: 0;
+}
+
+.coverageSideCarouselPanelHidden {
+  display: none;
+}
+
+.coverageEmbeddedTasksRoot {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.coverageEmbeddedTasksSection {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.coverageEmbeddedTasksTypesHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 0 2px;
+}
+
+.coverageEmbeddedTasksTypesToolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px 12px;
+  margin-left: auto;
+}
+
+.coverageEmbeddedTasksTypesMeta {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.coverageEmbeddedTasksTypesHeader strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.coverageEmbeddedTasksScroll {
+  overflow: auto;
+  max-height: min(68vh, 480px);
+  margin-top: 4px;
+  padding-right: 2px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.coverageEmbeddedTasksScroll .taskTable thead th {
+  background: var(--color-surface-elevated);
+}
+
+.coverageSideFlipScene {
+  width: 100%;
+  min-height: 0;
+  height: auto;
+  /* Плоский flip «как книга»: камера строго по центру, без наклона сверху */
+  perspective: 3200px;
+  perspective-origin: 50% 50%;
+}
+
+.coverageSideFlipCard {
+  min-height: 0;
+  height: auto;
+  transform-origin: center center;
+}
+
+.coverageSideFlipFace {
+  width: 100%;
+  min-width: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.coverageBoard .coverageSideFlipFace.riskTileFaceBack {
+  padding: 0;
+  align-items: stretch;
+  align-content: stretch;
+  transform: rotateY(180deg) translateZ(1px);
+}
+
+.coverageBoard .coverageSideFlipFace.riskTileFaceFront {
+  transform: rotateY(0deg) translateZ(1px);
+}
+
+.coverageBoard .coverageSideFlipCard > .coverageSideFlipFace {
+  min-height: 0;
+  align-self: start;
+  height: auto;
+}
+
+.coverageBoard .coverageSideFlipCard:not(.riskTileFlipCardFlipped) > .coverageSideFlipFace.riskTileFaceFront {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.coverageBoard .coverageSideFlipCard:not(.riskTileFlipCardFlipped) > .coverageSideFlipFace.riskTileFaceBack {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.coverageBoard .coverageSideFlipCard.riskTileFlipCardFlipped > .coverageSideFlipFace.riskTileFaceFront {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.coverageBoard .coverageSideFlipCard.riskTileFlipCardFlipped > .coverageSideFlipFace.riskTileFaceBack {
+  position: relative;
+  pointer-events: auto;
+  visibility: visible;
+}
+
+.coverageTileFront {
+  position: relative;
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  min-height: 84px;
+  padding: 0;
+  cursor: default;
+}
+
+.coverageTileFront:hover {
+  background: var(--color-surface-elevated);
+}
+
+.coverageTileMainBtn {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 14px;
+  cursor: pointer;
+}
+
+.coverageTileMainBtn:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: -2px;
+}
+
+.coverageBoard .coverageTileFront .riskAnalyticsTileIcon {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+}
+
+.coverageBoard .coverageTileFront .riskAnalyticsTileLabel {
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.coverageBoard .coverageTileFront .riskAnalyticsTileValue {
+  font-size: 26px;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.coverageBoard .coverageTileFront .riskAnalyticsTileBody {
+  gap: 2px;
+}
+
+.coverageTileInfoBtn {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  align-self: flex-start;
+  width: 30px;
+  height: 30px;
+  margin: 8px 8px 0 0;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  opacity: 0.72;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.coverageTileFront:hover .coverageTileInfoBtn,
+.coverageTileInfoBtn:focus-visible,
+.coverageTileInfoBtnActive {
+  opacity: 1;
+}
+
+.coverageTileInfoBtn:hover,
+.coverageTileInfoBtnActive {
+  color: var(--color-primary-text);
+  background: var(--color-primary-soft);
+  border-color: color-mix(in srgb, var(--color-primary-text) 35%, var(--color-border));
+}
+
+.coverageTileInfoBtn:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 1px;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskAnalyticsTile {
+  align-items: center;
+  min-height: 0;
+}
+
+.coverageBoard .coverageAnalyticsTiles .riskTileFaceBack.riskAnalyticsTile {
+  align-items: stretch;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 84px;
+  padding: 10px 12px;
+  cursor: default;
+}
+
+.coverageTileBackFace {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: auto;
+}
+
+.coverageTileBackBody {
+  display: grid;
+  flex: 1;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.coverageTileBackBody:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: -2px;
+  border-radius: 8px;
+}
+
+.coverageBoard .coverageTileBackFace .coverageTileExplainHeader {
+  flex-shrink: 0;
+}
+
+.coverageBoard .coverageTileBackFace .coverageTileExplainLine {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.coverageBoard .coverageTileBackFace .coverageTileExplainLabel {
+  margin-bottom: 1px;
+  font-size: 10px;
+}
+
+.coverageBoard .coverageTileBackFace .coverageTileExplainMeta {
+  flex-shrink: 0;
+  margin: 0;
+  padding-top: 0;
+}
+
+.coverageDetailBlock {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--color-border);
+}
+
+.coverageDetailHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.coverageDetailTitle {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.coverageDetailHint {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.coverageDetailEmpty {
+  margin: 0;
+  padding: 14px 16px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+}
+
+.coverageDetailTableWrap {
+  overflow: auto;
+  max-height: min(68vh, 480px);
+  width: 100%;
+  align-self: start;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.coverageDetailTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.coverageDetailTable th,
+.coverageDetailTable td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.coverageDetailTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: var(--color-surface-elevated);
+}
+
+.coverageDetailTable tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.coverageDetailTable tbody tr:hover {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 4%, var(--color-surface));
+}
+
+.coverageDetailNameCell {
+  min-width: 220px;
+  max-width: 420px;
+  color: var(--color-text-strong);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.coverageDetailTable td:not(.coverageDetailNameCell) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.coverageDetailRowExpandable {
+  cursor: pointer;
+}
+
+.coverageDetailRowExpandable:hover {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 6%, var(--color-surface));
+}
+
+.coverageDetailRowExpanded {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 8%, var(--color-surface));
+}
+
+.coverageDetailExpandBtn {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 6px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.coverageDetailExpandBtn:focus-visible {
+  outline: 2px solid var(--color-primary-text, #60a5fa);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.coverageDetailExpandIcon {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: var(--color-text-secondary);
+  transition: transform 0.18s ease;
+}
+
+.coverageDetailExpandIconOpen {
+  transform: rotate(180deg);
+}
+
+.coverageDetailExpandRow td {
+  padding: 0;
+  background: color-mix(in srgb, var(--color-surface-elevated) 70%, var(--color-surface));
+  border-bottom: 1px solid var(--color-border);
+}
+
+.coverageDetailExpandRow:hover {
+  background: transparent;
+}
+
+.coverageShortagePanel {
+  padding: 12px 14px 14px 36px;
+}
+
+.coverageShortageLead {
+  margin: 0 0 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.coverageShortageEmpty {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.coverageShortageTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.coverageShortageTable th,
+.coverageShortageTable td {
+  padding: 6px 10px;
+  text-align: left;
+  border-top: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.coverageShortageTable th {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: transparent;
+}
+
+.coverageShortageTable tbody tr:first-child td,
+.coverageShortageTable tbody tr:first-child th {
+  border-top: 0;
+}
+
+.coverageShortageName {
+  min-width: 180px;
+  max-width: 360px;
+  color: var(--color-text-strong);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.coverageShortageTable td:not(.coverageShortageName) {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.coverageShortageValue {
+  color: var(--color-danger-text, var(--color-danger, #ef4444));
+  font-weight: 700;
+}
+
+.coverageStatusBadge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+.coverageStatusGreen {
+  color: var(--color-success-text, var(--color-success));
+  background: color-mix(in srgb, var(--color-success) 16%, transparent);
+}
+
+.coverageStatusYellow {
+  color: #a16207;
+  background: color-mix(in srgb, #facc15 20%, transparent);
+}
+
+.coverageStatusRed {
+  color: var(--color-danger-text, var(--color-danger));
+  background: color-mix(in srgb, var(--color-danger) 16%, transparent);
+}
+
+.coverageStatusNeutral {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, transparent);
+}
+
+.coverageTileExplainPanel {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-primary) 28%, var(--color-border));
+  border-radius: 12px;
+  box-shadow: 0 10px 28px color-mix(in srgb, #000 18%, transparent);
+}
+
+.coverageBoard .coverageTileBackFace.coverageTileExplainPanel,
+.coverageBoard .coverageTileBackFace {
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 8%, transparent),
+    0 8px 24px color-mix(in srgb, #000 12%, transparent);
+}
+
+.coverageTileExplainHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.coverageTileExplainHeader strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.coverageTileExplainClose {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.coverageTileExplainClose:hover {
+  color: var(--color-text-strong);
+  background: var(--color-surface-elevated);
+}
+
+.coverageTileExplainLine {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.coverageTileExplainLabel {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--color-text-strong);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.coverageTileExplainMeta {
+  margin: 0;
+  color: var(--color-primary-text);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.coverageBoard .coverageSummaryBlock .riskAnalyticsRow {
+  grid-template-columns: 1fr;
+}
+
+.taskDashboardSummary {
+  padding: 14px 16px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.taskDashboardSummary .riskAnalyticsRow {
+  grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.95fr);
+  gap: 14px;
+  align-items: stretch;
+}
+
+.taskAnalyticsTiles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: start;
+  align-self: stretch;
+  min-width: 0;
+}
+
+.taskDashboardSummary .riskTileFlipScene {
+  height: auto;
+  min-height: 112px;
+}
+
+.taskDashboardSummary .riskTileFlipCard {
+  min-height: 112px;
+}
+
+.taskDashboardSummary .riskTileFaceBack {
+  align-items: flex-start;
+  overflow: visible;
+}
+
+.taskDashboardSummary .riskTileBackContent {
+  gap: 5px;
+}
+
+.taskDashboardSummary .riskTileBackRule {
+  line-height: 1.45;
+}
+
+.taskDashboardSummary .riskDoughnutPanel {
+  align-self: stretch;
+  min-height: 0;
+  height: auto;
+  padding: 8px 4px;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+}
+
+.coverageEmbeddedBlock {
+  display: grid;
+  gap: 12px;
+}
+
+.managerResultsBoard {
+  display: grid;
+  gap: 14px;
+  padding: 14px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 74%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 16px;
+}
+
+.managerResultsHeader {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.managerResultsSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.managerResultsSummaryCard,
+.managerResultTile {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.managerResultsSummaryCard span,
+.managerResultTile span {
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.managerResultsSummaryCard strong,
+.managerResultTile strong {
+  color: var(--color-text-strong);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.managerResultsSuccess {
+  color: var(--color-success-text, var(--color-success)) !important;
+}
+
+.managerResultsDanger {
+  color: var(--color-danger-text, var(--color-danger)) !important;
+}
+
+.managerResultsManagersGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.managerResultCard {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.managerResultCardHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.managerResultCard h3,
+.managerResultsReasonsHead h3 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.managerResultEyebrow {
+  margin: 0 0 4px;
+  color: var(--color-primary-text);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.managerResultRing {
+  --manager-progress: 0%;
+  display: grid;
+  flex-shrink: 0;
+  place-content: center;
+  width: 104px;
+  height: 104px;
+  text-align: center;
+  background:
+    radial-gradient(circle at center, var(--color-surface-elevated) 0 56%, transparent 57%),
+    conic-gradient(
+      var(--color-success-text, var(--color-success)) 0 var(--manager-progress),
+      var(--color-danger-text, var(--color-danger)) var(--manager-progress) 100%
+    );
+  border-radius: 50%;
+}
+
+.managerResultRing strong {
+  color: var(--color-text-strong);
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.managerResultRing span {
+  color: var(--color-text-secondary);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.managerResultTiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.managerResultBreakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.managerResultBreakdown span {
+  padding: 5px 8px;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong) 5%, transparent);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.managerResultsReasons {
+  display: grid;
+  gap: 10px;
+}
+
+.managerResultsReasonsHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.managerResultsReasonsHead span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  color: var(--color-danger-text, var(--color-danger));
+  background: var(--color-danger-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.managerResultsReasonList {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.managerResultsReasonCard {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(180px, 0.85fr);
+  gap: 12px;
+  min-width: 0;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid color-mix(in srgb, var(--color-danger-text, #f87171) 22%, var(--color-border));
+  border-radius: 12px;
+}
+
+.managerResultsReasonCard p,
+.managerResultsReasonCard blockquote {
+  margin: 0;
+}
+
+.managerResultsReasonCard p {
+  color: var(--color-primary-text);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.managerResultsReasonCard strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.managerResultsReasonCard span {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.managerResultsReasonCard blockquote {
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultsEmpty {
+  margin: 0;
+  padding: 12px 14px;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  font-size: 13px;
+}
+
+.coverageAnimatedViewport {
+  display: grid;
+  gap: 12px;
+  min-height: 0;
+}
+
+.coverageAnimPeriod {
+  animation: coveragePeriodIn 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.coverageAnimFade {
+  animation: coverageFadeIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes coverageFadeIn {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes coveragePeriodIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene {
+  animation: coverageTilePop 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene:nth-child(1) {
+  animation-delay: 0.02s;
+}
+
+.coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene:nth-child(2) {
+  animation-delay: 0.06s;
+}
+
+.coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene:nth-child(4) {
+  animation-delay: 0.14s;
+}
+
+@keyframes coverageTilePop {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.coverageSummaryRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.shiftEndHeaderActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.shiftEndButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-primary-text) 16%, var(--color-surface-elevated));
+  border: 1px solid color-mix(in srgb, var(--color-primary-text) 34%, var(--color-border));
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.shiftEndButton:hover {
+  background: color-mix(in srgb, var(--color-primary-text) 24%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-primary-text) 50%, var(--color-border));
+  transform: translateY(-1px);
+}
+
+.coverageDetailAnim {
+  animation: coverageDetailIn 0.36s cubic-bezier(0.22, 1, 0.36, 1) 0.06s both;
+}
+
+@keyframes coverageDetailIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .coverageAnimPeriod,
+  .coverageAnimFade,
+  .coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene,
+  .coverageDetailAnim,
+  .coverageBoard .riskTileFlipCard,
+  .coverageBoard .coverageSideFlipCard {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .coverageModeLead,
+  .coverageModeSwitchBtn {
+    transition: none;
+  }
+}
+

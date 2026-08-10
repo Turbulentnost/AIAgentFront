@@ -1,0 +1,57 @@
+/* TEMP(Aveon) — удалить вместе с TempOnecSyncFreshness.tsx */
+
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.line {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.kind {
+  color: var(--color-text-secondary);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.value {
+  color: var(--color-text-secondary);
+}
+
+.valueError {
+  color: #e85d4c;
+}
+
+.errorDetail {
+  margin: 0;
+  font-size: 11px;
+  color: #e85d4c;
+  line-height: 1.35;
+}
+
+.hintBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.hint {
+  margin: -2px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: var(--color-text-secondary);
+}
+
+.valueStrong {
+  color: var(--color-text-strong);
+  font-weight: 600;
+}
