@@ -24,6 +24,7 @@ type Props = {
   submitting: boolean;
   error: string | null;
   success: string | null;
+  manualShipmentNotices?: Array<{ id: string; message: string; nomenclature?: string }>;
   onClose: () => void;
   onSubmit: (reasons: Record<string, string>) => Promise<void>;
 };
@@ -69,6 +70,7 @@ export default function ShiftEndModal({
   submitting,
   error,
   success,
+  manualShipmentNotices = [],
   onClose,
   onSubmit,
 }: Props) {
@@ -179,6 +181,26 @@ export default function ShiftEndModal({
               <strong className={styles.statDanger}>{stats.incomplete}</strong>
             </div>
           </div>
+
+          {manualShipmentNotices.length > 0 ? (
+            <section className={styles.section}>
+              <div className={styles.sectionHead}>
+                <h3>Ручные правки Google формы</h3>
+                <span>{manualShipmentNotices.length}</span>
+              </div>
+              <div className={styles.taskList}>
+                {manualShipmentNotices.map((notice) => (
+                  <article key={notice.id} className={styles.taskCard}>
+                    <div>
+                      <p className={styles.taskType}>График Китай</p>
+                      <strong>{notice.nomenclature || "Номенклатура"}</strong>
+                      <span>{notice.message}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
 
           <section className={styles.section}>
             <div className={styles.sectionHead}>

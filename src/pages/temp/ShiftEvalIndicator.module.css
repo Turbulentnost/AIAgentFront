@@ -32,19 +32,19 @@
 
 .toneResolved {
   color: #15803d;
-  background: color-mix(in srgb, #22c55e 22%, transparent);
+  background: color-mix(in srgb, var(--color-success) 22%, transparent);
   animation: evalPop 0.35s ease;
 }
 
 .tonePartial {
   color: #a16207;
-  background: color-mix(in srgb, #facc15 26%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 26%, transparent);
   animation: evalPop 0.35s ease;
 }
 
 .toneNotResolved {
   color: #b91c1c;
-  background: color-mix(in srgb, #f87171 22%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 22%, transparent);
   animation: evalPop 0.35s ease;
 }
 

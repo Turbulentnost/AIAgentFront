@@ -21,6 +21,7 @@ export default defineConfig(({ mode }) => {
       host: "0.0.0.0",
       port: 5173,
       strictPort: true,
+      allowedHosts: true,
       // В Docker на Windows события изменения файлов не доходят через bind
       // mount — без polling правки кода не подхватываются без перезапуска.
       watch: { usePolling: true, interval: 500 },

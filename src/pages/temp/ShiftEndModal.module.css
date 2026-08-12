@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: color-mix(in srgb, #0b1220 62%, transparent);
+  background: color-mix(in srgb, var(--color-bg) 62%, transparent);
   animation: overlayIn 0.18s ease;
 }
 
@@ -80,7 +80,7 @@
 
 .closeBtn:hover:not(:disabled) {
   color: var(--color-text-strong, #f3f4f6);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 8%, transparent);
 }
 
 .body {
@@ -119,20 +119,20 @@
 
 .noticeWarning {
   color: #fbbf24;
-  background: color-mix(in srgb, #f59e0b 13%, transparent);
-  border-color: color-mix(in srgb, #f59e0b 32%, transparent);
+  background: color-mix(in srgb, var(--color-warning) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning) 32%, transparent);
 }
 
 .noticeSuccess {
   color: var(--color-success-text, #34d399);
-  background: color-mix(in srgb, #22c55e 12%, transparent);
-  border-color: color-mix(in srgb, #22c55e 28%, transparent);
+  background: color-mix(in srgb, var(--color-success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-success) 28%, transparent);
 }
 
 .noticeError {
   color: var(--color-danger-text, #f87171);
-  background: color-mix(in srgb, #ef4444 13%, transparent);
-  border-color: color-mix(in srgb, #ef4444 32%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 13%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger) 32%, transparent);
 }
 
 .statsGrid {
@@ -145,7 +145,7 @@
   display: grid;
   gap: 6px;
   padding: 12px 14px;
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
   border: 1px solid var(--color-border, #2a2f3a);
   border-radius: 12px;
 }
@@ -198,7 +198,7 @@
   height: 24px;
   padding: 0 8px;
   color: var(--color-text-secondary, #9ca3af);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 6%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 6%, transparent);
   border-radius: 999px;
   font-size: 12px;
   font-weight: 800;
@@ -266,12 +266,12 @@
 
 .statusResolved {
   color: var(--color-success-text, #34d399) !important;
-  background: color-mix(in srgb, #22c55e 14%, transparent);
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
 }
 
 .statusIncomplete {
   color: var(--color-danger-text, #f87171) !important;
-  background: color-mix(in srgb, #ef4444 14%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
 }
 
 .reasonField {
@@ -290,7 +290,7 @@
   min-height: 78px;
   padding: 10px 12px;
   color: var(--color-text-strong, #f3f4f6);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
   border: 1px solid var(--color-border, #2a2f3a);
   border-radius: 10px;
   font: inherit;
@@ -313,7 +313,7 @@
 .emptyText {
   margin: 0;
   padding: 12px 14px;
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
   border: 1px dashed var(--color-border, #2a2f3a);
   border-radius: 12px;
   font-size: 13px;
@@ -350,7 +350,7 @@
 }
 
 .secondaryBtn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 7%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 7%, transparent);
 }
 
 .primaryBtn {
@@ -360,7 +360,7 @@
 }
 
 .primaryBtn:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-primary, #2563eb) 88%, #fff);
+  background: color-mix(in srgb, var(--color-primary) 88%, var(--color-surface));
 }
 
 .primaryBtn:disabled,

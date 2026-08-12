@@ -30,13 +30,28 @@ export interface ProfileActivityItem {
 }
 
 export const profileFallbacks = {
-  departmentName: "Конструкторское бюро (КБ)",
+  divisionName: "Служба развития",
+  subdivisionName: "Сектор ИИ",
+  departmentName: "Сектор ИИ",
   roleName: "Сотрудник",
   position: "Инженер-конструктор",
   phone: "+7 (928) 123-45-67",
   createdAt: "2024-03-12T09:00:00.000Z",
   lastLoginAt: "2026-06-04T09:14:00.000Z"
 } as const;
+
+export function resolveDepartmentLabels(
+  departments: Array<{ id: string; name: string; parent_id: string | null }> | undefined,
+  departmentId: string | null | undefined
+) {
+  const department = departments?.find((item) => item.id === departmentId);
+  const subdivisionName = department?.name ?? profileFallbacks.subdivisionName;
+  const divisionName =
+    (department?.parent_id
+      ? departments?.find((item) => item.id === department.parent_id)?.name
+      : null) ?? profileFallbacks.divisionName;
+  return { divisionName, subdivisionName };
+}
 
 export const roleNameById: Record<string, string> = {
   employee: "Сотрудник",

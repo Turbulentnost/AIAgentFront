@@ -41,12 +41,10 @@
 }
 
 [data-theme="glassmorphism"] .shell,
-[data-theme="glassmorphism"] [class*="card"],
-[data-theme="glassmorphism"] [class*="Card"] {
+[data-theme="glassmorphism"] .card {
   backdrop-filter: blur(14px);
 }
 
-[data-theme="sketch"] [class*="card"],
-[data-theme="sketch"] [class*="Card"] {
+[data-theme="sketch"] .card {
   border-radius: 4px !important;
 }

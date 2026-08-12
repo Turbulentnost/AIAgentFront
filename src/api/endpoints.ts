@@ -13,6 +13,10 @@ import type {
   Department,
   DepartmentCreate,
   DepartmentSyncStatus,
+  DeveloperFeedbackMessagesResponse,
+  DeveloperFeedbackSendResponse,
+  DeveloperFeedbackThread,
+  DeveloperFeedbackThreadsResponse,
   EmployeeSyncResult,
   Document,
   DocumentChunk,
@@ -275,17 +279,48 @@ export const agentsApi = {
       .post<{ ok: boolean; path: string }>("/agents/document-analysis/reveal-in-explorer", formData)
       .then((r) => r.data);
   },
+  listAvionDeveloperFeedbackThreads: () =>
+    apiClient
+      .get<DeveloperFeedbackThreadsResponse>("/agents/document-analysis/developer-feedback/threads")
+      .then((r) => r.data),
+  getAvionDeveloperFeedbackMessages: (threadId: string) =>
+    apiClient
+      .get<DeveloperFeedbackMessagesResponse>(
+        `/agents/document-analysis/developer-feedback/threads/${threadId}/messages`
+      )
+      .then((r) => r.data),
   sendAvionDeveloperFeedback: (message: string, files: File[]) => {
     const formData = new FormData();
     formData.append("message", message);
     files.forEach((file) => formData.append("files", file));
     return apiClient
-      .post<{ ok: boolean; message?: string }>(
+      .post<DeveloperFeedbackSendResponse>(
         "/agents/document-analysis/developer-feedback",
         formData
       )
       .then((r) => r.data);
   },
+  sendAvionDeveloperFeedbackMessage: (threadId: string, message: string, files: File[]) => {
+    const formData = new FormData();
+    formData.append("message", message);
+    files.forEach((file) => formData.append("files", file));
+    return apiClient
+      .post<DeveloperFeedbackSendResponse>(
+        `/agents/document-analysis/developer-feedback/threads/${threadId}/messages`,
+        formData
+      )
+      .then((r) => r.data);
+  },
+  markAvionDeveloperFeedbackThreadRead: (threadId: string) =>
+    apiClient
+      .post<DeveloperFeedbackThread>(`/agents/document-analysis/developer-feedback/threads/${threadId}/read`)
+      .then((r) => r.data),
+  downloadAvionDeveloperFeedbackAttachment: (attachmentId: string) =>
+    apiClient
+      .get<Blob>(`/agents/document-analysis/developer-feedback/attachments/${attachmentId}`, {
+        responseType: "blob"
+      })
+      .then((r) => r.data),
 
   classifyAveonExcel: (files: File[], options?: { signal?: AbortSignal }) => {
     const formData = new FormData();
@@ -474,7 +509,7 @@ export const agentsApi = {
   },
 
   getAveonDashboardLatest: () =>
-    apiClient
+    longRunningApiClient
       .get<{
         ok: boolean;
         snapshot: {
@@ -523,6 +558,13 @@ export const agentsApi = {
             file_name: string;
             file_base64: string;
           } | null;
+          shift_day_expired?: boolean;
+          shift_previous_valid_date?: string | null;
+          shift_today_msk?: string;
+          dashboard_date_msk?: string | null;
+          refresh_status?: string | null;
+          refresh_error?: string | null;
+          refresh_attempted_date_msk?: string | null;
           merged_shipment_schedule?: {
             file_name: string;
             file_base64: string;
@@ -616,7 +658,14 @@ export const agentsApi = {
                 changedCells: shipmentSnap.changed_cells ?? []
               }
             : null,
-          coverageDashboard: snap.coverage_dashboard ?? null
+          coverageDashboard: snap.coverage_dashboard ?? null,
+          shiftDayExpired: Boolean(snap.shift_day_expired),
+          shiftPreviousValidDate: snap.shift_previous_valid_date ?? null,
+          shiftTodayMsk: snap.shift_today_msk ?? null,
+          dashboardDateMsk: snap.dashboard_date_msk ?? null,
+          autoRefreshStatus: snap.refresh_status ?? null,
+          autoRefreshError: snap.refresh_error ?? null,
+          autoRefreshAttemptedDateMsk: snap.refresh_attempted_date_msk ?? null
         };
       }),
 
@@ -913,6 +962,53 @@ export const agentsApi = {
       .then((r) => r.data);
   },
 
+  getCurrentRussiaShipmentSchedule: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        schedule: null | {
+          id: string;
+          country_scope: string;
+          source_type: string;
+          file_name: string;
+          file_sha256: string;
+          preview_values?: string[][];
+          stats?: Record<string, unknown>;
+          changed_cells?: Array<{ row: number; col: number }>;
+          is_active: boolean;
+          created_reason?: string | null;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      }>("/agents/document-analysis/shipment-schedule/current")
+      .then((r) => r.data),
+
+  uploadRussiaShipmentSchedule: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient
+      .post<{
+        ok: boolean;
+        schedule: {
+          id: string;
+          country_scope: string;
+          source_type: string;
+          file_name: string;
+          file_sha256: string;
+          preview_values?: string[][];
+          stats?: Record<string, unknown>;
+          changed_cells?: Array<{ row: number; col: number }>;
+          is_active: boolean;
+          created_at?: string | null;
+          updated_at?: string | null;
+        };
+      }>("/agents/document-analysis/shipment-schedule/russia/upload", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 600_000
+      })
+      .then((r) => r.data);
+  },
+
   saveMergedShipmentSnapshot: (payload: {
     fileName: string;
     fileBase64: string;
@@ -940,6 +1036,8 @@ export const agentsApi = {
     solution: string;
     nomenclature: string;
     managerResult: string;
+    taskKey?: string | null;
+    managerName?: string | null;
   }) =>
     apiClient
       .post<{
@@ -950,6 +1048,12 @@ export const agentsApi = {
         file_base64?: string;
         preview_values?: string[][];
         changed_cells?: Array<{ row: number; col: number }>;
+        country?: string | null;
+        supplier?: string | null;
+        matched_row?: number;
+        persisted?: boolean;
+        manual_action_required?: boolean;
+        already_processed?: boolean;
         change?: {
           nomenclature: string;
           original_date?: string;
@@ -961,6 +1065,8 @@ export const agentsApi = {
       }>("/agents/document-analysis/shipment-schedule/apply-manager-date-change", {
         file_name: payload.fileName,
         file_base64: payload.fileBase64,
+        task_key: payload.taskKey ?? null,
+        manager_name: payload.managerName ?? null,
         task_type: payload.taskType,
         problem: payload.problem,
         solution: payload.solution,
@@ -1157,10 +1263,19 @@ export const agentsApi = {
           active: number;
           resolved_percent: number;
         };
+        roster: {
+          total: number;
+          submitted: number;
+          in_progress?: number;
+          missing: number;
+        };
+        live_mode?: boolean;
         managers: Array<{
           id: string;
           manager_name: string;
           report_date: string;
+          report_status: "submitted" | "missing" | "in_progress";
+          region_label: string;
           stats: {
             total: number;
             resolved: number;
@@ -1174,12 +1289,20 @@ export const agentsApi = {
           incomplete_tasks: Array<Record<string, unknown>>;
           email_sent_to: string;
           email_sent_at?: string | null;
+          live_updated_at?: string | null;
         }>;
       }>("/agents/document-analysis/shift-assignment/completion-dashboard", {
         params: params?.reportDate ? { report_date: params.reportDate } : undefined
       })
       .then((r) => ({
         reportDate: r.data.report_date,
+        liveMode: Boolean(r.data.live_mode),
+        roster: {
+          total: r.data.roster?.total ?? r.data.managers?.length ?? 0,
+          submitted: r.data.roster?.submitted ?? 0,
+          inProgress: r.data.roster?.in_progress ?? 0,
+          missing: r.data.roster?.missing ?? 0
+        },
         summary: {
           total: r.data.summary.total ?? 0,
           resolved: r.data.summary.resolved ?? 0,
@@ -1193,6 +1316,8 @@ export const agentsApi = {
           id: manager.id,
           managerName: manager.manager_name,
           reportDate: manager.report_date,
+          reportStatus: manager.report_status ?? "submitted",
+          regionLabel: manager.region_label ?? "",
           stats: {
             total: manager.stats.total ?? 0,
             resolved: manager.stats.resolved ?? 0,
@@ -1205,7 +1330,32 @@ export const agentsApi = {
           tasks: manager.tasks ?? [],
           incompleteTasks: manager.incomplete_tasks ?? [],
           emailSentTo: manager.email_sent_to,
-          emailSentAt: manager.email_sent_at ?? null
+          emailSentAt: manager.email_sent_at ?? null,
+          liveUpdatedAt: manager.live_updated_at ?? null
+        }))
+      })),
+
+  getShiftCompletionDates: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        today: string;
+        roster_total?: number;
+        dates: Array<{
+          report_date: string;
+          reports_count: number;
+          roster_total?: number;
+          has_live?: boolean;
+        }>;
+      }>("/agents/document-analysis/shift-assignment/completion-dates")
+      .then((r) => ({
+        today: r.data.today,
+        rosterTotal: r.data.roster_total ?? 2,
+        dates: (r.data.dates ?? []).map((entry) => ({
+          reportDate: entry.report_date,
+          reportsCount: entry.reports_count ?? 0,
+          rosterTotal: entry.roster_total ?? r.data.roster_total ?? 2,
+          hasLive: Boolean(entry.has_live)
         }))
       }))
 };

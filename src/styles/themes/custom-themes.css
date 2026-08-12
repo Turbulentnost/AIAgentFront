@@ -1,3 +1,11 @@
 @import "./_foundations.css";
 @import "./_overrides.css";
 @import "./_effects.css";
+
+/* Semantic aliases — evaluated after per-theme accent overrides */
+:root,
+[data-theme] {
+  --color-primary-soft: color-mix(in srgb, var(--color-primary) 14%, var(--color-surface));
+  --color-text-muted: var(--color-muted);
+  --color-warning-text: var(--color-warning-dark);
+}

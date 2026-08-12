@@ -5,6 +5,8 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/auth/AuthContext";
 import { hasDedicatedLaunchPage, navigateToAgentLaunch } from "@/utils/agentLaunch";
 import { isMockAgent, withMockAvailableAgents } from "@/utils/availableAgents";
+import { isAvionOnlyUser } from "@/utils/avionOnlyAccess";
+import { isDocumentAnalysisAgent } from "@/utils/agentLaunch";
 import { agentsApi, departmentsApi, tasksApi } from "@/api/endpoints";
 import { AgentAccessEditor } from "@/components/AgentAccessEditor";
 import { FormSelect } from "@/components/form-controls";
@@ -428,6 +430,7 @@ function AgentCard({
 
 export default function Agents() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [kindTab, setKindTab] = useState<KindTab>("all");
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>("all");
   const [departmentFilter, setDepartmentFilter] = useState("all");
@@ -452,10 +455,13 @@ export default function Agents() {
     [tasksQuery.data]
   );
 
-  const catalogAgents = useMemo(
-    () => mergePinnedCatalogAgents(withMockAvailableAgents(agentsQuery.data ?? [])),
-    [agentsQuery.data]
-  );
+  const catalogAgents = useMemo(() => {
+    const available = withMockAvailableAgents(agentsQuery.data ?? [], user);
+    if (isAvionOnlyUser(user)) {
+      return available.filter(isDocumentAnalysisAgent);
+    }
+    return mergePinnedCatalogAgents(available);
+  }, [agentsQuery.data, user]);
 
   const departmentOptions = useMemo(
     () =>

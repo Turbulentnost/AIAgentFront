@@ -4,6 +4,17 @@
   margin: 0 auto;
 }
 
+[data-avion-agent] {
+  color: var(--color-text);
+}
+
+[data-theme="glassmorphism"] [data-avion-agent] .coverageBoard,
+[data-theme="glassmorphism"] [data-avion-agent] .taskDashboardSummary,
+[data-theme="glassmorphism"] [data-avion-agent] .riskAnalyticsTile,
+[data-theme="glassmorphism"] [data-avion-agent] .fileCard {
+  backdrop-filter: none;
+}
+
 .backLink {
   display: inline-flex;
   align-items: center;
@@ -103,7 +114,7 @@
 }
 
 .panelHint {
-  margin: -8px 0 0;
+  margin: 8px 0 0;
   color: var(--color-text-secondary);
   font-size: 13px;
   line-height: 1.45;
@@ -416,11 +427,11 @@
 }
 
 .fileIconMerged {
-  color: #1d7fc4;
-  background: color-mix(in srgb, var(--color-primary-soft) 65%, #38bdf8 35%);
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-primary-soft) 65%, var(--color-primary) 35%);
   box-shadow:
     var(--shadow-sm),
-    0 0 0 2px color-mix(in srgb, #38bdf8 45%, transparent);
+    0 0 0 2px color-mix(in srgb, var(--color-primary) 45%, transparent);
 }
 
 .fileCardMerging {
@@ -428,7 +439,7 @@
 }
 
 .fileCardMerged .fileMeta strong {
-  color: color-mix(in srgb, #1d7fc4 75%, var(--color-text-strong));
+  color: color-mix(in srgb, var(--color-primary-text) 75%, var(--color-text-strong));
 }
 
 .shipmentMergeBanner {
@@ -476,11 +487,11 @@
   min-height: 20px;
   margin: 4px auto 0;
   padding: 2px 8px;
-  color: #1d7fc4;
+  color: var(--color-primary-text);
   font-size: 10px;
   font-weight: 600;
   line-height: 1.3;
-  background: color-mix(in srgb, var(--color-primary-soft) 70%, #38bdf8 30%);
+  background: color-mix(in srgb, var(--color-primary-soft) 70%, var(--color-primary) 30%);
   border-radius: 999px;
 }
 
@@ -900,16 +911,16 @@
   gap: 10px;
   align-items: flex-start;
   padding: 12px 14px;
-  color: #9c2f1a;
-  background: color-mix(in srgb, #e85d4c 12%, var(--color-surface-elevated));
-  border: 1px solid color-mix(in srgb, #e85d4c 35%, var(--color-border));
+  color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger) 12%, var(--color-surface-elevated));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
   border-radius: var(--nav-button-radius);
 }
 
 .scheduleDiffNoticeBaseline {
-  color: var(--color-success-text, #2f9e64);
-  background: color-mix(in srgb, var(--color-success-soft, #e8f7ef) 72%, var(--color-surface-elevated));
-  border-color: color-mix(in srgb, var(--color-success-text, #2f9e64) 35%, var(--color-border));
+  color: var(--color-success-text);
+  background: color-mix(in srgb, var(--color-success-soft) 72%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-success-text) 35%, var(--color-border));
 }
 
 .scheduleDiffNoticeNeutral {
@@ -944,8 +955,8 @@
   align-items: center;
   padding: 3px 8px;
   color: var(--color-text-strong);
-  background: color-mix(in srgb, #e85d4c 16%, var(--color-surface));
-  border: 1px solid color-mix(in srgb, #e85d4c 30%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 16%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
@@ -962,19 +973,19 @@
   color: var(--color-text-strong);
   text-align: left;
   background: var(--color-surface-elevated);
-  border: 1px solid color-mix(in srgb, #e85d4c 40%, var(--color-border));
+  border: 1px solid color-mix(in srgb, var(--color-danger) 40%, var(--color-border));
   border-radius: var(--nav-button-radius);
   font: inherit;
   cursor: pointer;
 }
 
 .scheduleDiffDownloadButton:hover {
-  border-color: color-mix(in srgb, #e85d4c 55%, var(--color-border));
-  background: color-mix(in srgb, #e85d4c 8%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-danger) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface-elevated));
 }
 
 .scheduleDiffDownloadButton:focus-visible {
-  outline: 2px solid color-mix(in srgb, #e85d4c 55%, transparent);
+  outline: 2px solid color-mix(in srgb, var(--color-danger) 55%, transparent);
   outline-offset: 2px;
 }
 
@@ -1255,6 +1266,15 @@
   border-radius: 12px;
 }
 
+.stagePanelTitle {
+  margin: 0 0 2px;
+  padding: 0 0 2px;
+  color: var(--color-text-strong);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
 .stageRow {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
@@ -1429,7 +1449,6 @@
 }
 
 .riskAccordionPanelInner {
-  overflow: hidden;
   min-height: 0;
   padding: 0 14px 14px;
 }
@@ -1492,26 +1511,26 @@
 }
 
 .taskHorizonPillUrgent {
-  color: var(--color-danger-text, #f87171);
-  border-color: color-mix(in srgb, var(--color-danger-text, #f87171) 44%, var(--color-border));
-  background: color-mix(in srgb, var(--color-danger-text, #f87171) 10%, var(--color-surface));
+  color: var(--color-danger-text);
+  border-color: color-mix(in srgb, var(--color-danger-text) 44%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text) 10%, var(--color-surface));
 }
 
 .taskHorizonPillUrgent .taskHorizonPillCount {
-  color: #fff;
-  background: color-mix(in srgb, var(--color-danger-text, #f87171) 78%, #000);
+  color: var(--color-on-primary);
+  background: color-mix(in srgb, var(--color-danger-text) 78%, var(--color-bg));
 }
 
 .taskHorizonPillUrgent:hover {
-  border-color: color-mix(in srgb, var(--color-danger-text, #f87171) 58%, var(--color-border));
-  background: color-mix(in srgb, var(--color-danger-text, #f87171) 16%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger-text) 58%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text) 16%, var(--color-surface));
 }
 
 .taskHorizonPillUrgent.taskHorizonPillActive {
-  color: #fecaca;
-  border-color: color-mix(in srgb, var(--color-danger-text, #f87171) 68%, var(--color-border));
-  background: color-mix(in srgb, var(--color-danger-text, #f87171) 24%, var(--color-surface));
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger-text, #f87171) 28%, transparent);
+  color: color-mix(in srgb, var(--color-danger-text) 72%, var(--color-text-strong));
+  border-color: color-mix(in srgb, var(--color-danger-text) 68%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text) 24%, var(--color-surface));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger-text) 28%, transparent);
 }
 
 .taskHorizonPillWeek .taskHorizonPillCount {
@@ -2305,16 +2324,16 @@
 }
 
 .riskLevelHigh .riskItemCountdown {
-  color: color-mix(in srgb, var(--color-danger-text) 80%, #c98700);
+  color: color-mix(in srgb, var(--color-danger-text) 80%, var(--color-warning-dark));
   font-weight: 600;
 }
 
 .riskLevelMedium .riskItemCountdown {
-  color: #c98700;
+  color: var(--color-warning-dark);
 }
 
 .riskLevelLow .riskItemCountdown {
-  color: var(--color-success-text, #2f9e64);
+  color: var(--color-success-text);
 }
 
 .riskMeter {
@@ -2575,7 +2594,7 @@
   height: 28px;
   padding: 0;
   color: var(--color-text-secondary);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 6%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 6%, transparent);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
@@ -2586,14 +2605,14 @@
 }
 
 .taskTableIconBtn:hover {
-  color: #fff;
-  background: var(--color-primary, #2563eb);
-  border-color: color-mix(in srgb, var(--color-primary, #2563eb) 80%, #000);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 80%, var(--color-bg));
 }
 
 .taskTableIconBtnGhost:hover {
   color: var(--color-text-strong);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 10%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 10%, transparent);
   border-color: var(--color-border);
 }
 
@@ -2714,7 +2733,7 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--color-text-strong);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 8%, transparent);
   border: 1px solid var(--color-border);
   border-radius: 999px;
   cursor: pointer;
@@ -2726,9 +2745,9 @@
 }
 
 .taskItemActionBtn:hover {
-  color: #fff;
-  background: var(--color-primary, #2563eb);
-  border-color: color-mix(in srgb, var(--color-primary, #2563eb) 80%, #000);
+  color: var(--color-on-primary);
+  background: var(--color-primary);
+  border-color: color-mix(in srgb, var(--color-primary) 80%, var(--color-bg));
 }
 
 .taskItemActionBtnGhost {
@@ -2738,7 +2757,7 @@
 
 .taskItemActionBtnGhost:hover {
   color: var(--color-text-strong);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 8%, transparent);
   border-color: var(--color-border);
 }
 
@@ -2804,8 +2823,8 @@
 }
 
 .taskStatusPartial {
-  color: #a16207;
-  background: color-mix(in srgb, #facc15 20%, transparent);
+  color: var(--color-warning-dark);
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
 }
 
 .taskStatusNotResolved {
@@ -2825,6 +2844,48 @@
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
   border-radius: 16px;
+}
+
+.coverageBoard:has(.coverageEmbeddedBlockManagerResults) {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  height: auto;
+  max-height: calc(100dvh - 16px);
+  min-height: 0;
+  margin-top: 8px;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.coverageBoard:has(.coverageEmbeddedBlockTasks) {
+  display: flex;
+  flex-direction: column;
+  position: sticky;
+  top: 8px;
+  z-index: 5;
+  height: auto;
+  max-height: calc(100dvh - 16px);
+  min-height: 0;
+  margin-top: 8px;
+  padding: 10px 12px;
+  overflow: hidden;
+}
+
+.coverageBoard:has(.coverageEmbeddedBlockManagerResults) .coverageEmbeddedBlockManagerResults {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  gap: 8px;
+}
+
+.coverageBoard:has(.coverageEmbeddedBlockTasks) .coverageEmbeddedBlockTasks {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  gap: 8px;
 }
 
 .coverageBoardHeader {
@@ -2860,8 +2921,8 @@
 }
 
 .coverageModeLeadNom {
-  border-color: color-mix(in srgb, #a78bfa 32%, var(--color-border));
-  background: color-mix(in srgb, #a78bfa 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-violet) 32%, var(--color-border));
+  background: color-mix(in srgb, var(--color-violet) 10%, var(--color-surface));
 }
 
 .coverageModeLeadIcon {
@@ -2876,18 +2937,18 @@
 }
 
 .coverageModeLeadNom .coverageModeLeadIcon {
-  color: #c4b5fd;
-  background: color-mix(in srgb, #a78bfa 18%, transparent);
+  color: var(--color-login-violet-stroke);
+  background: color-mix(in srgb, var(--color-violet) 18%, transparent);
 }
 
 .coverageModeLeadTasks {
-  border-color: color-mix(in srgb, #f87171 32%, var(--color-border));
-  background: color-mix(in srgb, #f87171 10%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger-text) 32%, var(--color-border));
+  background: color-mix(in srgb, var(--color-danger-text) 10%, var(--color-surface));
 }
 
 .coverageModeLeadTasks .coverageModeLeadIcon {
-  color: #fca5a5;
-  background: color-mix(in srgb, #f87171 18%, transparent);
+  color: color-mix(in srgb, var(--color-danger-text) 82%, var(--color-surface));
+  background: color-mix(in srgb, var(--color-danger-text) 18%, transparent);
 }
 
 .coverageModeLeadTextWrap {
@@ -2941,7 +3002,7 @@
 
 .coverageModeSwitchBtn:hover:not(.coverageModeSwitchBtnActive) {
   color: var(--color-text-strong);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 5%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 5%, transparent);
 }
 
 .coverageModeSwitchBtn:active {
@@ -3127,8 +3188,24 @@
 }
 
 .coverageSideCarouselViewport {
-  overflow: hidden;
+  position: relative;
   width: 100%;
+}
+
+.coverageSideCarouselViewportTasks {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.coverageSideCarouselViewportTasks > .coverageSideCarouselPanel:not(.coverageSideCarouselPanelHidden) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .coverageSideCarouselPanel {
@@ -3136,20 +3213,102 @@
   min-width: 0;
 }
 
+.coverageSideCarouselPanel:not(.coverageSideCarouselPanelHidden) {
+  position: relative;
+  z-index: 1;
+}
+
 .coverageSideCarouselPanelHidden {
   display: none;
 }
 
 .coverageEmbeddedTasksRoot {
-  display: grid;
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.coverageEmbeddedTasksPinned {
+  display: grid;
+  flex-shrink: 0;
+  gap: 12px;
+  min-width: 0;
+  padding-block: 2px;
+}
+
+.coverageEmbeddedTasksScrollHost {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+  padding-right: 2px;
+}
+
+.coverageEmbeddedTasksScrollHost::-webkit-scrollbar {
+  width: 10px;
+}
+
+.coverageEmbeddedTasksScrollHost::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
 }
 
 .coverageEmbeddedTasksSection {
   display: grid;
   gap: 12px;
   min-width: 0;
+  min-height: 0;
+}
+
+.shiftTasksNewDayNotice {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px 18px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-primary) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary) 24%, var(--color-border));
+  border-radius: 14px;
+}
+
+.shiftTasksNewDayNoticeIcon {
+  display: grid;
+  flex-shrink: 0;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-primary-soft) 80%, var(--color-surface));
+  border-radius: 12px;
+}
+
+.shiftTasksNewDayNoticeBody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.shiftTasksNewDayNoticeBody strong {
+  color: var(--color-text-strong);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.shiftTasksNewDayNoticeBody p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.5;
 }
 
 .coverageEmbeddedTasksTypesHeader {
@@ -3182,14 +3341,22 @@
   font-weight: 700;
 }
 
-.coverageEmbeddedTasksScroll {
-  overflow: auto;
-  max-height: min(68vh, 480px);
+.coverageEmbeddedTasksScroll,
+.coverageEmbeddedTasksTableWrap {
   margin-top: 4px;
-  padding-right: 2px;
   border: 1px solid var(--color-border);
   border-radius: 10px;
   background: var(--color-surface);
+}
+
+.coverageEmbeddedTasksScroll {
+  overflow: visible;
+  max-height: none;
+  padding: 0;
+}
+
+.coverageEmbeddedTasksTableWrap {
+  overflow: visible;
 }
 
 .coverageEmbeddedTasksScroll .taskTable thead th {
@@ -3200,9 +3367,27 @@
   width: 100%;
   min-height: 0;
   height: auto;
-  /* Плоский flip «как книга»: камера строго по центру, без наклона сверху */
-  perspective: 3200px;
+  perspective: none;
   perspective-origin: 50% 50%;
+}
+
+.coverageSideFlipSceneAnimating {
+  perspective: 3200px;
+}
+
+.coverageBoard .coverageSideFlipCard.riskTileFlipCard {
+  transform: none;
+  transform-style: flat;
+  transition: none;
+}
+
+.coverageSideFlipSceneAnimating .coverageBoard .coverageSideFlipCard.riskTileFlipCard {
+  transform-style: preserve-3d;
+  transition: transform 0.62s cubic-bezier(0.4, 0.12, 0.2, 1);
+}
+
+.coverageSideFlipSceneAnimating .coverageBoard .coverageSideFlipCard.riskTileFlipCardFlipped {
+  transform: rotateY(180deg);
 }
 
 .coverageSideFlipCard {
@@ -3216,17 +3401,30 @@
   min-width: 0;
   display: grid;
   gap: 12px;
+  overflow: visible;
 }
 
 .coverageBoard .coverageSideFlipFace.riskTileFaceBack {
   padding: 0;
   align-items: stretch;
   align-content: stretch;
-  transform: rotateY(180deg) translateZ(1px);
+  transform: none;
+  backface-visibility: visible;
 }
 
 .coverageBoard .coverageSideFlipFace.riskTileFaceFront {
-  transform: rotateY(0deg) translateZ(1px);
+  transform: none;
+  backface-visibility: visible;
+}
+
+.coverageSideFlipSceneAnimating .coverageBoard .coverageSideFlipFace.riskTileFaceFront {
+  transform: rotateY(0deg);
+  backface-visibility: hidden;
+}
+
+.coverageSideFlipSceneAnimating .coverageBoard .coverageSideFlipFace.riskTileFaceBack {
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
 }
 
 .coverageBoard .coverageSideFlipCard > .coverageSideFlipFace {
@@ -3331,7 +3529,7 @@
   margin: 8px 8px 0 0;
   padding: 0;
   color: var(--color-text-secondary);
-  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
   border: 1px solid var(--color-border);
   border-radius: 8px;
   cursor: pointer;
@@ -3655,8 +3853,8 @@
 }
 
 .coverageStatusYellow {
-  color: #a16207;
-  background: color-mix(in srgb, #facc15 20%, transparent);
+  color: var(--color-warning-dark);
+  background: color-mix(in srgb, var(--color-warning) 20%, transparent);
 }
 
 .coverageStatusRed {
@@ -3772,10 +3970,25 @@
 .taskDashboardSummary .riskTileFlipScene {
   height: auto;
   min-height: 112px;
+  perspective: none;
 }
 
 .taskDashboardSummary .riskTileFlipCard {
   min-height: 112px;
+  transform-style: flat;
+}
+
+.taskDashboardSummary .riskTileFlipCard.riskTileFlipCardFlipped {
+  transform: rotateY(180deg);
+  transform-style: preserve-3d;
+}
+
+.taskDashboardSummary .riskTileFlipScene:has(.riskTileFlipCardFlipped) {
+  perspective: 1100px;
+}
+
+.taskDashboardSummary .riskTileFlipCard:not(.riskTileFlipCardFlipped) .riskTileFaceBack {
+  pointer-events: none;
 }
 
 .taskDashboardSummary .riskTileFaceBack {
@@ -3806,13 +4019,149 @@
   gap: 12px;
 }
 
+.coverageEmbeddedBlockManagerResults {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.coverageEmbeddedBlockTasks {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
+.coverageEmbeddedBlockTasks .coverageAnimatedViewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.coverageTasksPanelRoot {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.coverageEmbeddedBlockManagerResults .coverageBoardHeader {
+  flex-shrink: 0;
+  z-index: 30;
+  padding-bottom: 4px;
+  background: var(--color-surface-elevated);
+}
+
+.coverageEmbeddedBlockManagerResults .coverageAnimatedViewport {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.coverageSideCarouselViewportManagerResults {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.coverageSideCarouselViewportManagerResults > .coverageSideCarouselPanel:not(.coverageSideCarouselPanelHidden) {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.managerResultsPanelRoot {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .managerResultsBoard {
-  display: grid;
-  gap: 14px;
-  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 8px 10px 10px;
   background: color-mix(in srgb, var(--color-surface-elevated) 74%, transparent);
   border: 1px solid var(--color-border);
   border-radius: 16px;
+  overflow: hidden;
+}
+
+.managerResultsTop {
+  display: grid;
+  gap: 6px;
+  flex-shrink: 0;
+  z-index: 20;
+  position: relative;
+  background: color-mix(in srgb, var(--color-surface-elevated) 74%, transparent);
+}
+
+.managerResultsManagerStage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.managerResultsManagersGrid,
+.managerResultsManagerStack {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(0, 1fr);
+  gap: 10px;
+  align-items: stretch;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.managerResultPanel,
+.managerResultCard {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  background: var(--color-surface-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.managerResultPanel:not(.managerResultCardMissing) {
+  height: 100%;
+  max-height: 100%;
+  min-height: 0;
+}
+
+.managerResultCardMissing {
+  height: auto;
+  align-self: start;
+  padding: 14px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--color-text-strong) 3%, var(--color-surface-elevated));
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--color-text-secondary) 35%, var(--color-border));
 }
 
 .managerResultsHeader {
@@ -3825,16 +4174,16 @@
 
 .managerResultsSummaryGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 8px;
 }
 
 .managerResultsSummaryCard,
 .managerResultTile {
   display: grid;
-  gap: 6px;
+  gap: 4px;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 8px 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
@@ -3850,7 +4199,7 @@
 .managerResultsSummaryCard strong,
 .managerResultTile strong {
   color: var(--color-text-strong);
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -3864,20 +4213,234 @@
   color: var(--color-danger-text, var(--color-danger)) !important;
 }
 
-.managerResultsManagersGrid {
+.managerResultAnalytics {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+  flex-shrink: 0;
+  padding: 14px 14px 12px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-elevated);
 }
 
-.managerResultCard {
+.managerResultCardHeadSticky {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  box-shadow: 0 10px 18px color-mix(in srgb, var(--color-text-strong) 8%, transparent);
+}
+
+.managerResultPanelScroll {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 12px 10px 16px 14px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-text-secondary) 40%, transparent) transparent;
+}
+
+.managerResultPanelScroll::-webkit-scrollbar {
+  width: 10px;
+}
+
+.managerResultPanelScroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.managerResultPanelScroll::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--color-text-secondary) 35%, transparent);
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background-clip: padding-box;
+}
+
+.managerResultTasksBlock {
   display: grid;
-  gap: 12px;
-  min-width: 0;
-  padding: 14px;
-  background: var(--color-surface-elevated);
-  border: 1px solid var(--color-border);
-  border-radius: 14px;
+  gap: 8px;
+  min-height: 0;
+}
+
+.managerResultTasksBlockHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 0 4px;
+  background: transparent;
+}
+
+.managerResultTasksBlockHead h4 {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.managerResultTasksCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 24px;
+  padding: 0 8px;
+  color: var(--color-danger-text, var(--color-danger));
+  background: var(--color-danger-soft);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.managerResultTaskListWrap {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.managerResultTasksBlockToggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: fit-content;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary-text);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.managerResultsEmptyCompact {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
+  border: 1px dashed var(--color-border);
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+.managerResultRegionLabel {
+  margin: 2px 0 8px;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.managerResultMissingHint {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong) 4%, transparent);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultsRosterHint {
+  margin: 0;
+  padding: 10px 12px;
+  color: var(--color-warning-text);
+  background: color-mix(in srgb, var(--color-warning) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 28%, var(--color-border));
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultsRosterHintLive {
+  margin: 0;
+  padding: 10px 12px;
+  color: color-mix(in srgb, var(--color-success) 82%, var(--color-text-strong));
+  background: color-mix(in srgb, var(--color-success) 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-success) 28%, var(--color-border));
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultsLiveBanner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  color: color-mix(in srgb, var(--color-success) 88%, var(--color-text-strong));
+  background: color-mix(in srgb, var(--color-success) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-success) 24%, var(--color-border));
+  border-radius: 12px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultsLiveDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--color-success);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 45%, transparent);
+  animation: managerResultsLivePulse 1.8s ease-out infinite;
+}
+
+@keyframes managerResultsLivePulse {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 42%, transparent);
+  }
+
+  70% {
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--color-success) 0%, transparent);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-success) 0%, transparent);
+  }
+}
+
+.managerResultsLiveMeta {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.managerResultCardLive {
+  border-color: color-mix(in srgb, var(--color-success) 28%, var(--color-border));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-success) 8%, transparent);
+}
+
+.managerResultStatusPill_live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: color-mix(in srgb, var(--color-success) 88%, var(--color-text-strong));
+  background: color-mix(in srgb, var(--color-success) 12%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-success) 24%, var(--color-border));
+}
+
+.managerResultsSummaryCardLive strong {
+  color: color-mix(in srgb, var(--color-success) 88%, var(--color-text-strong));
+}
+
+.managerResultsDateChipLive {
+  border-color: color-mix(in srgb, var(--color-success) 32%, var(--color-border));
+}
+
+.managerResultRingMissing {
+  --manager-progress: 0%;
+  background: conic-gradient(
+    color-mix(in srgb, var(--color-text-secondary) 18%, transparent) 0deg,
+    color-mix(in srgb, var(--color-text-secondary) 18%, transparent) 360deg
+  );
+  color: var(--color-text-secondary);
+}
+
+.managerResultRingMissing strong {
+  font-size: 28px;
 }
 
 .managerResultCardHead {
@@ -3938,6 +4501,34 @@
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 8px;
+}
+
+.managerResultTileButton {
+  width: 100%;
+  margin: 0;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.managerResultTileButton:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 6%, var(--color-surface));
+}
+
+.managerResultTileButton:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--color-accent) 55%, transparent);
+  outline-offset: 2px;
+}
+
+.managerResultTileActive {
+  border-color: color-mix(in srgb, var(--color-accent) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 10%, var(--color-surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
 .managerResultBreakdown {
@@ -4042,6 +4633,436 @@
   font-size: 13px;
 }
 
+.coverageToolbarManagerResults {
+  justify-content: space-between;
+}
+
+.managerResultsDateNav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.managerResultsDateArrow,
+.managerResultsTodayBtn,
+.managerResultsRefreshBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 32px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  border-radius: 999px;
+  cursor: pointer;
+  transition:
+    background 0.18s ease,
+    border-color 0.18s ease,
+    color 0.18s ease,
+    transform 0.16s ease;
+}
+
+.managerResultsDateArrow {
+  width: 32px;
+  padding: 0;
+}
+
+.managerResultsTodayBtn,
+.managerResultsRefreshBtn {
+  padding: 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.managerResultsRefreshBtn {
+  width: 32px;
+  padding: 0;
+}
+
+.managerResultsDateArrow:hover,
+.managerResultsTodayBtn:hover,
+.managerResultsRefreshBtn:hover:not(:disabled) {
+  color: var(--color-text-strong);
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.managerResultsDateArrow:active,
+.managerResultsTodayBtn:active,
+.managerResultsRefreshBtn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.managerResultsRefreshBtn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.managerResultsDatePickerBtn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 72%, var(--color-surface));
+  color: var(--color-text-strong);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.managerResultsDateWeekday {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.managerResultsDateInputHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.managerResultsDateStripWrap {
+  display: grid;
+  gap: 8px;
+}
+
+.managerResultsDateStripLabel {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.managerResultsDateStrip {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.managerResultsDateChip {
+  display: grid;
+  gap: 2px;
+  flex: 0 0 auto;
+  min-width: 118px;
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  border-radius: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    transform 0.16s ease;
+}
+
+.managerResultsDateChip span:first-child {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.managerResultsDateChipMeta {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.managerResultsDateChip:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+  transform: translateY(-1px);
+}
+
+.managerResultsDateChipActive {
+  border-color: color-mix(in srgb, var(--color-primary) 55%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-soft) 80%, var(--color-surface));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.managerResultsLoadingGrid {
+  display: grid;
+  gap: 10px;
+}
+
+.managerResultsSkeletonCard,
+.managerResultsSkeletonWide {
+  border-radius: 12px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-text-strong) 6%, transparent) 0%,
+    color-mix(in srgb, var(--color-text-strong) 10%, transparent) 50%,
+    color-mix(in srgb, var(--color-text-strong) 6%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: managerResultsShimmer 1.2s ease-in-out infinite;
+}
+
+.managerResultsSkeletonCard {
+  min-height: 88px;
+}
+
+.managerResultsLoadingGrid {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.managerResultsSkeletonWide {
+  grid-column: 1 / -1;
+  min-height: 180px;
+}
+
+@keyframes managerResultsShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+.managerResultsErrorBox {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--color-danger) 35%, var(--color-border));
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-danger) 8%, var(--color-surface));
+}
+
+.managerResultsErrorBox p {
+  margin: 0;
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.managerResultsRetryBtn {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.managerResultsEmptyState {
+  display: grid;
+  gap: 8px;
+}
+
+.managerResultsEmptyHint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 12px;
+}
+
+.managerResultsEmailMeta {
+  margin: 6px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.managerResultCardToggle {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.managerResultCardExpanded {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, var(--color-border));
+}
+
+.managerResultExpandHint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--color-primary-text);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.managerResultExpandIconOpen {
+  transform: rotate(180deg);
+}
+
+.managerResultTaskList {
+  display: grid;
+  gap: 8px;
+  padding-top: 4px;
+  padding-bottom: 2px;
+  border-top: 1px solid var(--color-border);
+}
+
+.managerResultTaskRow {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  background: var(--color-surface);
+}
+
+.managerResultTaskHead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.managerResultTaskHead strong {
+  color: var(--color-text-strong);
+  font-size: 13px;
+}
+
+.managerResultTaskMeta {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+}
+
+.managerResultTaskResult {
+  margin: 8px 0 0;
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultTaskReason {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-left: 3px solid color-mix(in srgb, var(--color-danger) 45%, var(--color-border));
+  color: var(--color-text);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.managerResultStatusPill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.managerResultStatusPill_success {
+  color: var(--color-success-text, var(--color-success));
+  background: color-mix(in srgb, var(--color-success) 14%, transparent);
+}
+
+.managerResultStatusPill_warning {
+  color: var(--color-warning-text);
+  background: color-mix(in srgb, var(--color-warning) 16%, transparent);
+}
+
+.managerResultStatusPill_danger {
+  color: var(--color-danger-text, var(--color-danger));
+  background: color-mix(in srgb, var(--color-danger) 14%, transparent);
+}
+
+.managerResultStatusPill_muted {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-strong) 8%, transparent);
+}
+
+.managerResultsSpin {
+  animation: managerResultsSpin 0.9s linear infinite;
+}
+
+@keyframes managerResultsSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 1100px) {
+  .managerResultsSummaryGrid,
+  .managerResultsLoadingGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 960px) {
+  .coverageBoard:has(.coverageEmbeddedBlockManagerResults) {
+    top: 4px;
+    max-height: calc(100dvh - 8px);
+  }
+
+  .coverageEmbeddedBlockManagerResults {
+    min-height: 0;
+  }
+
+  .managerResultsManagerStack,
+  .managerResultsManagersGrid {
+    grid-template-columns: 1fr;
+    grid-auto-rows: minmax(280px, 1fr);
+    height: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .managerResultsManagerStage {
+    overflow-y: auto;
+  }
+
+  .managerResultPanel:not(.managerResultCardMissing) {
+    height: auto;
+    min-height: 280px;
+    max-height: min(680px, calc(100dvh - 220px));
+  }
+
+  .managerResultPanelScroll {
+    flex: 1 1 auto;
+    max-height: min(480px, calc(100dvh - 340px));
+  }
+}
+
+@media (max-width: 720px) {
+  .coverageToolbarManagerResults {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .managerResultsDateNav {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .managerResultsManagersGrid,
+  .managerResultsManagerStack,
+  .managerResultsReasonList {
+    grid-template-columns: 1fr;
+  }
+
+  .managerResultsSummaryGrid,
+  .managerResultsLoadingGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .coverageAnimatedViewport {
   display: grid;
   gap: 12px;
@@ -4054,6 +5075,23 @@
 
 .coverageAnimFade {
   animation: coverageFadeIn 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.coverageAnimSection {
+  animation: coverageSectionIn 0.34s cubic-bezier(0.22, 1, 0.36, 1) both;
+  pointer-events: auto;
+}
+
+@keyframes coverageSectionIn {
+  from {
+    opacity: 0.01;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 @keyframes coverageFadeIn {
@@ -4116,6 +5154,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: 8px;
+  padding-block: 2px;
 }
 
 .shiftEndHeaderActions {
@@ -4147,7 +5186,7 @@
 .shiftEndButton:hover {
   background: color-mix(in srgb, var(--color-primary-text) 24%, var(--color-surface-elevated));
   border-color: color-mix(in srgb, var(--color-primary-text) 50%, var(--color-border));
-  transform: translateY(-1px);
+  box-shadow: 0 2px 10px color-mix(in srgb, var(--color-primary-text) 22%, transparent);
 }
 
 .coverageDetailAnim {
@@ -4169,10 +5208,14 @@
 @media (prefers-reduced-motion: reduce) {
   .coverageAnimPeriod,
   .coverageAnimFade,
+  .coverageAnimSection,
   .coverageAnimPeriod .coverageAnalyticsTiles > .riskTileFlipScene,
   .coverageDetailAnim,
   .coverageBoard .riskTileFlipCard,
-  .coverageBoard .coverageSideFlipCard {
+  .coverageBoard .coverageSideFlipCard,
+  .managerResultsSkeletonCard,
+  .managerResultsSkeletonWide,
+  .managerResultsSpin {
     animation: none !important;
     transition: none !important;
   }

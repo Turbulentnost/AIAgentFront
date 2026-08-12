@@ -8,9 +8,9 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent
 } from "react";
-import { AlertTriangle, ChevronDown, CircleHelp, ClipboardList, Layers, Package, ShieldCheck, Siren, X } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, ClipboardList, CalendarDays, Layers, Package, RefreshCw, ShieldCheck, Siren, X } from "lucide-react";
 import styles from "../DocumentAnalysisAgent.module.css";
-import ShiftTaskBoard, { type ShiftTaskBoardProps } from "./ShiftTaskBoard";
+import ShiftTaskBoard, { ShiftTasksNewDayNotice, type ShiftTaskBoardProps } from "./ShiftTaskBoard";
 
 type CoverageDashboardSide = "products" | "nomenclatures" | "tasks" | "manager_results";
 
@@ -30,17 +30,54 @@ export type ManagerCompletionReport = {
   id: string;
   managerName: string;
   reportDate: string;
+  reportStatus: "submitted" | "missing" | "in_progress";
+  regionLabel: string;
   stats: ManagerCompletionStats;
   tasks: ManagerCompletionTask[];
   incompleteTasks: ManagerCompletionTask[];
   emailSentTo: string;
   emailSentAt: string | null;
+  liveUpdatedAt?: string | null;
+};
+
+export type ManagerCompletionRoster = {
+  total: number;
+  submitted: number;
+  inProgress: number;
+  missing: number;
 };
 
 export type ManagerCompletionDashboard = {
   reportDate: string;
+  liveMode: boolean;
   summary: ManagerCompletionStats;
+  roster: ManagerCompletionRoster;
   managers: ManagerCompletionReport[];
+};
+
+export type ManagerCompletionDateEntry = {
+  reportDate: string;
+  reportsCount: number;
+  rosterTotal: number;
+  hasLive?: boolean;
+};
+
+export type ManagerTasksNotice = {
+  kind: "new_day";
+  previousValidDate?: string | null;
+  today?: string;
+};
+
+export type ManagerResultsBundle = {
+  dashboard: ManagerCompletionDashboard | null;
+  selectedDate: string;
+  availableDates: ManagerCompletionDateEntry[];
+  today: string;
+  loading: boolean;
+  error: string | null;
+  onDateChange: (date: string) => void;
+  onRetry: () => void;
+  onRefresh: () => void;
 };
 
 export type CoveragePeriodKey = "day" | "week" | "month";
@@ -162,14 +199,35 @@ const PERIOD_OPTIONS: Array<{ key: CoveragePeriodKey; label: string }> = [
   { key: "month", label: "За месяц" }
 ];
 
-type CoverageViewTransition = { kind: "period" };
+type CoverageViewTransition = { kind: "period" } | { kind: "section" };
 
 function coverageTransitionClass(transition: CoverageViewTransition | null): string {
   if (!transition) return "";
-  return styles.coverageAnimPeriod;
+  return transition.kind === "period" ? styles.coverageAnimPeriod : styles.coverageAnimSection;
 }
 
 const COVERAGE_PERIOD_TRANSITION_MS = 440;
+const COVERAGE_SECTION_TRANSITION_MS = 340;
+const COVERAGE_FLIP_TRANSITION_MS = 620;
+
+function isCoverageFlipTransition(
+  from: CoverageDashboardSide,
+  to: CoverageDashboardSide
+): boolean {
+  return (
+    (from === "products" && to === "nomenclatures") ||
+    (from === "nomenclatures" && to === "products")
+  );
+}
+
+function sectionPanelContentKey(
+  panel: "coverage" | "tasks" | "manager_results",
+  isActive: boolean,
+  animKey: number
+): string {
+  if (!isActive || animKey === 0) return panel;
+  return `${panel}-${animKey}`;
+}
 
 function formatScheduleMonth(value: string): string {
   const [year, month] = value.split("-");
@@ -416,7 +474,12 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
 
   useEffect(() => {
     setExpandedProduct(null);
-  }, [tile.key, side, periodLabel, rows]);
+  }, [tile.key, side, periodLabel]);
+
+  const activeExpandedProduct = useMemo(() => {
+    if (!expandedProduct) return null;
+    return rows.some((row) => row.name === expandedProduct) ? expandedProduct : null;
+  }, [expandedProduct, rows]);
 
   const toggleProduct = useCallback((productName: string) => {
     setExpandedProduct((current) => (current === productName ? null : productName));
@@ -467,7 +530,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
             </thead>
             <tbody>
               {rows.map((row) => {
-                const isExpanded = expandableProducts && expandedProduct === row.name;
+                const isExpanded = expandableProducts && activeExpandedProduct === row.name;
                 const canExpand = expandableProducts;
                 const shortages = row.shortages ?? [];
                 const panelId = `coverage-shortages-${row.name.replace(/[^\w-]+/g, "-")}`;
@@ -482,6 +545,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                             }`
                           : undefined
                       }
+                      onClick={canExpand ? () => toggleProduct(row.name) : undefined}
                     >
                       <td className={styles.coverageDetailNameCell} title={row.name}>
                         {canExpand ? (
@@ -490,7 +554,10 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                             className={styles.coverageDetailExpandBtn}
                             aria-expanded={isExpanded}
                             aria-controls={panelId}
-                            onClick={() => toggleProduct(row.name)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleProduct(row.name);
+                            }}
                           >
                             <ChevronDown
                               size={14}
@@ -632,6 +699,108 @@ function CoverageTileBackFace({ tile, side, onClose }: CoverageTileExplainPanelP
   );
 }
 
+function formatLiveUpdatedAt(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function splitTasksByResolved(tasks: ManagerCompletionTask[]) {
+  const resolved: ManagerCompletionTask[] = [];
+  const remaining: ManagerCompletionTask[] = [];
+  for (const task of tasks) {
+    if (taskValue(task, "status") === "resolved") {
+      resolved.push(task);
+    } else {
+      remaining.push(task);
+    }
+  }
+  return { resolved, remaining };
+}
+
+type ManagerTaskTileFilter = "total" | "resolved" | "remaining";
+
+function getFilteredManagerTasks(
+  manager: ManagerCompletionReport,
+  filter: ManagerTaskTileFilter,
+  reportKind: "live" | "submitted"
+): ManagerCompletionTask[] {
+  const { resolved, remaining } = splitTasksByResolved(manager.tasks);
+  if (filter === "total") return manager.tasks;
+  if (filter === "resolved") return resolved;
+  if (reportKind === "submitted" && manager.incompleteTasks.length > 0) {
+    return manager.incompleteTasks;
+  }
+  return remaining;
+}
+
+function managerTaskFilterTitle(filter: ManagerTaskTileFilter, reportKind: "live" | "submitted"): string {
+  if (filter === "total") return "Все задания";
+  if (filter === "resolved") return "Выполненные задания";
+  return reportKind === "live" ? "Осталось сделать" : "Невыполненные задания и основания";
+}
+
+function managerTaskFilterEmpty(filter: ManagerTaskTileFilter, reportKind: "live" | "submitted"): string {
+  if (filter === "total") return "Заданий в отчёте нет.";
+  if (filter === "resolved") {
+    return reportKind === "live"
+      ? "Выполненных заданий пока нет."
+      : "Выполненных заданий в отчёте нет.";
+  }
+  return reportKind === "live"
+    ? "Все задания закрыты — менеджер может завершить смену."
+    : "Незакрытых заданий с основаниями нет.";
+}
+
+function ManagerResultTiles({
+  stats,
+  filter,
+  remainingLabel,
+  onFilterChange
+}: {
+  stats: ManagerCompletionStats;
+  filter: ManagerTaskTileFilter;
+  remainingLabel: string;
+  onFilterChange: (next: ManagerTaskTileFilter) => void;
+}) {
+  const tiles: Array<{ key: ManagerTaskTileFilter; label: string; value: number; valueClass?: string }> = [
+    { key: "total", label: "Всего", value: stats.total },
+    {
+      key: "resolved",
+      label: "Выполнено",
+      value: stats.resolved,
+      valueClass: styles.managerResultsSuccess
+    },
+    {
+      key: "remaining",
+      label: remainingLabel,
+      value: stats.incomplete,
+      valueClass: styles.managerResultsDanger
+    }
+  ];
+
+  return (
+    <div className={styles.managerResultTiles} role="tablist" aria-label="Фильтр заданий">
+      {tiles.map((tile) => (
+        <button
+          key={tile.key}
+          type="button"
+          role="tab"
+          aria-selected={filter === tile.key}
+          className={`${styles.managerResultTile} ${styles.managerResultTileButton} ${
+            filter === tile.key ? styles.managerResultTileActive : ""
+          }`}
+          onClick={() => onFilterChange(tile.key)}
+        >
+          <span>{tile.label}</span>
+          <strong className={tile.valueClass}>{tile.value}</strong>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function taskValue(task: ManagerCompletionTask, key: string): string {
   const value = task[key];
   return typeof value === "string" || typeof value === "number" ? String(value) : "";
@@ -652,7 +821,22 @@ function managerResultStatusLabel(status: string): string {
   }
 }
 
-function ManagerProgressRing({ stats }: { stats: ManagerCompletionStats }) {
+function ManagerProgressRing({
+  stats,
+  missing = false
+}: {
+  stats: ManagerCompletionStats;
+  missing?: boolean;
+}) {
+  if (missing) {
+    return (
+      <div className={`${styles.managerResultRing} ${styles.managerResultRingMissing}`} aria-label="Отчёт не сдан">
+        <strong>—</strong>
+        <span>нет отчёта</span>
+      </div>
+    );
+  }
+
   const percent = Math.max(0, Math.min(100, stats.resolvedPercent || 0));
   return (
     <div
@@ -666,129 +850,502 @@ function ManagerProgressRing({ stats }: { stats: ManagerCompletionStats }) {
   );
 }
 
-function ManagerResultsDashboard({ dashboard }: { dashboard: ManagerCompletionDashboard | null }) {
-  if (!dashboard) return null;
-  const incompleteTasks = dashboard.managers.flatMap((manager) =>
-    manager.incompleteTasks.map((task) => ({ manager: manager.managerName, task }))
+function addIsoDays(iso: string, delta: number): string {
+  const base = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(base.getTime())) return iso;
+  base.setDate(base.getDate() + delta);
+  return base.toISOString().slice(0, 10);
+}
+
+function formatWeekdayShort(iso: string): string {
+  const date = new Date(`${iso}T12:00:00`);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("ru-RU", { weekday: "short" });
+}
+
+function managerResultStatusTone(status: string): "success" | "danger" | "warning" | "muted" {
+  switch (status) {
+    case "resolved":
+      return "success";
+    case "partial":
+      return "warning";
+    case "not_resolved":
+      return "danger";
+    case "active":
+      return "muted";
+    default:
+      return "muted";
+  }
+}
+
+function managerResultStatusPillClass(tone: ReturnType<typeof managerResultStatusTone>): string {
+  switch (tone) {
+    case "success":
+      return styles.managerResultStatusPill_success;
+    case "warning":
+      return styles.managerResultStatusPill_warning;
+    case "danger":
+      return styles.managerResultStatusPill_danger;
+    default:
+      return styles.managerResultStatusPill_muted;
+  }
+}
+
+function ManagerResultsDateNav({
+  bundle,
+  formatDate
+}: {
+  bundle: ManagerResultsBundle;
+  formatDate: (iso: string | null | undefined) => string;
+}) {
+  const dateInputRef = useRef<HTMLInputElement>(null);
+  const isToday = bundle.selectedDate === bundle.today;
+
+  return (
+    <div className={styles.managerResultsDateNav} role="group" aria-label="Выбор даты отчёта">
+      <button
+        type="button"
+        className={styles.managerResultsDateArrow}
+        aria-label="Предыдущий день"
+        onClick={() => bundle.onDateChange(addIsoDays(bundle.selectedDate, -1))}
+      >
+        <ChevronLeft size={16} strokeWidth={2.4} aria-hidden="true" />
+      </button>
+      <button
+        type="button"
+        className={styles.managerResultsDatePickerBtn}
+        aria-label="Выбрать дату"
+        onClick={() => {
+          dateInputRef.current?.showPicker?.();
+          dateInputRef.current?.focus();
+        }}
+      >
+        <CalendarDays size={15} strokeWidth={2.2} aria-hidden="true" />
+        <span>{formatDate(bundle.selectedDate)}</span>
+        <span className={styles.managerResultsDateWeekday}>{formatWeekdayShort(bundle.selectedDate)}</span>
+        <input
+          ref={dateInputRef}
+          type="date"
+          className={styles.managerResultsDateInputHidden}
+          value={bundle.selectedDate}
+          onChange={(event) => {
+            if (event.target.value) bundle.onDateChange(event.target.value);
+          }}
+          aria-label="Дата отчёта"
+        />
+      </button>
+      <button
+        type="button"
+        className={styles.managerResultsDateArrow}
+        aria-label="Следующий день"
+        onClick={() => bundle.onDateChange(addIsoDays(bundle.selectedDate, 1))}
+      >
+        <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
+      </button>
+      {!isToday ? (
+        <button
+          type="button"
+          className={styles.managerResultsTodayBtn}
+          onClick={() => bundle.onDateChange(bundle.today)}
+        >
+          Сегодня
+        </button>
+      ) : null}
+      <button
+        type="button"
+        className={styles.managerResultsRefreshBtn}
+        aria-label="Обновить данные"
+        disabled={bundle.loading}
+        onClick={() => bundle.onRefresh()}
+      >
+        <RefreshCw size={14} strokeWidth={2.4} className={bundle.loading ? styles.managerResultsSpin : ""} aria-hidden="true" />
+      </button>
+    </div>
   );
-  const hasData = dashboard.summary.total > 0 || dashboard.managers.length > 0;
+}
+
+function ManagerResultsDateStrip({
+  bundle,
+  formatDate
+}: {
+  bundle: ManagerResultsBundle;
+  formatDate: (iso: string | null | undefined) => string;
+}) {
+  const stripRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const strip = stripRef.current;
+    if (!strip) return;
+    const active = strip.querySelector<HTMLElement>(`[data-report-date="${bundle.selectedDate}"]`);
+    active?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+  }, [bundle.selectedDate, bundle.availableDates.length]);
+
+  if (bundle.availableDates.length === 0) return null;
+
+  return (
+    <div className={styles.managerResultsDateStripWrap}>
+      <p className={styles.managerResultsDateStripLabel}>Дни с отчётами и live-сменами</p>
+      <div ref={stripRef} className={styles.managerResultsDateStrip} role="listbox" aria-label="Дни с завершёнными сменами">
+        {bundle.availableDates.map((entry) => {
+          const active = entry.reportDate === bundle.selectedDate;
+          const liveOnly = entry.hasLive && entry.reportsCount === 0;
+          return (
+            <button
+              key={entry.reportDate}
+              type="button"
+              role="option"
+              aria-selected={active}
+              data-report-date={entry.reportDate}
+              className={`${styles.managerResultsDateChip} ${
+                active ? styles.managerResultsDateChipActive : ""
+              } ${liveOnly ? styles.managerResultsDateChipLive : ""}`}
+              onClick={() => bundle.onDateChange(entry.reportDate)}
+            >
+              <span>{formatDate(entry.reportDate)}</span>
+              <span className={styles.managerResultsDateChipMeta}>
+                {formatWeekdayShort(entry.reportDate)} ·{" "}
+                {liveOnly
+                  ? "live"
+                  : `${entry.reportsCount}/${entry.rosterTotal || bundle.dashboard?.roster.total || 2} ${
+                      entry.reportsCount === 1 ? "отчёт" : entry.reportsCount < 5 ? "отчёта" : "отчётов"
+                    }`}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ManagerResultsLoadingState() {
+  return (
+    <div className={styles.managerResultsLoadingGrid} aria-hidden="true">
+      {Array.from({ length: 4 }).map((_, index) => (
+        <div key={index} className={styles.managerResultsSkeletonCard} />
+      ))}
+      <div className={styles.managerResultsSkeletonWide} />
+    </div>
+  );
+}
+
+function ManagerResultTaskList({ tasks }: { tasks: ManagerCompletionTask[] }) {
+  if (tasks.length === 0) {
+    return <p className={styles.managerResultsEmpty}>Заданий в отчёте нет.</p>;
+  }
+
+  return (
+    <div className={styles.managerResultTaskList}>
+      {tasks.map((task) => {
+        const title = taskValue(task, "nomenclature") || "Задание";
+        const status = taskValue(task, "status");
+        const tone = managerResultStatusTone(status);
+        const resultText = taskValue(task, "result_text");
+        const reason = taskValue(task, "reason");
+        const deadline = taskValue(task, "deadline");
+        const taskType = taskValue(task, "task_type");
+        return (
+          <article
+            key={`${taskValue(task, "key")}-${title}-${taskType}`}
+            className={styles.managerResultTaskRow}
+          >
+            <div className={styles.managerResultTaskMain}>
+              <div className={styles.managerResultTaskHead}>
+                <strong>{title}</strong>
+                <span
+                  className={`${styles.managerResultStatusPill} ${managerResultStatusPillClass(tone)}`}
+                >
+                  {managerResultStatusLabel(status)}
+                </span>
+              </div>
+              <p className={styles.managerResultTaskMeta}>
+                {taskType || "тип не указан"}
+                {deadline ? ` · срок ${deadline}` : ""}
+              </p>
+              {resultText ? <p className={styles.managerResultTaskResult}>{resultText}</p> : null}
+              {reason && status !== "resolved" ? (
+                <blockquote className={styles.managerResultTaskReason}>{reason}</blockquote>
+              ) : null}
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+}
+
+function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
+  const [taskFilter, setTaskFilter] = useState<ManagerTaskTileFilter>("remaining");
+  const isMissing = manager.reportStatus === "missing";
+  const isInProgress = manager.reportStatus === "in_progress";
+  const reportKind = isInProgress ? "live" : "submitted";
+  const liveUpdatedLabel = formatLiveUpdatedAt(manager.liveUpdatedAt);
+  const filteredTasks = useMemo(
+    () => getFilteredManagerTasks(manager, taskFilter, reportKind),
+    [manager, reportKind, taskFilter]
+  );
+
+  useEffect(() => {
+    setTaskFilter("remaining");
+  }, [manager.id, manager.reportStatus]);
+  const sentAtLabel = manager.emailSentAt
+    ? new Date(manager.emailSentAt).toLocaleString("ru-RU", {
+        day: "2-digit",
+        month: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit"
+      })
+    : null;
+
+  if (isMissing) {
+    return (
+      <article className={`${styles.managerResultPanel} ${styles.managerResultCardMissing}`}>
+        <div className={styles.managerResultAnalytics}>
+          <div className={styles.managerResultCardHead}>
+            <div>
+              <p className={styles.managerResultEyebrow}>Менеджер</p>
+              <h3>{manager.managerName}</h3>
+              {manager.regionLabel ? (
+                <p className={styles.managerResultRegionLabel}>{manager.regionLabel}</p>
+              ) : null}
+              <span className={`${styles.managerResultStatusPill} ${styles.managerResultStatusPill_muted}`}>
+                Смена не завершена
+              </span>
+            </div>
+            <ManagerProgressRing stats={manager.stats} missing />
+          </div>
+          <p className={styles.managerResultMissingHint}>
+            За этот день менеджер не нажал «Завершить смену» — отчёт не поступил. Данные по заданиям недоступны.
+          </p>
+        </div>
+      </article>
+    );
+  }
+
+  if (isInProgress) {
+    return (
+      <article className={`${styles.managerResultPanel} ${styles.managerResultCardLive}`}>
+        <div className={styles.managerResultAnalytics}>
+          <div className={styles.managerResultCardHead}>
+            <div>
+              <p className={styles.managerResultEyebrow}>Менеджер</p>
+              <h3>{manager.managerName}</h3>
+              {manager.regionLabel ? (
+                <p className={styles.managerResultRegionLabel}>{manager.regionLabel}</p>
+              ) : null}
+              <span className={`${styles.managerResultStatusPill} ${styles.managerResultStatusPill_live}`}>
+                <span className={styles.managerResultsLiveDot} aria-hidden="true" />
+                Live · смена не закрыта
+              </span>
+              {liveUpdatedLabel ? (
+                <p className={styles.managerResultsLiveMeta}>Обновлено в {liveUpdatedLabel}</p>
+              ) : (
+                <p className={styles.managerResultsLiveMeta}>Прогресс обновляется автоматически</p>
+              )}
+            </div>
+            <ManagerProgressRing stats={manager.stats} />
+          </div>
+          <ManagerResultTiles
+            stats={manager.stats}
+            filter={taskFilter}
+            remainingLabel="Осталось"
+            onFilterChange={setTaskFilter}
+          />
+          <div className={styles.managerResultBreakdown}>
+            <span>Активно: {manager.stats.active}</span>
+            <span>Частично: {manager.stats.partial}</span>
+            <span>Не выполнено: {manager.stats.notResolved}</span>
+          </div>
+        </div>
+
+        <div className={styles.managerResultPanelScroll}>
+          <section
+            className={styles.managerResultTasksBlock}
+            aria-label={`${managerTaskFilterTitle(taskFilter, "live")} ${manager.managerName}`}
+          >
+            <div className={styles.managerResultTasksBlockHead}>
+              <h4>{managerTaskFilterTitle(taskFilter, "live")}</h4>
+              <span className={styles.managerResultTasksCount}>{filteredTasks.length}</span>
+            </div>
+            {filteredTasks.length > 0 ? (
+              <ManagerResultTaskList tasks={filteredTasks} />
+            ) : (
+              <p className={styles.managerResultsEmptyCompact}>
+                {managerTaskFilterEmpty(taskFilter, "live")}
+              </p>
+            )}
+          </section>
+        </div>
+      </article>
+    );
+  }
+
+  return (
+    <article className={styles.managerResultPanel}>
+      <div className={styles.managerResultAnalytics}>
+        <div className={styles.managerResultCardHead}>
+          <div>
+            <p className={styles.managerResultEyebrow}>Менеджер</p>
+            <h3>{manager.managerName}</h3>
+            {manager.regionLabel ? (
+              <p className={styles.managerResultRegionLabel}>{manager.regionLabel}</p>
+            ) : null}
+            {manager.emailSentTo ? (
+              <p className={styles.managerResultsEmailMeta}>
+                Отчёт отправлен{sentAtLabel ? ` · ${sentAtLabel}` : ""}
+                {manager.emailSentTo ? ` · ${manager.emailSentTo}` : ""}
+              </p>
+            ) : null}
+          </div>
+          <ManagerProgressRing stats={manager.stats} />
+        </div>
+        <ManagerResultTiles
+          stats={manager.stats}
+          filter={taskFilter}
+          remainingLabel="Не закрыто"
+          onFilterChange={setTaskFilter}
+        />
+        <div className={styles.managerResultBreakdown}>
+          <span>Активно: {manager.stats.active}</span>
+          <span>Частично: {manager.stats.partial}</span>
+          <span>Не выполнено: {manager.stats.notResolved}</span>
+        </div>
+      </div>
+
+      <div className={styles.managerResultPanelScroll}>
+        <section
+          className={styles.managerResultTasksBlock}
+          aria-label={`${managerTaskFilterTitle(taskFilter, "submitted")} ${manager.managerName}`}
+        >
+          <div className={styles.managerResultTasksBlockHead}>
+            <h4>{managerTaskFilterTitle(taskFilter, "submitted")}</h4>
+            <span className={styles.managerResultTasksCount}>{filteredTasks.length}</span>
+          </div>
+          {filteredTasks.length > 0 ? (
+            <ManagerResultTaskList tasks={filteredTasks} />
+          ) : (
+            <p className={styles.managerResultsEmptyCompact}>
+              {managerTaskFilterEmpty(taskFilter, "submitted")}
+            </p>
+          )}
+        </section>
+      </div>
+    </article>
+  );
+}
+
+function ManagerResultsDashboard({
+  bundle,
+  formatDate
+}: {
+  bundle: ManagerResultsBundle;
+  formatDate: (iso: string | null | undefined) => string;
+}) {
+  const dashboard = bundle.dashboard;
+  const hasData = Boolean(dashboard && dashboard.managers.length > 0);
+  const hasReportsForDate = bundle.availableDates.some(
+    (entry) => entry.reportDate === bundle.selectedDate
+  );
+  const roster = dashboard?.roster ?? { total: 2, submitted: 0, inProgress: 0, missing: 2 };
+  const isLiveDay = Boolean(dashboard?.liveMode && bundle.selectedDate === bundle.today);
 
   return (
     <section className={styles.managerResultsBoard} aria-label="Результаты работы менеджеров">
-      <div className={styles.managerResultsHeader}>
-        <div className={styles.coverageModeLead}>
-          <span className={styles.coverageModeLeadIcon} aria-hidden="true">
-            <ClipboardList size={18} strokeWidth={2.2} />
-          </span>
-          <div className={styles.coverageModeLeadTextWrap}>
-            <h2 className={styles.coverageModeLeadTitle}>Результаты работы менеджеров</h2>
-            <p className={styles.coverageModeLeadHint}>
-              Общая сводка, сравнение менеджеров и основания по незакрытым заданиям
-            </p>
+      <div className={styles.managerResultsTop}>
+        {isLiveDay ? (
+          <div className={styles.managerResultsLiveBanner} role="status">
+            <span className={styles.managerResultsLiveDot} aria-hidden="true" />
+            <span>
+              Live-режим: смена ещё не закрыта, прогресс менеджеров обновляется автоматически каждые 30 секунд.
+            </span>
           </div>
+        ) : null}
+        {bundle.loading ? (
+        <ManagerResultsLoadingState />
+      ) : bundle.error ? (
+        <div className={styles.managerResultsErrorBox}>
+          <p>{bundle.error}</p>
+          <button type="button" className={styles.managerResultsRetryBtn} onClick={() => bundle.onRetry()}>
+            Повторить
+          </button>
         </div>
-        <span className={styles.riskTotalBadge}>
-          {formatRuDate(dashboard.reportDate)} · {dashboard.summary.total} заданий
-        </span>
+      ) : !hasData ? (
+        <div className={styles.managerResultsEmptyState}>
+          <p className={styles.managerResultsEmpty}>
+            {hasReportsForDate
+              ? "Отчёты за эту дату ещё обрабатываются или данные недоступны."
+              : bundle.selectedDate === bundle.today
+                ? "Сменное задание ещё не сформировано — выполните анализ Excel, чтобы менеджеры получили задания."
+                : "За выбранный день менеджеры ещё не завершали смену."}
+          </p>
+          {bundle.availableDates.length > 0 ? (
+            <p className={styles.managerResultsEmptyHint}>
+              Выберите другую дату в панели выше — доступно {bundle.availableDates.length}{" "}
+              {bundle.availableDates.length === 1 ? "день" : bundle.availableDates.length < 5 ? "дня" : "дней"} с отчётами.
+            </p>
+          ) : null}
+        </div>
+      ) : dashboard ? (
+          <>
+            {roster.inProgress > 0 ? (
+              <p className={styles.managerResultsRosterHintLive}>
+                {roster.inProgress === roster.total
+                  ? "Все менеджеры в live-режиме — смена ещё не закрыта, прогресс обновляется в реальном времени."
+                  : `${roster.inProgress} из ${roster.total} менеджеров работают над сменным заданием в live-режиме.`}
+              </p>
+            ) : null}
+            {roster.missing > 0 && roster.inProgress === 0 ? (
+              <p className={styles.managerResultsRosterHint}>
+                {roster.missing === roster.total
+                  ? "За этот день ни один менеджер не завершил смену."
+                  : `${roster.missing} из ${roster.total} менеджеров не сдали отчёт — карточки отмечены как «Смена не завершена».`}
+              </p>
+            ) : null}
+            {roster.missing > 0 && roster.inProgress > 0 ? (
+              <p className={styles.managerResultsRosterHint}>
+                {roster.missing} менеджер(ов) ещё не получили сменное задание или не начали работу.
+              </p>
+            ) : null}
+
+            <div className={styles.managerResultsSummaryGrid}>
+              <article className={styles.managerResultsSummaryCard}>
+                <span>Отчётов сдано</span>
+                <strong>
+                  {roster.submitted}/{roster.total}
+                </strong>
+              </article>
+              {roster.inProgress > 0 ? (
+                <article className={`${styles.managerResultsSummaryCard} ${styles.managerResultsSummaryCardLive}`}>
+                  <span>В live-режиме</span>
+                  <strong>{roster.inProgress}</strong>
+                </article>
+              ) : null}
+              <article className={styles.managerResultsSummaryCard}>
+                <span>Всего заданий</span>
+                <strong>{dashboard.summary.total}</strong>
+              </article>
+              <article className={styles.managerResultsSummaryCard}>
+                <span>Выполнено</span>
+                <strong className={styles.managerResultsSuccess}>{dashboard.summary.resolved}</strong>
+              </article>
+              <article className={styles.managerResultsSummaryCard}>
+                <span>Не выполнено</span>
+                <strong className={styles.managerResultsDanger}>{dashboard.summary.incomplete}</strong>
+              </article>
+            </div>
+          </>
+        ) : null}
       </div>
 
-      {!hasData ? (
-        <p className={styles.managerResultsEmpty}>
-          За выбранный день ещё нет завершённых смен менеджеров.
-        </p>
-      ) : (
-        <>
-          <div className={styles.managerResultsSummaryGrid}>
-            <article className={styles.managerResultsSummaryCard}>
-              <span>Всего заданий</span>
-              <strong>{dashboard.summary.total}</strong>
-            </article>
-            <article className={styles.managerResultsSummaryCard}>
-              <span>Выполнено</span>
-              <strong className={styles.managerResultsSuccess}>{dashboard.summary.resolved}</strong>
-            </article>
-            <article className={styles.managerResultsSummaryCard}>
-              <span>Не выполнено</span>
-              <strong className={styles.managerResultsDanger}>{dashboard.summary.incomplete}</strong>
-            </article>
-            <article className={styles.managerResultsSummaryCard}>
-              <span>Общая успеваемость</span>
-              <strong>{dashboard.summary.resolvedPercent}%</strong>
-            </article>
-          </div>
-
-          <div className={styles.managerResultsManagersGrid}>
+      {dashboard && !bundle.loading && !bundle.error && hasData ? (
+        <div className={styles.managerResultsManagerStage}>
+          <div className={styles.managerResultsManagerStack}>
             {dashboard.managers.map((manager) => (
-              <article key={manager.id} className={styles.managerResultCard}>
-                <div className={styles.managerResultCardHead}>
-                  <div>
-                    <p className={styles.managerResultEyebrow}>Менеджер</p>
-                    <h3>{manager.managerName}</h3>
-                  </div>
-                  <ManagerProgressRing stats={manager.stats} />
-                </div>
-                <div className={styles.managerResultTiles}>
-                  <div className={styles.managerResultTile}>
-                    <span>Всего</span>
-                    <strong>{manager.stats.total}</strong>
-                  </div>
-                  <div className={styles.managerResultTile}>
-                    <span>Выполнено</span>
-                    <strong className={styles.managerResultsSuccess}>{manager.stats.resolved}</strong>
-                  </div>
-                  <div className={styles.managerResultTile}>
-                    <span>Не закрыто</span>
-                    <strong className={styles.managerResultsDanger}>{manager.stats.incomplete}</strong>
-                  </div>
-                </div>
-                <div className={styles.managerResultBreakdown}>
-                  <span>Активно: {manager.stats.active}</span>
-                  <span>Частично: {manager.stats.partial}</span>
-                  <span>Не выполнено: {manager.stats.notResolved}</span>
-                </div>
-              </article>
+              <ManagerResultPanel key={manager.id} manager={manager} />
             ))}
           </div>
-
-          <div className={styles.managerResultsReasons}>
-            <div className={styles.managerResultsReasonsHead}>
-              <h3>Невыполненные задания и основания</h3>
-              <span>{incompleteTasks.length}</span>
-            </div>
-            {incompleteTasks.length > 0 ? (
-              <div className={styles.managerResultsReasonList}>
-                {incompleteTasks.map(({ manager, task }) => {
-                  const title = taskValue(task, "nomenclature") || "Задание";
-                  const reason = taskValue(task, "reason") || "Основание не указано";
-                  const taskType = taskValue(task, "task_type");
-                  const status = taskValue(task, "status");
-                  const deadline = taskValue(task, "deadline");
-                  return (
-                    <article
-                      key={`${manager}-${taskValue(task, "key")}-${title}`}
-                      className={styles.managerResultsReasonCard}
-                    >
-                      <div>
-                        <p>
-                          {manager} · {taskType || "тип не указан"}
-                        </p>
-                        <strong>{title}</strong>
-                        <span>
-                          {managerResultStatusLabel(status)}
-                          {deadline ? ` · ${deadline}` : ""}
-                        </span>
-                      </div>
-                      <blockquote>{reason}</blockquote>
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <p className={styles.managerResultsEmpty}>Незакрытых заданий с основаниями нет.</p>
-            )}
-          </div>
-        </>
-      )}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -797,27 +1354,37 @@ type CoverageDashboardTilesProps = {
   dashboard: CoverageDashboardPayload;
   formatDate?: (iso: string | null | undefined) => string;
   managerTasks?: ShiftTaskBoardProps | null;
-  managerResults?: ManagerCompletionDashboard | null;
+  managerTasksNotice?: ManagerTasksNotice | null;
+  managerResults?: ManagerResultsBundle | null;
 };
 
 export function CoverageDashboardTiles({
   dashboard,
   formatDate = formatRuDate,
   managerTasks = null,
+  managerTasksNotice = null,
   managerResults = null
 }: CoverageDashboardTilesProps) {
-  const hasTasksSide = Boolean(managerTasks);
   const hasManagerResultsSide = Boolean(managerResults);
+  const hasTasksSide =
+    !hasManagerResultsSide && (Boolean(managerTasks) || Boolean(managerTasksNotice));
   const hasExtraSide = hasTasksSide || hasManagerResultsSide;
   const [period, setPeriod] = useState<CoveragePeriodKey>(dashboard.defaultPeriod ?? "week");
   const [selectedTile, setSelectedTile] = useState<CoverageTileKey>("all");
   const [dashboardSide, setDashboardSide] = useState<CoverageDashboardSide>("products");
   const [explainedTile, setExplainedTile] = useState<CoverageTileKey | null>(null);
   const [viewTransition, setViewTransition] = useState<CoverageViewTransition | null>(null);
+  const [sectionAnimKey, setSectionAnimKey] = useState(0);
+  const [coverageFlipAnimating, setCoverageFlipAnimating] = useState(false);
+  const [coverageFlipVisual, setCoverageFlipVisual] = useState<"products" | "nomenclatures">("products");
   const transitionTimerRef = useRef<number | null>(null);
-  const carouselPanelRefs = useRef<Record<CoverageDashboardSide, HTMLDivElement | null>>({
-    products: null,
-    nomenclatures: null,
+  const coverageFlipTimerRef = useRef<number | null>(null);
+  const carouselPanelRefs = useRef<{
+    coverage: HTMLDivElement | null;
+    tasks: HTMLDivElement | null;
+    manager_results: HTMLDivElement | null;
+  }>({
+    coverage: null,
     tasks: null,
     manager_results: null
   });
@@ -842,9 +1409,28 @@ export function CoverageDashboardTiles({
       if (transitionTimerRef.current !== null) {
         window.clearTimeout(transitionTimerRef.current);
       }
+      if (coverageFlipTimerRef.current !== null) {
+        window.clearTimeout(coverageFlipTimerRef.current);
+      }
     },
     []
   );
+
+  const beginCoverageFlipAnimation = useCallback((nextVisual: "products" | "nomenclatures") => {
+    setCoverageFlipAnimating(true);
+    if (coverageFlipTimerRef.current !== null) {
+      window.clearTimeout(coverageFlipTimerRef.current);
+    }
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setCoverageFlipVisual(nextVisual);
+      });
+    });
+    coverageFlipTimerRef.current = window.setTimeout(() => {
+      setCoverageFlipAnimating(false);
+      coverageFlipTimerRef.current = null;
+    }, COVERAGE_FLIP_TRANSITION_MS);
+  }, []);
 
   useEffect(() => {
     setPeriod(dashboard.defaultPeriod ?? "week");
@@ -852,9 +1438,16 @@ export function CoverageDashboardTiles({
     setDashboardSide("products");
     setExplainedTile(null);
     setViewTransition(null);
+    setSectionAnimKey(0);
+    setCoverageFlipVisual("products");
+    setCoverageFlipAnimating(false);
     if (transitionTimerRef.current !== null) {
       window.clearTimeout(transitionTimerRef.current);
       transitionTimerRef.current = null;
+    }
+    if (coverageFlipTimerRef.current !== null) {
+      window.clearTimeout(coverageFlipTimerRef.current);
+      coverageFlipTimerRef.current = null;
     }
   }, [dashboard]);
 
@@ -871,13 +1464,19 @@ export function CoverageDashboardTiles({
     }
   }, [dashboardSide, hasManagerResultsSide, hasTasksSide]);
 
+  const isProductsMode = dashboardSide === "products";
+  const isNomenclaturesMode = dashboardSide === "nomenclatures";
+  const isTasksMode = dashboardSide === "tasks";
+  const isManagerResultsMode = dashboardSide === "manager_results";
+  const isCoverageMode = isProductsMode || isNomenclaturesMode;
+
   useEffect(() => {
-    if (!hasExtraSide) {
+    if (!hasExtraSide || !isCoverageMode) {
       setCarouselViewportHeight(undefined);
       return undefined;
     }
 
-    const panel = carouselPanelRefs.current[dashboardSide];
+    const panel = carouselPanelRefs.current.coverage;
     if (!panel) return undefined;
 
     const updateHeight = () => {
@@ -888,7 +1487,7 @@ export function CoverageDashboardTiles({
     const observer = new ResizeObserver(updateHeight);
     observer.observe(panel);
     return () => observer.disconnect();
-  }, [hasExtraSide, dashboardSide, period, selectedTile, managerTasks, managerResults]);
+  }, [hasExtraSide, isCoverageMode, period, selectedTile, managerTasks, managerResults]);
 
   useEffect(() => {
     if (!explainedTile) return;
@@ -900,10 +1499,6 @@ export function CoverageDashboardTiles({
   }, [explainedTile]);
 
   const periodData = dashboard.periods[period] ?? dashboard.periods.week ?? dashboard.periods.month;
-  const isProductsMode = dashboardSide === "products";
-  const isNomenclaturesMode = dashboardSide === "nomenclatures";
-  const isTasksMode = dashboardSide === "tasks";
-  const isManagerResultsMode = dashboardSide === "manager_results";
 
   const tileValues = useMemo(() => {
     if (!periodData) {
@@ -955,10 +1550,32 @@ export function CoverageDashboardTiles({
       if (nextSide === "tasks" && !hasTasksSide) return;
       if (nextSide === "manager_results" && !hasManagerResultsSide) return;
       if (nextSide === dashboardSide) return;
+      if (isCoverageFlipTransition(dashboardSide, nextSide)) {
+        beginCoverageFlipAnimation(nextSide === "nomenclatures" ? "nomenclatures" : "products");
+        setDashboardSide(nextSide);
+        setExplainedTile(null);
+        return;
+      }
+      if (nextSide === "products" || nextSide === "nomenclatures") {
+        setCoverageFlipVisual(nextSide);
+      }
+      setSectionAnimKey((current) => current + 1);
+      scheduleViewTransition({ kind: "section" }, COVERAGE_SECTION_TRANSITION_MS);
       setDashboardSide(nextSide);
       setExplainedTile(null);
     },
-    [dashboardSide, hasManagerResultsSide, hasTasksSide]
+    [beginCoverageFlipAnimation, dashboardSide, hasManagerResultsSide, hasTasksSide, scheduleViewTransition]
+  );
+
+  const sectionPanelAnimClass = useCallback(
+    (panel: "coverage" | "tasks" | "manager_results") => {
+      if (viewTransition?.kind !== "section") return "";
+      if (panel === "coverage" && isCoverageMode) return styles.coverageAnimSection;
+      if (panel === "tasks" && isTasksMode) return styles.coverageAnimSection;
+      if (panel === "manager_results" && isManagerResultsMode) return styles.coverageAnimSection;
+      return "";
+    },
+    [viewTransition, isCoverageMode, isTasksMode, isManagerResultsMode]
   );
 
   const periodAnimClassForSide = useCallback(
@@ -1081,6 +1698,35 @@ export function CoverageDashboardTiles({
     );
   };
 
+  const coverageFlipPanel = (
+    <div
+      className={`${styles.riskTileFlipScene} ${styles.coverageSideFlipScene} ${
+        coverageFlipAnimating ? styles.coverageSideFlipSceneAnimating : ""
+      }`}
+    >
+      <div
+        className={`${styles.riskTileFlipCard} ${styles.coverageSideFlipCard} ${
+          coverageFlipVisual === "nomenclatures" ? styles.riskTileFlipCardFlipped : ""
+        }`}
+      >
+        <div
+          className={`${styles.riskTileFace} ${styles.riskTileFaceFront} ${styles.coverageSideFlipFace}`}
+        >
+          <div key={`products-${period}`} className={periodAnimClassForSide("products")}>
+            {renderSidePanel("products")}
+          </div>
+        </div>
+        <div
+          className={`${styles.riskTileFace} ${styles.riskTileFaceBack} ${styles.coverageSideFlipFace}`}
+        >
+          <div key={`nomenclatures-${period}`} className={periodAnimClassForSide("nomenclatures")}>
+            {renderSidePanel("nomenclatures")}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
   const dashboardModeSwitch = (
     <div className={styles.coverageModeSwitch} role="tablist" aria-label="Тип дашборда">
       <button
@@ -1171,8 +1817,26 @@ export function CoverageDashboardTiles({
     </div>
   );
 
+  const managerResultsToolbar = managerResults ? (
+    <div
+      className={`${styles.coverageToolbar} ${styles.coverageToolbarManagerResults}`}
+      role="toolbar"
+      aria-label="Аналитика менеджеров"
+    >
+      <ManagerResultsDateNav bundle={managerResults} formatDate={formatDate} />
+      <span className={styles.coverageToolbarDivider} aria-hidden="true" />
+      {dashboardModeSwitch}
+    </div>
+  ) : (
+    tasksToolbar
+  );
+
   return (
-    <div className={styles.coverageEmbeddedBlock}>
+    <div
+      className={`${styles.coverageEmbeddedBlock} ${
+        isManagerResultsMode ? styles.coverageEmbeddedBlockManagerResults : ""
+      } ${isTasksMode ? styles.coverageEmbeddedBlockTasks : ""}`}
+    >
       <div className={styles.coverageBoardHeader}>
         <div className={styles.coverageBoardIntro}>
           <div
@@ -1217,7 +1881,11 @@ export function CoverageDashboardTiles({
           </div>
         </div>
         <div className={styles.coverageDashboardControls}>
-          {isTasksMode || isManagerResultsMode ? tasksToolbar : periodNav}
+          {isManagerResultsMode
+            ? managerResultsToolbar
+            : isTasksMode
+              ? tasksToolbar
+              : periodNav}
         </div>
       </div>
 
@@ -1228,81 +1896,78 @@ export function CoverageDashboardTiles({
       >
         {hasExtraSide ? (
           <div
-            className={styles.coverageSideCarouselViewport}
-            style={carouselViewportHeight ? { height: carouselViewportHeight } : undefined}
+            className={`${styles.coverageSideCarouselViewport} ${
+              isManagerResultsMode ? styles.coverageSideCarouselViewportManagerResults : ""
+            } ${isTasksMode ? styles.coverageSideCarouselViewportTasks : ""}`}
+            style={
+              carouselViewportHeight && isCoverageMode
+                ? { height: carouselViewportHeight }
+                : undefined
+            }
           >
             <div
               ref={(node) => {
-                carouselPanelRefs.current.products = node;
+                carouselPanelRefs.current.coverage = node;
               }}
               className={`${styles.coverageSideCarouselPanel} ${
-                isProductsMode ? "" : styles.coverageSideCarouselPanelHidden
+                isCoverageMode ? "" : styles.coverageSideCarouselPanelHidden
               }`}
             >
-              <div key={`products-${period}`} className={periodAnimClassForSide("products")}>
-                {renderSidePanel("products")}
+              <div
+                key={sectionPanelContentKey("coverage", isCoverageMode, sectionAnimKey)}
+                className={sectionPanelAnimClass("coverage")}
+              >
+                {coverageFlipPanel}
               </div>
             </div>
-            <div
-              ref={(node) => {
-                carouselPanelRefs.current.nomenclatures = node;
-              }}
-              className={`${styles.coverageSideCarouselPanel} ${
-                isNomenclaturesMode ? "" : styles.coverageSideCarouselPanelHidden
-              }`}
-            >
-              <div key={`nomenclatures-${period}`} className={periodAnimClassForSide("nomenclatures")}>
-                {renderSidePanel("nomenclatures")}
+            {hasTasksSide ? (
+              <div
+                ref={(node) => {
+                  carouselPanelRefs.current.tasks = node;
+                }}
+                className={`${styles.coverageSideCarouselPanel} ${
+                  isTasksMode ? "" : styles.coverageSideCarouselPanelHidden
+                }`}
+              >
+                <div
+                  key={sectionPanelContentKey("tasks", isTasksMode, sectionAnimKey)}
+                  className={`${styles.coverageTasksPanelRoot} ${sectionPanelAnimClass("tasks")}`.trim()}
+                >
+                  {managerTasks ? (
+                    <ShiftTaskBoard embedded {...managerTasks} />
+                  ) : managerTasksNotice ? (
+                    <ShiftTasksNewDayNotice
+                      embedded
+                      previousValidDate={managerTasksNotice.previousValidDate}
+                      today={managerTasksNotice.today}
+                      formatDate={formatDate}
+                    />
+                  ) : null}
+                </div>
               </div>
-            </div>
-            <div
-              ref={(node) => {
-                carouselPanelRefs.current.tasks = node;
-              }}
-              className={`${styles.coverageSideCarouselPanel} ${
-                isTasksMode ? "" : styles.coverageSideCarouselPanelHidden
-              }`}
-            >
-              <div key="tasks-panel" className={isTasksMode ? styles.coverageAnimFade : ""}>
-                {managerTasks ? <ShiftTaskBoard embedded {...managerTasks} /> : null}
+            ) : null}
+            {hasManagerResultsSide ? (
+              <div
+                ref={(node) => {
+                  carouselPanelRefs.current.manager_results = node;
+                }}
+                className={`${styles.coverageSideCarouselPanel} ${
+                  isManagerResultsMode ? "" : styles.coverageSideCarouselPanelHidden
+                }`}
+              >
+                <div
+                  key={sectionPanelContentKey("manager_results", isManagerResultsMode, sectionAnimKey)}
+                  className={`${styles.managerResultsPanelRoot} ${sectionPanelAnimClass("manager_results")}`.trim()}
+                >
+                  {managerResults ? (
+                    <ManagerResultsDashboard bundle={managerResults} formatDate={formatDate} />
+                  ) : null}
+                </div>
               </div>
-            </div>
-            <div
-              ref={(node) => {
-                carouselPanelRefs.current.manager_results = node;
-              }}
-              className={`${styles.coverageSideCarouselPanel} ${
-                isManagerResultsMode ? "" : styles.coverageSideCarouselPanelHidden
-              }`}
-            >
-              <div key="manager-results-panel" className={isManagerResultsMode ? styles.coverageAnimFade : ""}>
-                <ManagerResultsDashboard dashboard={managerResults} />
-              </div>
-            </div>
+            ) : null}
           </div>
         ) : (
-          <div className={`${styles.riskTileFlipScene} ${styles.coverageSideFlipScene}`}>
-            <div
-              className={`${styles.riskTileFlipCard} ${styles.coverageSideFlipCard} ${
-                isNomenclaturesMode ? styles.riskTileFlipCardFlipped : ""
-              }`}
-            >
-              <div
-                className={`${styles.riskTileFace} ${styles.riskTileFaceFront} ${styles.coverageSideFlipFace}`}
-              >
-                <div key={`products-${period}`} className={periodAnimClassForSide("products")}>
-                  {renderSidePanel("products")}
-                </div>
-              </div>
-              <div
-                className={`${styles.riskTileFace} ${styles.riskTileFaceBack} ${styles.coverageSideFlipFace}`}
-              >
-                <div key={`nomenclatures-${period}`} className={periodAnimClassForSide("nomenclatures")}>
-                  {renderSidePanel("nomenclatures")}
-                </div>
-              </div>
-            </div>
-          </div>
+          coverageFlipPanel
         )}
       </div>
     </div>
@@ -1313,13 +1978,15 @@ type CoverageDashboardProps = {
   dashboard: CoverageDashboardPayload | null;
   formatDate?: (iso: string | null | undefined) => string;
   managerTasks?: ShiftTaskBoardProps | null;
-  managerResults?: ManagerCompletionDashboard | null;
+  managerTasksNotice?: ManagerTasksNotice | null;
+  managerResults?: ManagerResultsBundle | null;
 };
 
 export function CoverageDashboard({
   dashboard,
   formatDate = formatRuDate,
   managerTasks = null,
+  managerTasksNotice = null,
   managerResults = null
 }: CoverageDashboardProps) {
   if (!dashboard) return null;
@@ -1330,6 +1997,7 @@ export function CoverageDashboard({
         dashboard={dashboard}
         formatDate={formatDate}
         managerTasks={managerTasks}
+        managerTasksNotice={managerTasksNotice}
         managerResults={managerResults}
       />
     </section>

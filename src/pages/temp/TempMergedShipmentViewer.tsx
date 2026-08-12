@@ -1,13 +1,25 @@
 /**
  * TEMP(Aveon merged shipment schedule viewer) — удалить вместе с flip-модалкой.
  */
-import { useCallback, useEffect, useMemo, useRef, useState, memo, type ReactNode } from "react";
+import {
+  useCallback,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useState,
+  memo,
+  type ReactNode,
+} from "react";
 import { Download, FlipHorizontal2, Loader2, Search, X } from "lucide-react";
 import ShipmentColumnFilterMenu, { type ShipmentRowSort } from "./ShipmentColumnFilterMenu";
 import {
   isFilterActive,
   parseShipmentColumnLayout,
+  resolveCountryColumnIndex,
   resolveVisibleColumnIndices,
+  rowMatchesCountryFilter,
+  shipmentCountryFilterLabel,
+  type ShipmentCountryFilter,
 } from "./mergedShipmentColumns";
 import styles from "./TempMergedShipmentViewer.module.css";
 export type MergedShipmentStats = {
@@ -57,7 +69,9 @@ function formatMeta(
   return parts.join(" · ");
 }
 
-function TruncatedTableCell({
+const TABLE_ROW_BATCH = 60;
+
+function TableCell({
   as: Tag,
   children,
   changed = false,
@@ -66,45 +80,13 @@ function TruncatedTableCell({
   children: ReactNode;
   changed?: boolean;
 }) {
-  const contentRef = useRef<HTMLSpanElement>(null);
-  const [truncated, setTruncated] = useState(false);
-  const [expanded, setExpanded] = useState(false);
-
-  const measure = useCallback(() => {
-    if (expanded) return;
-    const element = contentRef.current;
-    if (!element) return;
-    setTruncated(element.scrollWidth > element.clientWidth + 1);
-  }, [expanded]);
-
-  useEffect(() => {
-    measure();
-    const element = contentRef.current;
-    if (!element) return undefined;
-    const observer = new ResizeObserver(() => measure());
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [measure, children]);
-
+  const text = String(children ?? "");
   return (
     <Tag
-      className={[
-        truncated ? styles.cellTruncated : "",
-        changed ? styles.cellChanged : "",
-      ].filter(Boolean).join(" ") || undefined}
-      onMouseEnter={() => {
-        if (truncated) setExpanded(true);
-      }}
-      onMouseLeave={() => setExpanded(false)}
+      className={changed ? styles.cellChanged : undefined}
+      title={text.trim() ? text : undefined}
     >
-      <span ref={contentRef} className={styles.cellContent}>
-        {children}
-      </span>
-      {truncated && expanded ? (
-        <span className={styles.cellPopover} aria-hidden="true">
-          {children}
-        </span>
-      ) : null}
+      <span className={styles.cellContent}>{children}</span>
     </Tag>
   );
 }
@@ -113,6 +95,8 @@ type BodyRow = {
   row: string[];
   originalIndex: number;
 };
+
+const COUNTRY_FILTER_OPTIONS: ShipmentCountryFilter[] = ["all", "russia", "china"];
 
 function parseQty(value: string): number {
   const normalized = String(value ?? "")
@@ -133,35 +117,78 @@ function MergedShipmentTable({
   visibleIndices: number[];
   changedCells: Array<{ row: number; col: number }>;
 }) {
-  const changedKeys = new Set(changedCells.map((cell) => `${cell.row}:${cell.col}`));
+  const rowsKey = `${bodyRows.length}:${bodyRows[0]?.originalIndex ?? 0}:${visibleIndices.join(",")}`;
+  const [renderCount, setRenderCount] = useState(TABLE_ROW_BATCH);
+  const changedKeys = useMemo(
+    () => new Set(changedCells.map((cell) => `${cell.row}:${cell.col}`)),
+    [changedCells]
+  );
+
+  useEffect(() => {
+    setRenderCount(TABLE_ROW_BATCH);
+  }, [rowsKey]);
+
+  useEffect(() => {
+    if (renderCount >= bodyRows.length) return undefined;
+
+    let cancelled = false;
+    const scheduleNextBatch = () => {
+      if (cancelled) return;
+      setRenderCount((current) => Math.min(current + TABLE_ROW_BATCH, bodyRows.length));
+    };
+
+    if (typeof window.requestIdleCallback === "function") {
+      const idleId = window.requestIdleCallback(scheduleNextBatch, { timeout: 48 });
+      return () => {
+        cancelled = true;
+        window.cancelIdleCallback(idleId);
+      };
+    }
+
+    const timeoutId = window.setTimeout(scheduleNextBatch, 0);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [bodyRows.length, renderCount]);
+
+  const visibleRows = bodyRows.slice(0, renderCount);
+  const isRenderingMore = renderCount < bodyRows.length;
+
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
             {visibleIndices.map((colIndex) => (
-              <TruncatedTableCell as="th" key={`h-${colIndex}`}>
+              <TableCell as="th" key={`h-${colIndex}`}>
                 {header[colIndex] ?? ""}
-              </TruncatedTableCell>
+              </TableCell>
             ))}
           </tr>
         </thead>
         <tbody>
-          {bodyRows.map(({ row, originalIndex }) => (
+          {visibleRows.map(({ row, originalIndex }) => (
             <tr key={`r-${originalIndex}`}>
               {visibleIndices.map((colIndex) => (
-                <TruncatedTableCell
+                <TableCell
                   as="td"
                   key={`c-${originalIndex}-${colIndex}`}
                   changed={changedKeys.has(`${originalIndex + 1}:${colIndex}`)}
                 >
                   {row[colIndex] ?? ""}
-                </TruncatedTableCell>
+                </TableCell>
               ))}
             </tr>
           ))}
         </tbody>
       </table>
+      {isRenderingMore ? (
+        <p className={styles.tableProgress} aria-live="polite">
+          <Loader2 className={styles.spinnerInline} size={14} aria-hidden />
+          Загрузка таблицы: {renderCount} из {bodyRows.length} строк…
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -185,17 +212,31 @@ function TempMergedShipmentViewer({
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
   const [rowSort, setRowSort] = useState<ShipmentRowSort>("default");
+  const [countryFilter, setCountryFilter] = useState<ShipmentCountryFilter>("all");
+  const [tableReady, setTableReady] = useState(false);
 
   const header = values[0] ?? [];
   const body = values.length > 1 ? values.slice(1) : [];
   const columnLayout = useMemo(() => parseShipmentColumnLayout(header), [header]);
+  const countryColumnIndex = useMemo(() => resolveCountryColumnIndex(header), [header]);
 
   useEffect(() => {
     setVisibleMeta(new Set(columnLayout.metaIndices));
     setDateFrom(null);
     setDateTo(null);
     setRowSort("default");
+    setCountryFilter("all");
+    setTableReady(false);
   }, [fileName, columnLayout.metaIndices]);
+
+  useEffect(() => {
+    if (loading || values.length === 0) {
+      setTableReady(false);
+      return undefined;
+    }
+    const frameId = window.requestAnimationFrame(() => setTableReady(true));
+    return () => window.cancelAnimationFrame(frameId);
+  }, [loading, values.length, fileName]);
 
   const visibleIndices = useMemo(
     () => resolveVisibleColumnIndices(columnLayout, visibleMeta, dateFrom, dateTo),
@@ -216,6 +257,11 @@ function TempMergedShipmentViewer({
         (row[0] ?? "").toLowerCase().includes(normalizedQuery)
       );
     }
+    if (countryFilter !== "all") {
+      indexedRows = indexedRows.filter(({ row }) =>
+        rowMatchesCountryFilter(row, countryColumnIndex, countryFilter)
+      );
+    }
     if (rowSort === "default") return indexedRows;
 
     const qtyIndices = visibleIndices.filter((index) => dateColumnSet.has(index));
@@ -228,11 +274,15 @@ function TempMergedShipmentViewer({
       const rightSum = qtyIndices.reduce((sum, index) => sum + parseQty(right.row[index] ?? ""), 0);
       return rightSum - leftSum;
     });
-  }, [body, dateColumnSet, normalizedQuery, rowSort, visibleIndices]);
+  }, [body, countryColumnIndex, countryFilter, dateColumnSet, normalizedQuery, rowSort, visibleIndices]);
+  const deferredBodyRows = useDeferredValue(filteredBodyRows);
 
   const filterActive = useMemo(
-    () => isFilterActive(columnLayout, visibleMeta, dateFrom, dateTo) || rowSort !== "default",
-    [columnLayout, visibleMeta, dateFrom, dateTo, rowSort]
+    () =>
+      isFilterActive(columnLayout, visibleMeta, dateFrom, dateTo) ||
+      rowSort !== "default" ||
+      countryFilter !== "all",
+    [columnLayout, visibleMeta, dateFrom, dateTo, rowSort, countryFilter]
   );
 
   const resetFilters = useCallback(() => {
@@ -240,6 +290,7 @@ function TempMergedShipmentViewer({
     setDateFrom(null);
     setDateTo(null);
     setRowSort("default");
+    setCountryFilter("all");
   }, [columnLayout.metaIndices]);
 
   if (!open && !embedded) return null;
@@ -259,8 +310,11 @@ function TempMergedShipmentViewer({
           <p className={styles.meta}>
             {formatMeta(values, stats, sourceCount, loading)}
             {filterActive ? " · фильтр колонок" : ""}
-            {normalizedQuery && body.length > 0
-              ? ` · показано ${filteredBodyRows.length} из ${body.length}`
+            {countryFilter !== "all" ? ` · ${shipmentCountryFilterLabel(countryFilter)}` : ""}
+            {normalizedQuery || countryFilter !== "all"
+              ? body.length > 0
+                ? ` · показано ${filteredBodyRows.length} из ${body.length}`
+                : ""
               : ""}
           </p>
         </div>
@@ -278,8 +332,29 @@ function TempMergedShipmentViewer({
             onRowSortChange={setRowSort}
             onReset={resetFilters}
           />
-          <div className={styles.headerSearch}>          <Search size={15} className={styles.searchIcon} aria-hidden />
-          <input
+          {countryColumnIndex !== null ? (
+            <div className={styles.countryFilterGroup} role="group" aria-label="Фильтр по стране">
+              {COUNTRY_FILTER_OPTIONS.map((option) => (
+                <button
+                  key={option}
+                  type="button"
+                  className={[
+                    styles.countryFilterBtn,
+                    countryFilter === option ? styles.countryFilterBtnActive : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
+                  aria-pressed={countryFilter === option}
+                  onClick={() => setCountryFilter(option)}
+                >
+                  {shipmentCountryFilterLabel(option)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          <div className={styles.headerSearch}>
+            <Search size={15} className={styles.searchIcon} aria-hidden />
+            <input
             type="text"
             className={styles.searchInput}
             value={nomenclatureQuery}
@@ -336,18 +411,25 @@ function TempMergedShipmentViewer({
           <p className={styles.error}>{error}</p>
         ) : values.length === 0 ? (
           <p className={styles.empty}>Объединённый график получения комплектующих ещё не сформирован.</p>
+        ) : !tableReady ? (
+          <div className={styles.loadingState}>
+            <Loader2 className={styles.spinner} size={22} aria-hidden />
+            <span>Подготовка таблицы…</span>
+          </div>
         ) : filteredBodyRows.length === 0 ? (
           <p className={styles.empty}>
             {normalizedQuery
               ? `По запросу «${nomenclatureQuery.trim()}» номенклатура не найдена.`
-              : "Нет строк для выбранных колонок и диапазона дат."}
+              : countryFilter !== "all"
+                ? `Нет позиций для страны «${shipmentCountryFilterLabel(countryFilter)}».`
+                : "Нет строк для выбранных колонок и диапазона дат."}
           </p>
         ) : visibleIndices.length === 0 ? (
           <p className={styles.empty}>Выберите хотя бы одну колонку в фильтре.</p>
         ) : (
           <MergedShipmentTable
             header={header}
-            bodyRows={filteredBodyRows}
+            bodyRows={deferredBodyRows}
             visibleIndices={visibleIndices}
             changedCells={changedCells}
           />

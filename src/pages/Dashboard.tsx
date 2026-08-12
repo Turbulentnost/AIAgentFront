@@ -149,8 +149,8 @@ export default function Dashboard() {
   const porucheniyaPermissionsQuery = usePorucheniyaPermissions();
 
   const availableAgents = useMemo(
-    () => withMockAvailableAgents(agentsQuery.data ?? []),
-    [agentsQuery.data]
+    () => withMockAvailableAgents(agentsQuery.data ?? [], user),
+    [agentsQuery.data, user]
   );
 
   const launchAgents = useMemo(() => {

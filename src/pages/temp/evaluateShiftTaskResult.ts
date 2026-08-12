@@ -19,7 +19,11 @@ type EvaluateParams = {
   lastEvaluatedRef: MutableRefObject<Record<string, string>>;
   setResultEvals: Dispatch<SetStateAction<Record<string, ShiftResultEvalState>>>;
   currentEval?: ShiftResultEvalState;
-  onManagerResultEvaluated?: (context: ShiftTaskContext, managerResult: string) => Promise<void> | void;
+  onManagerResultEvaluated?: (
+    context: ShiftTaskContext,
+    managerResult: string,
+    taskKey: string
+  ) => Promise<void> | void;
 };
 
 const STATUS_FALLBACK: Record<Exclude<ResultEvalStatus, never>, string> = {
@@ -81,7 +85,7 @@ export async function evaluateShiftTaskResult({
   }
 
   if (lastEvaluatedRef.current[taskKey] === trimmed) {
-    await onManagerResultEvaluated?.(context, trimmed);
+    await onManagerResultEvaluated?.(context, trimmed, taskKey);
     return outcomeFromEvalState(currentEval);
   }
 
@@ -103,7 +107,7 @@ export async function evaluateShiftTaskResult({
         comment: response.comment,
       },
     }));
-    await onManagerResultEvaluated?.(context, trimmed);
+    await onManagerResultEvaluated?.(context, trimmed, taskKey);
 
     if (response.status === "resolved") {
       return { outcome: "resolved" };

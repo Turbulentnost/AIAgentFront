@@ -3,6 +3,8 @@ export type ShipmentDateColumn = {
   iso: string;
 };
 
+export type ShipmentCountryFilter = "all" | "russia" | "china";
+
 export type ShipmentColumnLayout = {
   metaIndices: number[];
   metaLabels: string[];
@@ -73,4 +75,52 @@ export function isFilterActive(
   if (dateFrom && dateFrom !== first) return true;
   if (dateTo && dateTo !== last) return true;
   return false;
+}
+
+export function resolveCountryColumnIndex(header: string[]): number | null {
+  const index = header.findIndex((label) => label.trim().toLowerCase() === "страна");
+  return index >= 0 ? index : null;
+}
+
+export function classifyShipmentCountry(value: string): "russia" | "china" | "unknown" {
+  const normalized = value.trim().toLowerCase().replace(/ё/g, "е");
+  if (!normalized) return "unknown";
+  if (
+    normalized.includes("китай") ||
+    normalized.includes("кнр") ||
+    normalized.includes("china") ||
+    normalized.includes("гонконг") ||
+    normalized.includes("hong kong")
+  ) {
+    return "china";
+  }
+  if (
+    normalized.includes("россия") ||
+    normalized.includes("российская федерация") ||
+    normalized === "рф" ||
+    normalized.includes("russia")
+  ) {
+    return "russia";
+  }
+  return "unknown";
+}
+
+export function rowMatchesCountryFilter(
+  row: string[],
+  countryColumnIndex: number | null,
+  filter: ShipmentCountryFilter
+): boolean {
+  if (filter === "all") return true;
+  if (countryColumnIndex === null) return false;
+
+  const bucket = classifyShipmentCountry(row[countryColumnIndex] ?? "");
+  if (filter === "russia") return bucket === "russia";
+  if (filter === "china") return bucket === "china";
+  return true;
+}
+
+export function shipmentCountryFilterLabel(filter: ShipmentCountryFilter): string {
+  if (filter === "russia") return "Россия";
+  if (filter === "china") return "Китай";
+  return "Все";
 }

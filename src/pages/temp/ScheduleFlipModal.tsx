@@ -236,13 +236,29 @@ export default function ScheduleFlipModal({
     ) : null;
 
   const shipmentPanel =
-    showShipment && shipment && shipmentMounted ? (
-      <ShipmentPanel
-        shipment={shipment}
-        onClose={onClose}
-        onFlipToShift={canFlip ? flipToShift : undefined}
-        onPrefetchShipment={mountShipmentPanel}
-      />
+    showShipment && shipment ? (
+      shipmentMounted ? (
+        <ShipmentPanel
+          shipment={shipment}
+          onClose={onClose}
+          onFlipToShift={canFlip ? flipToShift : undefined}
+          onPrefetchShipment={mountShipmentPanel}
+        />
+      ) : (
+        <TempMergedShipmentViewer
+          embedded
+          open
+          loading
+          values={[]}
+          fileName={shipment.fileName}
+          stats={shipment.stats}
+          sourceCount={shipment.sourceCount}
+          onExport={shipment.onExport}
+          onClose={onClose}
+          onBackToShiftAssignment={canFlip ? flipToShift : undefined}
+          onBackToShiftAssignmentHover={mountShipmentPanel}
+        />
+      )
     ) : null;
 
   const handleOverlayClick = (event: MouseEvent<HTMLDivElement>) => {

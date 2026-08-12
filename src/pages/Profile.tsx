@@ -34,6 +34,7 @@ import {
   mockProfileActivities,
   mockSecurityItems,
   profileFallbacks,
+  resolveDepartmentLabels,
   roleNameById
 } from "@/mock-data/profile";
 import type { ProfileActivityItem, ProfileAgentCard, ProfileAgentIcon } from "@/mock-data/profile";
@@ -279,9 +280,7 @@ export default function Profile() {
 
   const displayName = getDisplayName(user);
   const initials = initialsFromName(displayName) || "П";
-  const departmentName =
-    departmentsQuery.data?.find((department) => department.id === user.department_id)?.name ||
-    profileFallbacks.departmentName;
+  const { divisionName, subdivisionName } = resolveDepartmentLabels(departmentsQuery.data, user.department_id);
   const roleName =
     (user.is_superuser ? "Суперадминистратор" : undefined) ||
     (user.role_id ? roleNameById[user.role_id] : undefined) ||
@@ -394,7 +393,7 @@ export default function Profile() {
             <h2>{displayName}</h2>
             <p>
               <Building2 size={18} strokeWidth={2} aria-hidden="true" />
-              {departmentName}
+              {subdivisionName}
             </p>
             <p>
               <BriefcaseBusiness size={18} strokeWidth={2} aria-hidden="true" />
@@ -475,10 +474,17 @@ export default function Profile() {
             </div>
             <div>
               <dt>
+                <Building2 size={18} strokeWidth={2} aria-hidden="true" />
+                Отдел
+              </dt>
+              <dd>{divisionName}</dd>
+            </div>
+            <div>
+              <dt>
                 <UsersRound size={18} strokeWidth={2} aria-hidden="true" />
                 Подразделение
               </dt>
-              <dd>{departmentName}</dd>
+              <dd>{subdivisionName}</dd>
             </div>
             <div>
               <dt>

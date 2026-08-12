@@ -27,6 +27,43 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex-wrap: wrap;
+}
+
+.countryFilterGroup {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  padding: 2px;
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 8px;
+}
+
+.countryFilterBtn {
+  min-height: 28px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-secondary, #9ca3af);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+
+.countryFilterBtn:hover {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 6%, transparent);
+}
+
+.countryFilterBtnActive {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 18%, transparent);
 }
 
 .filterWrap {
@@ -476,6 +513,26 @@
 
 .spinner {
   animation: spin 0.9s linear infinite;
+}
+
+.spinnerInline {
+  display: inline-block;
+  vertical-align: -2px;
+  margin-right: 6px;
+  animation: spin 0.9s linear infinite;
+}
+
+.tableProgress {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  margin: 0;
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-secondary, #9ca3af);
+  background: color-mix(in srgb, var(--color-surface, #1a1d23) 92%, transparent);
+  border-top: 1px solid var(--color-border, #2a2f3a);
 }
 
 @keyframes spin {

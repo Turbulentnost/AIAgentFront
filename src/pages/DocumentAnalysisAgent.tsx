@@ -36,7 +36,7 @@ import { TempOnecSyncHint } from "./temp/TempOnecSyncFreshness";
 import TempGoogleSheetsViewer from "./temp/TempGoogleSheetsViewer";
 import ScheduleFlipModal, { type ScheduleFlipFace } from "./temp/ScheduleFlipModal";
 import type { MergedShipmentStats } from "./temp/TempMergedShipmentViewer";
-import ShiftTaskBoard from "./temp/ShiftTaskBoard";
+import ShiftTaskBoard, { ShiftTasksNewDayNotice } from "./temp/ShiftTaskBoard";
 import AvionDeveloperFeedbackWidget from "./temp/AvionDeveloperFeedbackWidget";
 import {
   buildInitialResultTexts,
@@ -61,9 +61,15 @@ import {
   CoverageDashboard,
   parseCoverageDashboard,
   type CoverageDashboardPayload,
-  type ManagerCompletionDashboard
+  type ManagerCompletionDashboard,
+  type ManagerCompletionDateEntry,
+  type ManagerResultsBundle
 } from "@/pages/temp/CoverageDashboard";
 import styles from "./DocumentAnalysisAgent.module.css";
+
+function todayMskIso(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Moscow" }).format(new Date());
+}
 
 type FileRoleStatus = "pending" | "loading" | "ready" | "error";
 type ShipmentMergeStatus = "merging" | "done";
@@ -99,6 +105,23 @@ type DetailedComparisonNotice = {
   oldVersion: string;
   newVersion: string;
   cells: number;
+};
+
+type RussiaShipmentSource = {
+  id: string;
+  file_name: string;
+  file_sha256: string;
+  created_at?: string | null;
+  updated_at?: string | null;
+  stats?: Record<string, unknown>;
+};
+
+type ShipmentManualChangeNotice = {
+  id: string;
+  message: string;
+  nomenclature?: string;
+  country?: string | null;
+  changedCells: Array<{ row: number; col: number }>;
 };
 
 const analysisStages = [
@@ -153,12 +176,6 @@ const requiredFileRoles = [
     label: "План производства на месяц",
     hint: "по дням / неделям · сравнение с сохранённой версией",
     required: false
-  },
-  {
-    role: "shipment_schedule",
-    label: "График получения комплектующих",
-    hint: "даты поставок и логистика",
-    required: true
   }
 ] as const;
 
@@ -721,6 +738,8 @@ export default function DocumentAnalysisAgent() {
   const [isDragOver, setIsDragOver] = useState(false);
   const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [dashboardRefreshWarning, setDashboardRefreshWarning] = useState<string | null>(null);
+  const [isLoadingLatestDashboard, setIsLoadingLatestDashboard] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [lastAnalysisAt, setLastAnalysisAt] = useState<string | null>(null);
   const [activeStageIndex, setActiveStageIndex] = useState(0);
@@ -742,6 +761,8 @@ export default function DocumentAnalysisAgent() {
     rowKinds: ShiftAssignmentRowKind[];
     meta: ShiftAssignmentMeta | null;
   } | null>(null);
+  const [shiftDayExpired, setShiftDayExpired] = useState(false);
+  const [shiftPreviousValidDate, setShiftPreviousValidDate] = useState<string | null>(null);
   const [scheduleFlipModalOpen, setScheduleFlipModalOpen] = useState(false);
   const [scheduleFlipModalFace, setScheduleFlipModalFace] = useState<ScheduleFlipFace>("shift");
   const [mergedShipmentSchedule, setMergedShipmentSchedule] = useState<{
@@ -759,6 +780,13 @@ export default function DocumentAnalysisAgent() {
   const [detailedDiff, setDetailedDiff] = useState<DetailedComparisonNotice | null>(null);
   const [schedulePruneNotice, setSchedulePruneNotice] = useState<string | null>(null);
   const [detailedPruneNotice, setDetailedPruneNotice] = useState<string | null>(null);
+  const [russiaShipmentSource, setRussiaShipmentSource] = useState<RussiaShipmentSource | null>(null);
+  const [russiaShipmentSourceLoading, setRussiaShipmentSourceLoading] = useState(false);
+  const [russiaShipmentUploadLoading, setRussiaShipmentUploadLoading] = useState(false);
+  const [shipmentSourceError, setShipmentSourceError] = useState<string | null>(null);
+  const [shipmentManualChangeNotices, setShipmentManualChangeNotices] = useState<
+    ShipmentManualChangeNotice[]
+  >([]);
   const [selectedRiskStageKey, setSelectedRiskStageKey] = useState("");
   const [riskItemFilter, setRiskItemFilter] = useState<RiskItemFilter>("all");
   const [flippedRiskTile, setFlippedRiskTile] = useState<RiskItemFilter | null>(null);
@@ -770,6 +798,13 @@ export default function DocumentAnalysisAgent() {
   );
   const [managerCompletionDashboard, setManagerCompletionDashboard] =
     useState<ManagerCompletionDashboard | null>(null);
+  const [managerReportDate, setManagerReportDate] = useState(() => todayMskIso());
+  const [managerCompletionToday, setManagerCompletionToday] = useState(() => todayMskIso());
+  const [managerCompletionDates, setManagerCompletionDates] = useState<ManagerCompletionDateEntry[]>(
+    []
+  );
+  const [managerCompletionLoading, setManagerCompletionLoading] = useState(false);
+  const [managerCompletionError, setManagerCompletionError] = useState<string | null>(null);
   const [riskPointsOpen, setRiskPointsOpen] = useState(false);
   const riskStageContentRef = useRef<HTMLDivElement>(null);
   const lastRealStageKeyRef = useRef("");
@@ -779,6 +814,7 @@ export default function DocumentAnalysisAgent() {
   const [rolesSource, setRolesSource] = useState<string | null>(null);
   const [isClassifyingRoles, setIsClassifyingRoles] = useState(false);
   const [isMergingShipments, setIsMergingShipments] = useState(false);
+  const [mergedShipmentPreviewLoading, setMergedShipmentPreviewLoading] = useState(false);
   const [isPruningSchedules, setIsPruningSchedules] = useState(false);
   const [isPruningDetailedSchedules, setIsPruningDetailedSchedules] = useState(false);
   const [onecManualSyncLoading, setOnecManualSyncLoading] = useState(false);
@@ -786,6 +822,7 @@ export default function DocumentAnalysisAgent() {
   const [googleSheetsProbeLoading, setGoogleSheetsProbeLoading] = useState(false);
   const [googleSheetsModalOpen, setGoogleSheetsModalOpen] = useState(false);
   const [googleSheetsError, setGoogleSheetsError] = useState<string | null>(null);
+  const [googleSheetsConfigured, setGoogleSheetsConfigured] = useState<boolean | null>(null);
   const [googleSheetsTitle, setGoogleSheetsTitle] = useState("ИТЦ В РАБОТЕ");
   const [googleSheetsSpreadsheetTitle, setGoogleSheetsSpreadsheetTitle] = useState<string | null>(null);
   const [googleSheetsValues, setGoogleSheetsValues] = useState<string[][]>([]);
@@ -795,12 +832,14 @@ export default function DocumentAnalysisAgent() {
   const [mergeSourceNames, setMergeSourceNames] = useState<string[]>([]);
   const lastShipmentMergeKeyRef = useRef("");
   const mergedShipmentHydratedKeyRef = useRef("");
+  const mergedShipmentPreviewInFlightRef = useRef(false);
   const appliedShipmentDateChangeRef = useRef<Set<string>>(new Set());
   const mergeInFlightRef = useRef(false);
   const lastSchedulePruneKeyRef = useRef("");
   const schedulePruneInFlightRef = useRef(false);
   const lastDetailedPruneKeyRef = useRef("");
   const detailedPruneInFlightRef = useRef(false);
+  const russiaShipmentInputRef = useRef<HTMLInputElement>(null);
   const [checklistFace, setChecklistFace] = useState<ChecklistPanelFace>("files");
   const stagesSectionRef = useRef<HTMLDivElement>(null);
   const classifyRequestIdRef = useRef(0);
@@ -812,6 +851,51 @@ export default function DocumentAnalysisAgent() {
   isAnalyzingRef.current = isAnalyzing;
   const { user } = useAuth();
   const managerScope = useMemo(() => resolveShiftManagerScope(user), [user]);
+
+  const refreshShipmentSources = useCallback(async () => {
+    setRussiaShipmentSourceLoading(true);
+    setShipmentSourceError(null);
+    const [russiaResult, googleResult] = await Promise.allSettled([
+      agentsApi.getCurrentRussiaShipmentSchedule(),
+      agentsApi.getAveonGoogleSheetsStatus()
+    ]);
+
+    if (russiaResult.status === "fulfilled") {
+      setRussiaShipmentSource(russiaResult.value.schedule);
+    } else {
+      setRussiaShipmentSource(null);
+    }
+
+    if (googleResult.status === "fulfilled") {
+      setGoogleSheetsConfigured(Boolean(googleResult.value.configured));
+    } else {
+      setGoogleSheetsConfigured(null);
+    }
+
+    const errors: string[] = [];
+    if (russiaResult.status === "rejected") {
+      errors.push(
+        extractAnalyzeError(russiaResult.reason) || "Не удалось проверить график России в БД"
+      );
+    } else if (!russiaResult.value.schedule) {
+      errors.push("Российский график отгрузок не загружен в БД");
+    }
+
+    if (googleResult.status === "rejected") {
+      errors.push(
+        extractAnalyzeError(googleResult.reason) || "Не удалось проверить Google Sheets"
+      );
+    } else if (!googleResult.value.configured) {
+      errors.push("Google Sheets для графика Китая не настроен");
+    }
+
+    setShipmentSourceError(errors.length ? errors.join(" · ") : null);
+    setRussiaShipmentSourceLoading(false);
+  }, []);
+
+  useEffect(() => {
+    void refreshShipmentSources();
+  }, [refreshShipmentSources]);
 
   const visibleShiftAssignment = useMemo(() => {
     if (!shiftAssignment) return null;
@@ -825,26 +909,101 @@ export default function DocumentAnalysisAgent() {
     return applyShiftManagerScopeToAssignment(taskBoard, managerScope);
   }, [taskBoard, managerScope]);
 
+  const loadManagerCompletionDates = useCallback(async () => {
+    try {
+      const payload = await agentsApi.getShiftCompletionDates();
+      setManagerCompletionDates(payload.dates);
+      setManagerCompletionToday(payload.today || todayMskIso());
+    } catch {
+      setManagerCompletionDates([]);
+    }
+  }, []);
+
+  const loadManagerCompletionDashboard = useCallback(async (reportDate: string) => {
+    setManagerCompletionLoading(true);
+    setManagerCompletionError(null);
+    try {
+      const dashboard = await agentsApi.getShiftCompletionDashboard({ reportDate });
+      setManagerCompletionDashboard(dashboard);
+    } catch {
+      setManagerCompletionDashboard(null);
+      setManagerCompletionError("Не удалось загрузить аналитику за выбранную дату.");
+    } finally {
+      setManagerCompletionLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    let cancelled = false;
     if (managerScope) {
       setManagerCompletionDashboard(null);
-      return () => {
-        cancelled = true;
-      };
+      setManagerCompletionDates([]);
+      setManagerCompletionError(null);
+      setManagerCompletionLoading(false);
+      return;
     }
-    void agentsApi
-      .getShiftCompletionDashboard()
-      .then((dashboard) => {
-        if (!cancelled) setManagerCompletionDashboard(dashboard);
-      })
-      .catch(() => {
-        if (!cancelled) setManagerCompletionDashboard(null);
-      });
-    return () => {
-      cancelled = true;
+    void loadManagerCompletionDates();
+  }, [managerScope, loadManagerCompletionDates]);
+
+  useEffect(() => {
+    if (managerScope) return;
+    void loadManagerCompletionDashboard(managerReportDate);
+  }, [managerScope, managerReportDate, loadManagerCompletionDashboard]);
+
+  useEffect(() => {
+    if (managerScope) return;
+    if (managerReportDate !== managerCompletionToday) return;
+    if (!managerCompletionDashboard?.liveMode) return;
+
+    const timer = window.setInterval(() => {
+      void loadManagerCompletionDashboard(managerReportDate);
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [
+    managerScope,
+    managerReportDate,
+    managerCompletionToday,
+    managerCompletionDashboard?.liveMode,
+    loadManagerCompletionDashboard
+  ]);
+
+  const managerTasksNotice = useMemo(() => {
+    if (!shiftDayExpired) return null;
+    return {
+      kind: "new_day" as const,
+      previousValidDate: shiftPreviousValidDate,
+      today: todayMskIso()
     };
-  }, [managerScope]);
+  }, [shiftDayExpired, shiftPreviousValidDate]);
+
+  const managerResultsBundle = useMemo<ManagerResultsBundle | null>(() => {
+    if (managerScope) return null;
+    return {
+      dashboard: managerCompletionDashboard,
+      selectedDate: managerReportDate,
+      availableDates: managerCompletionDates,
+      today: managerCompletionToday,
+      loading: managerCompletionLoading,
+      error: managerCompletionError,
+      onDateChange: setManagerReportDate,
+      onRetry: () => {
+        void loadManagerCompletionDashboard(managerReportDate);
+      },
+      onRefresh: () => {
+        void loadManagerCompletionDates();
+        void loadManagerCompletionDashboard(managerReportDate);
+      }
+    };
+  }, [
+    managerScope,
+    managerCompletionDashboard,
+    managerReportDate,
+    managerCompletionDates,
+    managerCompletionToday,
+    managerCompletionLoading,
+    managerCompletionError,
+    loadManagerCompletionDashboard,
+    loadManagerCompletionDates
+  ]);
 
   const acceptedHint = useMemo(
     () => documentAnalysisAcceptedExtensions.map((ext) => ext.replace(".", "").toUpperCase()).join(", "),
@@ -876,11 +1035,23 @@ export default function DocumentAnalysisAgent() {
     [presentRequiredRoles]
   );
 
+  const shipmentSourcesReady = Boolean(russiaShipmentSource) && googleSheetsConfigured !== false;
+
+  const showShipmentSourcesPanel = useMemo(
+    () =>
+      russiaShipmentSourceLoading ||
+      !russiaShipmentSource ||
+      googleSheetsConfigured === false ||
+      Boolean(shipmentSourceError),
+    [russiaShipmentSourceLoading, russiaShipmentSource, googleSheetsConfigured, shipmentSourceError]
+  );
+
   const requiredFilesValid =
     rolesSettled &&
     !isMergingShipments &&
     !isPruningSchedules &&
     !isPruningDetailedSchedules &&
+    shipmentSourcesReady &&
     missingRequiredRoles.length === 0;
 
   const requiredFileRowStates = useMemo((): Record<string, RequiredFileRowState> => {
@@ -909,6 +1080,7 @@ export default function DocumentAnalysisAgent() {
   useEffect(() => {
     let cancelled = false;
     progressSkipSaveRef.current = true;
+    setIsLoadingLatestDashboard(true);
     void agentsApi
       .getAveonDashboardLatest()
       .then((snapshot) => {
@@ -916,6 +1088,38 @@ export default function DocumentAnalysisAgent() {
         setLogisticsRisks(snapshot.logisticsRisks);
         setCoverageDashboard(parseCoverageDashboard(snapshot.coverageDashboard));
         setLastAnalysisAt(formatAnalysisTimestamp(snapshot.analyzedAt));
+        setShiftDayExpired(Boolean(snapshot.shiftDayExpired));
+        setShiftPreviousValidDate(snapshot.shiftPreviousValidDate ?? null);
+        const dashboardDate =
+          snapshot.dashboardDateMsk ??
+          (typeof snapshot.coverageDashboard === "object" &&
+          snapshot.coverageDashboard &&
+          "asOf" in snapshot.coverageDashboard
+            ? String((snapshot.coverageDashboard as { asOf?: string }).asOf ?? "").slice(0, 10)
+            : null) ??
+          snapshot.logisticsRisks.asOf?.slice(0, 10) ??
+          snapshot.analyzedAt.slice(0, 10);
+        if (
+          dashboardDate &&
+          snapshot.shiftTodayMsk &&
+          dashboardDate !== snapshot.shiftTodayMsk
+        ) {
+          const reason = snapshot.autoRefreshError ? ` Причина: ${snapshot.autoRefreshError}` : "";
+          setDashboardRefreshWarning(
+            `Не удалось обновить дашборды на сегодня, показан последний сохранённый анализ.${reason}`
+          );
+        } else if (
+          snapshot.autoRefreshStatus === "missing_inputs" ||
+          snapshot.autoRefreshStatus === "missing_detailed_schedule" ||
+          snapshot.autoRefreshStatus === "error"
+        ) {
+          const reason = snapshot.autoRefreshError ? ` Причина: ${snapshot.autoRefreshError}` : "";
+          setDashboardRefreshWarning(
+            `Не удалось обновить дашборды на сегодня, показан последний сохранённый анализ.${reason}`
+          );
+        } else {
+          setDashboardRefreshWarning(null);
+        }
 
         if (snapshot.taskDashboard) {
           const board = {
@@ -941,6 +1145,11 @@ export default function DocumentAnalysisAgent() {
           }
           setShiftResultEvals(savedEvals);
           setRiskDashboardOpen(true);
+        } else {
+          setTaskBoard(null);
+          setShiftAssignment(null);
+          setShiftResultTexts({});
+          setShiftResultEvals({});
         }
 
         if (snapshot.shiftAssignment && snapshot.taskDashboard) {
@@ -970,6 +1179,7 @@ export default function DocumentAnalysisAgent() {
       })
       .finally(() => {
         if (cancelled) return;
+        setIsLoadingLatestDashboard(false);
         window.setTimeout(() => {
           progressSkipSaveRef.current = false;
         }, 1000);
@@ -993,11 +1203,6 @@ export default function DocumentAnalysisAgent() {
     }, 800);
     return () => window.clearTimeout(timer);
   }, [taskBoard, shiftResultTexts, shiftResultEvals]);
-
-  const openScheduleFlipModal = useCallback((face: ScheduleFlipFace) => {
-    setScheduleFlipModalFace(face);
-    setScheduleFlipModalOpen(true);
-  }, []);
 
   const closeScheduleFlipModal = useCallback(() => {
     setScheduleFlipModalOpen(false);
@@ -1043,10 +1248,81 @@ export default function DocumentAnalysisAgent() {
     []
   );
 
+  const ensureMergedShipmentPreview = useCallback(async () => {
+    if (mergedShipmentPreviewInFlightRef.current) return;
+    if ((mergedShipmentSchedule?.values?.length ?? 0) > 1) return;
+
+    const mergedItem = stagedFilesRef.current.find(
+      (item) => item.role === "shipment_schedule" && item.isMergedShipment
+    );
+    if (!mergedItem) return;
+
+    mergedShipmentPreviewInFlightRef.current = true;
+    setMergedShipmentPreviewLoading(true);
+    try {
+      const previewPromise = agentsApi.previewShipmentSchedule(mergedItem.file);
+      const base64Promise = mergedShipmentSchedule?.fileBase64
+        ? Promise.resolve(mergedShipmentSchedule.fileBase64)
+        : fileToBase64(mergedItem.file);
+      const [preview, fileBase64] = await Promise.all([previewPromise, base64Promise]);
+      void persistMergedShipmentSchedule({
+        fileName: preview.file_name || mergedItem.file.name,
+        fileBase64,
+        values: preview.preview_values ?? [],
+        stats: mergedShipmentSchedule?.stats ?? {
+          nomenclature_total: Math.max((preview.preview_values ?? []).length - 1, 0)
+        },
+        sourceCount: mergedItem.mergedSourceCount ?? mergedShipmentSchedule?.sourceCount ?? 0,
+        changedCells: mergedShipmentSchedule?.changedCells ?? []
+      });
+    } catch (caughtError) {
+      console.error("Не удалось загрузить preview графика отгрузок:", caughtError);
+    } finally {
+      mergedShipmentPreviewInFlightRef.current = false;
+      setMergedShipmentPreviewLoading(false);
+    }
+  }, [mergedShipmentSchedule, persistMergedShipmentSchedule]);
+
+  const openScheduleFlipModal = useCallback(
+    (face: ScheduleFlipFace) => {
+      setScheduleFlipModalFace(face);
+      setScheduleFlipModalOpen(true);
+      if (face === "shipment") {
+        void ensureMergedShipmentPreview();
+      }
+    },
+    [ensureMergedShipmentPreview]
+  );
+
+  const pushShipmentManualNotice = useCallback(
+    (notice: Omit<ShipmentManualChangeNotice, "id">) => {
+      const message = notice.message.trim();
+      if (!message) return;
+      setShipmentManualChangeNotices((current) => {
+        const exists = current.some(
+          (item) =>
+            item.message === message &&
+            (item.nomenclature || "") === (notice.nomenclature || "")
+        );
+        if (exists) return current;
+        return [
+          {
+            ...notice,
+            message,
+            id: `${Date.now()}-${current.length}`,
+          },
+          ...current,
+        ].slice(0, 8);
+      });
+    },
+    []
+  );
+
   const handleManagerResultEvaluated = useCallback(
     async (
       context: { taskType: string; problem: string; solution: string; nomenclature: string },
-      managerResult: string
+      managerResult: string,
+      taskKey?: string
     ) => {
       if (!mergedShipmentSchedule?.fileBase64) return;
       const changeKey = [
@@ -1064,13 +1340,23 @@ export default function DocumentAnalysisAgent() {
           problem: context.problem,
           solution: context.solution,
           nomenclature: context.nomenclature,
-          managerResult
+          managerResult,
+          taskKey: taskKey ?? changeKey,
+          managerName: user?.full_name || user?.email || null
         });
+        if (response.manual_action_required) {
+          pushShipmentManualNotice({
+            message: response.message,
+            nomenclature: response.change?.nomenclature ?? context.nomenclature,
+            country: response.country,
+            changedCells: response.changed_cells ?? []
+          });
+        }
         if (!response.applied || !response.file_base64 || !response.preview_values) {
           console.info("[Aveon] дата графика отгрузок не изменена:", response.message);
           return;
         }
-        await persistMergedShipmentSchedule({
+        const nextSchedule = {
           fileName: response.file_name || mergedShipmentSchedule.fileName,
           fileBase64: response.file_base64,
           values: response.preview_values,
@@ -1080,7 +1366,12 @@ export default function DocumentAnalysisAgent() {
             ...(mergedShipmentSchedule.changedCells ?? []),
             ...(response.changed_cells ?? [])
           ]
-        });
+        };
+        if (response.manual_action_required) {
+          setMergedShipmentSchedule(nextSchedule);
+        } else {
+          await persistMergedShipmentSchedule(nextSchedule);
+        }
         const nextFileName = response.file_name || mergedShipmentSchedule.fileName;
         const nextFile = fileFromBase64(response.file_base64, nextFileName);
         mergedShipmentHydratedKeyRef.current = `${nextFile.name}:${nextFile.size}:${nextFile.lastModified}`;
@@ -1101,7 +1392,13 @@ export default function DocumentAnalysisAgent() {
         console.warn("Не удалось применить изменение даты в графике отгрузок:", caughtError);
       }
     },
-    [mergedShipmentSchedule, persistMergedShipmentSchedule]
+    [
+      mergedShipmentSchedule,
+      persistMergedShipmentSchedule,
+      pushShipmentManualNotice,
+      user?.email,
+      user?.full_name,
+    ]
   );
 
   const scheduleFlipShiftProps = useMemo(
@@ -1120,6 +1417,7 @@ export default function DocumentAnalysisAgent() {
             resultEvals: shiftResultEvals,
             onResultEvalsChange: setShiftResultEvals,
             onManagerResultEvaluated: handleManagerResultEvaluated,
+            manualShipmentNotices: shipmentManualChangeNotices,
             onExport: exportVisibleShiftAssignment,
           }
         : null,
@@ -1128,24 +1426,47 @@ export default function DocumentAnalysisAgent() {
       shiftResultTexts,
       shiftResultEvals,
       handleManagerResultEvaluated,
+      shipmentManualChangeNotices,
       exportVisibleShiftAssignment,
     ]
   );
 
+  const stagedMergedShipment = useMemo(
+    () => stagedFiles.find((item) => item.role === "shipment_schedule" && item.isMergedShipment),
+    [stagedFiles]
+  );
+
+  const shipmentScheduleAvailable = Boolean(
+    mergedShipmentSchedule || stagedMergedShipment || isMergingShipments
+  );
+
   const scheduleFlipShipmentProps = useMemo(
-    () =>
-      mergedShipmentSchedule
-        ? {
-            values: mergedShipmentSchedule.values,
-            fileName: mergedShipmentSchedule.fileName,
-            fileBase64: mergedShipmentSchedule.fileBase64,
-            stats: mergedShipmentSchedule.stats,
-            sourceCount: mergedShipmentSchedule.sourceCount,
-            changedCells: mergedShipmentSchedule.changedCells,
-            onExport: exportMergedShipmentSchedule,
-          }
-        : null,
-    [mergedShipmentSchedule, exportMergedShipmentSchedule]
+    () => {
+      if (!shipmentScheduleAvailable) return null;
+
+      const schedule = mergedShipmentSchedule;
+      const hasPreviewRows = (schedule?.values?.length ?? 0) > 1;
+
+      return {
+        loading: isMergingShipments || mergedShipmentPreviewLoading || !hasPreviewRows,
+        error: null,
+        values: schedule?.values ?? [],
+        fileName: schedule?.fileName ?? stagedMergedShipment?.file.name ?? "merged_shipment.xlsx",
+        fileBase64: schedule?.fileBase64 ?? "",
+        stats: schedule?.stats ?? null,
+        sourceCount: schedule?.sourceCount ?? stagedMergedShipment?.mergedSourceCount,
+        changedCells: schedule?.changedCells ?? [],
+        onExport: exportMergedShipmentSchedule
+      };
+    },
+    [
+      shipmentScheduleAvailable,
+      mergedShipmentSchedule,
+      stagedMergedShipment,
+      isMergingShipments,
+      mergedShipmentPreviewLoading,
+      exportMergedShipmentSchedule
+    ]
   );
 
   const handleOnecManualSync = useCallback(async () => {
@@ -1212,6 +1533,26 @@ export default function DocumentAnalysisAgent() {
       setGoogleSheetsProbeLoading(false);
     }
   }, []);
+
+  const handleRussiaShipmentUpload = useCallback(async (file: File | null | undefined) => {
+    if (!file) return;
+    setRussiaShipmentUploadLoading(true);
+    setShipmentSourceError(null);
+    try {
+      const result = await agentsApi.uploadRussiaShipmentSchedule(file);
+      setRussiaShipmentSource(result.schedule);
+      setMergedShipmentSchedule(null);
+      setShipmentManualChangeNotices([]);
+      await refreshShipmentSources();
+    } catch (caughtError) {
+      setShipmentSourceError(extractAnalyzeError(caughtError) || "Не удалось загрузить российский график");
+    } finally {
+      setRussiaShipmentUploadLoading(false);
+      if (russiaShipmentInputRef.current) {
+        russiaShipmentInputRef.current.value = "";
+      }
+    }
+  }, [refreshShipmentSources]);
 
   const addFiles = useCallback((files: FileList | File[]) => {
     if (isAnalyzingRef.current) return;
@@ -1467,17 +1808,17 @@ export default function DocumentAnalysisAgent() {
           }
         }
         mergedShipmentHydratedKeyRef.current = `${merged.file.name}:${merged.file.size}:${merged.file.lastModified}`;
-        await persistMergedShipmentSchedule({
+        setStagedFiles((current) => [
+          ...current.filter((item) => item.role !== "shipment_schedule" || item.isMergedShipment),
+          merged
+        ]);
+        void persistMergedShipmentSchedule({
           fileName: result.file_name,
           fileBase64: result.file_base64,
           values: previewValues,
           stats: (result.stats as MergedShipmentStats | undefined) ?? null,
           sourceCount: shipmentItems.length
         });
-        setStagedFiles((current) => [
-          ...current.filter((item) => item.role !== "shipment_schedule" || item.isMergedShipment),
-          merged
-        ]);
         setError(null);
       } catch (caughtError) {
         console.error("Ошибка объединения графиков отгрузок:", caughtError);
@@ -1514,6 +1855,10 @@ export default function DocumentAnalysisAgent() {
     if (mergedShipmentHydratedKeyRef.current === hydrateKey) {
       return;
     }
+    if ((mergedShipmentSchedule?.values?.length ?? 0) > 1) {
+      mergedShipmentHydratedKeyRef.current = hydrateKey;
+      return;
+    }
     mergedShipmentHydratedKeyRef.current = hydrateKey;
 
     void (async () => {
@@ -1522,7 +1867,7 @@ export default function DocumentAnalysisAgent() {
           fileToBase64(mergedItem.file),
           agentsApi.previewShipmentSchedule(mergedItem.file)
         ]);
-        await persistMergedShipmentSchedule({
+        void persistMergedShipmentSchedule({
           fileName: preview.file_name || mergedItem.file.name,
           fileBase64,
           values: preview.preview_values ?? [],
@@ -1536,7 +1881,13 @@ export default function DocumentAnalysisAgent() {
         mergedShipmentHydratedKeyRef.current = "";
       }
     })();
-  }, [rolesSettled, isClassifyingRoles, filesFingerprint, persistMergedShipmentSchedule]);
+  }, [
+    rolesSettled,
+    isClassifyingRoles,
+    filesFingerprint,
+    mergedShipmentSchedule?.values?.length,
+    persistMergedShipmentSchedule
+  ]);
 
   useEffect(() => {
     if (!rolesSettled || isClassifyingRoles || isAnalyzingRef.current) {
@@ -1662,6 +2013,7 @@ export default function DocumentAnalysisAgent() {
     setChecklistFace("stages");
     setIsAnalyzing(true);
     setError(null);
+    setDashboardRefreshWarning(null);
     setScheduleDiff(null);
     setDetailedDiff(null);
     setShiftAssignment(null);
@@ -1680,7 +2032,10 @@ export default function DocumentAnalysisAgent() {
     }, 1200);
 
     try {
-      const result = await agentsApi.analyzeAveonExcel(stagedFiles.map((item) => item.file));
+      const analysisFiles = stagedFiles
+        .filter((item) => item.role !== "shipment_schedule")
+        .map((item) => item.file);
+      const result = await agentsApi.analyzeAveonExcel(analysisFiles);
 
       window.clearInterval(stageTimer);
       setActiveStageIndex(analysisStages.length - 1);
@@ -1781,6 +2136,8 @@ export default function DocumentAnalysisAgent() {
           rowKinds: result.shiftAssignmentRowKinds ?? [],
           meta: result.shiftAssignmentMeta
         };
+        setShiftDayExpired(false);
+        setShiftPreviousValidDate(null);
         setTaskBoard(board);
         const header = board.values[0] ?? [];
         setShiftResultTexts(
@@ -1875,6 +2232,21 @@ export default function DocumentAnalysisAgent() {
       setLastAnalysisAt(
         formatAnalysisTimestamp(result.dashboardAnalyzedAt ?? null)
       );
+      try {
+        const snapshot = await agentsApi.getAveonDashboardLatest();
+        if (snapshot?.mergedShipmentSchedule) {
+          setMergedShipmentSchedule({
+            fileName: snapshot.mergedShipmentSchedule.fileName,
+            fileBase64: snapshot.mergedShipmentSchedule.fileBase64,
+            values: snapshot.mergedShipmentSchedule.values,
+            stats: snapshot.mergedShipmentSchedule.stats,
+            sourceCount: snapshot.mergedShipmentSchedule.sourceCount,
+            changedCells: snapshot.mergedShipmentSchedule.changedCells
+          });
+        }
+      } catch {
+        // merged schedule optional for UI
+      }
       logAveonScheduleSnapshotStatus();
     } catch (caughtError) {
       setError(extractAnalyzeError(caughtError) || "Не удалось выполнить анализ");
@@ -2178,13 +2550,23 @@ export default function DocumentAnalysisAgent() {
         </span>
       );
     }
+    if (!shipmentSourcesReady) {
+      return (
+        <span className={`${styles.statusBadge} ${styles.statusBadgeDanger}`}>
+          Нет источника графика
+        </span>
+      );
+    }
     return (
       <span className={`${styles.statusBadge} ${styles.statusBadgeSuccess}`}>Готов к анализу</span>
     );
   })();
 
   return (
-    <div className={`${styles.page} ${stagesOverlayOpen ? styles.pageStagesOverlayOpen : ""}`}>
+    <div
+      data-avion-agent
+      className={`${styles.page} ${stagesOverlayOpen ? styles.pageStagesOverlayOpen : ""}`}
+    >
       <Link to="/agents" className={styles.backLink}>
         <ArrowLeft size={16} strokeWidth={2.1} aria-hidden="true" />
         К каталогу агентов
@@ -2205,9 +2587,62 @@ export default function DocumentAnalysisAgent() {
             <h2 className={styles.panelTitle}>Файлы для анализа</h2>
             <p className={styles.panelHint}>
               Перетащите документы в область ниже или выберите их вручную. Поддерживаются {acceptedHint}.
-              При нескольких графиках производства остаются две последние версии — после анализа покажем расхождения планов.
+              График отгрузок вручную не загружается: Россия берётся из БД, Китай — из актуального Google Sheets.
             </p>
           </div>
+
+          {showShipmentSourcesPanel ? (
+          <div className={styles.requiredFiles}>
+            <div className={`${styles.stageRow} ${russiaShipmentSource ? styles.stageRowReady : styles.stageRowMissing}`}>
+              <span className={styles.stageDot}>БД</span>
+              <span className={styles.requiredFileRowText}>
+                <span className={styles.requiredFileRowLabel}>График Россия</span>
+                <span className={styles.requiredFileRowHint}>
+                  {russiaShipmentSourceLoading
+                    ? "Проверяем активную версию…"
+                    : russiaShipmentSource
+                      ? `Активна версия ${russiaShipmentSource.file_name}`
+                      : "Активная версия не загружена"}
+                </span>
+              </span>
+            </div>
+            <div className={`${styles.stageRow} ${googleSheetsConfigured === false ? styles.stageRowMissing : styles.stageRowReady}`}>
+              <span className={styles.stageDot}>GS</span>
+              <span className={styles.requiredFileRowText}>
+                <span className={styles.requiredFileRowLabel}>График Китай</span>
+                <span className={styles.requiredFileRowHint}>
+                  {googleSheetsConfigured === false
+                    ? "Google Sheets не настроен"
+                    : "Берётся из текущего листа «ИТЦ В РАБОТЕ»"}
+                </span>
+              </span>
+            </div>
+            {shipmentSourceError ? (
+              <p className={styles.errorText}>{shipmentSourceError}</p>
+            ) : null}
+            {user?.is_superuser ? (
+              <div className={styles.uploadActions}>
+                <input
+                  ref={russiaShipmentInputRef}
+                  type="file"
+                  accept=".xlsx,.xlsm"
+                  hidden
+                  onChange={(event) => {
+                    void handleRussiaShipmentUpload(event.target.files?.[0]);
+                  }}
+                />
+                <button
+                  type="button"
+                  className={styles.secondaryButton}
+                  disabled={russiaShipmentUploadLoading}
+                  onClick={() => russiaShipmentInputRef.current?.click()}
+                >
+                  {russiaShipmentUploadLoading ? "Загружаем график…" : "Загрузить график России в БД"}
+                </button>
+              </div>
+            ) : null}
+          </div>
+          ) : null}
 
           <div
             className={`${styles.dropZone} ${isDragOver ? styles.dropZoneDragOver : ""} ${
@@ -2265,6 +2700,8 @@ export default function DocumentAnalysisAgent() {
                   ? "Загрузите обязательные файлы"
                   : isMergingShipments
                     ? "Дождитесь объединения графиков отгрузок"
+                    : !shipmentSourcesReady
+                      ? "Проверьте источники графика отгрузок: Россия в БД и Google Sheets Китай"
                     : !rolesSettled
                       ? "Дождитесь определения ролей"
                       : !requiredFilesValid
@@ -2334,7 +2771,30 @@ export default function DocumentAnalysisAgent() {
               {detailedPruneNotice}
             </p>
           ) : null}
+          {shipmentManualChangeNotices.length ? (
+            <div className={styles.scheduleDiffBlock} role="status">
+              {shipmentManualChangeNotices.map((notice) => (
+                <div key={notice.id} className={styles.scheduleDiffNotice}>
+                  <AlertTriangle size={18} aria-hidden />
+                  <div className={styles.scheduleDiffNoticeText}>
+                    <strong>Нужно обновить Google форму</strong>
+                    <span>{notice.message}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : null}
 
+          {isLoadingLatestDashboard ? (
+            <p className={styles.rolesHint} role="status">
+              Проверяем сохранённые дашборды и при необходимости обновляем на сегодня…
+            </p>
+          ) : null}
+          {dashboardRefreshWarning ? (
+            <p className={styles.errorText} role="alert">
+              {dashboardRefreshWarning}
+            </p>
+          ) : null}
           {error ? (
             <p className={styles.errorText} role="alert">
               {error}
@@ -2466,23 +2926,30 @@ export default function DocumentAnalysisAgent() {
         <aside className={styles.panel} aria-label="Сводка агента">
           <h2 className={styles.panelTitle}>Сводка</h2>
 
-          <div className={styles.summaryBlock}>
-            <h3 className={styles.summaryBlockTitle}>Текущая сессия</h3>
-            <div className={styles.summaryRows}>
-              <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>Файлов в очереди</span>
-                <span className={styles.summaryValue}>{stagedFiles.length}</span>
-              </div>
-              <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>Общий объём</span>
-                <span className={styles.summaryValue}>
+          <div className={styles.stagePanel} aria-label="Текущая сессия">
+            <h3 className={styles.stagePanelTitle}>Текущая сессия</h3>
+            <div className={styles.stageRow}>
+              <span className={styles.stageDot}>1</span>
+              <span className={styles.requiredFileRowText}>
+                <span className={styles.requiredFileRowLabel}>Файлов в очереди</span>
+                <span className={styles.requiredFileRowHint}>{stagedFiles.length}</span>
+              </span>
+            </div>
+            <div className={styles.stageRow}>
+              <span className={styles.stageDot}>2</span>
+              <span className={styles.requiredFileRowText}>
+                <span className={styles.requiredFileRowLabel}>Общий объём</span>
+                <span className={styles.requiredFileRowHint}>
                   {formatBytes(stagedFiles.reduce((sum, item) => sum + item.file.size, 0))}
                 </span>
-              </div>
-              <div className={styles.summaryRow}>
-                <span className={styles.summaryLabel}>Последний запрос</span>
-                <span className={styles.summaryValue}>{lastAnalysisAt ?? "—"}</span>
-              </div>
+              </span>
+            </div>
+            <div className={styles.stageRow}>
+              <span className={styles.stageDot}>3</span>
+              <span className={styles.requiredFileRowText}>
+                <span className={styles.requiredFileRowLabel}>Последний запрос</span>
+                <span className={styles.requiredFileRowHint}>{lastAnalysisAt ?? "—"}</span>
+              </span>
             </div>
           </div>
 
@@ -2697,7 +3164,7 @@ export default function DocumentAnalysisAgent() {
             </div>
           ) : null}
 
-          {mergedShipmentSchedule ? (
+          {shipmentScheduleAvailable ? (
             <div className={styles.shiftAssignmentBlock}>
               <button
                 type="button"
@@ -2710,14 +3177,33 @@ export default function DocumentAnalysisAgent() {
                     График получения комплектующих
                   </span>
                   <span className={styles.shiftAssignmentButtonMeta}>
-                    объединённый ·{" "}
-                    {mergedShipmentSchedule.stats?.nomenclature_total ??
-                      Math.max(mergedShipmentSchedule.values.length - 1, 0)}{" "}
-                    номенклатур
+                    {isMergingShipments
+                      ? "объединение файлов…"
+                      : mergedShipmentPreviewLoading
+                        ? "загрузка таблицы…"
+                        : mergedShipmentSchedule?.stats?.nomenclature_total != null
+                          ? `объединённый · ${mergedShipmentSchedule.stats.nomenclature_total} номенклатур`
+                          : mergedShipmentSchedule?.values?.length
+                            ? `объединённый · ${Math.max(mergedShipmentSchedule.values.length - 1, 0)} номенклатур`
+                            : "объединённый · открыть таблицу"}
                   </span>
                 </span>
                 <ChevronRight size={18} aria-hidden />
               </button>
+            </div>
+          ) : null}
+
+          {shipmentManualChangeNotices.length ? (
+            <div className={styles.scheduleDiffBlock} role="alert">
+              {shipmentManualChangeNotices.map((notice) => (
+                <div key={notice.id} className={styles.scheduleDiffNotice}>
+                  <AlertTriangle size={18} aria-hidden />
+                  <div className={styles.scheduleDiffNoticeText}>
+                    <strong>Измените Google форму по Китаю</strong>
+                    <span>{notice.message}</span>
+                  </div>
+                </div>
+              ))}
             </div>
           ) : null}
 
@@ -2846,6 +3332,7 @@ export default function DocumentAnalysisAgent() {
                   onResultTextsChange: setShiftResultTexts,
                   onResultEvalsChange: setShiftResultEvals,
                   onManagerResultEvaluated: handleManagerResultEvaluated,
+                  manualShipmentNotices: shipmentManualChangeNotices,
                   dashboardOpen: riskDashboardOpen,
                   tasksOpen: riskPointsOpen,
                   onDashboardOpenChange: setRiskDashboardOpen,
@@ -2853,13 +3340,14 @@ export default function DocumentAnalysisAgent() {
                   onOpenShiftModal: visibleShiftAssignment
                     ? () => openScheduleFlipModal("shift")
                     : undefined,
-                  onOpenShipmentModal: mergedShipmentSchedule
+                  onOpenShipmentModal: shipmentScheduleAvailable
                     ? () => openScheduleFlipModal("shipment")
                     : undefined
                 }
               : null
           }
-          managerResults={!managerScope ? managerCompletionDashboard : null}
+          managerTasksNotice={managerScope ? managerTasksNotice : null}
+          managerResults={managerResultsBundle}
         />
       ) : null}
 
@@ -2874,6 +3362,7 @@ export default function DocumentAnalysisAgent() {
           onResultTextsChange={setShiftResultTexts}
           onResultEvalsChange={setShiftResultEvals}
           onManagerResultEvaluated={handleManagerResultEvaluated}
+          manualShipmentNotices={shipmentManualChangeNotices}
           dashboardOpen={riskDashboardOpen}
           tasksOpen={riskPointsOpen}
           onDashboardOpenChange={setRiskDashboardOpen}
@@ -2882,9 +3371,17 @@ export default function DocumentAnalysisAgent() {
             visibleShiftAssignment ? () => openScheduleFlipModal("shift") : undefined
           }
           onOpenShipmentModal={
-            mergedShipmentSchedule ? () => openScheduleFlipModal("shipment") : undefined
+            shipmentScheduleAvailable ? () => openScheduleFlipModal("shipment") : undefined
           }
         />
+      ) : managerTasksNotice && !coverageDashboard ? (
+        <section className={styles.riskBoard} aria-label="Сменное задание">
+          <ShiftTasksNewDayNotice
+            previousValidDate={managerTasksNotice.previousValidDate}
+            today={managerTasksNotice.today}
+            formatDate={formatRuDate}
+          />
+        </section>
       ) : !coverageDashboard && logisticsRisks ? (
         <section className={styles.riskBoard} aria-label="Контрольные точки логистики">
           <div className={styles.riskBoardHeader}>

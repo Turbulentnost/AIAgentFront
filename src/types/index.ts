@@ -191,6 +191,59 @@ export interface OneCTasksResponse {
   resolved_user: string;
   tasks: OneCTask[];
 }
+
+export interface DeveloperFeedbackAttachment {
+  id: string;
+  original_filename: string;
+  content_type: string | null;
+  file_size: number;
+  checksum: string;
+  download_url: string;
+  created_at: string;
+}
+
+export interface DeveloperFeedbackMessage {
+  id: string;
+  thread_id: string;
+  author_user_id: string | null;
+  author_role: "user" | "developer" | string;
+  author_name: string;
+  author_email: string;
+  body: string;
+  created_at: string;
+  attachments: DeveloperFeedbackAttachment[];
+}
+
+export interface DeveloperFeedbackThread {
+  id: string;
+  participant_user_id: string;
+  participant_name: string;
+  participant_email: string;
+  status: string;
+  last_message_at: string | null;
+  last_message_preview: string | null;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeveloperFeedbackThreadsResponse {
+  mode: "user" | "developer" | string;
+  threads: DeveloperFeedbackThread[];
+}
+
+export interface DeveloperFeedbackMessagesResponse {
+  mode: "user" | "developer" | string;
+  thread: DeveloperFeedbackThread;
+  messages: DeveloperFeedbackMessage[];
+}
+
+export interface DeveloperFeedbackSendResponse {
+  ok: boolean;
+  mode: "user" | "developer" | string;
+  thread: DeveloperFeedbackThread;
+  message: DeveloperFeedbackMessage;
+}
 export interface TaskStep {
   id: string;
   task_id: string;

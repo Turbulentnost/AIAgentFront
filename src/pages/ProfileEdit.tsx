@@ -6,7 +6,7 @@ import { departmentsApi, usersApi } from "@/api/endpoints";
 import { useAuth } from "@/auth/AuthContext";
 import formStyles from "@/components/form-controls/form-controls.module.css";
 import ThemePicker from "@/components/ThemePicker";
-import { profileFallbacks, roleNameById } from "@/mock-data/profile";
+import { profileFallbacks, resolveDepartmentLabels, roleNameById } from "@/mock-data/profile";
 import type { User, UserUpdate } from "@/types";
 import styles from "./ProfileEdit.module.css";
 
@@ -109,11 +109,10 @@ export default function ProfileEdit() {
     return Object.keys(buildUpdatePayload(form, user)).length > 0;
   }, [form, user]);
 
-  const departmentName = useMemo(() => {
-    if (!user) return profileFallbacks.departmentName;
-    const department = departmentsQuery.data?.find((item) => item.id === user.department_id);
-    return department?.name ?? profileFallbacks.departmentName;
-  }, [departmentsQuery.data, user]);
+  const { divisionName, subdivisionName } = useMemo(
+    () => resolveDepartmentLabels(departmentsQuery.data, user?.department_id),
+    [departmentsQuery.data, user?.department_id]
+  );
 
   const roleName = user?.role_id ? roleNameById[user.role_id] ?? profileFallbacks.roleName : profileFallbacks.roleName;
 
@@ -270,8 +269,12 @@ export default function ProfileEdit() {
             <h3>Управляется администратором</h3>
             <dl className={styles.readOnlyGrid}>
               <div>
+                <dt>Отдел</dt>
+                <dd>{divisionName}</dd>
+              </div>
+              <div>
                 <dt>Подразделение</dt>
-                <dd>{departmentName}</dd>
+                <dd>{subdivisionName}</dd>
               </div>
               <div>
                 <dt>Роль</dt>

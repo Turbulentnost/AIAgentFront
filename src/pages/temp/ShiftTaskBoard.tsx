@@ -11,6 +11,7 @@ import {
 import {
   AlertTriangle,
   CalendarCheck,
+  CalendarDays,
   CheckCircle2,
   ChevronDown,
   ClipboardList,
@@ -425,7 +426,8 @@ type Props = {
   onResultEvalsChange?: Dispatch<SetStateAction<Record<string, ShiftResultEvalState>>>;
   onManagerResultEvaluated?: (
     context: { taskType: string; problem: string; solution: string; nomenclature: string },
-    managerResult: string
+    managerResult: string,
+    taskKey: string
   ) => Promise<void> | void;
   dashboardOpen: boolean;
   tasksOpen: boolean;
@@ -433,9 +435,47 @@ type Props = {
   onTasksOpenChange: (open: boolean) => void;
   onOpenShiftModal?: () => void;
   onOpenShipmentModal?: () => void;
+  manualShipmentNotices?: Array<{ id: string; message: string; nomenclature?: string }>;
   /** Встроен в дашборд обеспеченности (без отдельного заголовка и аккордеонов). */
   embedded?: boolean;
 };
+
+export type ShiftTasksNewDayNoticeProps = {
+  previousValidDate?: string | null;
+  today?: string;
+  formatDate?: (iso: string | null | undefined) => string;
+  embedded?: boolean;
+};
+
+export function ShiftTasksNewDayNotice({
+  previousValidDate,
+  today,
+  formatDate = (value) => value ?? "",
+  embedded = false
+}: ShiftTasksNewDayNoticeProps) {
+  const todayLabel = today ? formatDate(today) : "сегодня";
+  const previousLabel = previousValidDate ? formatDate(previousValidDate) : null;
+
+  return (
+    <div className={embedded ? styles.coverageEmbeddedTasksSection : undefined}>
+      <div className={styles.shiftTasksNewDayNotice} role="status">
+        <span className={styles.shiftTasksNewDayNoticeIcon} aria-hidden="true">
+          <CalendarDays size={22} strokeWidth={2.2} />
+        </span>
+        <div className={styles.shiftTasksNewDayNoticeBody}>
+          <strong>Наступил новый день — начните новую смену</strong>
+          <p>
+            {previousLabel
+              ? `Задания за ${previousLabel} больше не отображаются: смена действует только до конца календарного дня. `
+              : "Сменное задание за прошлый день завершено. "}
+            Чтобы приступить к работе на {todayLabel}, проведите актуальный анализ Excel с помощью агента —
+            после него сформируется новое сменное задание.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export type ShiftTaskBoardProps = Props;
 
@@ -455,6 +495,7 @@ export default function ShiftTaskBoard({
   onTasksOpenChange,
   onOpenShiftModal,
   onOpenShipmentModal,
+  manualShipmentNotices = [],
   embedded = false,
 }: Props) {
   const [taskHorizon, setTaskHorizon] = useState<TaskHorizonFilter>("urgent");
@@ -469,7 +510,9 @@ export default function ShiftTaskBoard({
   const [shiftEndError, setShiftEndError] = useState<string | null>(null);
   const [shiftEndSuccess, setShiftEndSuccess] = useState<string | null>(null);
   const taskContentRef = useRef<HTMLDivElement>(null);
+  const tasksScrollHostRef = useRef<HTMLDivElement>(null);
   const lastRealTaskTypeRef = useRef("");
+  const lastAppliedTileFilterRef = useRef<TaskItemFilter | null>(null);
   const lastEvaluatedRef = useRef<Record<string, string>>({});
 
   const allTasks = useMemo(
@@ -515,6 +558,7 @@ export default function ShiftTaskBoard({
       setTaskItemFilter("all");
       setFlippedTaskTile(null);
       setVirtualTaskFilter(null);
+      lastAppliedTileFilterRef.current = null;
       return;
     }
     const availableKeys = new Set(taskTypeGroups.map((group) => group.key));
@@ -527,6 +571,7 @@ export default function ShiftTaskBoard({
     setTaskItemFilter("all");
     setFlippedTaskTile(null);
     setVirtualTaskFilter(null);
+    lastAppliedTileFilterRef.current = null;
   }, [taskTypeGroups]);
 
   const isVirtualTypeSelected = Boolean(parseVirtualTaskFilter(selectedTaskTypeKey));
@@ -555,14 +600,30 @@ export default function ShiftTaskBoard({
     }
   }, [selectedTaskTypeKey]);
 
-  const openVirtualTaskType = useCallback((filter: TaskItemFilter) => {
-    setVirtualTaskFilter(filter);
-    setTaskItemFilter(filter);
-    setSelectedTaskTypeKey(virtualTaskKey(filter));
-    window.requestAnimationFrame(() => {
-      taskContentRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-    });
-  }, []);
+  const scrollTaskContentIntoView = useCallback(() => {
+    const target = taskContentRef.current;
+    if (!target) return;
+    if (embedded) {
+      const host = tasksScrollHostRef.current;
+      if (!host) return;
+      const offset = target.getBoundingClientRect().top - host.getBoundingClientRect().top;
+      host.scrollTo({ top: host.scrollTop + offset, behavior: "smooth" });
+      return;
+    }
+    target.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [embedded]);
+
+  const openVirtualTaskType = useCallback(
+    (filter: TaskItemFilter) => {
+      setVirtualTaskFilter(filter);
+      setTaskItemFilter(filter);
+      setSelectedTaskTypeKey(virtualTaskKey(filter));
+      window.requestAnimationFrame(() => {
+        scrollTaskContentIntoView();
+      });
+    },
+    [scrollTaskContentIntoView]
+  );
 
   const applyTileFilterToActiveType = useCallback(
     (filter: TaskItemFilter) => {
@@ -588,13 +649,15 @@ export default function ShiftTaskBoard({
 
   const handleTaskTileLeftClick = useCallback(
     (filter: TaskItemFilter) => {
-      const onActiveTypeForThisTile =
-        !parseVirtualTaskFilter(selectedTaskTypeKey) && taskItemFilter === filter;
-      if (onActiveTypeForThisTile) {
+      const onRealType = !parseVirtualTaskFilter(selectedTaskTypeKey);
+      const filterAlreadyApplied = onRealType && taskItemFilter === filter;
+      const repeatClick = lastAppliedTileFilterRef.current === filter;
+      if (filterAlreadyApplied && repeatClick) {
         openVirtualTaskType(filter);
-      } else {
-        applyTileFilterToActiveType(filter);
+        return;
       }
+      applyTileFilterToActiveType(filter);
+      lastAppliedTileFilterRef.current = filter;
     },
     [applyTileFilterToActiveType, openVirtualTaskType, selectedTaskTypeKey, taskItemFilter]
   );
@@ -611,6 +674,7 @@ export default function ShiftTaskBoard({
   const handleTaskTypeBadgeClick = useCallback((typeKey: string) => {
     setFlippedTaskTile(null);
     setTaskItemFilter("all");
+    lastAppliedTileFilterRef.current = null;
     if (!parseVirtualTaskFilter(typeKey)) {
       setVirtualTaskFilter(null);
     }
@@ -620,6 +684,7 @@ export default function ShiftTaskBoard({
   const dismissVirtualTaskType = useCallback(() => {
     setVirtualTaskFilter(null);
     setFlippedTaskTile(null);
+    lastAppliedTileFilterRef.current = null;
     if (parseVirtualTaskFilter(selectedTaskTypeKey) && taskTypeGroups.length) {
       setSelectedTaskTypeKey(lastRealTaskTypeRef.current || taskTypeGroups[0]?.key || "");
       setTaskItemFilter("all");
@@ -825,6 +890,7 @@ export default function ShiftTaskBoard({
                     onSelectFilter={(filter) => {
                       setTaskItemFilter(filter);
                       setFlippedTaskTile(null);
+                      lastAppliedTileFilterRef.current = filter;
                       if (isVirtualTypeSelected) {
                         setVirtualTaskFilter(null);
                         if (taskTypeGroups.length) {
@@ -861,6 +927,7 @@ export default function ShiftTaskBoard({
               setFlippedTaskTile(null);
               setVirtualTaskFilter(null);
               setTaskItemFilter("all");
+              lastAppliedTileFilterRef.current = null;
             }}
           >
             {item.label}
@@ -954,7 +1021,11 @@ export default function ShiftTaskBoard({
                   </div>
 
                   {filteredTasks.length > 0 ? (
-                    <div className={embedded ? styles.coverageEmbeddedTasksScroll : undefined}>
+                    <div
+                      className={
+                        embedded ? `${styles.coverageEmbeddedTasksTableWrap} ${styles.coverageEmbeddedTasksScroll}` : undefined
+                      }
+                    >
                       <table className={styles.taskTable}>
                         <thead>
                           <tr>
@@ -1090,6 +1161,7 @@ export default function ShiftTaskBoard({
         submitting={shiftEndSubmitting}
         error={shiftEndError}
         success={shiftEndSuccess}
+        manualShipmentNotices={manualShipmentNotices}
         onClose={handleCloseShiftEnd}
         onSubmit={handleSubmitShiftEnd}
       />
@@ -1099,35 +1171,39 @@ export default function ShiftTaskBoard({
   if (embedded) {
     return (
       <div className={styles.coverageEmbeddedTasksRoot} aria-label="Задачи сменного задания">
-        <div className={styles.coverageSummaryRow}>
-          {canEndShift ? (
-            <button
-              type="button"
-              className={styles.shiftEndButton}
-              onClick={handleOpenShiftEnd}
-            >
-              <CalendarCheck size={14} aria-hidden />
-              Завершить смену
-            </button>
-          ) : null}
-          <span className={styles.riskTotalBadge}>
-            {meta
-              ? `${meta.asOf} · неделя ${meta.weekPeriod} · ${progressStats.total} заданий`
-              : `${progressStats.total} заданий`}
-          </span>
-        </div>
-        {dashboardPanel}
-        <div className={styles.coverageEmbeddedTasksTypesHeader}>
-          <strong>Задания по типам</strong>
-          <div className={styles.coverageEmbeddedTasksTypesToolbar}>
-            {horizonNav}
-            <span className={styles.coverageEmbeddedTasksTypesMeta}>
-              {taskHorizon === "urgent" ? "Срочно и сегодня" : "План на неделю"} · {taskTypeGroups.length}{" "}
-              типов
+        <div className={styles.coverageEmbeddedTasksPinned}>
+          <div className={styles.coverageSummaryRow}>
+            {canEndShift ? (
+              <button
+                type="button"
+                className={styles.shiftEndButton}
+                onClick={handleOpenShiftEnd}
+              >
+                <CalendarCheck size={14} aria-hidden />
+                Завершить смену
+              </button>
+            ) : null}
+            <span className={styles.riskTotalBadge}>
+              {meta
+                ? `${meta.asOf} · неделя ${meta.weekPeriod} · ${progressStats.total} заданий`
+                : `${progressStats.total} заданий`}
             </span>
           </div>
+          {dashboardPanel}
+          <div className={styles.coverageEmbeddedTasksTypesHeader}>
+            <strong>Задания по типам</strong>
+            <div className={styles.coverageEmbeddedTasksTypesToolbar}>
+              {horizonNav}
+              <span className={styles.coverageEmbeddedTasksTypesMeta}>
+                {taskHorizon === "urgent" ? "Срочно и сегодня" : "План на неделю"} · {taskTypeGroups.length}{" "}
+                типов
+              </span>
+            </div>
+          </div>
         </div>
-        {tasksPanel}
+        <div ref={tasksScrollHostRef} className={styles.coverageEmbeddedTasksScrollHost}>
+          {tasksPanel}
+        </div>
         {modal}
       </div>
     );

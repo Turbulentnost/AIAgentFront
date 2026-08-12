@@ -68,7 +68,11 @@ type Props = {
   onOpenShipmentSchedule?: () => void;
   onOpenShipmentScheduleHover?: () => void;
   shipmentScheduleAvailable?: boolean;
-  onManagerResultEvaluated?: (context: TaskContext, managerResult: string) => Promise<void> | void;
+  onManagerResultEvaluated?: (
+    context: TaskContext,
+    managerResult: string,
+    taskKey: string
+  ) => Promise<void> | void;
 };
 
 const HIDDEN_COLUMNS = new Set(["Тип задания"]);
@@ -1478,7 +1482,7 @@ function TempShiftAssignmentViewer({
 
   const panel = (
     <div
-      className={styles.modal}
+      className={`${styles.modal} ${embedded ? styles.modalEmbedded : ""}`}
       role="dialog"
       aria-modal={embedded ? undefined : "true"}
       aria-labelledby="temp-shift-assignment-title"
