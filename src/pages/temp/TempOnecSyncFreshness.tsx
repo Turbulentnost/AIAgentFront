@@ -7,6 +7,8 @@ import {
   buildSpecsFreshnessLabel,
   buildStockFreshnessLabel,
   formatAveonDateTime,
+  sanitizeOnecErrorMessage,
+  type ProductionPlanStatus,
   type ResourceSpecsStatus,
   type StockStatus,
 } from "./onecSyncFreshness";
@@ -14,17 +16,22 @@ import {
 export function TempOnecSyncHint({
   stock,
   specs,
+  productionPlan,
   loading,
 }: {
   stock: StockStatus | null;
   specs: ResourceSpecsStatus | null;
+  productionPlan?: ProductionPlanStatus | null;
   loading?: boolean;
 }) {
   const failed =
     Boolean(stock?.status && stock.status !== "ok") ||
-    Boolean(specs?.status && specs.status !== "ok");
-  const text = buildCombinedOnecFreshnessLabel(stock, specs);
-  const errorMessages = [stock?.error_message, specs?.error_message].filter(Boolean);
+    Boolean(specs?.status && specs.status !== "ok") ||
+    Boolean(productionPlan?.status && productionPlan.status !== "ok");
+  const text = buildCombinedOnecFreshnessLabel(stock, specs, productionPlan);
+  const errorMessages = [stock?.error_message, specs?.error_message, productionPlan?.error_message]
+    .filter(Boolean)
+    .map((message) => sanitizeOnecErrorMessage(String(message)));
 
   return (
     <div className={styles.hintBlock} aria-live="polite">

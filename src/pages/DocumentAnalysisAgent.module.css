@@ -80,19 +80,16 @@
   align-items: start;
 }
 
-/* Пока оверлей этапов открыт — workspace выше блока рисков, чтобы список не уходил под него */
-.pageStagesOverlayOpen .workspace {
+/* Пока раскрыты этапы — sticky-дашборд ниже не перекрывает сводку справа */
+.pageStagesOverlayOpen .coverageBoard {
   position: relative;
-  z-index: 4;
+  top: auto;
+  z-index: 1;
 }
 
 .pageStagesOverlayOpen .riskBoard {
   position: relative;
   z-index: 1;
-  transition: opacity 0.25s ease, filter 0.25s ease;
-  opacity: 0.55;
-  filter: saturate(0.85);
-  pointer-events: none;
 }
 
 .panel {
@@ -103,6 +100,7 @@
   border: 1px solid var(--color-border);
   border-radius: 14px;
   box-shadow: 0 10px 24px var(--color-shadow-06);
+  min-width: 0;
 }
 
 .panelTitle {
@@ -699,6 +697,7 @@
   align-items: center;
   width: fit-content;
   min-height: 28px;
+  margin-top: 12px;
   padding: 4px 12px;
   color: var(--form-status-badge-text);
   background: var(--form-status-badge-bg);
@@ -726,6 +725,7 @@
   position: relative;
   z-index: 1;
   min-height: 0;
+  margin-top: 12px;
 }
 
 .flipScene {
@@ -857,7 +857,7 @@
 }
 
 .pageStagesOverlayOpen .stagesSection {
-  z-index: 6;
+  z-index: 2;
 }
 
 .stagePanelWrap {
@@ -886,6 +886,7 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
 }
 
 .schedulePruneNotice {
@@ -1021,6 +1022,8 @@
   display: flex;
   flex-direction: column;
   gap: 4px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* TEMP(Aveon debug files) — удалить вместе с блоком */
@@ -1164,35 +1167,20 @@
   white-space: nowrap;
 }
 
-.stagesOverlayBackdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  padding: 0;
-  background: color-mix(in srgb, var(--color-surface) 35%, transparent);
-  border: 0;
-  cursor: pointer;
-  animation: stagesOverlayFadeIn 0.28s ease;
-}
-
 .stagesOverlay {
-  position: absolute;
-  top: 0;
-  right: 0;
-  left: 0;
-  z-index: 20;
+  position: relative;
+  z-index: 1;
   display: grid;
   gap: 10px;
   max-height: min(68vh, 480px);
+  margin-top: 8px;
   padding: 12px;
   overflow: hidden auto;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  box-shadow:
-    0 18px 48px var(--color-shadow-06),
-    0 0 0 1px color-mix(in srgb, var(--color-border) 70%, transparent);
-  animation: stagesOverlaySlideIn 0.3s ease;
+  box-shadow: 0 8px 24px var(--color-shadow-06);
+  animation: stagesOverlaySlideIn 0.24s ease;
 }
 
 .stagesOverlayHeader {
@@ -1233,16 +1221,6 @@
 .stagesOverlayClose:focus-visible {
   outline: 2px solid var(--form-control-focus-border-color);
   outline-offset: 2px;
-}
-
-@keyframes stagesOverlayFadeIn {
-  from {
-    opacity: 0;
-  }
-
-  to {
-    opacity: 1;
-  }
 }
 
 @keyframes stagesOverlaySlideIn {
@@ -2844,6 +2822,151 @@
   background: var(--color-surface-elevated);
   border: 1px solid var(--color-border);
   border-radius: 16px;
+}
+
+.coverageBoardLoading {
+  display: grid;
+  gap: 16px;
+}
+
+.coverageDashboardLoadingStatus {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 14px;
+  color: var(--color-primary-text);
+  background: color-mix(in srgb, var(--color-primary-soft) 72%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-primary-text) 24%, var(--color-border));
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.coverageDashboardLoadingSpinner {
+  flex-shrink: 0;
+  animation: coverageDashboardSpin 0.9s linear infinite;
+}
+
+@keyframes coverageDashboardSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.coverageDashboardLoadingPeriods {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-self: flex-start;
+}
+
+.coverageDashboardLoadingPeriod {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px dashed var(--color-border);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.72;
+}
+
+.coverageDashboardLoadingTile {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-height: 84px;
+  padding: 12px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.coverageDashboardLoadingTileIcon {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-text-strong) 6%, transparent) 0%,
+    color-mix(in srgb, var(--color-text-strong) 11%, transparent) 50%,
+    color-mix(in srgb, var(--color-text-strong) 6%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: coverageDashboardShimmer 1.2s ease-in-out infinite;
+}
+
+.coverageDashboardLoadingTileBody {
+  display: grid;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+}
+
+.coverageDashboardLoadingLine {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--color-text-strong) 6%, transparent) 0%,
+    color-mix(in srgb, var(--color-text-strong) 11%, transparent) 50%,
+    color-mix(in srgb, var(--color-text-strong) 6%, transparent) 100%
+  );
+  background-size: 200% 100%;
+  animation: coverageDashboardShimmer 1.2s ease-in-out infinite;
+}
+
+.coverageDashboardLoadingLine[data-width="tiny"] {
+  width: 28%;
+}
+
+.coverageDashboardLoadingLine[data-width="short"] {
+  width: 42%;
+}
+
+.coverageDashboardLoadingLine[data-width="medium"] {
+  width: 58%;
+}
+
+.coverageDashboardLoadingLine[data-width="long"] {
+  width: 76%;
+}
+
+.coverageDashboardLoadingTable {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+}
+
+.coverageDashboardLoadingTableHead,
+.coverageDashboardLoadingTableRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1.6fr) repeat(3, minmax(56px, 0.5fr));
+  gap: 12px;
+  align-items: center;
+}
+
+.coverageDashboardLoadingTableHead {
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+@keyframes coverageDashboardShimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .coverageBoard:has(.coverageEmbeddedBlockManagerResults) {
@@ -5215,7 +5338,10 @@
   .coverageBoard .coverageSideFlipCard,
   .managerResultsSkeletonCard,
   .managerResultsSkeletonWide,
-  .managerResultsSpin {
+  .managerResultsSpin,
+  .coverageDashboardLoadingSpinner,
+  .coverageDashboardLoadingLine,
+  .coverageDashboardLoadingTileIcon {
     animation: none !important;
     transition: none !important;
   }

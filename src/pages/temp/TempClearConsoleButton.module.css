@@ -1,0 +1,314 @@
+.wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--nav-button-min-height);
+  padding: 10px 14px;
+  color: var(--color-text-strong);
+  text-align: center;
+  background: var(--color-surface-elevated);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--nav-button-radius);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: color-mix(in srgb, var(--color-primary-text) 30%, var(--color-border));
+}
+
+.button:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
+.hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: color-mix(in srgb, var(--color-bg) 55%, transparent);
+}
+
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(1280px, 100%);
+  max-height: min(90vh, 900px);
+  overflow: hidden;
+  background: var(--color-surface, #1a1d23);
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 12px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--color-border, #2a2f3a);
+}
+
+.title {
+  margin: 0;
+  color: var(--color-text-strong, #f3f4f6);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.meta {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 12px;
+}
+
+.closeBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: var(--color-text-secondary, #9ca3af);
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.closeBtn:hover {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 8%, transparent);
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  padding: 12px 18px 18px;
+}
+
+.state,
+.error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 24px 0;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 14px;
+}
+
+.error {
+  color: #e85d4c;
+}
+
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tableWrap {
+  max-height: calc(90vh - 145px);
+  overflow: auto;
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 8px;
+}
+
+.table {
+  width: max-content;
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.table th,
+.table td {
+  max-width: 320px;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+  border-right: 1px solid color-mix(in srgb, var(--color-border, #2a2f3a) 70%, transparent);
+  border-bottom: 1px solid var(--color-border, #2a2f3a);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--color-text-strong, #f3f4f6);
+  font-weight: 600;
+  background: var(--color-surface-elevated, #22262f);
+}
+
+.table td {
+  color: var(--color-text, #d1d5db);
+}
+
+.table tbody tr:hover td {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 6%, transparent);
+}
+
+.monthTabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.monthTab {
+  padding: 6px 12px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 12px;
+  font-weight: 600;
+  background: transparent;
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.monthTabActive {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 12%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary-text, #60a5fa) 35%, var(--color-border, #2a2f3a));
+}
+
+.monthCaption {
+  margin: 0 0 10px;
+  color: var(--color-text-strong, #f3f4f6);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.note {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 12px;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 6%, transparent);
+  border-radius: 8px;
+}
+
+.matrixWrap {
+  max-height: calc(90vh - 210px);
+  overflow: auto;
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 8px;
+}
+
+.matrix {
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.matrix th,
+.matrix td {
+  padding: 6px 8px;
+  border-right: 1px solid color-mix(in srgb, var(--color-border, #2a2f3a) 70%, transparent);
+  border-bottom: 1px solid var(--color-border, #2a2f3a);
+}
+
+.matrix thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: var(--color-text-strong, #f3f4f6);
+  font-weight: 600;
+  text-align: center;
+  background: var(--color-surface-elevated, #22262f);
+}
+
+.stickyCol {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  min-width: 220px;
+  max-width: 320px;
+  text-align: left;
+  vertical-align: top;
+  background: var(--color-surface-elevated, #22262f);
+}
+
+.matrix thead .stickyCol {
+  z-index: 4;
+}
+
+.productName {
+  display: block;
+  color: var(--color-text-strong, #f3f4f6);
+  font-weight: 600;
+}
+
+.productCode,
+.productUnit {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.qtyCol {
+  min-width: 36px;
+}
+
+.qtyCell {
+  text-align: center;
+  color: var(--color-text-muted, #6b7280);
+  vertical-align: middle;
+}
+
+.qtyCellFilled {
+  color: var(--color-text, #d1d5db);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 5%, transparent);
+}
+
+.undatedCol,
+.undatedCell {
+  min-width: 72px;
+  text-align: center;
+  background: color-mix(in srgb, #f59e0b 8%, transparent);
+}
+
+.totalCol,
+.totalCell {
+  min-width: 52px;
+  text-align: center;
+  font-weight: 700;
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+}
+
+.matrix tbody tr:hover .qtyCellFilled {
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 12%, transparent);
+}

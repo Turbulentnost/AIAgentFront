@@ -33,11 +33,18 @@ import {
   Upload
 } from "lucide-react";
 import { TempOnecSyncHint } from "./temp/TempOnecSyncFreshness";
-import TempGoogleSheetsViewer from "./temp/TempGoogleSheetsViewer";
+import { TempOnecSyncResult } from "./temp/TempOnecSyncResult";
+import {
+  parseOnecManualSyncMessage,
+  sanitizeOnecErrorMessage,
+  type OnecManualSyncMessageView,
+} from "./temp/onecSyncFreshness";
 import ScheduleFlipModal, { type ScheduleFlipFace } from "./temp/ScheduleFlipModal";
 import type { MergedShipmentStats } from "./temp/TempMergedShipmentViewer";
 import ShiftTaskBoard, { ShiftTasksNewDayNotice } from "./temp/ShiftTaskBoard";
 import AvionDeveloperFeedbackWidget from "./temp/AvionDeveloperFeedbackWidget";
+import SummaryReferencePanel from "./temp/SummaryReferencePanel";
+import { useAveonReferenceCache } from "./temp/useAveonReferenceCache";
 import {
   buildInitialResultTexts,
   buildColIndexByHeader,
@@ -65,6 +72,7 @@ import {
   type ManagerCompletionDateEntry,
   type ManagerResultsBundle
 } from "@/pages/temp/CoverageDashboard";
+import CoverageDashboardLoading from "@/pages/temp/CoverageDashboardLoading";
 import styles from "./DocumentAnalysisAgent.module.css";
 
 function todayMskIso(): string {
@@ -818,17 +826,16 @@ export default function DocumentAnalysisAgent() {
   const [isPruningSchedules, setIsPruningSchedules] = useState(false);
   const [isPruningDetailedSchedules, setIsPruningDetailedSchedules] = useState(false);
   const [onecManualSyncLoading, setOnecManualSyncLoading] = useState(false);
-  const [onecManualSyncMessage, setOnecManualSyncMessage] = useState<string | null>(null);
-  const [googleSheetsProbeLoading, setGoogleSheetsProbeLoading] = useState(false);
-  const [googleSheetsModalOpen, setGoogleSheetsModalOpen] = useState(false);
-  const [googleSheetsError, setGoogleSheetsError] = useState<string | null>(null);
+  const [onecManualSyncResult, setOnecManualSyncResult] = useState<OnecManualSyncMessageView | null>(null);
   const [googleSheetsConfigured, setGoogleSheetsConfigured] = useState<boolean | null>(null);
-  const [googleSheetsTitle, setGoogleSheetsTitle] = useState("ИТЦ В РАБОТЕ");
-  const [googleSheetsSpreadsheetTitle, setGoogleSheetsSpreadsheetTitle] = useState<string | null>(null);
-  const [googleSheetsValues, setGoogleSheetsValues] = useState<string[][]>([]);
   const [onecSyncRefreshToken, setOnecSyncRefreshToken] = useState(0);
-  const { stock: onecStockStatus, specs: onecSpecsStatus, loading: onecSyncStatusLoading } =
-    useTempOnecSyncStatus(onecSyncRefreshToken);
+  const {
+    stock: onecStockStatus,
+    specs: onecSpecsStatus,
+    productionPlan: onecProductionPlanStatus,
+    loading: onecSyncStatusLoading
+  } = useTempOnecSyncStatus(onecSyncRefreshToken);
+  const referenceCache = useAveonReferenceCache(onecSyncRefreshToken);
   const [mergeSourceNames, setMergeSourceNames] = useState<string[]>([]);
   const lastShipmentMergeKeyRef = useRef("");
   const mergedShipmentHydratedKeyRef = useRef("");
@@ -1471,66 +1478,20 @@ export default function DocumentAnalysisAgent() {
 
   const handleOnecManualSync = useCallback(async () => {
     setOnecManualSyncLoading(true);
-    setOnecManualSyncMessage(null);
+    setOnecManualSyncResult(null);
     try {
       const result = await agentsApi.runAveonOnecSyncNow();
-      if (result.ok) {
-        setOnecManualSyncMessage("Выгрузка из 1С завершена успешно.");
-      } else if (result.status === "skipped_locked") {
-        setOnecManualSyncMessage("Синхронизация уже выполняется — дождитесь завершения.");
-      } else {
-        const stockMsg = result.stock?.message;
-        const specsMsg = result.resource_specs?.message;
-        setOnecManualSyncMessage(
-          stockMsg || specsMsg || "Не удалось выгрузить данные из 1С."
-        );
-      }
+      setOnecManualSyncResult(parseOnecManualSyncMessage(result));
       setOnecSyncRefreshToken((value) => value + 1);
     } catch (caughtError) {
       console.error("[Aveon 1С] ошибка ручной выгрузки", caughtError);
-      setOnecManualSyncMessage(extractAnalyzeError(caughtError) || "Ошибка выгрузки из 1С.");
+      setOnecManualSyncResult({
+        tone: "error",
+        title: sanitizeOnecErrorMessage(extractAnalyzeError(caughtError) || "Ошибка выгрузки из 1С."),
+        steps: [],
+      });
     } finally {
       setOnecManualSyncLoading(false);
-    }
-  }, []);
-
-  const handleGoogleSheetsProbe = useCallback(async () => {
-    const logPrefix = "[Aveon TEMP Google Sheets]";
-    setGoogleSheetsProbeLoading(true);
-    setGoogleSheetsModalOpen(true);
-    setGoogleSheetsError(null);
-    setGoogleSheetsValues([]);
-    setGoogleSheetsTitle("ИТЦ В РАБОТЕ");
-    setGoogleSheetsSpreadsheetTitle(null);
-    console.group(logPrefix);
-    console.log(`${logPrefix} loading sheet «ИТЦ В РАБОТЕ»…`);
-
-    try {
-      const result = await agentsApi.fetchAveonGoogleSheets();
-      const parsed = result.parsed;
-      const values = parsed?.values ?? [];
-      setGoogleSheetsTitle(parsed?.sheet_title || result.sheet_title || "ИТЦ В РАБОТЕ");
-      setGoogleSheetsSpreadsheetTitle(parsed?.spreadsheet_title ?? null);
-      setGoogleSheetsValues(values);
-      console.log(`${logPrefix} ok=`, result.ok);
-      console.log(`${logPrefix} sheet=`, parsed?.sheet_title, "rows=", parsed?.row_count);
-      console.log(`${logPrefix} preview=`, parsed?.preview_rows);
-      if (!values.length) {
-        setGoogleSheetsError("Лист пуст или данные не пришли");
-      }
-    } catch (caughtError) {
-      console.error(`${logPrefix} request failed`, caughtError);
-      let message = "Не удалось загрузить лист Google Sheets";
-      if (isAxiosError(caughtError)) {
-        const detail = caughtError.response?.data?.detail;
-        if (typeof detail === "string") message = detail;
-        console.error(`${logPrefix} axios status=`, caughtError.response?.status);
-        console.error(`${logPrefix} axios data=`, caughtError.response?.data);
-      }
-      setGoogleSheetsError(message);
-    } finally {
-      console.groupEnd();
-      setGoogleSheetsProbeLoading(false);
     }
   }, []);
 
@@ -2785,11 +2746,6 @@ export default function DocumentAnalysisAgent() {
             </div>
           ) : null}
 
-          {isLoadingLatestDashboard ? (
-            <p className={styles.rolesHint} role="status">
-              Проверяем сохранённые дашборды и при необходимости обновляем на сегодня…
-            </p>
-          ) : null}
           {dashboardRefreshWarning ? (
             <p className={styles.errorText} role="alert">
               {dashboardRefreshWarning}
@@ -2924,8 +2880,7 @@ export default function DocumentAnalysisAgent() {
         </section>
 
         <aside className={styles.panel} aria-label="Сводка агента">
-          <h2 className={styles.panelTitle}>Сводка</h2>
-
+          <SummaryReferencePanel cache={referenceCache}>
           <div className={styles.stagePanel} aria-label="Текущая сессия">
             <h3 className={styles.stagePanelTitle}>Текущая сессия</h3>
             <div className={styles.stageRow}>
@@ -2965,45 +2920,17 @@ export default function DocumentAnalysisAgent() {
               >
                 {onecManualSyncLoading
                   ? "Выгрузка из 1С…"
-                  : "Выгрузить остатки и спецификации из 1С"}
+                  : "Выгрузить остатки, спецификации и план из 1С"}
               </button>
               <TempOnecSyncHint
                 stock={onecStockStatus}
                 specs={onecSpecsStatus}
+                productionPlan={onecProductionPlanStatus}
                 loading={onecSyncStatusLoading || onecManualSyncLoading}
               />
-              {onecManualSyncMessage ? (
-                <p className={styles.tempDebugHint} role="status">
-                  {onecManualSyncMessage}
-                </p>
-              ) : null}
-            </div>
-            <div className={styles.tempSyncAction}>
-              <button
-                type="button"
-                className={styles.tempOdataPingButton}
-                disabled={googleSheetsProbeLoading}
-                onClick={() => void handleGoogleSheetsProbe()}
-              >
-                {googleSheetsProbeLoading
-                  ? "Загрузка «ИТЦ В РАБОТЕ»…"
-                  : "TEMP: лист «ИТЦ В РАБОТЕ»"}
-              </button>
-              <p className={styles.tempDebugHint}>
-                Откроет временную модалку с таблицей из Google Sheets.
-              </p>
+              <TempOnecSyncResult view={onecManualSyncResult} />
             </div>
           </div>
-
-          <TempGoogleSheetsViewer
-            open={googleSheetsModalOpen}
-            loading={googleSheetsProbeLoading}
-            error={googleSheetsError}
-            sheetTitle={googleSheetsTitle}
-            spreadsheetTitle={googleSheetsSpreadsheetTitle}
-            values={googleSheetsValues}
-            onClose={() => setGoogleSheetsModalOpen(false)}
-          />
 
           {scheduleDiff ? (
             <div className={styles.scheduleDiffBlock} role="status">
@@ -3284,13 +3211,6 @@ export default function DocumentAnalysisAgent() {
             ) : null}
 
             {stagesOverlayOpen && showStagesCompactBar ? (
-              <>
-                <button
-                  type="button"
-                  className={styles.stagesOverlayBackdrop}
-                  aria-label="Закрыть этапы анализа"
-                  onClick={() => setStagesOverlayOpen(false)}
-                />
                 <div
                   id="analysis-stages-overlay"
                   className={styles.stagesOverlay}
@@ -3310,13 +3230,17 @@ export default function DocumentAnalysisAgent() {
                   </div>
                   <div className={styles.stagePanel}>{renderAnalysisStageRows()}</div>
                 </div>
-              </>
             ) : null}
           </div>
+          </SummaryReferencePanel>
         </aside>
       </div>
 
-      {coverageDashboard ? (
+      {isLoadingLatestDashboard || isAnalyzing ? (
+        <CoverageDashboardLoading mode={isAnalyzing ? "analyzing" : "loading"} />
+      ) : null}
+
+      {coverageDashboard && !isAnalyzing ? (
         <CoverageDashboard
           dashboard={coverageDashboard}
           formatDate={formatRuDate}
@@ -3351,7 +3275,7 @@ export default function DocumentAnalysisAgent() {
         />
       ) : null}
 
-      {visibleTaskBoard && !coverageDashboard ? (
+      {visibleTaskBoard && !coverageDashboard && !isLoadingLatestDashboard && !isAnalyzing ? (
         <ShiftTaskBoard
           values={visibleTaskBoard.values}
           rowPriorities={visibleTaskBoard.rowPriorities}
@@ -3374,7 +3298,7 @@ export default function DocumentAnalysisAgent() {
             shipmentScheduleAvailable ? () => openScheduleFlipModal("shipment") : undefined
           }
         />
-      ) : managerTasksNotice && !coverageDashboard ? (
+      ) : managerTasksNotice && !coverageDashboard && !isLoadingLatestDashboard && !isAnalyzing ? (
         <section className={styles.riskBoard} aria-label="Сменное задание">
           <ShiftTasksNewDayNotice
             previousValidDate={managerTasksNotice.previousValidDate}
@@ -3382,7 +3306,7 @@ export default function DocumentAnalysisAgent() {
             formatDate={formatRuDate}
           />
         </section>
-      ) : !coverageDashboard && logisticsRisks ? (
+      ) : !coverageDashboard && logisticsRisks && !isLoadingLatestDashboard && !isAnalyzing ? (
         <section className={styles.riskBoard} aria-label="Контрольные точки логистики">
           <div className={styles.riskBoardHeader}>
             <div>

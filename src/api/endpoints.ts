@@ -702,6 +702,52 @@ export const agentsApi = {
       }>("/agents/document-analysis/temp-odata-ping")
       .then((r) => r.data),
 
+  /** TEMP(Aveon production plan OData) — удалить вместе с кнопкой на странице агента */
+  tempAveonProductionPlan: () =>
+    longRunningApiClient
+      .post<{
+        ok: boolean;
+        message: string;
+        base?: string;
+        source: string;
+        count: number;
+        header: {
+          ref_key: string;
+          number: string;
+          date: string;
+          posted: boolean;
+          deletion_mark: boolean;
+        } | null;
+        values: string[][];
+        matrix_view?: {
+          month_keys: string[];
+          default_month: string;
+          matrices: Record<
+            string,
+            {
+              month_key: string;
+              month_label: string;
+              granularity: "day" | "month";
+              date_keys: string[];
+              date_labels: string[];
+              has_undated: boolean;
+              note: string;
+              products: Array<{
+                product_key: string;
+                name: string;
+                code: string;
+                unit: string;
+                qty_by_date: Record<string, number>;
+                month_only_qty: number;
+                total: number;
+              }>;
+            }
+          >;
+        };
+        table_entities: string[];
+      }>("/agents/document-analysis/temp-production-plan")
+      .then((r) => r.data),
+
   /** TEMP(Aveon resource specs) — удалить вместе с кнопкой на странице агента */
   tempAveonResourceSpecsSync: () =>
     longRunningApiClient
@@ -854,6 +900,15 @@ export const agentsApi = {
           db_outputs: number;
           error_message?: string | null;
         };
+        production_plan?: {
+          last_sync_at: string | null;
+          status: string | null;
+          saved_count: number;
+          db_count: number;
+          plan_number: string;
+          plan_date: string | null;
+          error_message?: string | null;
+        };
       }>("/agents/document-analysis/onec-sync-status")
       .then((r) => r.data),
 
@@ -864,6 +919,7 @@ export const agentsApi = {
         status?: string;
         stock?: { ok?: boolean; message?: string };
         resource_specs?: { ok?: boolean; message?: string };
+        production_plan?: { ok?: boolean; message?: string };
       }>("/agents/document-analysis/onec-sync-now", null, { timeout: 600000 })
       .then((r) => r.data),
 
@@ -889,6 +945,27 @@ export const agentsApi = {
           has_file: boolean;
         }>;
       }>("/agents/document-analysis/schedule-snapshot-status")
+      .then((r) => r.data),
+
+  listAveonStockBalances: (params?: { q?: string; warehouse?: string; limit?: number; offset?: number }) =>
+    apiClient
+      .get<{
+        ok: boolean;
+        total: number;
+        limit: number;
+        offset: number;
+        synced_at?: string | null;
+        items: Array<{
+          code: string;
+          name: string;
+          warehouse: string;
+          in_stock: number;
+          to_ship: number;
+          available: number;
+          nomenclature_key?: string;
+          warehouse_key?: string;
+        }>;
+      }>("/agents/document-analysis/stock-balances", { params })
       .then((r) => r.data),
 
   listAveonResourceSpecs: (params?: { status?: string; q?: string; limit?: number; offset?: number }) =>
@@ -919,7 +996,7 @@ export const agentsApi = {
           status: string;
           main_product: { key: string; code: string; name: string; qty: number };
           synced_at?: string | null;
-          materials: Array<{ code: string; name: string; qty: number; line_number: number }>;
+          materials: Array<{ code: string; name: string; qty: number; unit?: string; line_number: number }>;
           outputs: Array<{ code: string; name: string; qty: number; line_number: number }>;
         };
       }>(`/agents/document-analysis/resource-specs/${encodeURIComponent(refKey)}`)

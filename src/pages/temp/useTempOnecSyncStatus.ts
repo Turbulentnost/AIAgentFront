@@ -4,13 +4,14 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { agentsApi } from "@/api/endpoints";
-import type { ResourceSpecsStatus, StockStatus } from "./onecSyncFreshness";
+import type { ProductionPlanStatus, ResourceSpecsStatus, StockStatus } from "./onecSyncFreshness";
 
 const POLL_INTERVAL_MS = 60_000;
 
 export function useTempOnecSyncStatus(refreshToken = 0) {
   const [stock, setStock] = useState<StockStatus | null>(null);
   const [specs, setSpecs] = useState<ResourceSpecsStatus | null>(null);
+  const [productionPlan, setProductionPlan] = useState<ProductionPlanStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
   const reload = useCallback(async (options?: { silent?: boolean }) => {
@@ -21,10 +22,12 @@ export function useTempOnecSyncStatus(refreshToken = 0) {
       const result = await agentsApi.getAveonOnecSyncStatus();
       setStock(result.stock ?? null);
       setSpecs(result.resource_specs ?? null);
+      setProductionPlan(result.production_plan ?? null);
     } catch {
       if (!options?.silent) {
         setStock(null);
         setSpecs(null);
+        setProductionPlan(null);
       }
     } finally {
       if (!options?.silent) {
@@ -59,5 +62,5 @@ export function useTempOnecSyncStatus(refreshToken = 0) {
     };
   }, [reload]);
 
-  return { stock, specs, loading, reload };
+  return { stock, specs, productionPlan, loading, reload };
 }
