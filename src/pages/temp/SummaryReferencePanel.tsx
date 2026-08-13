@@ -65,7 +65,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     id: "stockBalances",
     label: "Остатки на складах",
-    hint: "Таблица остатков из БД 1С",
+    hint: "Остатки по материалам из спецификаций",
     icon: Package,
   },
 ];

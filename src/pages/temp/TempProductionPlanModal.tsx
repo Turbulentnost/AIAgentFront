@@ -36,6 +36,8 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
 
   const defaultMonth = matrixView?.default_month ?? "";
   const activeMonth = selectedMonth || defaultMonth;
+  const activeMonthSource =
+    activeMonth && data?.month_sources ? data.month_sources[activeMonth] : null;
 
   const activeMatrix = useMemo(() => {
     if (!matrixView || !activeMonth) return null;
@@ -71,9 +73,17 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
               {loading
                 ? "загрузка…"
                 : header
-                  ? `№${header.number || "—"} от ${formatHeaderDate(header.date)} · ${productCount} изделий`
+                  ? `${data?.year ? `${data.year} год · ` : ""}${productCount} изделий · документов: ${data?.documents_count ?? 1}`
                   : data?.message || "нет данных"}
             </p>
+            {header ? (
+              <p className={styles.meta}>
+                Последний документ: №{header.number || "—"} от {formatHeaderDate(header.date)}
+                {header.period_start && header.period_end
+                  ? ` · период ${formatHeaderDate(header.period_start)} — ${formatHeaderDate(header.period_end)}`
+                  : null}
+              </p>
+            ) : null}
             {data?.source ? <p className={styles.meta}>Источник: БД 1С · {data.source}</p> : null}
           </div>
           <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
@@ -117,6 +127,13 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
                 </div>
               ) : activeMatrix.month_label ? (
                 <p className={styles.monthCaption}>{activeMatrix.month_label}</p>
+              ) : null}
+
+              {activeMonthSource?.number ? (
+                <p className={styles.note}>
+                  Источник месяца: №{activeMonthSource.number}
+                  {activeMonthSource.date ? ` от ${formatHeaderDate(activeMonthSource.date)}` : ""}
+                </p>
               ) : null}
 
               {activeMatrix.note ? <p className={styles.note}>{activeMatrix.note}</p> : null}

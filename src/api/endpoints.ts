@@ -947,11 +947,20 @@ export const agentsApi = {
       }>("/agents/document-analysis/schedule-snapshot-status")
       .then((r) => r.data),
 
-  listAveonStockBalances: (params?: { q?: string; warehouse?: string; limit?: number; offset?: number }) =>
+  listAveonStockBalances: (params?: {
+    q?: string;
+    warehouse?: string;
+    limit?: number;
+    offset?: number;
+    spec_materials_only?: boolean;
+  }) =>
     apiClient
       .get<{
         ok: boolean;
         total: number;
+        total_all?: number;
+        spec_materials_only?: boolean;
+        spec_nomenclature_count?: number;
         limit: number;
         offset: number;
         synced_at?: string | null;

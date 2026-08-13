@@ -46,6 +46,9 @@ export type ResourceSpecsCache = {
 export type StockBalancesCache = {
   ok: boolean;
   total: number;
+  totalAll?: number;
+  specMaterialsOnly?: boolean;
+  specNomenclatureCount?: number;
   syncedAt: string | null;
   items: Array<{
     code: string;
@@ -164,10 +167,16 @@ async function loadResourceSpecs(): Promise<ResourceSpecsCache> {
 
 async function loadStockBalances(): Promise<StockBalancesCache> {
   try {
-    const result = await agentsApi.listAveonStockBalances({ limit: 10000 });
+    const result = await agentsApi.listAveonStockBalances({
+      limit: 10000,
+      spec_materials_only: true,
+    });
     return {
       ok: true,
       total: result.total,
+      totalAll: result.total_all,
+      specMaterialsOnly: result.spec_materials_only,
+      specNomenclatureCount: result.spec_nomenclature_count,
       syncedAt: result.synced_at ?? null,
       items: result.items,
       error: null,
