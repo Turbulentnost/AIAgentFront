@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { Loader2, X } from "lucide-react";
 import type { ProductionPlanCache } from "./useAveonReferenceCache";
 import styles from "./TempClearConsoleButton.module.css";
@@ -32,10 +32,9 @@ function formatHeaderDate(iso: string): string {
 export default function TempProductionPlanModal({ open, loading, data, onClose }: Props) {
   const matrixView = data?.matrix_view ?? null;
   const header = data?.header ?? null;
-  const [selectedMonth, setSelectedMonth] = useState("");
 
   const defaultMonth = matrixView?.default_month ?? "";
-  const activeMonth = selectedMonth || defaultMonth;
+  const activeMonth = defaultMonth;
   const activeMonthSource =
     activeMonth && data?.month_sources ? data.month_sources[activeMonth] : null;
 
@@ -103,29 +102,7 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
             <p className={styles.state}>План найден, но строк с изделиями нет.</p>
           ) : (
             <>
-              {matrixView && matrixView.month_keys.length > 1 ? (
-                <div className={styles.monthTabs} role="tablist" aria-label="Месяц плана">
-                  {matrixView.month_keys.map((monthKey) => {
-                    const label = matrixView.matrices[monthKey]?.month_label || monthKey;
-                    return (
-                      <button
-                        key={monthKey}
-                        type="button"
-                        role="tab"
-                        aria-selected={activeMonth === monthKey}
-                        className={
-                          activeMonth === monthKey
-                            ? `${styles.monthTab} ${styles.monthTabActive}`
-                            : styles.monthTab
-                        }
-                        onClick={() => setSelectedMonth(monthKey)}
-                      >
-                        {label}
-                      </button>
-                    );
-                  })}
-                </div>
-              ) : activeMatrix.month_label ? (
+              {activeMatrix.month_label ? (
                 <p className={styles.monthCaption}>{activeMatrix.month_label}</p>
               ) : null}
 

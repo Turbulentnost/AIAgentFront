@@ -37,7 +37,7 @@ export function useTempOnecSyncStatus(refreshToken = 0) {
   }, []);
 
   useEffect(() => {
-    void reload();
+    void reload({ silent: refreshToken > 0 });
   }, [reload, refreshToken]);
 
   useEffect(() => {

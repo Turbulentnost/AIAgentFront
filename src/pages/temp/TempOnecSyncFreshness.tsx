@@ -18,11 +18,13 @@ export function TempOnecSyncHint({
   specs,
   productionPlan,
   loading,
+  manualSyncInProgress,
 }: {
   stock: StockStatus | null;
   specs: ResourceSpecsStatus | null;
   productionPlan?: ProductionPlanStatus | null;
   loading?: boolean;
+  manualSyncInProgress?: boolean;
 }) {
   const failed =
     Boolean(stock?.status && stock.status !== "ok") ||
@@ -32,11 +34,16 @@ export function TempOnecSyncHint({
   const errorMessages = [stock?.error_message, specs?.error_message, productionPlan?.error_message]
     .filter(Boolean)
     .map((message) => sanitizeOnecErrorMessage(String(message)));
+  const statusText = loading
+    ? manualSyncInProgress
+      ? "Выгрузка из 1С…"
+      : "Загрузка…"
+    : text;
 
   return (
     <div className={styles.hintBlock} aria-live="polite">
       <p className={styles.hint}>
-        <span className={failed ? styles.valueError : styles.value}>{loading ? "Загрузка…" : text}</span>
+        <span className={failed ? styles.valueError : styles.value}>{statusText}</span>
       </p>
       {failed && errorMessages.length ? (
         <p className={styles.errorDetail}>{errorMessages.join(" · ")}</p>

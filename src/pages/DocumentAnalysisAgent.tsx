@@ -33,6 +33,10 @@ import {
   Upload
 } from "lucide-react";
 import { TempOnecSyncHint } from "./temp/TempOnecSyncFreshness";
+import {
+  TempOnecSyncProgress,
+  type OnecSyncProgressView,
+} from "./temp/TempOnecSyncProgress";
 import { TempOnecSyncResult } from "./temp/TempOnecSyncResult";
 import {
   parseOnecManualSyncMessage,
@@ -70,7 +74,8 @@ import {
   type CoverageDashboardPayload,
   type ManagerCompletionDashboard,
   type ManagerCompletionDateEntry,
-  type ManagerResultsBundle
+  type ManagerResultsBundle,
+  type ExecutiveReportDownloadParams
 } from "@/pages/temp/CoverageDashboard";
 import CoverageDashboardLoading from "@/pages/temp/CoverageDashboardLoading";
 import styles from "./DocumentAnalysisAgent.module.css";
@@ -169,6 +174,80 @@ function logAveonScheduleSnapshotStatus(): void {
     .catch(() => {
       // snapshot недоступен — не мешаем работе агента
     });
+}
+
+type AnalysisInputSourceEntry = {
+  source?: string;
+  source_label?: string;
+  files?: string[];
+  detail?: string;
+};
+
+type AnalysisInputSources = {
+  summary?: { mode?: string; text?: string };
+  uploaded_files?: Array<{ filename: string; role: string }>;
+  server_injected_files?: string[];
+  production_schedule?: AnalysisInputSourceEntry;
+  detailed_production_schedule?: AnalysisInputSourceEntry;
+  specifications?: AnalysisInputSourceEntry;
+  stock?: AnalysisInputSourceEntry;
+  shipment_schedule?: AnalysisInputSourceEntry;
+};
+
+const INPUT_SOURCE_BLOCK_LABELS: Record<string, string> = {
+  production_schedule: "План производства (помесячный)",
+  detailed_production_schedule: "Детальный план производства",
+  specifications: "Спецификации и материалы",
+  stock: "Остатки",
+  shipment_schedule: "График отгрузок"
+};
+
+function logAnalysisInputSources(
+  inputSources: AnalysisInputSources | null | undefined,
+  stagedFiles: Array<{ file: File; role: string | null }>
+): void {
+  console.log("===========");
+  console.log("[Анализ] Источники данных");
+  if (!inputSources) {
+    console.log("(метаданные источников не получены с сервера)");
+    return;
+  }
+  if (inputSources.summary?.text) {
+    console.log("Итого:", inputSources.summary.text);
+  }
+  if (inputSources.summary?.mode) {
+    console.log("Режим:", inputSources.summary.mode);
+  }
+  console.log("---");
+  if (inputSources.uploaded_files?.length) {
+    console.log("Файлы, загруженные пользователем:");
+    inputSources.uploaded_files.forEach((item, index) => {
+      const roleLabel = ROLE_LABELS[item.role] ?? item.role;
+      console.log(`  ${index + 1}. ${item.filename} → ${roleLabel}`);
+    });
+  } else if (stagedFiles.length) {
+    console.log("Файлы, загруженные пользователем:");
+    stagedFiles.forEach((item, index) => {
+      const roleLabel = item.role ? (ROLE_LABELS[item.role] ?? item.role) : "роль не определена";
+      console.log(`  ${index + 1}. ${item.file.name} → ${roleLabel}`);
+    });
+  }
+  if (inputSources.server_injected_files?.length) {
+    console.log("Добавлено сервером:", inputSources.server_injected_files.join(", "));
+  }
+  console.log("---");
+  for (const [key, blockLabel] of Object.entries(INPUT_SOURCE_BLOCK_LABELS)) {
+    const entry = inputSources[key as keyof AnalysisInputSources];
+    if (!entry || typeof entry !== "object" || !("source" in entry)) continue;
+    const sourceEntry = entry as AnalysisInputSourceEntry;
+    const filesLabel = sourceEntry.files?.length ? sourceEntry.files.join(", ") : "—";
+    console.log(`${blockLabel}: ${sourceEntry.source_label ?? sourceEntry.source ?? "—"}`);
+    console.log(`  файлы: ${filesLabel}`);
+    if (sourceEntry.detail) {
+      console.log(`  ${sourceEntry.detail}`);
+    }
+  }
+  console.log("===========");
 }
 
 /** Файлы в чеклисте до анализа. Остатки и спецификации — из БД (синхронизация 1С). */
@@ -813,6 +892,8 @@ export default function DocumentAnalysisAgent() {
   );
   const [managerCompletionLoading, setManagerCompletionLoading] = useState(false);
   const [managerCompletionError, setManagerCompletionError] = useState<string | null>(null);
+  const [executiveReportLoading, setExecutiveReportLoading] = useState(false);
+  const [executiveReportError, setExecutiveReportError] = useState<string | null>(null);
   const [riskPointsOpen, setRiskPointsOpen] = useState(false);
   const riskStageContentRef = useRef<HTMLDivElement>(null);
   const lastRealStageKeyRef = useRef("");
@@ -827,6 +908,8 @@ export default function DocumentAnalysisAgent() {
   const [isPruningDetailedSchedules, setIsPruningDetailedSchedules] = useState(false);
   const [onecManualSyncLoading, setOnecManualSyncLoading] = useState(false);
   const [onecManualSyncResult, setOnecManualSyncResult] = useState<OnecManualSyncMessageView | null>(null);
+  const [onecManualSyncProgress, setOnecManualSyncProgress] =
+    useState<OnecSyncProgressView | null>(null);
   const [googleSheetsConfigured, setGoogleSheetsConfigured] = useState<boolean | null>(null);
   const [onecSyncRefreshToken, setOnecSyncRefreshToken] = useState(0);
   const {
@@ -982,6 +1065,33 @@ export default function DocumentAnalysisAgent() {
     };
   }, [shiftDayExpired, shiftPreviousValidDate]);
 
+  const handleExecutiveReportDownload = useCallback(async (params: ExecutiveReportDownloadParams) => {
+    if (managerScope) return;
+    setExecutiveReportLoading(true);
+    setExecutiveReportError(null);
+    try {
+      const report = await agentsApi.downloadExecutiveProcurementReport({
+        periodMode: params.mode,
+        reportDate: params.mode === "day" ? params.reportDate ?? managerReportDate : undefined,
+        dateFrom: params.mode === "range" ? params.dateFrom : undefined,
+        dateTo: params.mode === "range" ? params.dateTo : undefined
+      });
+      const filename =
+        params.mode === "day"
+          ? `aveon_executive_procurement_report_${params.reportDate ?? managerReportDate}.xlsx`
+          : params.mode === "all"
+            ? `aveon_executive_procurement_report_all.xlsx`
+            : `aveon_executive_procurement_report_${params.dateFrom}_${params.dateTo}.xlsx`;
+      downloadBlob(report, filename);
+    } catch (caughtError) {
+      setExecutiveReportError(
+        extractAnalyzeError(caughtError) || "Не удалось сформировать сводный отчёт руководителя."
+      );
+    } finally {
+      setExecutiveReportLoading(false);
+    }
+  }, [managerScope, managerReportDate]);
+
   const managerResultsBundle = useMemo<ManagerResultsBundle | null>(() => {
     if (managerScope) return null;
     return {
@@ -991,6 +1101,8 @@ export default function DocumentAnalysisAgent() {
       today: managerCompletionToday,
       loading: managerCompletionLoading,
       error: managerCompletionError,
+      executiveReportLoading,
+      executiveReportError,
       onDateChange: setManagerReportDate,
       onRetry: () => {
         void loadManagerCompletionDashboard(managerReportDate);
@@ -998,7 +1110,8 @@ export default function DocumentAnalysisAgent() {
       onRefresh: () => {
         void loadManagerCompletionDates();
         void loadManagerCompletionDashboard(managerReportDate);
-      }
+      },
+      onExecutiveReportDownload: handleExecutiveReportDownload
     };
   }, [
     managerScope,
@@ -1008,8 +1121,11 @@ export default function DocumentAnalysisAgent() {
     managerCompletionToday,
     managerCompletionLoading,
     managerCompletionError,
+    executiveReportLoading,
+    executiveReportError,
     loadManagerCompletionDashboard,
-    loadManagerCompletionDates
+    loadManagerCompletionDates,
+    handleExecutiveReportDownload
   ]);
 
   const acceptedHint = useMemo(
@@ -1476,9 +1592,44 @@ export default function DocumentAnalysisAgent() {
     ]
   );
 
+  useEffect(() => {
+    if (!onecManualSyncLoading) return;
+
+    let cancelled = false;
+    const refreshProgress = async () => {
+      try {
+        const result = await agentsApi.getAveonOnecSyncProgress();
+        if (!cancelled) {
+          setOnecManualSyncProgress(result.progress ?? null);
+        }
+      } catch {
+        // Прогресс вспомогательный: основной POST всё равно вернёт итог синхронизации.
+      }
+    };
+
+    void refreshProgress();
+    const timer = window.setInterval(() => void refreshProgress(), 1500);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [onecManualSyncLoading]);
+
   const handleOnecManualSync = useCallback(async () => {
     setOnecManualSyncLoading(true);
     setOnecManualSyncResult(null);
+    setOnecManualSyncProgress({
+      running: true,
+      started_at: new Date().toISOString(),
+      step: "connect",
+      label: "Подключаемся к 1С и готовим выгрузку",
+      steps: [
+        { key: "stock", title: "Остатки", status: "pending" },
+        { key: "resource_specs", title: "Спецификации", status: "pending" },
+        { key: "production_plan", title: "План производства", status: "pending" },
+        { key: "save_plan", title: "Запись в БД", status: "pending" },
+      ],
+    });
     try {
       const result = await agentsApi.runAveonOnecSyncNow();
       setOnecManualSyncResult(parseOnecManualSyncMessage(result));
@@ -1492,6 +1643,7 @@ export default function DocumentAnalysisAgent() {
       });
     } finally {
       setOnecManualSyncLoading(false);
+      setOnecManualSyncProgress(null);
     }
   }, []);
 
@@ -1750,7 +1902,10 @@ export default function DocumentAnalysisAgent() {
 
     void (async () => {
       try {
-        const result = await agentsApi.mergeShipmentSchedules(shipmentItems.map((item) => item.file));
+        const result = await agentsApi.mergeShipmentSchedules(
+          shipmentItems.map((item) => item.file),
+          { includeGoogleSheets: false }
+        );
         if (!result.ok || !result.file_base64 || !result.file_name) {
           throw new Error(result.message || "Не удалось объединить графики отгрузок");
         }
@@ -1993,14 +2148,28 @@ export default function DocumentAnalysisAgent() {
     }, 1200);
 
     try {
-      const analysisFiles = stagedFiles
-        .filter((item) => item.role !== "shipment_schedule")
-        .map((item) => item.file);
+      console.clear();
+      console.log("[Анализ] Запуск…");
+      if (stagedFiles.length) {
+        console.log("Загруженные файлы:");
+        stagedFiles.forEach((item, index) => {
+          const roleLabel = item.role ? (ROLE_LABELS[item.role] ?? item.role) : "роль не определена";
+          console.log(`  ${index + 1}. ${item.file.name} → ${roleLabel}`);
+        });
+      }
+
+      const analysisFiles = stagedFiles.map((item) => item.file);
       const result = await agentsApi.analyzeAveonExcel(analysisFiles);
 
       window.clearInterval(stageTimer);
       setActiveStageIndex(analysisStages.length - 1);
-      console.clear();
+      logAnalysisInputSources(result.inputSources, stagedFiles);
+      if (result.mergedShipmentSchedule) {
+        setMergedShipmentSchedule({
+          ...result.mergedShipmentSchedule,
+          stats: result.mergedShipmentSchedule.stats as MergedShipmentStats | null
+        });
+      }
       console.log("Определение ролей файлов — источник:", result.source);
       console.log("Роли файлов:");
       result.roles.forEach((item, index) => {
@@ -2195,6 +2364,24 @@ export default function DocumentAnalysisAgent() {
       );
       try {
         const snapshot = await agentsApi.getAveonDashboardLatest();
+        if (snapshot?.coverageDashboard) {
+          setCoverageDashboard(parseCoverageDashboard(snapshot.coverageDashboard));
+        }
+        if (snapshot?.taskDashboard?.values.length) {
+          const board = {
+            values: snapshot.taskDashboard.values,
+            rowPriorities: snapshot.taskDashboard.rowPriorities,
+            rowKinds: snapshot.taskDashboard.rowKinds,
+            meta: snapshot.taskDashboard.meta
+          };
+          setTaskBoard(board);
+          if (Object.keys(snapshot.taskDashboard.resultTexts).length > 0) {
+            setShiftResultTexts(snapshot.taskDashboard.resultTexts);
+          }
+          if (Object.keys(snapshot.taskDashboard.resultEvals).length > 0) {
+            setShiftResultEvals(snapshot.taskDashboard.resultEvals);
+          }
+        }
         if (snapshot?.mergedShipmentSchedule) {
           setMergedShipmentSchedule({
             fileName: snapshot.mergedShipmentSchedule.fileName,
@@ -2926,8 +3113,10 @@ export default function DocumentAnalysisAgent() {
                 stock={onecStockStatus}
                 specs={onecSpecsStatus}
                 productionPlan={onecProductionPlanStatus}
-                loading={onecSyncStatusLoading || onecManualSyncLoading}
+                loading={onecSyncStatusLoading && !onecManualSyncResult}
+                manualSyncInProgress={onecManualSyncLoading}
               />
+              <TempOnecSyncProgress progress={onecManualSyncProgress} />
               <TempOnecSyncResult view={onecManualSyncResult} />
             </div>
           </div>

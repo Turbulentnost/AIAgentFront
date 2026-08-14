@@ -424,6 +424,49 @@ export const agentsApi = {
         detailed_compared_with_saved?: boolean;
         coverage_dashboard?: unknown;
         dashboard_analyzed_at?: string | null;
+        input_sources?: {
+          summary?: { mode?: string; text?: string };
+          uploaded_files?: Array<{ filename: string; role: string }>;
+          server_injected_files?: string[];
+          production_schedule?: {
+            source?: string;
+            source_label?: string;
+            files?: string[];
+            detail?: string;
+          };
+          detailed_production_schedule?: {
+            source?: string;
+            source_label?: string;
+            files?: string[];
+            detail?: string;
+          };
+          specifications?: {
+            source?: string;
+            source_label?: string;
+            files?: string[];
+            detail?: string;
+          };
+          stock?: {
+            source?: string;
+            source_label?: string;
+            files?: string[];
+            detail?: string;
+          };
+          shipment_schedule?: {
+            source?: string;
+            source_label?: string;
+            files?: string[];
+            detail?: string;
+          };
+        };
+        merged_shipment_schedule?: {
+          file_name: string;
+          file_base64: string;
+          values?: string[][];
+          stats?: Record<string, unknown>;
+          source_count?: number;
+          changed_cells?: Array<{ row: number; col: number }>;
+        } | null;
       }>("/agents/document-analysis/analyze-excel", formData, {
         timeout: 600000
       })
@@ -504,7 +547,18 @@ export const agentsApi = {
         detailedBaselineSaved: Boolean(r.data.detailed_baseline_saved),
         detailedComparedWithSaved: Boolean(r.data.detailed_compared_with_saved),
         coverageDashboard: r.data.coverage_dashboard ?? null,
-        dashboardAnalyzedAt: r.data.dashboard_analyzed_at ?? null
+        dashboardAnalyzedAt: r.data.dashboard_analyzed_at ?? null,
+        inputSources: r.data.input_sources ?? null,
+        mergedShipmentSchedule: r.data.merged_shipment_schedule
+          ? {
+              fileName: r.data.merged_shipment_schedule.file_name,
+              fileBase64: r.data.merged_shipment_schedule.file_base64,
+              values: r.data.merged_shipment_schedule.values ?? [],
+              stats: r.data.merged_shipment_schedule.stats ?? null,
+              sourceCount: r.data.merged_shipment_schedule.source_count ?? 0,
+              changedCells: r.data.merged_shipment_schedule.changed_cells ?? []
+            }
+          : null
       }));
   },
 
@@ -708,17 +762,34 @@ export const agentsApi = {
       .post<{
         ok: boolean;
         message: string;
+        year?: number;
         base?: string;
         source: string;
         count: number;
+        documents_count?: number;
         header: {
           ref_key: string;
           number: string;
           date: string;
           posted: boolean;
           deletion_mark: boolean;
+          period_start?: string;
+          period_end?: string;
         } | null;
         values: string[][];
+        month_sources?: Record<
+          string,
+          {
+            ref_key: string;
+            number: string;
+            date: string;
+            period_start?: string;
+            period_end?: string;
+            source_count?: number;
+            source_refs?: string[];
+            source_numbers?: string[];
+          }
+        >;
         matrix_view?: {
           month_keys: string[];
           default_month: string;
@@ -923,6 +994,27 @@ export const agentsApi = {
       }>("/agents/document-analysis/onec-sync-now", null, { timeout: 600000 })
       .then((r) => r.data),
 
+  getAveonOnecSyncProgress: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        progress: {
+          running: boolean;
+          owner?: string;
+          started_at?: string | null;
+          finished_at?: string | null;
+          step?: string;
+          label?: string;
+          steps?: Array<{
+            key: string;
+            title: string;
+            status: "pending" | "running" | "done" | "error" | string;
+            message?: string;
+          }>;
+        };
+      }>("/agents/document-analysis/onec-sync-progress")
+      .then((r) => r.data),
+
   getAveonScheduleSnapshotStatus: () =>
     apiClient
       .get<{
@@ -1011,7 +1103,7 @@ export const agentsApi = {
       }>(`/agents/document-analysis/resource-specs/${encodeURIComponent(refKey)}`)
       .then((r) => r.data),
 
-  mergeShipmentSchedules: (files: File[]) => {
+  mergeShipmentSchedules: (files: File[], options?: { includeGoogleSheets?: boolean }) => {
     const formData = new FormData();
     for (const file of files) {
       formData.append("files", file);
@@ -1027,6 +1119,9 @@ export const agentsApi = {
         stats?: Record<string, unknown>;
       }>("/agents/document-analysis/merge-shipment-schedules", formData, {
         headers: { "Content-Type": "multipart/form-data" },
+        params: {
+          include_google_sheets: options?.includeGoogleSheets ?? true
+        },
         timeout: 600_000
       })
       .then((r) => r.data);
@@ -1420,6 +1515,24 @@ export const agentsApi = {
           liveUpdatedAt: manager.live_updated_at ?? null
         }))
       })),
+
+  downloadExecutiveProcurementReport: (params?: {
+    reportDate?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    periodMode?: "day" | "range" | "all";
+  }) =>
+    apiClient
+      .get<Blob>("/agents/document-analysis/executive-procurement-report", {
+        params: {
+          ...(params?.reportDate ? { report_date: params.reportDate } : {}),
+          ...(params?.dateFrom ? { date_from: params.dateFrom } : {}),
+          ...(params?.dateTo ? { date_to: params.dateTo } : {}),
+          ...(params?.periodMode ? { period_mode: params.periodMode } : {})
+        },
+        responseType: "blob"
+      })
+      .then((r) => r.data),
 
   getShiftCompletionDates: () =>
     apiClient

@@ -68,7 +68,6 @@ export default function TempClearConsoleButton() {
   const [source, setSource] = useState("");
   const [header, setHeader] = useState<ProductionPlanHeader | null>(null);
   const [matrixView, setMatrixView] = useState<ProductionPlanMatrixView | null>(null);
-  const [selectedMonth, setSelectedMonth] = useState("");
 
   async function handleClick() {
     console.clear();
@@ -78,7 +77,6 @@ export default function TempClearConsoleButton() {
     setMessage("");
     setHeader(null);
     setMatrixView(null);
-    setSelectedMonth("");
 
     try {
       const result = await agentsApi.tempAveonProductionPlan();
@@ -86,7 +84,6 @@ export default function TempClearConsoleButton() {
       setSource(result.source);
       setHeader(result.header);
       setMatrixView(result.matrix_view ?? null);
-      setSelectedMonth(result.matrix_view?.default_month ?? "");
       if (!result.ok) {
         setError(result.message || "Не удалось получить план производства из 1С.");
       }
@@ -99,9 +96,10 @@ export default function TempClearConsoleButton() {
   }
 
   const activeMatrix = useMemo(() => {
-    if (!matrixView || !selectedMonth) return null;
-    return matrixView.matrices[selectedMonth] ?? null;
-  }, [matrixView, selectedMonth]);
+    const monthKey = matrixView?.default_month ?? "";
+    if (!matrixView || !monthKey) return null;
+    return matrixView.matrices[monthKey] ?? null;
+  }, [matrixView]);
 
   const productCount = activeMatrix?.products.length ?? 0;
 
@@ -170,30 +168,7 @@ export default function TempClearConsoleButton() {
                 <p className={styles.state}>План найден, но строк с изделиями нет.</p>
               ) : (
                 <>
-                  {matrixView && matrixView.month_keys.length > 1 ? (
-                    <div className={styles.monthTabs} role="tablist" aria-label="Месяц плана">
-                      {matrixView.month_keys.map((monthKey) => {
-                        const label =
-                          matrixView.matrices[monthKey]?.month_label || monthKey;
-                        return (
-                          <button
-                            key={monthKey}
-                            type="button"
-                            role="tab"
-                            aria-selected={selectedMonth === monthKey}
-                            className={
-                              selectedMonth === monthKey
-                                ? `${styles.monthTab} ${styles.monthTabActive}`
-                                : styles.monthTab
-                            }
-                            onClick={() => setSelectedMonth(monthKey)}
-                          >
-                            {label}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  ) : activeMatrix.month_label ? (
+                  {activeMatrix.month_label ? (
                     <p className={styles.monthCaption}>{activeMatrix.month_label}</p>
                   ) : null}
 
