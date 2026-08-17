@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2, X } from "lucide-react";
 import type { ProductionPlanCache } from "./useAveonReferenceCache";
 import styles from "./TempClearConsoleButton.module.css";
@@ -32,9 +32,12 @@ function formatHeaderDate(iso: string): string {
 export default function TempProductionPlanModal({ open, loading, data, onClose }: Props) {
   const matrixView = data?.matrix_view ?? null;
   const header = data?.header ?? null;
+  const monthKeys = matrixView?.month_keys ?? [];
 
-  const defaultMonth = matrixView?.default_month ?? "";
-  const activeMonth = defaultMonth;
+  const defaultMonth = matrixView?.default_month ?? monthKeys[0] ?? "";
+  const [selectedMonth, setSelectedMonth] = useState(defaultMonth);
+
+  const activeMonth = monthKeys.includes(selectedMonth) ? selectedMonth : defaultMonth;
   const activeMonthSource =
     activeMonth && data?.month_sources ? data.month_sources[activeMonth] : null;
 
@@ -42,6 +45,12 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
     if (!matrixView || !activeMonth) return null;
     return matrixView.matrices[activeMonth] ?? null;
   }, [matrixView, activeMonth]);
+
+  useEffect(() => {
+    if (defaultMonth) {
+      setSelectedMonth(defaultMonth);
+    }
+  }, [defaultMonth, open]);
 
   if (!open) return null;
 
@@ -66,7 +75,7 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
         <div className={styles.header}>
           <div>
             <h2 id="temp-production-plan-title" className={styles.title}>
-              План производства
+              План производства на месяц
             </h2>
             <p className={styles.meta}>
               {loading
@@ -102,7 +111,26 @@ export default function TempProductionPlanModal({ open, loading, data, onClose }
             <p className={styles.state}>План найден, но строк с изделиями нет.</p>
           ) : (
             <>
-              {activeMatrix.month_label ? (
+              {monthKeys.length > 1 ? (
+                <div className={styles.monthTabs} role="tablist" aria-label="Месяцы плана">
+                  {monthKeys.map((monthKey) => (
+                    <button
+                      key={monthKey}
+                      type="button"
+                      role="tab"
+                      aria-selected={monthKey === activeMonth}
+                      className={
+                        monthKey === activeMonth ? `${styles.monthTab} ${styles.monthTabActive}` : styles.monthTab
+                      }
+                      onClick={() => setSelectedMonth(monthKey)}
+                    >
+                      {matrixView?.matrices[monthKey]?.month_label ?? monthKey}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+
+              {activeMatrix?.month_label ? (
                 <p className={styles.monthCaption}>{activeMatrix.month_label}</p>
               ) : null}
 

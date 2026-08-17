@@ -224,7 +224,7 @@ export function useAveonReferenceCache(refreshToken = 0) {
     ]);
 
     const errors: string[] = [];
-    if (!productionPlan?.ok) errors.push("план производства");
+    if (!productionPlan?.ok) errors.push("годовой график");
     if (!googleSheets.ok) errors.push("ИТЦ В РАБОТЕ");
     if (!russiaShipment.ok) errors.push("график России");
     if (!resourceSpecs.ok) errors.push("спецификации");

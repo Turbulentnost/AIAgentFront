@@ -164,6 +164,25 @@
   gap: 8px;
 }
 
+.menuSection {
+  display: grid;
+  gap: 8px;
+}
+
+.menuSectionTitle {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.menuList {
+  display: grid;
+  gap: 8px;
+}
+
 .menuBtn {
   display: flex;
   gap: 12px;

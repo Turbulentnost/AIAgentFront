@@ -94,7 +94,6 @@ export type ManagerResultsBundle = {
 
 export type CoveragePeriodKey = "day" | "week" | "month";
 export type CoverageTileKey = "all" | "green" | "yellow" | "red";
-type CoverageAnalysisMode = "strict" | "conditional";
 
 export type CoverageMaterialShortage = {
   name: string;
@@ -114,9 +113,7 @@ export type CoverageRow = {
   plan: number;
   fact: number;
   covered: number;
-  strictCovered?: number;
-  conditionalCovered?: number;
-  conditional?: boolean;
+  assemblableQty?: number;
   status: string;
   available?: number;
   materialKind?: string;
@@ -124,6 +121,7 @@ export type CoverageRow = {
   materialKindConfidence?: string;
   materialKindReason?: string;
   optional?: boolean;
+  materials?: CoverageMaterialShortage[];
   shortages?: CoverageMaterialShortage[];
 };
 
@@ -146,7 +144,7 @@ export type CoverageSidePayload = {
 };
 
 export type CoveragePeriodPayload = {
-  key: CoveragePeriodKey;
+  key: CoveragePeriodKey | "custom";
   label: string;
   days: string[];
   products: CoverageSidePayload;
@@ -193,15 +191,16 @@ function tileExplanation(
         };
       case "yellow":
         return {
-          title: "Можно собрать условно",
-          shows: "Сколько изделий можно собрать частично или полностью, если расходники и позиции «возможно в цехе» не считать блокирующими.",
-          counts: "Основное число — условно доступный выпуск. В строке изделия показываем строгую цифру отдельно, если она ниже условной."
+          title: "Частично собрать",
+          shows: "Изделия, у которых материалов хватает не на весь план, но часть номенклатур уже есть.",
+          counts:
+            "Основное число — сколько полуфабрикатов можно собрать сейчас по спецификации (узкое место по номенклатурам). Подпись — сколько видов изделий в частичном статусе."
         };
       case "red":
         return {
           title: "Без покрытия",
-          shows: "Сколько запланированных изделий сейчас вообще нельзя собрать из-за отсутствия нужных номенклатур или спецификации.",
-          counts: "Берём изделия с нулевым покрытием. Основное число — их план в штуках; подпись — сколько разных изделий заблокировано."
+          shows: "Изделия, у которых по всем номенклатурам спецификации нет остатка и нет поступлений на период.",
+          counts: "Берём изделия с полностью нулевым материальным покрытием. Основное число — их план в штуках."
         };
       default:
         return { title: tile.label, shows: tile.hint, counts: "" };
@@ -212,8 +211,8 @@ function tileExplanation(
     case "all":
       return {
         title: "Потребность номенклатур",
-        shows: "Сколько обязательной номенклатуры требуется производству за выбранный период. Расходники и возможные цеховые остатки показаны отдельно.",
-        counts: "Основное число — суммарная потребность обязательных позиций. Спорные позиции остаются в таблице и вынесены из плиточного расчёта."
+        shows: "Сколько обязательной номенклатуры требуется производству за выбранный период.",
+        counts: "Основное число — суммарная потребность. Подпись — количество разных номенклатур с ненулевым планом."
       };
     case "green":
       return {
@@ -268,19 +267,6 @@ const PERIOD_OPTIONS: Array<{ key: CoveragePeriodKey; label: string }> = [
   { key: "month", label: "За месяц" }
 ];
 
-const ANALYSIS_MODE_OPTIONS: Array<{ key: CoverageAnalysisMode; label: string; hint: string }> = [
-  {
-    key: "strict",
-    label: "Как раньше",
-    hint: "Все строки спецификации блокируют выпуск"
-  },
-  {
-    key: "conditional",
-    label: "Без расходников и цеха",
-    hint: "Расходники и возможные цеховые остатки не блокируют условный выпуск"
-  }
-];
-
 type CoverageSideKey = "products" | "nomenclatures";
 
 type CoverageViewTransition = { kind: "period" } | { kind: "section" };
@@ -317,25 +303,48 @@ function sectionPanelContentKey(
   return `${panel}-${animKey}`;
 }
 
-function formatScheduleMonth(value: string): string {
-  const [year, month] = value.split("-");
-  const monthIndex = Number.parseInt(month ?? "", 10);
-  if (!year || monthIndex < 1 || monthIndex > 12) return value;
-  const labels = [
-    "январь",
-    "февраль",
-    "март",
-    "апрель",
-    "май",
-    "июнь",
-    "июль",
-    "август",
-    "сентябрь",
-    "октябрь",
-    "ноябрь",
-    "декабрь"
-  ];
-  return `${labels[monthIndex - 1]} ${year}`;
+function formatCoveragePeriodLabel(
+  days: string[],
+  formatDate: (iso: string | null | undefined) => string
+): string | null {
+  if (!days.length) return null;
+  if (days.length === 1) return formatDate(days[0]);
+  return `${formatDate(days[0])}–${formatDate(days[days.length - 1])}`;
+}
+
+function resolveCoverageScheduleBounds(dashboard: CoverageDashboardPayload): { min: string; max: string } {
+  const monthDays = dashboard.periods.month?.days ?? [];
+  if (monthDays.length > 0) {
+    return { min: monthDays[0], max: monthDays[monthDays.length - 1] };
+  }
+  const [year, month] = dashboard.scheduleMonth.split("-");
+  if (!year || !month) {
+    const fallback = dashboard.asOf || "2026-01-01";
+    return { min: fallback, max: fallback };
+  }
+  const monthNum = Number.parseInt(month, 10);
+  const lastDay = new Date(Number.parseInt(year, 10), monthNum, 0).getDate();
+  return {
+    min: `${year}-${month}-01`,
+    max: `${year}-${month}-${String(lastDay).padStart(2, "0")}`
+  };
+}
+
+function rangeFromPeriodDays(days: string[] | undefined): { from: string; to: string } | null {
+  if (!days?.length) return null;
+  return { from: days[0], to: days[days.length - 1] };
+}
+
+function matchingPresetPeriod(
+  dashboard: CoverageDashboardPayload,
+  dateFrom: string,
+  dateTo: string
+): CoveragePeriodKey | null {
+  for (const key of ["day", "week", "month"] as const) {
+    const range = rangeFromPeriodDays(dashboard.periods[key]?.days);
+    if (range && range.from === dateFrom && range.to === dateTo) return key;
+  }
+  return null;
 }
 
 function mapCoverageDashboard(raw: unknown): CoverageDashboardPayload | null {
@@ -385,10 +394,8 @@ function mapCoverageDashboard(raw: unknown): CoverageDashboardPayload | null {
             plan: Number(item.plan ?? 0),
             fact: Number(item.fact ?? 0),
             covered: Number(item.covered ?? 0),
-            strictCovered: item.strictCovered !== undefined ? Number(item.strictCovered ?? 0) : undefined,
-            conditionalCovered:
-              item.conditionalCovered !== undefined ? Number(item.conditionalCovered ?? 0) : undefined,
-            conditional: Boolean(item.conditional ?? false),
+            assemblableQty:
+              item.assemblableQty !== undefined ? Number(item.assemblableQty ?? 0) : undefined,
             status: String(item.status ?? "")
           };
           mapped.materialKind = String(item.materialKind ?? "");
@@ -399,27 +406,14 @@ function mapCoverageDashboard(raw: unknown): CoverageDashboardPayload | null {
           if (item.available !== undefined && item.available !== null) {
             mapped.available = Number(item.available);
           }
+          if (Array.isArray(item.materials)) {
+            mapped.materials = mapCoverageMaterialLines(item.materials);
+          }
           if (Array.isArray(item.shortages)) {
-            mapped.shortages = item.shortages.flatMap((shortage) => {
-              if (!shortage || typeof shortage !== "object") return [];
-              const part = shortage as Record<string, unknown>;
-              const name = String(part.name ?? "");
-              if (!name) return [];
-              return [
-                {
-                  name,
-                  plan: Number(part.plan ?? 0),
-                  stock: Number(part.stock ?? 0),
-                  expected: Number(part.expected ?? 0),
-                  shortage: Number(part.shortage ?? 0),
-                  materialKind: String(part.materialKind ?? ""),
-                  materialKindLabel: String(part.materialKindLabel ?? ""),
-                  materialKindConfidence: String(part.materialKindConfidence ?? ""),
-                  materialKindReason: String(part.materialKindReason ?? ""),
-                  optional: Boolean(part.optional ?? false)
-                }
-              ];
-            });
+            mapped.shortages = mapCoverageMaterialLines(item.shortages);
+          }
+          if (!mapped.materials?.length && mapped.shortages?.length) {
+            mapped.materials = mapped.shortages;
           }
           return [mapped];
         })
@@ -445,6 +439,82 @@ function mapCoverageDashboard(raw: unknown): CoverageDashboardPayload | null {
     scheduleMonth: String(data.schedule_month ?? ""),
     defaultPeriod: normalizedPeriod,
     periods
+  };
+}
+
+function mapCoverageSide(sideRaw: unknown): CoverageSidePayload {
+  const sideData = sideRaw && typeof sideRaw === "object" ? (sideRaw as Record<string, unknown>) : {};
+  const tilesRaw =
+    sideData.tiles && typeof sideData.tiles === "object"
+      ? (sideData.tiles as Record<string, unknown>)
+      : {};
+  const rowsRaw = Array.isArray(sideData.rows) ? sideData.rows : [];
+  return {
+    tiles: {
+      all: Number(tilesRaw.all ?? 0),
+      green: Number(tilesRaw.green ?? 0),
+      yellow: Number(tilesRaw.yellow ?? 0),
+      red: Number(tilesRaw.red ?? 0),
+      plan_total: Number(tilesRaw.plan_total ?? 0),
+      fact_total: Number(tilesRaw.fact_total ?? 0),
+      covered_total: Number(tilesRaw.covered_total ?? 0),
+      green_plan_total: Number(tilesRaw.green_plan_total ?? 0),
+      yellow_plan_total: Number(tilesRaw.yellow_plan_total ?? 0),
+      red_plan_total: Number(tilesRaw.red_plan_total ?? 0),
+      green_covered_total: Number(tilesRaw.green_covered_total ?? 0),
+      yellow_covered_total: Number(tilesRaw.yellow_covered_total ?? 0),
+      red_covered_total: Number(tilesRaw.red_covered_total ?? 0),
+      optional: Number(tilesRaw.optional ?? 0),
+      optional_plan_total: Number(tilesRaw.optional_plan_total ?? 0),
+      optional_covered_total: Number(tilesRaw.optional_covered_total ?? 0)
+    },
+    rows: rowsRaw.flatMap((row) => {
+      if (!row || typeof row !== "object") return [];
+      const item = row as Record<string, unknown>;
+      const name = String(item.name ?? "");
+      if (!name) return [];
+      const mapped: CoverageRow = {
+        name,
+        plan: Number(item.plan ?? 0),
+        fact: Number(item.fact ?? 0),
+        covered: Number(item.covered ?? 0),
+        assemblableQty: item.assemblableQty !== undefined ? Number(item.assemblableQty ?? 0) : undefined,
+        status: String(item.status ?? "")
+      };
+      mapped.materialKind = String(item.materialKind ?? "");
+      mapped.materialKindLabel = String(item.materialKindLabel ?? "");
+      mapped.materialKindConfidence = String(item.materialKindConfidence ?? "");
+      mapped.materialKindReason = String(item.materialKindReason ?? "");
+      mapped.optional = Boolean(item.optional ?? false);
+      if (item.available !== undefined && item.available !== null) {
+        mapped.available = Number(item.available);
+      }
+      if (Array.isArray(item.materials)) {
+        mapped.materials = mapCoverageMaterialLines(item.materials);
+      }
+      if (Array.isArray(item.shortages)) {
+        mapped.shortages = mapCoverageMaterialLines(item.shortages);
+      }
+      if (!mapped.materials?.length && mapped.shortages?.length) {
+        mapped.materials = mapped.shortages;
+      }
+      return [mapped];
+    })
+  };
+}
+
+export function parseCoveragePeriod(raw: unknown): CoveragePeriodPayload | null {
+  if (!raw || typeof raw !== "object") return null;
+  const period = raw as Record<string, unknown>;
+  const keyRaw = String(period.key ?? "custom");
+  const key: CoveragePeriodPayload["key"] =
+    keyRaw === "day" || keyRaw === "week" || keyRaw === "month" ? keyRaw : "custom";
+  return {
+    key,
+    label: String(period.label ?? key),
+    days: Array.isArray(period.days) ? period.days.map(String) : [],
+    products: mapCoverageSide(period.products),
+    nomenclatures: mapCoverageSide(period.nomenclatures)
   };
 }
 
@@ -477,44 +547,40 @@ function formatCompactQty(value: number): string {
 function tileMetricValue(
   tileKey: CoverageTileKey,
   tiles: CoverageSidePayload["tiles"],
-  side: CoverageSideKey,
-  analysisMode: CoverageAnalysisMode
+  side: CoverageSideKey
 ): { value: string; subLabel: string } {
   const count = tiles[tileKey] ?? 0;
   const itemLabel = side === "products" ? "видов изделий" : "позиций";
   const unitLabel = side === "products" ? "шт" : "ед.";
-  const optionalSuffix =
-    side === "nomenclatures" && (tiles.optional ?? 0) > 0
-      ? analysisMode === "conditional"
-        ? ` · ${tiles.optional} спорн. вне расчёта`
-        : ` · ${tiles.optional} спорн. включены`
-      : "";
 
   if (tileKey === "all") {
     return {
       value: formatCompactQty(tiles.plan_total ?? 0),
-      subLabel: `план · ${count} ${itemLabel}${optionalSuffix}`
+      subLabel: `план · ${count} ${itemLabel}`
     };
   }
 
   if (tileKey === "green") {
     return {
       value: formatCompactQty(tiles.green_plan_total ?? tiles.covered_total ?? 0),
-      subLabel: `${count} ${itemLabel} · полностью${optionalSuffix}`
+      subLabel: `${count} ${itemLabel} · полностью`
     };
   }
 
   if (tileKey === "yellow") {
     return {
       value: formatCompactQty(tiles.yellow_covered_total ?? 0),
-      subLabel: `${unitLabel} можно сейчас · ${count} ${itemLabel}${optionalSuffix}`
+      subLabel:
+        side === "products"
+          ? `${unitLabel} полуфабрикатов · ${count} ${itemLabel}`
+          : `${unitLabel} можно сейчас · ${count} ${itemLabel}`
     };
   }
 
   if (tileKey === "red") {
     return {
       value: formatCompactQty(tiles.red_plan_total ?? 0),
-      subLabel: `без покрытия · ${count} ${itemLabel}${optionalSuffix}`
+      subLabel: `без покрытия · ${count} ${itemLabel}`
     };
   }
 
@@ -570,91 +636,41 @@ function filterRows(rows: CoverageRow[], tile: CoverageTileKey): CoverageRow[] {
   return rows.filter((row) => row.status === tile);
 }
 
-function coverageStatusFromCovered(plan: number, covered: number): string {
-  if (plan <= 0) return "none";
-  if (covered + 1e-9 >= plan) return "green";
-  if (covered > 1e-12) return "yellow";
-  return "red";
+function mapCoverageMaterialLines(raw: unknown): CoverageMaterialShortage[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.flatMap((entry) => {
+    if (!entry || typeof entry !== "object") return [];
+    const part = entry as Record<string, unknown>;
+    const name = String(part.name ?? "");
+    if (!name) return [];
+    return [
+      {
+        name,
+        plan: Number(part.plan ?? 0),
+        stock: Number(part.stock ?? 0),
+        expected: Number(part.expected ?? 0),
+        shortage: Number(part.shortage ?? 0),
+        materialKind: String(part.materialKind ?? ""),
+        materialKindLabel: String(part.materialKindLabel ?? ""),
+        materialKindConfidence: String(part.materialKindConfidence ?? ""),
+        materialKindReason: String(part.materialKindReason ?? ""),
+        optional: Boolean(part.optional ?? false)
+      }
+    ];
+  });
 }
 
-function productRowForAnalysisMode(row: CoverageRow, mode: CoverageAnalysisMode): CoverageRow {
-  const strictCovered = typeof row.strictCovered === "number" ? row.strictCovered : row.covered;
-  const conditionalCovered =
-    typeof row.conditionalCovered === "number" ? row.conditionalCovered : row.covered;
-  if (mode === "strict") {
-    return {
-      ...row,
-      covered: strictCovered,
-      conditional: false,
-      status: coverageStatusFromCovered(row.plan, strictCovered)
-    };
+function productMaterialLines(row: CoverageRow): CoverageMaterialShortage[] {
+  if (row.materials?.length) return row.materials;
+  return row.shortages ?? [];
+}
+
+function productShortageLines(row: CoverageRow): CoverageMaterialShortage[] {
+  const materials = productMaterialLines(row);
+  if (row.materials?.length) {
+    return materials.filter((item) => item.shortage > 1e-9);
   }
-  const covered = Math.max(strictCovered, conditionalCovered);
-  const status =
-    strictCovered + 1e-9 >= row.plan
-      ? "green"
-      : covered > 1e-12
-        ? "yellow"
-        : coverageStatusFromCovered(row.plan, covered);
-  return {
-    ...row,
-    covered,
-    conditional: covered > strictCovered + 1e-9,
-    status
-  };
-}
-
-function buildCoverageTileStats(
-  rows: CoverageRow[],
-  { ignoreOptional = false }: { ignoreOptional?: boolean } = {}
-): CoverageSidePayload["tiles"] {
-  const allWithPlan = rows.filter((row) => row.plan > 0);
-  const optionalRows = allWithPlan.filter((row) => row.optional);
-  const withPlan = ignoreOptional ? allWithPlan.filter((row) => !row.optional) : allWithPlan;
-  const greenRows = withPlan.filter((row) => row.status === "green");
-  const yellowRows = withPlan.filter((row) => row.status === "yellow");
-  const redRows = withPlan.filter((row) => row.status === "red");
-  const sum = (items: CoverageRow[], key: "plan" | "fact" | "covered") =>
-    items.reduce((total, row) => total + (Number.isFinite(row[key]) ? row[key] : 0), 0);
-  return {
-    all: withPlan.length,
-    green: greenRows.length,
-    yellow: yellowRows.length,
-    red: redRows.length,
-    plan_total: sum(withPlan, "plan"),
-    fact_total: sum(withPlan, "fact"),
-    covered_total: sum(withPlan, "covered"),
-    green_plan_total: sum(greenRows, "plan"),
-    yellow_plan_total: sum(yellowRows, "plan"),
-    red_plan_total: sum(redRows, "plan"),
-    green_covered_total: sum(greenRows, "covered"),
-    yellow_covered_total: sum(yellowRows, "covered"),
-    red_covered_total: sum(redRows, "covered"),
-    optional: optionalRows.length,
-    optional_plan_total: sum(optionalRows, "plan"),
-    optional_covered_total: sum(optionalRows, "covered")
-  };
-}
-
-function coveragePeriodForAnalysisMode(
-  periodData: CoveragePeriodPayload,
-  mode: CoverageAnalysisMode
-): CoveragePeriodPayload {
-  const productRows = periodData.products.rows.map((row) => productRowForAnalysisMode(row, mode));
-  const nomenclatureRows = periodData.nomenclatures.rows;
-  return {
-    ...periodData,
-    products: {
-      rows: productRows,
-      tiles: buildCoverageTileStats(productRows)
-    },
-    nomenclatures: {
-      rows: nomenclatureRows,
-      tiles: buildCoverageTileStats(nomenclatureRows, {
-        ignoreOptional: mode === "conditional"
-      })
-    }
-  };
+  return materials;
 }
 
 function statusLabel(status: string): string {
@@ -767,7 +783,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
     const byName = new Map<string, CoverageProblemMaterial>();
     for (const row of rows) {
       if (!selectedProblemProducts.has(row.name)) continue;
-      for (const shortage of row.shortages ?? []) {
+      for (const shortage of productShortageLines(row)) {
         const current = byName.get(shortage.name);
         if (current) {
           current.plan += shortage.plan;
@@ -799,8 +815,8 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
 
   const expandHint = expandableProducts
     ? tile.key === "red"
-      ? "Нажмите на изделие, чтобы увидеть недостающие номенклатуры."
-      : "Нажмите на изделие, чтобы увидеть, каких материалов не хватает для полного плана."
+      ? "Нажмите на изделие, чтобы увидеть все номенклатуры спецификации."
+      : "Нажмите на изделие, чтобы увидеть полный состав спецификации и дефициты."
     : null;
 
   const detailColumnCount = showAvailable ? 6 : 5;
@@ -891,8 +907,8 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
               ) : null}
             </div>
           ) : null}
-          <span className={styles.riskTotalBadge}>
-            {rows.length > 0 ? `${rows.length} поз.` : "Нет позиций"}
+          <span className={styles.coverageDetailCount}>
+            {rows.length > 0 ? `${rows.length} позиций` : "Нет позиций"}
           </span>
         </div>
       </div>
@@ -916,14 +932,10 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
               {rows.map((row) => {
                 const isExpanded = expandableProducts && activeExpandedProduct === row.name;
                 const canExpand = expandableProducts;
-                const shortages = row.shortages ?? [];
+                const materials = productMaterialLines(row);
                 const panelId = `coverage-shortages-${row.name.replace(/[^\w-]+/g, "-")}`;
                 const rowMaterialClass = row.optional ? materialKindClass(row.materialKind) : "";
                 const rowKindLabel = materialKindLabel(row);
-                const strictCovered =
-                  typeof row.strictCovered === "number" ? row.strictCovered : row.covered;
-                const conditionalCovered =
-                  typeof row.conditionalCovered === "number" ? row.conditionalCovered : row.covered;
 
                 return (
                   <Fragment key={row.name}>
@@ -971,21 +983,13 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                       <td>{formatQty(row.plan)}</td>
                       <td>{formatQty(row.fact)}</td>
                       <td
-                        className={row.conditional ? styles.coverageConditionalValue : undefined}
                         title={
-                          row.conditional
-                            ? `Условно: ${formatQty(conditionalCovered)}; строго по всем строкам: ${formatQty(
-                                strictCovered
-                              )}`
+                          side === "products"
+                            ? "Сколько полуфабрикатов можно собрать по спецификации"
                             : undefined
                         }
                       >
                         {formatQty(row.covered)}
-                        {row.conditional ? (
-                          <span className={styles.coverageStrictHint}>
-                            строго {formatQty(strictCovered)}
-                          </span>
-                        ) : null}
                       </td>
                       {showAvailable ? <td>{formatQty(row.available ?? 0)}</td> : null}
                       <td>
@@ -998,55 +1002,77 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                       <tr className={styles.coverageDetailExpandRow}>
                         <td colSpan={detailColumnCount}>
                           <div id={panelId} className={styles.coverageShortagePanel}>
-                            {shortages.length === 0 ? (
+                            {materials.length === 0 ? (
                               <p className={styles.coverageShortageEmpty}>
-                                Для этого изделия не найдена спецификация или недостающие
-                                номенклатуры не определены.
+                                Для этого изделия не найдена спецификация или номенклатуры не
+                                определены.
                               </p>
                             ) : (
                               <>
                                 <p className={styles.coverageShortageLead}>
-                                  Недостающие номенклатуры для плана {formatQty(row.plan)} за период
+                                  Номенклатуры спецификации для плана {formatQty(row.plan)} за период
                                 </p>
-                                <table className={styles.coverageShortageTable}>
-                                  <thead>
-                                    <tr>
-                                      <th>Номенклатура</th>
-                                      <th>План</th>
-                                      <th>Остаток</th>
-                                      <th>Ожид. поступление</th>
-                                      <th>Не хватает</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {shortages.map((shortage) => {
-                                      const shortageClass = shortage.optional
-                                        ? materialKindClass(shortage.materialKind)
-                                        : "";
-                                      const shortageLabel = materialKindLabel(shortage);
-                                      return (
-                                      <tr key={shortage.name} className={shortageClass || undefined}>
-                                        <td className={styles.coverageShortageName} title={shortage.name}>
-                                          {shortage.name}
-                                          {shortage.optional && shortageLabel ? (
-                                            <span className={styles.coverageMaterialBadge}>{shortageLabel}</span>
-                                          ) : null}
-                                        </td>
-                                        <td>{formatQty(shortage.plan)}</td>
-                                        <td>{formatQty(shortage.stock)}</td>
-                                        <td>{formatQty(shortage.expected)}</td>
-                                        <td
-                                          className={
-                                            shortage.shortage > 0 ? styles.coverageShortageValue : undefined
-                                          }
-                                        >
-                                          {formatQty(shortage.shortage)}
-                                        </td>
+                                <div className={styles.coverageBomScroll}>
+                                  <table
+                                    className={styles.coverageBomTable}
+                                    aria-label={`Номенклатуры изделия ${row.name}`}
+                                  >
+                                    <colgroup>
+                                      <col className={styles.coverageBomColName} />
+                                      <col className={styles.coverageBomColQty} span={4} />
+                                    </colgroup>
+                                    <thead>
+                                      <tr>
+                                        <th scope="col">Номенклатура</th>
+                                        <th scope="col">План</th>
+                                        <th scope="col">Остаток</th>
+                                        <th scope="col">Ожид. поступление</th>
+                                        <th scope="col">Не хватает</th>
                                       </tr>
-                                      );
-                                    })}
-                                  </tbody>
-                                </table>
+                                    </thead>
+                                    <tbody>
+                                      {materials.map((material) => {
+                                        const materialClass = material.optional
+                                          ? materialKindClass(material.materialKind)
+                                          : "";
+                                        const materialLabel = materialKindLabel(material);
+                                        const hasShortage = material.shortage > 1e-9;
+                                        return (
+                                          <tr
+                                            key={material.name}
+                                            className={`${materialClass || ""} ${
+                                              hasShortage ? styles.coverageBomRowShortage : ""
+                                            }`.trim() || undefined}
+                                          >
+                                            <td
+                                              className={styles.coverageShortageName}
+                                              title={material.name}
+                                            >
+                                              <span className={styles.coverageShortageNameText}>
+                                                {material.name}
+                                              </span>
+                                              {material.optional && materialLabel ? (
+                                                <span className={styles.coverageMaterialBadge}>
+                                                  {materialLabel}
+                                                </span>
+                                              ) : null}
+                                            </td>
+                                            <td>{formatQty(material.plan)}</td>
+                                            <td>{formatQty(material.stock)}</td>
+                                            <td>{formatQty(material.expected)}</td>
+                                            <td
+                                              className={
+                                                hasShortage ? styles.coverageShortageValue : undefined
+                                              }
+                                            >
+                                              {formatQty(material.shortage)}
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
                               </>
                             )}
                           </div>
@@ -2168,9 +2194,162 @@ function ManagerResultsDashboard({
   );
 }
 
+type CoveragePeriodSelectionMode = "preset" | "range";
+
+function CoveragePeriodPicker({
+  scheduleMin,
+  scheduleMax,
+  period,
+  periodMode,
+  rangeFrom,
+  rangeTo,
+  menuOpen,
+  rangeLoading,
+  rangeError,
+  onToggleMenu,
+  onCloseMenu,
+  onPresetSelect,
+  onRangeFromChange,
+  onRangeToChange,
+  onApplyRange,
+  formatDate
+}: {
+  scheduleMin: string;
+  scheduleMax: string;
+  period: CoveragePeriodKey;
+  periodMode: CoveragePeriodSelectionMode;
+  rangeFrom: string;
+  rangeTo: string;
+  menuOpen: boolean;
+  rangeLoading: boolean;
+  rangeError: string | null;
+  onToggleMenu: () => void;
+  onCloseMenu: () => void;
+  onPresetSelect: (nextPeriod: CoveragePeriodKey) => void;
+  onRangeFromChange: (value: string) => void;
+  onRangeToChange: (value: string) => void;
+  onApplyRange: () => void;
+  formatDate: (iso: string | null | undefined) => string;
+}) {
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const triggerLabel = useMemo(() => {
+    if (periodMode === "range" && rangeFrom && rangeTo) {
+      return `${formatDate(rangeFrom)}–${formatDate(rangeTo)}`;
+    }
+    if (periodMode === "preset") {
+      return PERIOD_OPTIONS.find((option) => option.key === period)?.label ?? "Выбрать период";
+    }
+    return "Выбрать период";
+  }, [formatDate, period, periodMode, rangeFrom, rangeTo]);
+
+  const rangeInvalid = Boolean(rangeFrom && rangeTo && rangeFrom > rangeTo);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onCloseMenu();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [menuOpen, onCloseMenu]);
+
+  return (
+    <div className={styles.coveragePeriodPicker} ref={menuRef}>
+      <button
+        type="button"
+        className={`${styles.coveragePeriodTrigger} ${menuOpen ? styles.coveragePeriodTriggerOpen : ""}`}
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        onClick={onToggleMenu}
+      >
+        <CalendarDays size={14} strokeWidth={2.2} aria-hidden="true" />
+        <span>{rangeLoading ? "Считаем…" : triggerLabel}</span>
+        <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
+      </button>
+
+      {menuOpen ? (
+        <div
+          className={styles.coveragePeriodMenu}
+          role="menu"
+          aria-label="Выбор периода обеспеченности"
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          <div className={styles.coveragePeriodMenuPresets} role="group" aria-label="Рекомендованные периоды">
+            {PERIOD_OPTIONS.map((option) => (
+              <button
+                key={option.key}
+                type="button"
+                role="menuitemradio"
+                aria-checked={periodMode === "preset" && period === option.key}
+                className={`${styles.coveragePeriodBtn} ${
+                  periodMode === "preset" && period === option.key ? styles.coveragePeriodBtnActive : ""
+                }`}
+                onClick={() => onPresetSelect(option.key)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+
+          <div className={styles.coveragePeriodMenuRange}>
+            <label className={styles.coveragePeriodMenuField}>
+              <span>С</span>
+              <input
+                type="date"
+                className={styles.coveragePeriodMenuDateInput}
+                value={rangeFrom}
+                min={scheduleMin}
+                max={rangeTo || scheduleMax}
+                onChange={(event) => {
+                  if (event.target.value) onRangeFromChange(event.target.value);
+                }}
+                aria-label="Начало периода"
+              />
+            </label>
+            <span className={styles.coveragePeriodMenuDash} aria-hidden="true">
+              —
+            </span>
+            <label className={styles.coveragePeriodMenuField}>
+              <span>По</span>
+              <input
+                type="date"
+                className={styles.coveragePeriodMenuDateInput}
+                value={rangeTo}
+                min={rangeFrom || scheduleMin}
+                max={scheduleMax}
+                onChange={(event) => {
+                  if (event.target.value) onRangeToChange(event.target.value);
+                }}
+                aria-label="Конец периода"
+              />
+            </label>
+          </div>
+
+          {rangeInvalid ? (
+            <p className={styles.coveragePeriodMenuError}>Дата начала не может быть позже даты окончания.</p>
+          ) : rangeError ? (
+            <p className={styles.coveragePeriodMenuError}>{rangeError}</p>
+          ) : null}
+
+          <button
+            type="button"
+            className={styles.coveragePeriodMenuApply}
+            disabled={rangeLoading || rangeInvalid || !rangeFrom || !rangeTo}
+            onClick={onApplyRange}
+          >
+            {rangeLoading ? "Считаем…" : "Применить период"}
+          </button>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 type CoverageDashboardTilesProps = {
   dashboard: CoverageDashboardPayload;
   formatDate?: (iso: string | null | undefined) => string;
+  onFetchCustomPeriod?: (dateFrom: string, dateTo: string) => Promise<CoveragePeriodPayload | null>;
   managerTasks?: ShiftTaskBoardProps | null;
   managerTasksNotice?: ManagerTasksNotice | null;
   managerResults?: ManagerResultsBundle | null;
@@ -2179,6 +2358,7 @@ type CoverageDashboardTilesProps = {
 export function CoverageDashboardTiles({
   dashboard,
   formatDate = formatRuDate,
+  onFetchCustomPeriod,
   managerTasks = null,
   managerTasksNotice = null,
   managerResults = null
@@ -2188,8 +2368,23 @@ export function CoverageDashboardTiles({
     !hasManagerResultsSide && (Boolean(managerTasks) || Boolean(managerTasksNotice));
   const hasExtraSide = hasTasksSide || hasManagerResultsSide;
   const [period, setPeriod] = useState<CoveragePeriodKey>(dashboard.defaultPeriod ?? "week");
+  const [periodMode, setPeriodMode] = useState<CoveragePeriodSelectionMode>("preset");
+  const [customPeriodData, setCustomPeriodData] = useState<CoveragePeriodPayload | null>(null);
+  const scheduleBounds = useMemo(() => resolveCoverageScheduleBounds(dashboard), [dashboard]);
+  const [rangeFrom, setRangeFrom] = useState(
+    () =>
+      rangeFromPeriodDays(dashboard.periods[dashboard.defaultPeriod ?? "week"]?.days)?.from ??
+      scheduleBounds.min
+  );
+  const [rangeTo, setRangeTo] = useState(
+    () =>
+      rangeFromPeriodDays(dashboard.periods[dashboard.defaultPeriod ?? "week"]?.days)?.to ??
+      scheduleBounds.max
+  );
+  const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
+  const [rangeLoading, setRangeLoading] = useState(false);
+  const [rangeError, setRangeError] = useState<string | null>(null);
   const [selectedTile, setSelectedTile] = useState<CoverageTileKey>("all");
-  const [analysisMode, setAnalysisMode] = useState<CoverageAnalysisMode>("conditional");
   const [dashboardSide, setDashboardSide] = useState<CoverageDashboardSide>("products");
   const [explainedTileBySide, setExplainedTileBySide] = useState(createEmptyExplainedTiles);
   const [viewTransition, setViewTransition] = useState<CoverageViewTransition | null>(null);
@@ -2252,7 +2447,21 @@ export function CoverageDashboardTiles({
   }, []);
 
   useEffect(() => {
-    setPeriod(dashboard.defaultPeriod ?? "week");
+    const nextPeriod = dashboard.defaultPeriod ?? "week";
+    const nextRange =
+      rangeFromPeriodDays(dashboard.periods[nextPeriod]?.days) ??
+      rangeFromPeriodDays(dashboard.periods.week?.days) ??
+      rangeFromPeriodDays(dashboard.periods.month?.days);
+    setPeriod(nextPeriod);
+    setPeriodMode("preset");
+    setCustomPeriodData(null);
+    if (nextRange) {
+      setRangeFrom(nextRange.from);
+      setRangeTo(nextRange.to);
+    }
+    setPeriodMenuOpen(false);
+    setRangeLoading(false);
+    setRangeError(null);
     setSelectedTile("all");
     setDashboardSide("products");
     setExplainedTileBySide(createEmptyExplainedTiles());
@@ -2268,11 +2477,11 @@ export function CoverageDashboardTiles({
       window.clearTimeout(coverageFlipTimerRef.current);
       coverageFlipTimerRef.current = null;
     }
-  }, [dashboard]);
+  }, [dashboard.asOf, dashboard.defaultPeriod, dashboard.scheduleMonth, scheduleBounds]);
 
   useEffect(() => {
     setExplainedTileBySide(createEmptyExplainedTiles());
-  }, [period, dashboardSide, analysisMode]);
+  }, [period, dashboardSide]);
 
   useEffect(() => {
     if (dashboardSide === "tasks" && !hasTasksSide) {
@@ -2306,7 +2515,7 @@ export function CoverageDashboardTiles({
     const observer = new ResizeObserver(updateHeight);
     observer.observe(panel);
     return () => observer.disconnect();
-  }, [hasExtraSide, isCoverageMode, period, selectedTile, analysisMode, managerTasks, managerResults]);
+  }, [hasExtraSide, isCoverageMode, period, selectedTile, managerTasks, managerResults]);
 
   useEffect(() => {
     const hasOpen = Boolean(explainedTileBySide.products || explainedTileBySide.nomenclatures);
@@ -2318,11 +2527,11 @@ export function CoverageDashboardTiles({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [explainedTileBySide]);
 
-  const rawPeriodData = dashboard.periods[period] ?? dashboard.periods.week ?? dashboard.periods.month;
-  const periodData = useMemo(
-    () => (rawPeriodData ? coveragePeriodForAnalysisMode(rawPeriodData, analysisMode) : rawPeriodData),
-    [analysisMode, rawPeriodData]
-  );
+  const rawPeriodData =
+    periodMode === "range" && customPeriodData
+      ? customPeriodData
+      : dashboard.periods[period] ?? dashboard.periods.week ?? dashboard.periods.month;
+  const periodData = rawPeriodData;
 
   const tileValues = useMemo(() => {
     if (!periodData) {
@@ -2366,24 +2575,75 @@ export function CoverageDashboardTiles({
     }));
   }, []);
 
-  const handlePeriodChange = useCallback(
-    (nextPeriod: CoveragePeriodKey) => {
-      if (nextPeriod === period) return;
-      scheduleViewTransition({ kind: "period" }, COVERAGE_PERIOD_TRANSITION_MS);
-      setPeriod(nextPeriod);
+  const applyDateRange = useCallback(
+    async (dateFrom: string, dateTo: string) => {
+      if (!dateFrom || !dateTo || dateFrom > dateTo) return;
+      const matchedPreset = matchingPresetPeriod(dashboard, dateFrom, dateTo);
+      if (matchedPreset) {
+        if (periodMode !== "preset" || period !== matchedPreset) {
+          scheduleViewTransition({ kind: "period" }, COVERAGE_PERIOD_TRANSITION_MS);
+        }
+        setPeriodMode("preset");
+        setCustomPeriodData(null);
+        setRangeError(null);
+        setPeriod(matchedPreset);
+        return;
+      }
+      if (!onFetchCustomPeriod) {
+        setRangeError("Пересчёт произвольного периода недоступен.");
+        return;
+      }
+      setRangeLoading(true);
+      setRangeError(null);
+      try {
+        const nextPeriod = await onFetchCustomPeriod(dateFrom, dateTo);
+        if (!nextPeriod) {
+          setRangeError("В выбранном диапазоне нет рабочих дней графика.");
+          return;
+        }
+        scheduleViewTransition({ kind: "period" }, COVERAGE_PERIOD_TRANSITION_MS);
+        setPeriodMode("range");
+        setCustomPeriodData(nextPeriod);
+      } catch (error) {
+        setRangeError(error instanceof Error ? error.message : "Не удалось пересчитать период.");
+      } finally {
+        setRangeLoading(false);
+      }
     },
-    [period, scheduleViewTransition]
+    [dashboard, onFetchCustomPeriod, period, periodMode, scheduleViewTransition]
   );
 
-  const handleAnalysisModeChange = useCallback(
-    (nextMode: CoverageAnalysisMode) => {
-      if (nextMode === analysisMode) return;
-      scheduleViewTransition({ kind: "period" }, COVERAGE_PERIOD_TRANSITION_MS);
-      setAnalysisMode(nextMode);
-      setSelectedTile("all");
+  const handlePeriodChange = useCallback(
+    (nextPeriod: CoveragePeriodKey) => {
+      const nextRange = rangeFromPeriodDays(dashboard.periods[nextPeriod]?.days);
+      if (nextRange) {
+        setRangeFrom(nextRange.from);
+        setRangeTo(nextRange.to);
+      }
+      if (nextPeriod !== period || periodMode !== "preset") {
+        scheduleViewTransition({ kind: "period" }, COVERAGE_PERIOD_TRANSITION_MS);
+      }
+      setPeriodMode("preset");
+      setCustomPeriodData(null);
+      setRangeError(null);
+      setPeriod(nextPeriod);
     },
-    [analysisMode, scheduleViewTransition]
+    [dashboard.periods, period, periodMode, scheduleViewTransition]
   );
+
+  useEffect(() => {
+    if (!rangeFrom || !rangeTo || rangeFrom > rangeTo) return;
+    const matchedPreset = matchingPresetPeriod(dashboard, rangeFrom, rangeTo);
+    if (matchedPreset && periodMode === "preset" && period === matchedPreset) return;
+    const timer = window.setTimeout(() => {
+      void applyDateRange(rangeFrom, rangeTo);
+    }, 350);
+    return () => window.clearTimeout(timer);
+  }, [applyDateRange, dashboard, period, periodMode, rangeFrom, rangeTo]);
+
+  const handleApplyCustomRange = useCallback(() => {
+    void applyDateRange(rangeFrom, rangeTo);
+  }, [applyDateRange, rangeFrom, rangeTo]);
 
   const selectDashboardSide = useCallback(
     (nextSide: CoverageDashboardSide) => {
@@ -2426,9 +2686,10 @@ export function CoverageDashboardTiles({
     [dashboardSide, viewTransition]
   );
   const animatingView = viewTransition !== null;
-  const scheduleMonthLabel = dashboard.scheduleMonth
-    ? formatScheduleMonth(dashboard.scheduleMonth)
-    : null;
+  const coveragePeriodLabel =
+    !isTasksMode && !isManagerResultsMode && periodData?.days?.length
+      ? formatCoveragePeriodLabel(periodData.days, formatDate)
+      : null;
 
   if (!periodData) return null;
 
@@ -2440,25 +2701,8 @@ export function CoverageDashboardTiles({
       showNomSide ? periodData.nomenclatures.rows : periodData.products.rows,
       selectedTileMeta.key
     );
-    const summaryPlanLabel = showNomSide ? "потребность" : "план";
-    const summaryCoveredLabel = showNomSide ? "покрыто" : "можно выпустить";
-    const analysisModeLabel =
-      analysisMode === "strict" ? "строго как раньше" : "без расходников и цеховых";
-
     return (
       <>
-        <div className={styles.coverageSummaryRow}>
-          <span className={styles.riskTotalBadge}>
-            {formatDate(dashboard.asOf)} · {periodData.label} · {periodData.days.length} дн. · {summaryPlanLabel}{" "}
-            {formatCompactQty(sideTilesLocal.plan_total ?? 0)} · факт{" "}
-            {formatCompactQty(sideTilesLocal.fact_total ?? 0)} · {summaryCoveredLabel}{" "}
-            {formatCompactQty(sideTilesLocal.covered_total ?? 0)} · режим: {analysisModeLabel}
-            {showNomSide && (sideTilesLocal.optional ?? 0) > 0
-              ? ` · спорные вне плиток ${sideTilesLocal.optional} поз.`
-              : ""}
-          </span>
-        </div>
-
         <div className={`${styles.riskAnalyticsBlock} ${styles.coverageSummaryBlock}`}>
           <div className={styles.riskAnalyticsRow}>
             <div className={styles.coverageAnalyticsTiles} role="group" aria-label="Обеспеченность">
@@ -2466,7 +2710,7 @@ export function CoverageDashboardTiles({
                 const isSelected = selectedTile === tile.key;
                 const isFlipped = explainedTile === tile.key;
                 const Icon = tileIcon(tile.key);
-                const metric = tileMetricValue(tile.key, sideTilesLocal, side, analysisMode);
+                const metric = tileMetricValue(tile.key, sideTilesLocal, side);
                 const displayLabel = coverageTileLabel(tile.key, side);
 
                 return (
@@ -2634,41 +2878,27 @@ export function CoverageDashboardTiles({
 
   const periodNav = (
     <div className={styles.coverageToolbar} role="toolbar" aria-label="Управление дашбордом обеспеченности">
-      <div className={styles.coveragePeriodNav} role="tablist" aria-label="Период обеспеченности">
-        {PERIOD_OPTIONS.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            role="tab"
-            aria-selected={period === option.key}
-            className={`${styles.coveragePeriodBtn} ${
-              period === option.key ? styles.coveragePeriodBtnActive : ""
-            }`}
-            onClick={() => handlePeriodChange(option.key)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      <span className={styles.coverageToolbarDivider} aria-hidden="true" />
-      <div className={styles.coverageAnalysisMode} role="group" aria-label="Режим расчёта обеспеченности">
-        {ANALYSIS_MODE_OPTIONS.map((option) => (
-          <button
-            key={option.key}
-            type="button"
-            className={`${styles.coverageAnalysisModeBtn} ${
-              analysisMode === option.key ? styles.coverageAnalysisModeBtnActive : ""
-            }`}
-            title={option.hint}
-            aria-pressed={analysisMode === option.key}
-            onClick={() => handleAnalysisModeChange(option.key)}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-      <span className={styles.coverageToolbarDivider} aria-hidden="true" />
-      {dashboardModeSwitch}
+      <CoveragePeriodPicker
+        scheduleMin={scheduleBounds.min}
+        scheduleMax={scheduleBounds.max}
+        period={period}
+        periodMode={periodMode}
+        rangeFrom={rangeFrom}
+        rangeTo={rangeTo}
+        menuOpen={periodMenuOpen}
+        rangeLoading={rangeLoading}
+        rangeError={rangeError}
+        onToggleMenu={() => setPeriodMenuOpen((current) => !current)}
+        onCloseMenu={() => setPeriodMenuOpen(false)}
+        onPresetSelect={handlePeriodChange}
+        onRangeFromChange={setRangeFrom}
+        onRangeToChange={setRangeTo}
+        onApplyRange={() => {
+          void handleApplyCustomRange();
+        }}
+        formatDate={formatDate}
+      />
+      <div className={styles.coverageToolbarTrailing}>{dashboardModeSwitch}</div>
     </div>
   );
 
@@ -2703,48 +2933,16 @@ export function CoverageDashboardTiles({
       } ${isTasksMode ? styles.coverageEmbeddedBlockTasks : ""}`}
     >
       <div className={styles.coverageBoardHeader}>
-        <div className={styles.coverageBoardIntro}>
-          <div
-            className={`${styles.coverageModeLead} ${
-              isProductsMode
-                ? styles.coverageModeLeadProducts
-                : isNomenclaturesMode
-                  ? styles.coverageModeLeadNom
-                  : styles.coverageModeLeadTasks
-            }`}
-          >
-            <span className={styles.coverageModeLeadIcon} aria-hidden="true">
-              {isProductsMode ? (
-                <Package size={18} strokeWidth={2.2} />
-              ) : isNomenclaturesMode ? (
-                <Layers size={18} strokeWidth={2.2} />
-              ) : (
-                <ClipboardList size={18} strokeWidth={2.2} />
-              )}
-            </span>
-            <div className={styles.coverageModeLeadTextWrap}>
-              <h2 className={styles.coverageModeLeadTitle}>
-                {isProductsMode
-                  ? "Обеспеченность производства по изделиям"
-                  : isNomenclaturesMode
-                    ? "Обеспеченность производства по номенклатурам"
-                    : isManagerResultsMode
-                      ? "Результаты работы менеджеров"
-                      : "Задачи сменного задания"}
-              </h2>
-              <p className={styles.coverageModeLeadHint}>
-                {isProductsMode
-                  ? "План, факт и возможность сборки из материалов"
-                  : isNomenclaturesMode
-                    ? "Потребность, остатки и поступления материалов"
-                    : isManagerResultsMode
-                      ? "Сводка по выполнению, сравнение менеджеров и основания"
-                      : "Срочные и недельные задания менеджера по закупкам"}
-                {scheduleMonthLabel && !isTasksMode && !isManagerResultsMode ? ` · ${scheduleMonthLabel}` : ""}
-              </p>
-            </div>
-          </div>
-        </div>
+        <h2 className={styles.coverageBoardTitle}>
+          {isProductsMode
+            ? "Обеспеченность по изделиям"
+            : isNomenclaturesMode
+              ? "Обеспеченность по номенклатурам"
+              : isManagerResultsMode
+                ? "Результаты работы менеджеров"
+                : "Задачи сменного задания"}
+          {coveragePeriodLabel ? ` · ${coveragePeriodLabel}` : ""}
+        </h2>
         <div className={styles.coverageDashboardControls}>
           {isManagerResultsMode
             ? managerResultsToolbar
@@ -2842,6 +3040,7 @@ export function CoverageDashboardTiles({
 type CoverageDashboardProps = {
   dashboard: CoverageDashboardPayload | null;
   formatDate?: (iso: string | null | undefined) => string;
+  onFetchCustomPeriod?: (dateFrom: string, dateTo: string) => Promise<CoveragePeriodPayload | null>;
   managerTasks?: ShiftTaskBoardProps | null;
   managerTasksNotice?: ManagerTasksNotice | null;
   managerResults?: ManagerResultsBundle | null;
@@ -2850,6 +3049,7 @@ type CoverageDashboardProps = {
 export function CoverageDashboard({
   dashboard,
   formatDate = formatRuDate,
+  onFetchCustomPeriod,
   managerTasks = null,
   managerTasksNotice = null,
   managerResults = null
@@ -2857,10 +3057,11 @@ export function CoverageDashboard({
   if (!dashboard) return null;
 
   return (
-    <section className={styles.coverageBoard} aria-label="Обеспеченность производства">
+    <section className={styles.coverageBoard} aria-label="Обеспеченность по изделиям">
       <CoverageDashboardTiles
         dashboard={dashboard}
         formatDate={formatDate}
+        onFetchCustomPeriod={onFetchCustomPeriod}
         managerTasks={managerTasks}
         managerTasksNotice={managerTasksNotice}
         managerResults={managerResults}

@@ -279,6 +279,28 @@ export const agentsApi = {
       .post<{ ok: boolean; path: string }>("/agents/document-analysis/reveal-in-explorer", formData)
       .then((r) => r.data);
   },
+  previewWorkbookForTab: (file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return apiClient
+      .post<{
+        ok: boolean;
+        file_name: string;
+        sheets: Array<{
+          name: string;
+          values: string[][];
+          row_count: number;
+          truncated_rows: boolean;
+          truncated_cols: boolean;
+        }>;
+        sheet_count: number;
+        truncated_sheets: boolean;
+      }>("/agents/document-analysis/workbook/preview", formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+        timeout: 180_000
+      })
+      .then((r) => r.data);
+  },
   listAvionDeveloperFeedbackThreads: () =>
     apiClient
       .get<DeveloperFeedbackThreadsResponse>("/agents/document-analysis/developer-feedback/threads")
@@ -330,7 +352,7 @@ export const agentsApi = {
         source: string;
         roles: Array<{ filename: string; role: string }>;
       }>("/agents/document-analysis/classify-excel", formData, {
-        timeout: 60000,
+        timeout: 15000,
         signal: options?.signal
       })
       .then((r) => ({
@@ -562,7 +584,7 @@ export const agentsApi = {
       }));
   },
 
-  getAveonDashboardLatest: () =>
+  getAveonDashboardLatest: (options?: { skipRefresh?: boolean }) =>
     longRunningApiClient
       .get<{
         ok: boolean;
@@ -633,7 +655,9 @@ export const agentsApi = {
           } | null;
           coverage_dashboard?: unknown;
         } | null;
-      }>("/agents/document-analysis/dashboard-latest")
+      }>("/agents/document-analysis/dashboard-latest", {
+        params: options?.skipRefresh ? { skip_refresh: true } : undefined
+      })
       .then((r) => {
         if (!r.data.ok || !r.data.snapshot) return null;
         const snap = r.data.snapshot;
@@ -722,6 +746,19 @@ export const agentsApi = {
           autoRefreshAttemptedDateMsk: snap.refresh_attempted_date_msk ?? null
         };
       }),
+
+  getCoverageDashboardPeriod: (dateFrom: string, dateTo: string) =>
+    longRunningApiClient
+      .get<{
+        ok: boolean;
+        date_from: string;
+        date_to: string;
+        period: unknown;
+      }>("/agents/document-analysis/coverage-dashboard/period", {
+        params: { date_from: dateFrom, date_to: dateTo },
+        timeout: 60000
+      })
+      .then((r) => r.data),
 
   clearAveonDashboardLatest: () =>
     apiClient.delete<{ ok: boolean; removed: boolean }>("/agents/document-analysis/dashboard-latest").then((r) => r.data),
@@ -814,6 +851,20 @@ export const agentsApi = {
               }>;
             }
           >;
+        };
+        year_schedule_view?: {
+          year: number;
+          month_keys: string[];
+          month_labels: string[];
+          products_count: number;
+          products: Array<{
+            product_key: string;
+            name: string;
+            code: string;
+            unit: string;
+            qty_by_month: Record<string, number>;
+            total: number;
+          }>;
         };
         table_entities: string[];
       }>("/agents/document-analysis/temp-production-plan")

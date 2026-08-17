@@ -1,4 +1,4 @@
-import { Loader2, Package } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import styles from "../DocumentAnalysisAgent.module.css";
 
 type Props = {
@@ -17,22 +17,12 @@ export default function CoverageDashboardLoading({ mode = "loading" }: Props) {
   return (
     <section
       className={`${styles.coverageBoard} ${styles.coverageBoardLoading}`}
-      aria-label="Обеспеченность производства"
+      aria-label="Обеспеченность по изделиям"
       aria-busy="true"
       aria-live="polite"
     >
       <div className={styles.coverageBoardHeader}>
-        <div className={styles.coverageBoardIntro}>
-          <div className={`${styles.coverageModeLead} ${styles.coverageModeLeadProducts}`}>
-            <span className={styles.coverageModeLeadIcon} aria-hidden="true">
-              <Package size={18} strokeWidth={2.2} />
-            </span>
-            <div className={styles.coverageModeLeadTextWrap}>
-              <h2 className={styles.coverageModeLeadTitle}>Обеспеченность производства</h2>
-              <p className={styles.coverageModeLeadHint}>План, остатки и поступления по изделиям и материалам</p>
-            </div>
-          </div>
-        </div>
+        <h2 className={styles.coverageBoardTitle}>Обеспеченность по изделиям</h2>
         <div className={styles.coverageDashboardLoadingPeriods} aria-hidden="true">
           {PERIOD_LABELS.map((label) => (
             <span key={label} className={styles.coverageDashboardLoadingPeriod}>

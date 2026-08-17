@@ -26,7 +26,6 @@ import {
   Package,
   ShieldCheck,
   Siren,
-  Sparkles,
   CheckCircle2,
   Info,
   Trash2,
@@ -68,10 +67,13 @@ import {
   mockDocumentAnalysisAgent
 } from "@/mock-data/documentAnalysisAgent";
 import { agentsApi } from "@/api/endpoints";
+import { openWorkbookInNewTab } from "@/utils/workbookPreviewStore";
 import {
   CoverageDashboard,
   parseCoverageDashboard,
+  parseCoveragePeriod,
   type CoverageDashboardPayload,
+  type CoveragePeriodPayload,
   type ManagerCompletionDashboard,
   type ManagerCompletionDateEntry,
   type ManagerResultsBundle,
@@ -250,24 +252,21 @@ function logAnalysisInputSources(
   console.log("===========");
 }
 
-/** Файлы в чеклисте до анализа. Остатки и спецификации — из БД (синхронизация 1С). */
+/** Опциональные Excel-файлы пользователя (переопределяют данные из БД). */
 const requiredFileRoles = [
   {
     role: "production_schedule",
-    label: "План производства",
-    hint: "месяцы → Заказ / Опытные / Склад × План / Факт · сравнение с сохранённой версией",
-    required: true
+    label: "План производства (Excel)",
+    hint: "опционально · переопределяет годовой график из БД · сравнение с сохранённой версией",
+    required: false
   },
   {
     role: "detailed_production_schedule",
-    label: "План производства на месяц",
-    hint: "по дням / неделям · сравнение с сохранённой версией",
+    label: "Детальный план (Excel)",
+    hint: "по дням / неделям · переопределяет план из 1С · сравнение с сохранённой версией",
     required: false
   }
 ] as const;
-
-type ChecklistPanelFace = "files" | "stages";
-type RequiredFileRowState = "idle" | "ready" | "missing" | "checking";
 
 type LogisticsRiskStageView = {
   key: string;
@@ -744,9 +743,9 @@ function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-/** Показать файл в проводнике Windows. */
+/** Открыть Excel-файл таблицей в новой вкладке. */
 async function openLocalFile(file: File): Promise<void> {
-  await agentsApi.revealAveonFileInExplorer(file);
+  await openWorkbookInNewTab(file);
 }
 
 function extractAnalyzeError(error: unknown): string {
@@ -819,7 +818,7 @@ function formatAnalysisTimestamp(value?: string | null): string {
     .replace(",", "");
 }
 
-export default function DocumentAnalysisAgent() {
+export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hideCatalogLink?: boolean }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dragDepthRef = useRef(0);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -828,7 +827,8 @@ export default function DocumentAnalysisAgent() {
   const [dashboardRefreshWarning, setDashboardRefreshWarning] = useState<string | null>(null);
   const [isLoadingLatestDashboard, setIsLoadingLatestDashboard] = useState(true);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [lastAnalysisAt, setLastAnalysisAt] = useState<string | null>(null);
+  const [lastSavedAnalysisAt, setLastSavedAnalysisAt] = useState<string | null>(null);
+  const [sessionAnalysisAt, setSessionAnalysisAt] = useState<string | null>(null);
   const [activeStageIndex, setActiveStageIndex] = useState(0);
   const [logisticsRisks, setLogisticsRisks] = useState<{
     asOf: string | null;
@@ -930,7 +930,6 @@ export default function DocumentAnalysisAgent() {
   const lastDetailedPruneKeyRef = useRef("");
   const detailedPruneInFlightRef = useRef(false);
   const russiaShipmentInputRef = useRef<HTMLInputElement>(null);
-  const [checklistFace, setChecklistFace] = useState<ChecklistPanelFace>("files");
   const stagesSectionRef = useRef<HTMLDivElement>(null);
   const classifyRequestIdRef = useRef(0);
   const classifyAbortRef = useRef<AbortController | null>(null);
@@ -1150,6 +1149,19 @@ export default function DocumentAnalysisAgent() {
     !isClassifyingRoles &&
     stagedFiles.every((item) => item.roleStatus === "ready" || item.roleStatus === "error");
 
+  const productionDbReady = Boolean(
+    referenceCache.productionPlan?.ok &&
+      (referenceCache.productionPlan?.year_schedule_view?.products_count ?? 0) > 0
+  );
+  const stockDbReady = Boolean((onecStockStatus?.db_count ?? 0) > 0);
+  const specsDbReady = Boolean((onecSpecsStatus?.db_specs ?? 0) > 0);
+  const productionPlanOnecReady = Boolean(
+    (onecProductionPlanStatus?.db_count ?? 0) > 0 || productionDbReady
+  );
+  const dbSourcesReady =
+    productionDbReady && Boolean(russiaShipmentSource) && googleSheetsConfigured !== false;
+  const onecSourcesReady = stockDbReady && specsDbReady && productionPlanOnecReady;
+
   const missingRequiredRoles = useMemo(
     () =>
       requiredFileRoles.filter(
@@ -1160,41 +1172,15 @@ export default function DocumentAnalysisAgent() {
 
   const shipmentSourcesReady = Boolean(russiaShipmentSource) && googleSheetsConfigured !== false;
 
-  const showShipmentSourcesPanel = useMemo(
-    () =>
-      russiaShipmentSourceLoading ||
-      !russiaShipmentSource ||
-      googleSheetsConfigured === false ||
-      Boolean(shipmentSourceError),
-    [russiaShipmentSourceLoading, russiaShipmentSource, googleSheetsConfigured, shipmentSourceError]
-  );
-
   const requiredFilesValid =
     rolesSettled &&
     !isMergingShipments &&
     !isPruningSchedules &&
     !isPruningDetailedSchedules &&
     shipmentSourcesReady &&
+    dbSourcesReady &&
+    onecSourcesReady &&
     missingRequiredRoles.length === 0;
-
-  const requiredFileRowStates = useMemo((): Record<string, RequiredFileRowState> => {
-    const states: Record<string, RequiredFileRowState> = {};
-    for (const entry of requiredFileRoles) {
-      if (presentRequiredRoles.has(entry.role)) {
-        states[entry.role] = "ready";
-      } else if (!stagedFiles.length) {
-        states[entry.role] = "idle";
-      } else if (!rolesSettled) {
-        states[entry.role] = entry.required ? "checking" : "idle";
-      } else if (entry.required) {
-        states[entry.role] = "missing";
-      } else {
-        // опциональный детальный график — без красного, если не загружен
-        states[entry.role] = "idle";
-      }
-    }
-    return states;
-  }, [presentRequiredRoles, rolesSettled, stagedFiles.length]);
 
   useEffect(() => {
     logAveonScheduleSnapshotStatus();
@@ -1210,7 +1196,7 @@ export default function DocumentAnalysisAgent() {
         if (cancelled || !snapshot) return;
         setLogisticsRisks(snapshot.logisticsRisks);
         setCoverageDashboard(parseCoverageDashboard(snapshot.coverageDashboard));
-        setLastAnalysisAt(formatAnalysisTimestamp(snapshot.analyzedAt));
+        setLastSavedAnalysisAt(formatAnalysisTimestamp(snapshot.analyzedAt));
         setShiftDayExpired(Boolean(snapshot.shiftDayExpired));
         setShiftPreviousValidDate(snapshot.shiftPreviousValidDate ?? null);
         const dashboardDate =
@@ -1751,7 +1737,6 @@ export default function DocumentAnalysisAgent() {
       classifyAbortRef.current = null;
       setRolesSource(null);
       setIsClassifyingRoles(false);
-      setChecklistFace("files");
       return;
     }
 
@@ -1761,7 +1746,6 @@ export default function DocumentAnalysisAgent() {
       previousFingerprint !== filesFingerprint &&
       !isAnalyzingRef.current
     ) {
-      setChecklistFace("files");
       setStagesCompact(false);
       setStagesInlineHidden(false);
       setStagesOverlayOpen(false);
@@ -2126,8 +2110,8 @@ export default function DocumentAnalysisAgent() {
     classifyRequestIdRef.current += 1;
     setIsClassifyingRoles(false);
 
-    setChecklistFace("stages");
     setIsAnalyzing(true);
+    setSessionAnalysisAt(null);
     setError(null);
     setDashboardRefreshWarning(null);
     setScheduleDiff(null);
@@ -2359,11 +2343,14 @@ export default function DocumentAnalysisAgent() {
       setCoverageDashboard(parseCoverageDashboard(result.coverageDashboard));
       setRiskDashboardOpen(true);
       setRiskPointsOpen(false);
-      setLastAnalysisAt(
-        formatAnalysisTimestamp(result.dashboardAnalyzedAt ?? null)
-      );
+      const analyzedAt = formatAnalysisTimestamp(result.dashboardAnalyzedAt ?? null);
+      setLastSavedAnalysisAt(analyzedAt);
+      if (result.fileBase64) {
+        setSessionAnalysisAt(analyzedAt);
+      }
+      setIsAnalyzing(false);
       try {
-        const snapshot = await agentsApi.getAveonDashboardLatest();
+        const snapshot = await agentsApi.getAveonDashboardLatest({ skipRefresh: true });
         if (snapshot?.coverageDashboard) {
           setCoverageDashboard(parseCoverageDashboard(snapshot.coverageDashboard));
         }
@@ -2398,7 +2385,6 @@ export default function DocumentAnalysisAgent() {
       logAveonScheduleSnapshotStatus();
     } catch (caughtError) {
       setError(extractAnalyzeError(caughtError) || "Не удалось выполнить анализ");
-      setChecklistFace("files");
       setActiveStageIndex(0);
     } finally {
       window.clearInterval(stageTimer);
@@ -2417,6 +2403,31 @@ export default function DocumentAnalysisAgent() {
     if (!year || !month || !day) return iso;
     return `${day}.${month}.${year}`;
   }, []);
+
+  const fetchCustomCoveragePeriod = useCallback(
+    async (dateFrom: string, dateTo: string): Promise<CoveragePeriodPayload | null> => {
+      try {
+        const response = await agentsApi.getCoverageDashboardPeriod(dateFrom, dateTo);
+        if (!response?.ok) return null;
+        return parseCoveragePeriod(response.period);
+      } catch (error) {
+        if (isAxiosError(error)) {
+          const detail = error.response?.data;
+          if (typeof detail === "string" && detail.trim()) {
+            throw new Error(detail);
+          }
+          if (detail && typeof detail === "object" && "detail" in detail) {
+            const message = (detail as { detail?: unknown }).detail;
+            if (typeof message === "string" && message.trim()) {
+              throw new Error(message);
+            }
+          }
+        }
+        throw error instanceof Error ? error : new Error("Не удалось пересчитать период.");
+      }
+    },
+    []
+  );
 
   useEffect(() => {
     if (!logisticsRisks?.stages.length) {
@@ -2584,21 +2595,19 @@ export default function DocumentAnalysisAgent() {
     });
   }, []);
 
-  const showInlineStages =
-    checklistFace === "files" || isAnalyzing || !lastAnalysisAt || !stagesInlineHidden;
+  const showInlineStages = isAnalyzing || Boolean(sessionAnalysisAt);
   const showStagesCompactBar =
-    Boolean(lastAnalysisAt) &&
+    Boolean(sessionAnalysisAt) &&
     !isAnalyzing &&
-    stagesInlineHidden &&
-    checklistFace === "stages";
+    stagesInlineHidden;
 
   useEffect(() => {
-    if (lastAnalysisAt && !isAnalyzing) {
+    if (sessionAnalysisAt && !isAnalyzing) {
       const collapseTimer = window.setTimeout(() => setStagesCompact(true), 550);
       return () => window.clearTimeout(collapseTimer);
     }
     return undefined;
-  }, [lastAnalysisAt, isAnalyzing]);
+  }, [sessionAnalysisAt, isAnalyzing]);
 
   useEffect(() => {
     if (!stagesOverlayOpen) return undefined;
@@ -2627,31 +2636,9 @@ export default function DocumentAnalysisAgent() {
     setStagesOverlayOpen((current) => !current);
   }, []);
 
-  const renderRequiredFileRows = () =>
-    requiredFileRoles.map((entry, index) => {
-      const state = requiredFileRowStates[entry.role] ?? "idle";
-      const rowClass =
-        state === "ready"
-          ? styles.stageRowReady
-          : state === "missing"
-            ? styles.stageRowMissing
-            : state === "checking"
-              ? styles.stageRowChecking
-              : "";
-      return (
-        <div key={entry.role} className={`${styles.stageRow} ${rowClass}`}>
-          <span className={styles.stageDot}>{index + 1}</span>
-          <span className={styles.requiredFileRowText}>
-            <span className={styles.requiredFileRowLabel}>{entry.label}</span>
-            <span className={styles.requiredFileRowHint}>{entry.hint}</span>
-          </span>
-        </div>
-      );
-    });
-
   const renderAnalysisStageRows = () =>
     analysisStages.map((stage, index) => {
-      const isCompleted = isAnalyzing ? index < activeStageIndex : Boolean(lastAnalysisAt);
+      const isCompleted = isAnalyzing ? index < activeStageIndex : Boolean(sessionAnalysisAt);
       const isActive = isAnalyzing && index === activeStageIndex;
       return (
         <div
@@ -2666,8 +2653,17 @@ export default function DocumentAnalysisAgent() {
       );
     });
 
+  const isCheckingUploadedFiles =
+    isClassifyingRoles ||
+    isMergingShipments ||
+    isPruningSchedules ||
+    isPruningDetailedSchedules ||
+    stagedFiles.some(
+      (item) => item.roleStatus === "loading" || item.roleStatus === "pending"
+    );
+
   const sessionStatusBadge = (() => {
-    if (lastAnalysisAt && checklistFace === "stages") {
+    if (sessionAnalysisAt) {
       return (
         <span className={`${styles.statusBadge} ${styles.statusBadgeSuccess}`}>
           result.xlsx сформирован
@@ -2682,12 +2678,33 @@ export default function DocumentAnalysisAgent() {
       );
     }
     if (!stagedFiles.length) {
-      return <span className={styles.statusBadge}>Ожидает файлы</span>;
+      return null;
     }
-    if (!rolesSettled || isClassifyingRoles || isMergingShipments || isPruningSchedules || isPruningDetailedSchedules) {
+    if (isCheckingUploadedFiles) {
       return (
         <span className={`${styles.statusBadge} ${styles.statusBadgeProgress}`}>
           Проверяем файлы
+        </span>
+      );
+    }
+    if (rolesSettled) {
+      return (
+        <span className={`${styles.statusBadge} ${styles.statusBadgeSuccess}`}>
+          Роли определены
+        </span>
+      );
+    }
+    if (!dbSourcesReady) {
+      return (
+        <span className={`${styles.statusBadge} ${styles.statusBadgeDanger}`}>
+          Нет данных в БД
+        </span>
+      );
+    }
+    if (!onecSourcesReady) {
+      return (
+        <span className={`${styles.statusBadge} ${styles.statusBadgeDanger}`}>
+          Нужна выгрузка из 1С
         </span>
       );
     }
@@ -2705,9 +2722,7 @@ export default function DocumentAnalysisAgent() {
         </span>
       );
     }
-    return (
-      <span className={`${styles.statusBadge} ${styles.statusBadgeSuccess}`}>Готов к анализу</span>
-    );
+    return null;
   })();
 
   return (
@@ -2715,16 +2730,14 @@ export default function DocumentAnalysisAgent() {
       data-avion-agent
       className={`${styles.page} ${stagesOverlayOpen ? styles.pageStagesOverlayOpen : ""}`}
     >
-      <Link to="/agents" className={styles.backLink}>
-        <ArrowLeft size={16} strokeWidth={2.1} aria-hidden="true" />
-        К каталогу агентов
-      </Link>
+      {!hideCatalogLink ? (
+        <Link to="/agents" className={styles.backLink}>
+          <ArrowLeft size={16} strokeWidth={2.1} aria-hidden="true" />
+          К каталогу агентов
+        </Link>
+      ) : null}
 
       <header className={styles.hero}>
-        <span className={styles.heroBadge}>
-          <Sparkles size={14} strokeWidth={2.1} aria-hidden="true" />
-          Закупки · Авион
-        </span>
         <h1>{mockDocumentAnalysisAgent.name}</h1>
         <p>{documentAnalysisAgentSubtitle}</p>
       </header>
@@ -2735,62 +2748,10 @@ export default function DocumentAnalysisAgent() {
             <h2 className={styles.panelTitle}>Файлы для анализа</h2>
             <p className={styles.panelHint}>
               Перетащите документы в область ниже или выберите их вручную. Поддерживаются {acceptedHint}.
-              График отгрузок вручную не загружается: Россия берётся из БД, Китай — из актуального Google Sheets.
+              Годовой график, графики комплектующих и справочники берутся из БД; Excel-файлы нужны только для
+              переопределения.
             </p>
           </div>
-
-          {showShipmentSourcesPanel ? (
-          <div className={styles.requiredFiles}>
-            <div className={`${styles.stageRow} ${russiaShipmentSource ? styles.stageRowReady : styles.stageRowMissing}`}>
-              <span className={styles.stageDot}>БД</span>
-              <span className={styles.requiredFileRowText}>
-                <span className={styles.requiredFileRowLabel}>График Россия</span>
-                <span className={styles.requiredFileRowHint}>
-                  {russiaShipmentSourceLoading
-                    ? "Проверяем активную версию…"
-                    : russiaShipmentSource
-                      ? `Активна версия ${russiaShipmentSource.file_name}`
-                      : "Активная версия не загружена"}
-                </span>
-              </span>
-            </div>
-            <div className={`${styles.stageRow} ${googleSheetsConfigured === false ? styles.stageRowMissing : styles.stageRowReady}`}>
-              <span className={styles.stageDot}>GS</span>
-              <span className={styles.requiredFileRowText}>
-                <span className={styles.requiredFileRowLabel}>График Китай</span>
-                <span className={styles.requiredFileRowHint}>
-                  {googleSheetsConfigured === false
-                    ? "Google Sheets не настроен"
-                    : "Берётся из текущего листа «ИТЦ В РАБОТЕ»"}
-                </span>
-              </span>
-            </div>
-            {shipmentSourceError ? (
-              <p className={styles.errorText}>{shipmentSourceError}</p>
-            ) : null}
-            {user?.is_superuser ? (
-              <div className={styles.uploadActions}>
-                <input
-                  ref={russiaShipmentInputRef}
-                  type="file"
-                  accept=".xlsx,.xlsm"
-                  hidden
-                  onChange={(event) => {
-                    void handleRussiaShipmentUpload(event.target.files?.[0]);
-                  }}
-                />
-                <button
-                  type="button"
-                  className={styles.secondaryButton}
-                  disabled={russiaShipmentUploadLoading}
-                  onClick={() => russiaShipmentInputRef.current?.click()}
-                >
-                  {russiaShipmentUploadLoading ? "Загружаем график…" : "Загрузить график России в БД"}
-                </button>
-              </div>
-            ) : null}
-          </div>
-          ) : null}
 
           <div
             className={`${styles.dropZone} ${isDragOver ? styles.dropZoneDragOver : ""} ${
@@ -2844,17 +2805,17 @@ export default function DocumentAnalysisAgent() {
               onClick={handleAnalyze}
               disabled={!requiredFilesValid || isAnalyzing}
               title={
-                !stagedFiles.length
-                  ? "Загрузите обязательные файлы"
-                  : isMergingShipments
-                    ? "Дождитесь объединения графиков отгрузок"
-                    : !shipmentSourcesReady
-                      ? "Проверьте источники графика отгрузок: Россия в БД и Google Sheets Китай"
-                    : !rolesSettled
-                      ? "Дождитесь определения ролей"
-                      : !requiredFilesValid
-                        ? `Не хватает: ${missingRequiredRoles.map((item) => item.label).join(", ")}`
-                        : undefined
+                isMergingShipments
+                  ? "Дождитесь объединения графиков отгрузок"
+                  : !dbSourcesReady
+                    ? "Проверьте данные в БД: годовой график, Россия, Китай"
+                    : !onecSourcesReady
+                      ? "Выгрузите остатки, спецификации и план из 1С"
+                      : !rolesSettled
+                        ? "Дождитесь определения ролей загруженных Excel"
+                        : !requiredFilesValid
+                          ? "Не все источники готовы к анализу"
+                          : undefined
               }
             >
               {isAnalyzing ? (
@@ -2881,8 +2842,8 @@ export default function DocumentAnalysisAgent() {
                   setSelectedRiskStageKey("");
                   setRiskItemFilter("all");
                   setOpenSupplierKeys(new Set());
-                  setStagesCompact(Boolean(lastAnalysisAt));
-                  setStagesInlineHidden(Boolean(lastAnalysisAt));
+                  setStagesCompact(Boolean(sessionAnalysisAt));
+                  setStagesInlineHidden(Boolean(sessionAnalysisAt));
                   setStagesOverlayOpen(false);
                   setRolesSource(null);
                   setIsClassifyingRoles(false);
@@ -2900,7 +2861,6 @@ export default function DocumentAnalysisAgent() {
                   setDetailedPruneNotice(null);
                   setScheduleDiff(null);
                   setDetailedDiff(null);
-                  setChecklistFace(lastAnalysisAt ? "stages" : "files");
                 }}
                 disabled={isAnalyzing}
               >
@@ -2997,13 +2957,15 @@ export default function DocumentAnalysisAgent() {
                       <button
                         type="button"
                         className={styles.fileOpenButton}
-                        aria-label={`Показать в проводнике: ${item.file.name}`}
-                        title={`Показать в проводнике: ${item.file.name}`}
+                        aria-label={`Открыть ${item.file.name} в новой вкладке`}
+                        title={`Открыть таблицу в новой вкладке: ${item.file.name}`}
                         onClick={() => {
                           void openLocalFile(item.file).catch((error) => {
-                            console.error("Не удалось открыть проводник", error);
+                            console.error("Не удалось открыть файл", error);
                             window.alert(
-                              "Не удалось открыть проводник. Проверьте, что backend запущен на этой же Windows-машине."
+                              error instanceof Error
+                                ? error.message
+                                : "Не удалось открыть файл в новой вкладке."
                             );
                           });
                         }}
@@ -3025,12 +2987,14 @@ export default function DocumentAnalysisAgent() {
                       <button
                         type="button"
                         className={styles.fileNameButton}
-                        title={`Показать в проводнике: ${item.file.name}`}
+                        title={`Открыть таблицу в новой вкладке: ${item.file.name}`}
                         onClick={() => {
                           void openLocalFile(item.file).catch((error) => {
-                            console.error("Не удалось открыть проводник", error);
+                            console.error("Не удалось открыть файл", error);
                             window.alert(
-                              "Не удалось открыть проводник. Проверьте, что backend запущен на этой же Windows-машине."
+                              error instanceof Error
+                                ? error.message
+                                : "Не удалось открыть файл в новой вкладке."
                             );
                           });
                         }}
@@ -3067,7 +3031,37 @@ export default function DocumentAnalysisAgent() {
         </section>
 
         <aside className={styles.panel} aria-label="Сводка агента">
-          <SummaryReferencePanel cache={referenceCache}>
+          <SummaryReferencePanel
+            cache={referenceCache}
+            backFooter={
+              <>
+                {shipmentSourceError ? <p className={styles.errorText}>{shipmentSourceError}</p> : null}
+                {user?.is_superuser ? (
+                  <div className={styles.uploadActions}>
+                    <input
+                      ref={russiaShipmentInputRef}
+                      type="file"
+                      accept=".xlsx,.xlsm"
+                      hidden
+                      onChange={(event) => {
+                        void handleRussiaShipmentUpload(event.target.files?.[0]);
+                      }}
+                    />
+                    <button
+                      type="button"
+                      className={styles.secondaryButton}
+                      disabled={russiaShipmentUploadLoading}
+                      onClick={() => russiaShipmentInputRef.current?.click()}
+                    >
+                      {russiaShipmentUploadLoading
+                        ? "Загружаем график…"
+                        : "Загрузить график России в БД"}
+                    </button>
+                  </div>
+                ) : null}
+              </>
+            }
+          >
           <div className={styles.stagePanel} aria-label="Текущая сессия">
             <h3 className={styles.stagePanelTitle}>Текущая сессия</h3>
             <div className={styles.stageRow}>
@@ -3090,7 +3084,7 @@ export default function DocumentAnalysisAgent() {
               <span className={styles.stageDot}>3</span>
               <span className={styles.requiredFileRowText}>
                 <span className={styles.requiredFileRowLabel}>Последний запрос</span>
-                <span className={styles.requiredFileRowHint}>{lastAnalysisAt ?? "—"}</span>
+                <span className={styles.requiredFileRowHint}>{lastSavedAnalysisAt ?? "—"}</span>
               </span>
             </div>
           </div>
@@ -3333,42 +3327,16 @@ export default function DocumentAnalysisAgent() {
           />
 
           <div className={styles.stagesSection} ref={stagesSectionRef}>
-            {showInlineStages ? (
+            {showInlineStages && !stagesInlineHidden ? (
               <div
                 className={`${styles.stagePanelWrap} ${
-                  stagesCompact && lastAnalysisAt && checklistFace === "stages"
-                    ? styles.stagePanelWrapCollapsing
-                    : ""
+                  stagesCompact && sessionAnalysisAt ? styles.stagePanelWrapCollapsing : ""
                 }`}
                 onTransitionEnd={handleStagesCollapseTransitionEnd}
               >
                 <div className={styles.stagePanelWrapInner}>
-                  <div className={styles.flipScene}>
-                    <div
-                      className={`${styles.flipCard} ${
-                        checklistFace === "stages" ? styles.flipCardFlipped : ""
-                      }`}
-                    >
-                      <div
-                        className={`${styles.flipFace} ${styles.flipFaceFront}`}
-                        aria-hidden={checklistFace !== "files"}
-                      >
-                        <div
-                          className={styles.stagePanel}
-                          aria-label="Обязательные файлы для анализа"
-                        >
-                          {renderRequiredFileRows()}
-                        </div>
-                      </div>
-                      <div
-                        className={`${styles.flipFace} ${styles.flipFaceBack}`}
-                        aria-hidden={checklistFace !== "stages"}
-                      >
-                        <div className={styles.stagePanel} aria-label="Этапы анализа">
-                          {renderAnalysisStageRows()}
-                        </div>
-                      </div>
-                    </div>
+                  <div className={styles.stagePanel} aria-label="Этапы анализа">
+                    {renderAnalysisStageRows()}
                   </div>
                 </div>
               </div>
@@ -3425,14 +3393,15 @@ export default function DocumentAnalysisAgent() {
         </aside>
       </div>
 
-      {isLoadingLatestDashboard || isAnalyzing ? (
+      {!coverageDashboard && (isLoadingLatestDashboard || isAnalyzing) ? (
         <CoverageDashboardLoading mode={isAnalyzing ? "analyzing" : "loading"} />
       ) : null}
 
-      {coverageDashboard && !isAnalyzing ? (
+      {coverageDashboard ? (
         <CoverageDashboard
           dashboard={coverageDashboard}
           formatDate={formatRuDate}
+          onFetchCustomPeriod={fetchCustomCoveragePeriod}
           managerTasks={
             visibleTaskBoard
               ? {

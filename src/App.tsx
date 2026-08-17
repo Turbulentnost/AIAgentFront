@@ -7,6 +7,7 @@ import PricingAgentStageRouter from "@/pages/PricingAgentStageRouter";
 import ProcurementAgent from "@/pages/ProcurementAgent";
 import ProductionPreparationEngineerAgent from "@/pages/ProductionPreparationEngineerAgent";
 import DocumentAnalysisAgent from "@/pages/DocumentAnalysisAgent";
+import WorkbookViewerPage from "@/pages/WorkbookViewerPage";
 import type { ReactNode } from "react";
 import { useAuth } from "./auth/AuthContext";
 import Layout from "./components/Layout";
@@ -49,6 +50,7 @@ export default function App() {
       <Route path="/agents/procurement" element={<ProtectedRoute><Layout title="Оркестратор закупок"><ProcurementAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/production-preparation-engineer" element={<ProtectedRoute><Layout title="Инженер по подготовке производства"><ProductionPreparationEngineerAgent /></Layout></ProtectedRoute>} />
       <Route path="/agents/document-analysis" element={<ProtectedRoute><Layout title="Агент закупок (Авион)"><DocumentAnalysisAgent /></Layout></ProtectedRoute>} />
+      <Route path="/agents/document-analysis/workbook/:previewId" element={<ProtectedRoute><WorkbookViewerPage /></ProtectedRoute>} />
       <Route path="/agent-builder" element={<ProtectedRoute><Layout title="Конструктор агентов"><AgentBuilder /></Layout></ProtectedRoute>} />
       <Route path="/tasks" element={<ProtectedRoute><Layout title="Задачи"><Tasks /></Layout></ProtectedRoute>} />
       <Route path="/knowledge-base" element={<ProtectedRoute><Layout title="База знаний"><KnowledgeBase /></Layout></ProtectedRoute>} />

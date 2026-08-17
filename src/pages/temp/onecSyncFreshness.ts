@@ -48,30 +48,27 @@ type ProductionPlanStatus = {
 
 export function buildStockFreshnessLabel(stock: StockStatus | null | undefined): string {
   if (!stock?.last_sync_at) {
-    return stock?.db_count ? `В БД ${stock.db_count.toLocaleString("ru-RU")} поз., дата синхронизации неизвестна` : "Ещё не синхронизировалось";
+    return stock?.db_count ? "Последнее обновление из 1С: дата неизвестна" : "Ещё не синхронизировалось";
   }
   const when = formatAveonDateTime(stock.last_sync_at);
-  const count = (stock.db_count || stock.saved_count || 0).toLocaleString("ru-RU");
   if (stock.status && stock.status !== "ok") {
-    return `Последняя попытка: ${when} · ошибка`;
+    return `Последнее обновление из 1С: ${when} · ошибка`;
   }
-  return `Последняя выгрузка из 1С: ${when} · ${count} поз.`;
+  return `Последнее обновление из 1С: ${when}`;
 }
 
 export function buildSpecsFreshnessLabel(specs: ResourceSpecsStatus | null | undefined): string {
   if (!specs?.last_sync_at) {
     if (specs?.db_specs) {
-      return `В БД ${specs.db_specs} спец. · ${specs.db_materials.toLocaleString("ru-RU")} мат., дата синхронизации неизвестна`;
+      return "Последнее обновление из 1С: дата неизвестна";
     }
     return "Ещё не синхронизировалось";
   }
   const when = formatAveonDateTime(specs.last_sync_at);
-  const specsCount = (specs.db_specs || specs.specs_count || 0).toLocaleString("ru-RU");
-  const matsCount = (specs.db_materials || specs.materials_count || 0).toLocaleString("ru-RU");
   if (specs.status && specs.status !== "ok") {
-    return `Последняя попытка: ${when} · ошибка`;
+    return `Последнее обновление из 1С: ${when} · ошибка`;
   }
-  return `Последняя выгрузка из 1С: ${when} · ${specsCount} спец. · ${matsCount} мат.`;
+  return `Последнее обновление из 1С: ${when}`;
 }
 
 function latestSyncAt(
@@ -110,14 +107,7 @@ export function buildCombinedOnecFreshnessLabel(
         : "Ошибка синхронизации 1С";
     }
     if (stockCount || specsCount || planCount) {
-      const parts: string[] = [];
-      if (stockCount) parts.push(`${stockCount.toLocaleString("ru-RU")} поз.`);
-      if (specsCount) {
-        parts.push(`${specsCount.toLocaleString("ru-RU")} спец.`);
-        if (specs?.db_materials) parts.push(`${specs.db_materials.toLocaleString("ru-RU")} мат.`);
-      }
-      if (planCount) parts.push(`план ${productionPlan?.plan_number || "—"} · ${planCount.toLocaleString("ru-RU")} стр.`);
-      return `Последняя выгрузка из 1С · ${parts.join(" · ")}, дата неизвестна`;
+      return "Последнее обновление из 1С: дата неизвестна";
     }
     return "Ещё не синхронизировалось";
   }
@@ -127,24 +117,10 @@ export function buildCombinedOnecFreshnessLabel(
     const detail = rawDetail ? sanitizeOnecErrorMessage(rawDetail) : null;
     return detail
       ? `Ошибка синхронизации 1С: ${detail}`
-      : `Последняя выгрузка из 1С: ${formatAveonDateTime(when)} · ошибка`;
+      : `Последнее обновление из 1С: ${formatAveonDateTime(when)} · ошибка`;
   }
 
-  const parts: string[] = [`Последняя выгрузка из 1С: ${formatAveonDateTime(when)}`];
-  const posCount = stock?.db_count || stock?.saved_count || 0;
-  if (posCount) parts.push(`${posCount.toLocaleString("ru-RU")} поз.`);
-  const specsCount = specs?.db_specs || specs?.specs_count || 0;
-  if (specsCount) parts.push(`${specsCount.toLocaleString("ru-RU")} спец.`);
-  const matsCount = specs?.db_materials || specs?.materials_count || 0;
-  if (matsCount) parts.push(`${matsCount.toLocaleString("ru-RU")} мат.`);
-  const planCount = productionPlan?.db_count || productionPlan?.saved_count || 0;
-  if (planCount) {
-    parts.push(
-      `план ${productionPlan?.plan_number || "—"} · ${planCount.toLocaleString("ru-RU")} стр.`
-    );
-  }
-
-  return parts.join(" · ");
+  return `Последнее обновление из 1С: ${formatAveonDateTime(when)}`;
 }
 
 export type OnecManualSyncResult = {

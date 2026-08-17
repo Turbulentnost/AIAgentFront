@@ -1,7 +1,8 @@
-import { type ReactNode, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Boxes,
+  CalendarRange,
   ClipboardList,
   FileSpreadsheet,
   Loader2,
@@ -15,9 +16,11 @@ import TempProductionPlanModal from "./TempProductionPlanModal";
 import TempResourceSpecsModal from "./TempResourceSpecsModal";
 import TempRussiaShipmentModal from "./TempRussiaShipmentModal";
 import TempStockBalancesModal from "./TempStockBalancesModal";
+import TempYearProductionScheduleModal from "./TempYearProductionScheduleModal";
 import styles from "./SummaryReferencePanel.module.css";
 
-type ReferenceModal =
+export type ReferenceModal =
+  | "yearProductionSchedule"
   | "productionPlan"
   | "chinaSheets"
   | "russiaShipment"
@@ -28,21 +31,24 @@ type ReferenceModal =
 type Props = {
   cache: ReferenceCacheState;
   children: ReactNode;
+  activeModal?: ReferenceModal;
+  onActiveModalChange?: (modal: ReferenceModal) => void;
+  backFooter?: ReactNode;
 };
 
 type MenuItem = {
-  id: ReferenceModal;
+  id: Exclude<ReferenceModal, null>;
   label: string;
   hint: string;
   icon: typeof Package;
 };
 
-const MENU_ITEMS: MenuItem[] = [
+const PRIMARY_MENU_ITEMS: MenuItem[] = [
   {
-    id: "productionPlan",
-    label: "План производства на месяц",
-    hint: "Изделия × даты · БД 1С",
-    icon: ClipboardList,
+    id: "russiaShipment",
+    label: "График комплектующих · Россия",
+    hint: "Актуальная версия Excel в БД",
+    icon: Truck,
   },
   {
     id: "chinaSheets",
@@ -51,36 +57,106 @@ const MENU_ITEMS: MenuItem[] = [
     icon: FileSpreadsheet,
   },
   {
-    id: "russiaShipment",
-    label: "График комплектующих · Россия",
-    hint: "Актуальная версия из БД",
-    icon: Truck,
+    id: "productionPlan",
+    label: "План производства на месяц",
+    hint: "Дневная/месячная матрица · выгрузка 1С",
+    icon: ClipboardList,
   },
   {
     id: "resourceSpecs",
     label: "Спецификации",
-    hint: "Материалы по выбранной спеке",
+    hint: "Материалы по выбранной спеке · 1С → БД",
     icon: Boxes,
   },
   {
     id: "stockBalances",
     label: "Остатки на складах",
-    hint: "Остатки по материалам из спецификаций",
+    hint: "Остатки по материалам · 1С → БД",
     icon: Package,
   },
 ];
 
-export default function SummaryReferencePanel({ cache, children }: Props) {
-  const [flipped, setFlipped] = useState(false);
-  const [activeModal, setActiveModal] = useState<ReferenceModal>(null);
+const EXTRA_MENU_ITEMS: MenuItem[] = [
+  {
+    id: "yearProductionSchedule",
+    label: "График производства на год",
+    hint: "Изделия × месяцы · база данных",
+    icon: CalendarRange,
+  },
+];
 
-  function openModal(id: ReferenceModal) {
+function MenuSection({
+  title,
+  items,
+  loading,
+  onOpen,
+}: {
+  title: string;
+  items: MenuItem[];
+  loading: boolean;
+  onOpen: (id: Exclude<ReferenceModal, null>) => void;
+}) {
+  return (
+    <section className={styles.menuSection}>
+      <p className={styles.menuSectionTitle}>{title}</p>
+      <div className={styles.menuList} role="list">
+        {items.map((item) => {
+          const Icon = item.icon;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              className={styles.menuBtn}
+              role="listitem"
+              disabled={loading}
+              onClick={() => onOpen(item.id)}
+            >
+              <span className={styles.menuBtnIcon} aria-hidden>
+                <Icon size={18} strokeWidth={2} />
+              </span>
+              <span className={styles.menuBtnText}>
+                <span className={styles.menuBtnLabel}>{item.label}</span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+export default function SummaryReferencePanel({
+  cache,
+  children,
+  activeModal: controlledModal,
+  onActiveModalChange,
+  backFooter,
+}: Props) {
+  const [flipped, setFlipped] = useState(false);
+  const [internalModal, setInternalModal] = useState<ReferenceModal>(null);
+  const activeModal = controlledModal !== undefined ? controlledModal : internalModal;
+
+  function setActiveModal(id: ReferenceModal) {
+    if (onActiveModalChange) {
+      onActiveModalChange(id);
+    } else {
+      setInternalModal(id);
+    }
+  }
+
+  function openModal(id: Exclude<ReferenceModal, null>) {
     setActiveModal(id);
   }
 
   function closeModal() {
     setActiveModal(null);
   }
+
+  useEffect(() => {
+    if (activeModal) {
+      setFlipped(true);
+    }
+  }, [activeModal]);
 
   return (
     <>
@@ -91,8 +167,8 @@ export default function SummaryReferencePanel({ cache, children }: Props) {
             type="button"
             className={`${styles.gearBtn} ${flipped ? styles.gearBtnActive : ""}`}
             aria-expanded={flipped}
-            aria-label={flipped ? "Вернуться к сводке" : "Справочники и данные из БД"}
-            title={flipped ? "Назад к сводке" : "Справочники из БД"}
+            aria-label={flipped ? "Вернуться к сводке" : "Сводка файлов"}
+            title={flipped ? "Назад к сводке" : "Сводка файлов"}
             onClick={() => setFlipped((value) => !value)}
           >
             <Settings2 size={18} aria-hidden />
@@ -108,48 +184,33 @@ export default function SummaryReferencePanel({ cache, children }: Props) {
             <div className={`${styles.flipFace} ${styles.flipFaceBack}`} aria-hidden={!flipped}>
               <div className={styles.backPanel}>
                 <div className={styles.backHeader}>
-                  <p className={styles.backTitle}>Справочники</p>
-                  <p className={styles.backHint}>
-                    Данные загружены один раз при открытии агента. Модалки открываются без повторной
-                    загрузки.
-                  </p>
                   {cache.loading ? (
                     <p className={styles.backStatus}>
                       <Loader2 className={styles.backSpinner} size={14} aria-hidden />
-                      Обновление справочников…
+                      Обновление данных…
                     </p>
                   ) : cache.errors.length ? (
                     <p className={styles.backStatusWarn}>
                       Часть данных недоступна: {cache.errors.join(", ")}
                     </p>
-                  ) : cache.loaded ? (
-                    <p className={styles.backStatusOk}>Справочники готовы</p>
                   ) : null}
                 </div>
 
-                <div className={styles.menuList} role="list">
-                  {MENU_ITEMS.map((item) => {
-                    const Icon = item.icon;
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={styles.menuBtn}
-                        role="listitem"
-                        disabled={cache.loading}
-                        onClick={() => openModal(item.id)}
-                      >
-                        <span className={styles.menuBtnIcon} aria-hidden>
-                          <Icon size={18} strokeWidth={2} />
-                        </span>
-                        <span className={styles.menuBtnText}>
-                          <span className={styles.menuBtnLabel}>{item.label}</span>
-                          <span className={styles.menuBtnHint}>{item.hint}</span>
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
+                <MenuSection
+                  title="Основные файлы"
+                  items={PRIMARY_MENU_ITEMS}
+                  loading={cache.loading}
+                  onOpen={openModal}
+                />
+
+                <MenuSection
+                  title="Дополнительные файлы"
+                  items={EXTRA_MENU_ITEMS}
+                  loading={cache.loading}
+                  onOpen={openModal}
+                />
+
+                {backFooter}
 
                 <button
                   type="button"
@@ -164,6 +225,13 @@ export default function SummaryReferencePanel({ cache, children }: Props) {
           </div>
         </div>
       </div>
+
+      <TempYearProductionScheduleModal
+        open={activeModal === "yearProductionSchedule"}
+        loading={cache.loading}
+        data={cache.productionPlan}
+        onClose={closeModal}
+      />
 
       <TempProductionPlanModal
         open={activeModal === "productionPlan"}
