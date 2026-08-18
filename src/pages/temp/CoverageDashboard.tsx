@@ -1,5 +1,4 @@
 import {
-  Fragment,
   useCallback,
   useEffect,
   useMemo,
@@ -8,8 +7,25 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent
 } from "react";
-import { AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, CircleHelp, ClipboardList, CalendarDays, Layers, Package, RefreshCw, ShieldCheck, Siren, X } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  ClipboardList,
+  CalendarDays,
+  Download,
+  Layers,
+  ListFilter,
+  Package,
+  RefreshCw,
+  ShieldCheck,
+  Siren,
+  X
+} from "lucide-react";
 import styles from "../DocumentAnalysisAgent.module.css";
+import { exportTableToExcel } from "@/utils/exportTableToExcel";
 import ShiftTaskBoard, { ShiftTasksNewDayNotice, type ShiftTaskBoardProps } from "./ShiftTaskBoard";
 
 type CoverageDashboardSide = "products" | "nomenclatures" | "tasks" | "manager_results";
@@ -243,6 +259,32 @@ const COVERAGE_TILES: CoverageTileMeta[] = [
   { key: "yellow", label: "Частично", tone: "danger", hint: "Покрытие есть, но меньше плана" },
   { key: "red", label: "Не обеспечено", tone: "critical", hint: "Нет покрытия или нет спецификации" }
 ];
+
+function coverageTileSurfaceClass(key: CoverageTileKey): string {
+  switch (key) {
+    case "green":
+      return styles.coverageTileSurfaceGreen;
+    case "yellow":
+      return styles.coverageTileSurfacePartial;
+    case "red":
+      return styles.coverageTileSurfaceRed;
+    default:
+      return styles.coverageTileSurfacePlan;
+  }
+}
+
+function coverageTileIconClass(key: CoverageTileKey): string {
+  switch (key) {
+    case "green":
+      return styles.coverageTileIconGreen;
+    case "yellow":
+      return styles.coverageTileIconPartial;
+    case "red":
+      return styles.coverageTileIconRed;
+    default:
+      return styles.coverageTileIconPlan;
+  }
+}
 
 function coverageTileLabel(tileKey: CoverageTileKey, side: CoverageSideKey): string {
   if (side === "products") {
@@ -599,32 +641,6 @@ function tileIcon(key: CoverageTileKey) {
   }
 }
 
-function toneClass(tone: CoverageTileMeta["tone"]): string {
-  switch (tone) {
-    case "success":
-      return styles.riskAnalyticsTileSuccess;
-    case "danger":
-      return styles.riskAnalyticsTileDanger;
-    case "critical":
-      return styles.riskAnalyticsTileCritical;
-    default:
-      return "";
-  }
-}
-
-function iconToneClass(tone: CoverageTileMeta["tone"]): string {
-  switch (tone) {
-    case "success":
-      return styles.riskAnalyticsTileIconSuccess;
-    case "danger":
-      return styles.riskAnalyticsTileIconDanger;
-    case "critical":
-      return styles.riskAnalyticsTileIconCritical;
-    default:
-      return "";
-  }
-}
-
 function filterRows(rows: CoverageRow[], tile: CoverageTileKey): CoverageRow[] {
   if (tile === "all") {
     return rows.filter((row) => row.plan > 0);
@@ -695,21 +711,327 @@ function statusClass(status: string): string {
   }
 }
 
-function materialKindClass(kind: string | undefined): string {
-  if (kind === "consumable") return styles.coverageMaterialConsumable;
-  if (kind === "workshop") return styles.coverageMaterialWorkshop;
-  return "";
-}
-
-function materialKindLabel(row: Pick<CoverageRow, "materialKind" | "materialKindLabel">): string {
-  if (row.materialKindLabel) return row.materialKindLabel;
-  if (row.materialKind === "consumable") return "возможно расходник";
-  if (row.materialKind === "workshop") return "возможно в цехе";
-  return "";
-}
-
 export function parseCoverageDashboard(raw: unknown): CoverageDashboardPayload | null {
   return mapCoverageDashboard(raw);
+}
+
+type MaterialCoverageStatusKey = "green" | "yellow" | "red";
+
+const MATERIAL_COVERAGE_STATUS_OPTIONS: Array<{ key: MaterialCoverageStatusKey; label: string }> = [
+  { key: "green", label: "Обеспечено" },
+  { key: "yellow", label: "Частично" },
+  { key: "red", label: "Не обеспечено" }
+];
+
+const MATERIAL_COVERAGE_STATUS_ORDER: Record<MaterialCoverageStatusKey | "none", number> = {
+  green: 0,
+  yellow: 1,
+  red: 2,
+  none: 3
+};
+
+function materialCoverageStatus(material: CoverageMaterialShortage): MaterialCoverageStatusKey | "none" {
+  if (material.plan <= 1e-12) return "none";
+  const available = material.stock + material.expected;
+  if (available + 1e-9 >= material.plan) return "green";
+  if (available > 1e-12) return "yellow";
+  return "red";
+}
+
+function sanitizeCoverageExportFileName(name: string): string {
+  return name.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_").trim().slice(0, 80) || "izdelie";
+}
+
+type CoverageProductBomModalProps = {
+  row: CoverageRow;
+  periodLabel: string;
+  tileLabel: string;
+  onClose: () => void;
+};
+
+function CoverageProductBomModal({
+  row,
+  periodLabel,
+  tileLabel,
+  onClose
+}: CoverageProductBomModalProps) {
+  const materials = productMaterialLines(row);
+  const [statusFilterOpen, setStatusFilterOpen] = useState(false);
+  const [selectedStatuses, setSelectedStatuses] = useState<Set<MaterialCoverageStatusKey>>(
+    () => new Set(MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => option.key))
+  );
+  const statusFilterRef = useRef<HTMLDivElement | null>(null);
+
+  const materialsWithStatus = useMemo(
+    () =>
+      materials.map((material) => ({
+        material,
+        status: materialCoverageStatus(material)
+      })),
+    [materials]
+  );
+
+  const filteredMaterials = useMemo(() => {
+    const filtered = materialsWithStatus.filter(
+      (entry) => entry.status !== "none" && selectedStatuses.has(entry.status)
+    );
+    return [...filtered].sort((left, right) => {
+      const byStatus =
+        MATERIAL_COVERAGE_STATUS_ORDER[left.status] -
+        MATERIAL_COVERAGE_STATUS_ORDER[right.status];
+      if (byStatus !== 0) return byStatus;
+      return left.material.name.localeCompare(right.material.name, "ru");
+    });
+  }, [materialsWithStatus, selectedStatuses]);
+
+  const selectedStatusCount = selectedStatuses.size;
+  const statusFilterActive =
+    selectedStatusCount > 0 &&
+    selectedStatusCount < MATERIAL_COVERAGE_STATUS_OPTIONS.length;
+
+  const toggleMaterialStatus = useCallback((status: MaterialCoverageStatusKey) => {
+    setSelectedStatuses((current) => {
+      const next = new Set(current);
+      if (next.has(status)) {
+        next.delete(status);
+      } else {
+        next.add(status);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleExport = useCallback(() => {
+    if (filteredMaterials.length === 0) return;
+    exportTableToExcel(
+      `obespechennost_${sanitizeCoverageExportFileName(row.name)}.csv`,
+      [
+        { key: "name", title: "Номенклатура" },
+        { key: "plan", title: "План" },
+        { key: "stock", title: "Остаток" },
+        { key: "expected", title: "Ожид. поступление" },
+        { key: "shortage", title: "Не хватает" },
+        { key: "status", title: "Статус" }
+      ],
+      filteredMaterials.map(({ material, status }) => ({
+        name: material.name,
+        plan: material.plan,
+        stock: material.stock,
+        expected: material.expected,
+        shortage: material.shortage,
+        status: statusLabel(status)
+      }))
+    );
+  }, [filteredMaterials, row.name]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        if (statusFilterOpen) {
+          setStatusFilterOpen(false);
+          return;
+        }
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [onClose, statusFilterOpen]);
+
+  useEffect(() => {
+    if (!statusFilterOpen) return;
+    const onMouseDown = (event: MouseEvent) => {
+      if (!statusFilterRef.current?.contains(event.target as Node)) {
+        setStatusFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
+  }, [statusFilterOpen]);
+
+  return (
+    <div
+      className={styles.coverageProductModalBackdrop}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className={styles.coverageProductModal}
+        role="dialog"
+        aria-modal="true"
+        aria-label={`Спецификация изделия ${row.name}`}
+      >
+        <header className={styles.coverageProductModalHead}>
+          <div>
+            <p className={styles.coverageProductModalEyebrow}>
+              {periodLabel} · {tileLabel}
+            </p>
+            <h3>{row.name}</h3>
+            <p>
+              План {formatQty(row.plan)} · обеспечено {formatQty(row.covered)} ·{" "}
+              <span className={`${styles.coverageStatusBadge} ${statusClass(row.status)}`}>
+                {statusLabel(row.status)}
+              </span>
+            </p>
+          </div>
+          <div className={styles.coverageProductModalActions}>
+            {materials.length > 0 ? (
+              <>
+                <div className={styles.coverageProductModalFilterWrap} ref={statusFilterRef}>
+                  <button
+                    type="button"
+                    className={`${styles.coverageProductModalFilterBtn} ${
+                      statusFilterActive ? styles.coverageProductModalFilterBtnActive : ""
+                    }`}
+                    aria-haspopup="menu"
+                    aria-expanded={statusFilterOpen}
+                    onClick={() => setStatusFilterOpen((open) => !open)}
+                  >
+                    <ListFilter size={15} strokeWidth={2.2} aria-hidden="true" />
+                    <span>Статус</span>
+                    {statusFilterActive ? (
+                      <span className={styles.coverageProductModalFilterCount}>
+                        {selectedStatusCount}/{MATERIAL_COVERAGE_STATUS_OPTIONS.length}
+                      </span>
+                    ) : null}
+                    <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
+                  </button>
+                  {statusFilterOpen ? (
+                    <div className={styles.coverageProductModalFilterMenu} role="menu">
+                      <div className={styles.coverageProductModalFilterMenuHead}>
+                        <strong>Показать по статусу</strong>
+                        <span>
+                          {filteredMaterials.length}/{materialsWithStatus.length}
+                        </span>
+                      </div>
+                      <div className={styles.coverageProductModalFilterMenuList}>
+                        {MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => {
+                          const checked = selectedStatuses.has(option.key);
+                          return (
+                            <label
+                              key={option.key}
+                              className={styles.coverageProductModalFilterMenuItem}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => toggleMaterialStatus(option.key)}
+                              />
+                              <span
+                                className={`${styles.coverageStatusBadge} ${statusClass(option.key)}`}
+                              >
+                                {option.label}
+                              </span>
+                            </label>
+                          );
+                        })}
+                      </div>
+                      <div className={styles.coverageProductModalFilterMenuActions}>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSelectedStatuses(
+                              new Set(MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => option.key))
+                            )
+                          }
+                        >
+                          Все
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedStatuses(new Set())}
+                        >
+                          Снять
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  className={styles.coverageProductModalExportBtn}
+                  disabled={filteredMaterials.length === 0}
+                  onClick={handleExport}
+                >
+                  <Download size={15} strokeWidth={2.2} aria-hidden="true" />
+                  <span>Выгрузить в Excel</span>
+                </button>
+              </>
+            ) : null}
+            <button
+              type="button"
+              className={styles.coverageProductModalClose}
+              aria-label="Закрыть"
+              onClick={onClose}
+            >
+              <X size={18} strokeWidth={2.4} aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+
+        {materials.length === 0 ? (
+          <p className={styles.coverageProductModalEmpty}>
+            Для этого изделия не найдена спецификация или номенклатуры не определены.
+          </p>
+        ) : selectedStatusCount === 0 ? (
+          <p className={styles.coverageProductModalEmpty}>
+            Выберите хотя бы один статус в фильтре, чтобы показать номенклатуры.
+          </p>
+        ) : filteredMaterials.length === 0 ? (
+          <p className={styles.coverageProductModalEmpty}>
+            По выбранным статусам нет номенклатур в спецификации.
+          </p>
+        ) : (
+          <div className={styles.coverageProductModalTableWrap}>
+            <p className={styles.coverageProductModalLead}>
+              Номенклатуры спецификации для плана {formatQty(row.plan)} за период
+              {statusFilterActive ? ` · показано ${filteredMaterials.length}` : ""}
+            </p>
+            <table className={styles.coverageProductModalTable}>
+              <thead>
+                <tr>
+                  <th>Номенклатура</th>
+                  <th>План</th>
+                  <th>Остаток</th>
+                  <th>Ожид. поступление</th>
+                  <th>Не хватает</th>
+                  <th>Статус</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredMaterials.map(({ material, status: materialStatus }) => {
+                  const hasShortage = material.shortage > 1e-9;
+                  return (
+                    <tr
+                      key={material.name}
+                      className={hasShortage ? styles.coverageBomRowShortage : undefined}
+                    >
+                      <td className={styles.coverageProblemMaterialName}>{material.name}</td>
+                      <td>{formatQty(material.plan)}</td>
+                      <td>{formatQty(material.stock)}</td>
+                      <td>{formatQty(material.expected)}</td>
+                      <td className={hasShortage ? styles.coverageShortageValue : undefined}>
+                        {formatQty(material.shortage)}
+                      </td>
+                      <td>
+                        <span
+                          className={`${styles.coverageStatusBadge} ${statusClass(materialStatus)}`}
+                        >
+                          {statusLabel(materialStatus)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+    </div>
+  );
 }
 
 type CoverageDetailTableProps = {
@@ -729,10 +1051,8 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
   const tileLabel = coverageTileLabel(tile.key, side);
   const explanation = tileExplanation(tile, side);
   const showAvailable = side === "nomenclatures";
-  const expandableProducts =
-    side === "products" && (tile.key === "red" || tile.key === "yellow");
-  const optionalRows = rows.filter((row) => row.optional);
-  const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
+  const clickableProducts = side === "products";
+  const [productModalRow, setProductModalRow] = useState<CoverageRow | null>(null);
   const [problemMenuOpen, setProblemMenuOpen] = useState(false);
   const [problemModalOpen, setProblemModalOpen] = useState(false);
   const [selectedProblemProducts, setSelectedProblemProducts] = useState<Set<string>>(
@@ -740,7 +1060,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
   );
 
   useEffect(() => {
-    setExpandedProduct(null);
+    setProductModalRow(null);
     setProblemMenuOpen(false);
     setProblemModalOpen(false);
   }, [tile.key, side, periodLabel]);
@@ -753,13 +1073,17 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
     setSelectedProblemProducts(new Set(rows.map((row) => row.name)));
   }, [rows, side, tile.key]);
 
-  const activeExpandedProduct = useMemo(() => {
-    if (!expandedProduct) return null;
-    return rows.some((row) => row.name === expandedProduct) ? expandedProduct : null;
-  }, [expandedProduct, rows]);
+  const activeProductModalRow = useMemo(() => {
+    if (!productModalRow) return null;
+    return rows.find((row) => row.name === productModalRow.name) ?? null;
+  }, [productModalRow, rows]);
 
-  const toggleProduct = useCallback((productName: string) => {
-    setExpandedProduct((current) => (current === productName ? null : productName));
+  const openProductModal = useCallback((row: CoverageRow) => {
+    setProductModalRow(row);
+  }, []);
+
+  const closeProductModal = useCallback(() => {
+    setProductModalRow(null);
   }, []);
 
   const toggleProblemProduct = useCallback((productName: string) => {
@@ -809,13 +1133,9 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
   const showProblemSelector = side === "products" && tile.key === "red" && rows.length > 0;
   const selectedProblemCount = selectedProblemProducts.size;
 
-  const expandHint = expandableProducts
-    ? tile.key === "red"
-      ? "Нажмите на изделие, чтобы увидеть все номенклатуры спецификации."
-      : "Нажмите на изделие, чтобы увидеть полный состав спецификации и дефициты."
+  const expandHint = clickableProducts
+    ? "Нажмите на изделие, чтобы открыть спецификацию с остатками, поступлениями и дефицитами."
     : null;
-
-  const detailColumnCount = showAvailable ? 6 : 5;
 
   return (
     <div
@@ -830,16 +1150,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
           </h3>
           <p className={styles.coverageDetailHint}>
             {periodLabel}. {expandHint ?? explanation.shows}
-            {optionalRows.length > 0
-              ? ` Спорные номенклатуры показаны в таблице: ${optionalRows.length} поз.`
-              : ""}
           </p>
-          {optionalRows.length > 0 ? (
-            <div className={styles.coverageMaterialLegend} aria-label="Легенда спорных номенклатур">
-              <span className={styles.coverageMaterialLegendConsumable}>Возможно расходник</span>
-              <span className={styles.coverageMaterialLegendWorkshop}>Возможно в цехе</span>
-            </div>
-          ) : null}
         </div>
         <div className={styles.coverageDetailHeaderActions}>
           {showProblemSelector ? (
@@ -925,46 +1236,27 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
               </tr>
             </thead>
             <tbody>
-              {rows.map((row) => {
-                const isExpanded = expandableProducts && activeExpandedProduct === row.name;
-                const canExpand = expandableProducts;
-                const materials = productMaterialLines(row);
-                const panelId = `coverage-shortages-${row.name.replace(/[^\w-]+/g, "-")}`;
-                const rowMaterialClass = row.optional ? materialKindClass(row.materialKind) : "";
-                const rowKindLabel = materialKindLabel(row);
-
-                return (
-                  <Fragment key={row.name}>
-                    <tr
-                      className={
-                        `${rowMaterialClass} ${
-                          canExpand
-                            ? `${styles.coverageDetailRowExpandable} ${
-                              isExpanded ? styles.coverageDetailRowExpanded : ""
-                            }`
-                            : ""
-                        }`.trim() || undefined
-                      }
-                      onClick={canExpand ? () => toggleProduct(row.name) : undefined}
-                    >
+              {rows.map((row) => (
+                  <tr
+                    key={row.name}
+                    className={clickableProducts ? styles.coverageDetailRowExpandable : undefined}
+                    onClick={clickableProducts ? () => openProductModal(row) : undefined}
+                  >
                       <td className={styles.coverageDetailNameCell} title={row.name}>
-                        {canExpand ? (
+                        {clickableProducts ? (
                           <button
                             type="button"
                             className={styles.coverageDetailExpandBtn}
-                            aria-expanded={isExpanded}
-                            aria-controls={panelId}
+                            aria-haspopup="dialog"
                             onClick={(event) => {
                               event.stopPropagation();
-                              toggleProduct(row.name);
+                              openProductModal(row);
                             }}
                           >
-                            <ChevronDown
+                            <ChevronRight
                               size={14}
                               strokeWidth={2.2}
-                              className={`${styles.coverageDetailExpandIcon} ${
-                                isExpanded ? styles.coverageDetailExpandIconOpen : ""
-                              }`}
+                              className={styles.coverageDetailExpandIcon}
                               aria-hidden="true"
                             />
                             <span>{row.name}</span>
@@ -972,9 +1264,6 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                         ) : (
                           <span>{row.name}</span>
                         )}
-                        {row.optional && rowKindLabel ? (
-                          <span className={styles.coverageMaterialBadge}>{rowKindLabel}</span>
-                        ) : null}
                       </td>
                       <td>{formatQty(row.plan)}</td>
                       <td>{formatQty(row.fact)}</td>
@@ -994,94 +1283,20 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                         </span>
                       </td>
                     </tr>
-                    {isExpanded ? (
-                      <tr className={styles.coverageDetailExpandRow}>
-                        <td colSpan={detailColumnCount}>
-                          <div id={panelId} className={styles.coverageShortagePanel}>
-                            {materials.length === 0 ? (
-                              <p className={styles.coverageShortageEmpty}>
-                                Для этого изделия не найдена спецификация или номенклатуры не
-                                определены.
-                              </p>
-                            ) : (
-                              <>
-                                <p className={styles.coverageShortageLead}>
-                                  Номенклатуры спецификации для плана {formatQty(row.plan)} за период
-                                </p>
-                                <div className={styles.coverageBomScroll}>
-                                  <table
-                                    className={styles.coverageBomTable}
-                                    aria-label={`Номенклатуры изделия ${row.name}`}
-                                  >
-                                    <colgroup>
-                                      <col className={styles.coverageBomColName} />
-                                      <col className={styles.coverageBomColQty} span={4} />
-                                    </colgroup>
-                                    <thead>
-                                      <tr>
-                                        <th scope="col">Номенклатура</th>
-                                        <th scope="col">План</th>
-                                        <th scope="col">Остаток</th>
-                                        <th scope="col">Ожид. поступление</th>
-                                        <th scope="col">Не хватает</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody>
-                                      {materials.map((material) => {
-                                        const materialClass = material.optional
-                                          ? materialKindClass(material.materialKind)
-                                          : "";
-                                        const materialLabel = materialKindLabel(material);
-                                        const hasShortage = material.shortage > 1e-9;
-                                        return (
-                                          <tr
-                                            key={material.name}
-                                            className={`${materialClass || ""} ${
-                                              hasShortage ? styles.coverageBomRowShortage : ""
-                                            }`.trim() || undefined}
-                                          >
-                                            <td
-                                              className={styles.coverageShortageName}
-                                              title={material.name}
-                                            >
-                                              <span className={styles.coverageShortageNameText}>
-                                                {material.name}
-                                              </span>
-                                              {material.optional && materialLabel ? (
-                                                <span className={styles.coverageMaterialBadge}>
-                                                  {materialLabel}
-                                                </span>
-                                              ) : null}
-                                            </td>
-                                            <td>{formatQty(material.plan)}</td>
-                                            <td>{formatQty(material.stock)}</td>
-                                            <td>{formatQty(material.expected)}</td>
-                                            <td
-                                              className={
-                                                hasShortage ? styles.coverageShortageValue : undefined
-                                              }
-                                            >
-                                              {formatQty(material.shortage)}
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    ) : null}
-                  </Fragment>
-                );
-              })}
+              ))}
             </tbody>
           </table>
         </div>
       )}
+
+      {activeProductModalRow ? (
+        <CoverageProductBomModal
+          row={activeProductModalRow}
+          periodLabel={periodLabel}
+          tileLabel={tileLabel}
+          onClose={closeProductModal}
+        />
+      ) : null}
 
       {problemModalOpen ? (
         <div
@@ -1134,25 +1349,16 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                     </tr>
                   </thead>
                   <tbody>
-                    {problemMaterials.map((item) => {
-                      const itemClass = item.optional ? materialKindClass(item.materialKind) : "";
-                      const itemLabel = materialKindLabel(item);
-                      return (
-                      <tr key={item.name} className={itemClass || undefined}>
-                        <td className={styles.coverageProblemMaterialName}>
-                          {item.name}
-                          {item.optional && itemLabel ? (
-                            <span className={styles.coverageMaterialBadge}>{itemLabel}</span>
-                          ) : null}
-                        </td>
+                    {problemMaterials.map((item) => (
+                      <tr key={item.name}>
+                        <td className={styles.coverageProblemMaterialName}>{item.name}</td>
                         <td>{item.products.join("; ")}</td>
                         <td>{formatQty(item.plan)}</td>
                         <td>{formatQty(item.stock)}</td>
                         <td>{formatQty(item.expected)}</td>
                         <td className={styles.coverageShortageValue}>{formatQty(item.shortage)}</td>
                       </tr>
-                      );
-                    })}
+                    ))}
                   </tbody>
                 </table>
               </div>
@@ -1176,7 +1382,7 @@ function CoverageTileBackFace({ tile, side, onClose }: CoverageTileExplainPanelP
 
   return (
     <div
-      className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceBack} ${toneClass(tile.tone)} ${styles.coverageTileBackFace}`}
+      className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceBack} ${coverageTileSurfaceClass(tile.key)} ${styles.coverageTileBackFace}`}
       role="group"
       aria-label={`${explanation.title}: пояснение`}
       onContextMenu={(event) => {
@@ -2240,8 +2446,17 @@ function CoveragePeriodPicker({
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onCloseMenu();
     };
+    const onPointerDown = (event: MouseEvent) => {
+      const root = menuRef.current;
+      if (!root || root.contains(event.target as Node)) return;
+      onCloseMenu();
+    };
     window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+    };
   }, [menuOpen, onCloseMenu]);
 
   return (
@@ -2700,7 +2915,7 @@ export function CoverageDashboardTiles({
                       }`}
                     >
                       <div
-                        className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceFront} ${toneClass(tile.tone)} ${styles.coverageTileFront} ${
+                        className={`${styles.riskAnalyticsTile} ${styles.riskTileFace} ${styles.riskTileFaceFront} ${coverageTileSurfaceClass(tile.key)} ${styles.coverageTileFront} ${
                           isSelected ? styles.riskAnalyticsTileActive : ""
                         }`}
                       >
@@ -2713,7 +2928,7 @@ export function CoverageDashboardTiles({
                           onClick={() => handleTileClick(tile.key)}
                         >
                           <span
-                            className={`${styles.riskAnalyticsTileIcon} ${iconToneClass(tile.tone)}`}
+                            className={`${styles.riskAnalyticsTileIcon} ${coverageTileIconClass(tile.key)}`}
                             aria-hidden="true"
                           >
                             <Icon size={22} strokeWidth={2} />

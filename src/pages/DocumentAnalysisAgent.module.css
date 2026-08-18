@@ -4001,6 +4001,123 @@
   min-height: 0;
 }
 
+/* Плитки обеспеченности: цвет всей карточки по статусу */
+.coverageBoard .coverageTileFront.coverageTileSurfacePlan,
+.coverageBoard .coverageTileBackFace.coverageTileSurfacePlan {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-text-secondary) 14%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-text-secondary) 32%, var(--color-border));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceGreen,
+.coverageBoard .coverageTileBackFace.coverageTileSurfaceGreen {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-success-soft) 88%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-success-text) 38%, var(--color-border));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePartial,
+.coverageBoard .coverageTileBackFace.coverageTileSurfacePartial {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-warning) 22%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-warning-dark) 42%, var(--color-border));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceRed,
+.coverageBoard .coverageTileBackFace.coverageTileSurfaceRed {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-danger-soft) 82%, var(--color-surface-elevated));
+  border-color: color-mix(in srgb, var(--color-danger-text) 42%, var(--color-border));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePlan:hover {
+  background: color-mix(in srgb, var(--color-text-secondary) 20%, var(--color-surface-elevated));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceGreen:hover {
+  background: color-mix(in srgb, var(--color-success-soft) 96%, var(--color-surface-elevated));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePartial:hover {
+  background: color-mix(in srgb, var(--color-warning) 30%, var(--color-surface-elevated));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceRed:hover {
+  background: color-mix(in srgb, var(--color-danger-soft) 92%, var(--color-surface-elevated));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePlan.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-text-secondary) 55%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-text-secondary) 28%, transparent);
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceGreen.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-success-text) 55%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-success-text) 30%, transparent);
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePartial.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-warning-dark) 58%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-warning-dark) 32%, transparent);
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceRed.riskAnalyticsTileActive {
+  border-color: color-mix(in srgb, var(--color-danger-text) 58%, var(--color-border));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-danger-text) 32%, transparent);
+}
+
+.coverageTileIconPlan {
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-text-secondary) 12%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-text-secondary) 24%, var(--color-border));
+}
+
+.coverageTileIconGreen {
+  color: var(--color-success-text);
+  background: color-mix(in srgb, var(--color-success-soft) 70%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-success-text) 28%, transparent);
+}
+
+.coverageTileIconPartial {
+  color: var(--color-warning-dark);
+  background: color-mix(in srgb, var(--color-warning) 28%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-warning-dark) 30%, transparent);
+}
+
+.coverageTileIconRed {
+  color: var(--color-danger-text);
+  background: color-mix(in srgb, var(--color-danger-soft) 75%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-danger-text) 28%, transparent);
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePlan .riskAnalyticsTileLabel {
+  color: color-mix(in srgb, var(--color-text-secondary) 88%, var(--color-text-strong));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceGreen .riskAnalyticsTileLabel {
+  color: color-mix(in srgb, var(--color-success-text) 72%, var(--color-text-strong));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePartial .riskAnalyticsTileLabel {
+  color: color-mix(in srgb, var(--color-warning-dark) 78%, var(--color-text-strong));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceRed .riskAnalyticsTileLabel {
+  color: color-mix(in srgb, var(--color-danger-text) 78%, var(--color-text-strong));
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceGreen .riskAnalyticsTileValue {
+  color: var(--color-success-text);
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfacePartial .riskAnalyticsTileValue {
+  color: var(--color-warning-dark);
+}
+
+.coverageBoard .coverageTileFront.coverageTileSurfaceRed .riskAnalyticsTileValue {
+  color: var(--color-danger-text);
+}
+
 .coverageBoard .coverageAnalyticsTiles .riskTileFaceBack.riskAnalyticsTile {
   align-items: stretch;
   flex-direction: column;
@@ -4741,6 +4858,313 @@
   color: var(--color-text-strong);
   font-weight: 700;
   line-height: 1.35;
+}
+
+.coverageProductModalBackdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 75% 8%, color-mix(in srgb, var(--color-primary-text, #60a5fa) 16%, transparent), transparent 32%),
+    color-mix(in srgb, #020617 72%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.coverageProductModal {
+  width: min(980px, 96vw);
+  max-height: min(82vh, 780px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-surface-elevated) 96%, #0f172a);
+  border: 1px solid color-mix(in srgb, var(--color-primary-text, #60a5fa) 24%, var(--color-border));
+  border-radius: 20px;
+  box-shadow: 0 28px 80px color-mix(in srgb, #000000 48%, transparent);
+}
+
+.coverageProductModalHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 18px 20px 14px;
+  border-bottom: 1px solid var(--color-border);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--color-primary-text, #60a5fa) 12%, transparent), transparent 54%),
+    var(--color-surface);
+}
+
+.coverageProductModalEyebrow {
+  margin: 0 0 4px;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.coverageProductModalHead h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.25;
+}
+
+.coverageProductModalHead p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.coverageProductModalClose {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  color: var(--color-text-secondary);
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.coverageProductModalClose:hover {
+  color: var(--color-text-strong);
+}
+
+.coverageProductModalActions {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.coverageProductModalFilterWrap {
+  position: relative;
+  z-index: 4;
+}
+
+.coverageProductModalFilterBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 11px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-surface-elevated) 92%, #1e293b);
+  border: 1px solid color-mix(in srgb, var(--color-primary-text, #60a5fa) 28%, var(--color-border));
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    box-shadow 150ms ease;
+}
+
+.coverageProductModalFilterBtn:hover,
+.coverageProductModalFilterBtnActive {
+  border-color: color-mix(in srgb, var(--color-primary-text, #60a5fa) 52%, var(--color-border));
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--color-primary-text, #60a5fa) 12%, transparent);
+}
+
+.coverageProductModalFilterCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 18%, transparent);
+  color: var(--color-text-strong);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverageProductModalFilterMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(280px, 82vw);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: color-mix(in srgb, var(--color-surface-elevated) 96%, #0f172a);
+  border: 1px solid color-mix(in srgb, var(--color-primary-text, #60a5fa) 24%, var(--color-border));
+  border-radius: 14px;
+  box-shadow: 0 18px 44px color-mix(in srgb, #000000 34%, transparent);
+}
+
+.coverageProductModalFilterMenuHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 2px;
+  color: var(--color-text-strong);
+  font-size: 12px;
+}
+
+.coverageProductModalFilterMenuHead span {
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverageProductModalFilterMenuList {
+  display: grid;
+  gap: 4px;
+}
+
+.coverageProductModalFilterMenuItem {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-surface) 84%, transparent);
+  border: 1px solid transparent;
+  border-radius: 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.coverageProductModalFilterMenuItem:hover {
+  border-color: color-mix(in srgb, var(--color-primary-text, #60a5fa) 22%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 8%, var(--color-surface));
+}
+
+.coverageProductModalFilterMenuItem input {
+  margin: 0;
+  accent-color: var(--color-primary-text, #60a5fa);
+}
+
+.coverageProductModalFilterMenuActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  padding-top: 2px;
+}
+
+.coverageProductModalFilterMenuActions button {
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 5px 9px;
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.coverageProductModalFilterMenuActions button:hover {
+  color: var(--color-text-strong);
+  border-color: color-mix(in srgb, var(--color-primary-text) 24%, var(--color-border));
+}
+
+.coverageProductModalExportBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 11px;
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-surface-elevated) 92%, #14532d);
+  border: 1px solid color-mix(in srgb, #22c55e 34%, var(--color-border));
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  cursor: pointer;
+  transition:
+    transform 150ms ease,
+    border-color 150ms ease,
+    opacity 150ms ease;
+}
+
+.coverageProductModalExportBtn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, #22c55e 58%, var(--color-border));
+}
+
+.coverageProductModalExportBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.coverageProductModalEmpty {
+  margin: 0;
+  padding: 24px 20px 28px;
+  color: var(--color-text-secondary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.coverageProductModalTableWrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 20px 20px;
+  overflow: auto;
+}
+
+.coverageProductModalLead {
+  margin: 16px 0 10px;
+  color: var(--color-text-secondary);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.coverageProductModalTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.coverageProductModalTable th,
+.coverageProductModalTable td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--color-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.coverageProductModalTable th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  color: var(--color-text-secondary);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  background: color-mix(in srgb, var(--color-surface-elevated) 96%, var(--color-surface));
+}
+
+.coverageProductModalTable td:nth-child(n + 2):not(:last-child) {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverageProductModalTable tbody tr.coverageMaterialConsumable {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #3b82f6 12%, transparent), transparent 58%),
+    color-mix(in srgb, var(--color-surface) 92%, #3b82f6);
+}
+
+.coverageProductModalTable tbody tr.coverageMaterialWorkshop {
+  background:
+    linear-gradient(90deg, color-mix(in srgb, #a855f7 12%, transparent), transparent 58%),
+    color-mix(in srgb, var(--color-surface) 92%, #a855f7);
 }
 
 .coverageStatusBadge {
