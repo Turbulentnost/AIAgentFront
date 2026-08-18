@@ -399,10 +399,9 @@ export default function Login() {
                   <UserRound className={styles.fieldIcon} size={18} strokeWidth={2.1} aria-hidden="true" />
                   <input
                     id={emailId}
-                    autoComplete="email"
-                    inputMode="email"
+                    autoComplete="username"
                     placeholder="name@company.com или логин"
-                    type="email"
+                    type="text"
                     value={email}
                     onChange={(event) => setEmail(event.target.value)}
                     required

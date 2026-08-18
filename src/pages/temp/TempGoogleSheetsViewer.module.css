@@ -28,8 +28,106 @@
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
-  padding: 16px 18px;
+  padding: 16px 18px 12px;
   border-bottom: 1px solid var(--color-border, #2a2f3a);
+}
+
+.headerMain {
+  min-width: 0;
+}
+
+.sheetNav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 18px 12px;
+  border-bottom: 1px solid var(--color-border, #2a2f3a);
+}
+
+.sheetNavBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--color-text-secondary, #9ca3af);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 4%, transparent);
+  border: 1px solid var(--color-border, #2a2f3a);
+  border-radius: 8px;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.sheetNavBtn:hover:not(:disabled) {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-primary-text, #60a5fa) 10%, transparent);
+}
+
+.sheetNavBtn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sheetTabs {
+  display: flex;
+  flex: 1 1 auto;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.sheetTab {
+  flex: 0 0 auto;
+  max-width: 220px;
+  padding: 7px 12px;
+  overflow: hidden;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.sheetTab:hover {
+  color: var(--color-text-strong, #f3f4f6);
+  background: color-mix(in srgb, var(--color-text-strong, #fff) 6%, transparent);
+}
+
+.sheetTabActive {
+  color: #bfdbfe;
+  background: color-mix(in srgb, #3b82f6 18%, transparent);
+  border-color: color-mix(in srgb, #60a5fa 36%, var(--color-border, #2a2f3a));
+}
+
+.sheetCounter {
+  flex: 0 0 auto;
+  min-width: 48px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 11px;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheetMeta {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 10px;
+  color: var(--color-text-secondary, #9ca3af);
+  font-size: 12px;
+}
+
+.sheetMeta strong {
+  color: var(--color-text-strong, #f3f4f6);
+  font-size: 13px;
 }
 
 .title {
@@ -96,7 +194,7 @@
 }
 
 .tableWrap {
-  max-height: calc(90vh - 120px);
+  max-height: calc(90vh - 190px);
   overflow: auto;
   border: 1px solid var(--color-border, #2a2f3a);
   border-radius: 8px;

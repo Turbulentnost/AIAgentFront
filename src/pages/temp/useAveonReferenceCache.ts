@@ -4,6 +4,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { isAxiosError } from "axios";
 import { agentsApi } from "@/api/endpoints";
+import type { GoogleSheetTab } from "./TempGoogleSheetsViewer";
 
 export type ProductionPlanCache = Awaited<ReturnType<typeof agentsApi.tempAveonProductionPlan>>;
 
@@ -12,6 +13,8 @@ export type GoogleSheetsCache = {
   sheetTitle: string;
   spreadsheetTitle: string | null;
   values: string[][];
+  sheets: GoogleSheetTab[];
+  preferredSheetIndex: number;
   error: string | null;
 };
 
@@ -92,12 +95,45 @@ async function loadGoogleSheets(): Promise<GoogleSheetsCache> {
   try {
     const result = await agentsApi.fetchAveonGoogleSheets();
     const parsed = result.parsed;
-    const values = parsed?.values ?? [];
+    const rawSheets = parsed?.sheets ?? [];
+    const sheets: GoogleSheetTab[] = rawSheets
+      .filter((sheet) => sheet.ok !== false)
+      .map((sheet) => ({
+        title: sheet.title,
+        gid: sheet.gid ?? null,
+        rowCount: sheet.row_count ?? sheet.values?.length ?? 0,
+        columnCount: sheet.column_count ?? 0,
+        values: sheet.values ?? [],
+        error: sheet.error ?? null,
+      }))
+      .filter((sheet) => sheet.values.length > 0 || sheet.error);
+
+    const preferredTitle =
+      parsed?.preferred_sheet_title || parsed?.sheet_title || result.sheet_title || "ИТЦ В РАБОТЕ";
+    let preferredSheetIndex = sheets.findIndex((sheet) => sheet.title === preferredTitle);
+    if (preferredSheetIndex < 0) {
+      preferredSheetIndex = 0;
+    }
+
+    if (!sheets.length && (parsed?.values?.length ?? 0) > 0) {
+      sheets.push({
+        title: preferredTitle,
+        gid: parsed?.sheet_gid ?? null,
+        rowCount: parsed?.row_count ?? parsed?.values?.length ?? 0,
+        columnCount: parsed?.column_count ?? 0,
+        values: parsed?.values ?? [],
+      });
+      preferredSheetIndex = 0;
+    }
+
+    const values = sheets[preferredSheetIndex]?.values ?? parsed?.values ?? [];
     return {
       ok: result.ok && values.length > 0,
-      sheetTitle: parsed?.sheet_title || result.sheet_title || "ИТЦ В РАБОТЕ",
+      sheetTitle: sheets[preferredSheetIndex]?.title || preferredTitle,
       spreadsheetTitle: parsed?.spreadsheet_title ?? null,
       values,
+      sheets,
+      preferredSheetIndex,
       error: values.length ? null : "Лист пуст или данные не пришли",
     };
   } catch {
@@ -106,6 +142,8 @@ async function loadGoogleSheets(): Promise<GoogleSheetsCache> {
       sheetTitle: "ИТЦ В РАБОТЕ",
       spreadsheetTitle: null,
       values: [],
+      sheets: [],
+      preferredSheetIndex: 0,
       error: "Не удалось загрузить лист Google Sheets",
     };
   }

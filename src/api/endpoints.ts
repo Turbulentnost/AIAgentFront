@@ -763,6 +763,19 @@ export const agentsApi = {
   clearAveonDashboardLatest: () =>
     apiClient.delete<{ ok: boolean; removed: boolean }>("/agents/document-analysis/dashboard-latest").then((r) => r.data),
 
+  /** TEMP(WeChat utility test) — удалить вместе с кнопкой test */
+  testWechatUtilityConnection: () =>
+    apiClient
+      .post<{
+        ok: boolean;
+        error?: string;
+        health: Record<string, unknown> | null;
+        healthError: string | null;
+        wsMessage: Record<string, unknown> | null;
+        wsUrl: string | null;
+      }>("/agents/document-analysis/wechat-utility-test")
+      .then((r) => r.data),
+
   /** TEMP(Aveon OData ping) — удалить вместе с кнопкой на странице агента */
   tempAveonOdataPing: () =>
     longRunningApiClient
@@ -978,11 +991,22 @@ export const agentsApi = {
           format?: string;
           spreadsheet_title?: string;
           sheet_title?: string;
+          preferred_sheet_title?: string;
           sheet_gid?: number | string;
           row_count?: number;
           column_count?: number;
           preview_rows?: string[][];
           values?: string[][];
+          sheets?: Array<{
+            title: string;
+            gid?: number | string | null;
+            ok?: boolean;
+            row_count?: number;
+            column_count?: number;
+            values?: string[][];
+            preview_rows?: string[][];
+            error?: string | null;
+          }>;
         } | null;
       }>("/agents/document-analysis/google-sheets/fetch")
       .then((r) => r.data),

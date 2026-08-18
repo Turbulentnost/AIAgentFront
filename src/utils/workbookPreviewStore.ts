@@ -89,7 +89,11 @@ async function sweepExpiredWorkbooks(): Promise<void> {
 }
 
 export function workbookPreviewPath(id: string): string {
-  return `/agents/document-analysis/workbook/${encodeURIComponent(id)}`;
+  const route = `/agents/document-analysis/workbook/${encodeURIComponent(id)}`;
+  if (typeof window !== "undefined" && window.aveonDesktop?.platform === "electron") {
+    return `#${route}`;
+  }
+  return route;
 }
 
 export async function openWorkbookInNewTab(file: File): Promise<void> {

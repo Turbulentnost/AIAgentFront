@@ -3396,21 +3396,23 @@
 
 .coveragePeriodMenuRange {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 8px;
 }
 
 .coveragePeriodMenuField {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 10px;
   font-size: 11px;
   color: var(--color-text-secondary);
 }
 
 .coveragePeriodMenuField > span {
   font-weight: 700;
+  white-space: nowrap;
 }
 
 .coveragePeriodMenuDateBtn {
@@ -3462,6 +3464,12 @@
   margin: 0;
   font-size: 11px;
   color: var(--color-danger, #ef4444);
+}
+
+.coveragePeriodMenuStatus {
+  margin: 0;
+  font-size: 11px;
+  color: var(--color-text-secondary);
 }
 
 .coveragePeriodMenuApply {

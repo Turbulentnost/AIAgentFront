@@ -134,6 +134,7 @@ export default function SummaryReferencePanel({
 }: Props) {
   const [flipped, setFlipped] = useState(false);
   const [internalModal, setInternalModal] = useState<ReferenceModal>(null);
+  const [chinaSheetIndex, setChinaSheetIndex] = useState(0);
   const activeModal = controlledModal !== undefined ? controlledModal : internalModal;
 
   function setActiveModal(id: ReferenceModal) {
@@ -157,6 +158,12 @@ export default function SummaryReferencePanel({
       setFlipped(true);
     }
   }, [activeModal]);
+
+  useEffect(() => {
+    if (activeModal === "chinaSheets") {
+      setChinaSheetIndex(cache.googleSheets?.preferredSheetIndex ?? 0);
+    }
+  }, [activeModal, cache.googleSheets?.preferredSheetIndex]);
 
   return (
     <>
@@ -244,8 +251,11 @@ export default function SummaryReferencePanel({
         open={activeModal === "chinaSheets"}
         loading={cache.loading}
         error={cache.googleSheets?.error ?? null}
-        sheetTitle={cache.googleSheets?.sheetTitle ?? "ИТЦ В РАБОТЕ"}
         spreadsheetTitle={cache.googleSheets?.spreadsheetTitle}
+        sheets={cache.googleSheets?.sheets}
+        activeSheetIndex={chinaSheetIndex}
+        onSheetChange={setChinaSheetIndex}
+        sheetTitle={cache.googleSheets?.sheetTitle ?? "ИТЦ В РАБОТЕ"}
         values={cache.googleSheets?.values ?? []}
         onClose={closeModal}
       />

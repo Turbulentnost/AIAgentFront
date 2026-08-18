@@ -430,14 +430,10 @@ function mapCoverageDashboard(raw: unknown): CoverageDashboardPayload | null {
     };
   }
 
-  const defaultPeriod = String(data.default_period ?? "week");
-  const normalizedPeriod: CoveragePeriodKey =
-    defaultPeriod === "day" || defaultPeriod === "month" ? defaultPeriod : "week";
-
   return {
     asOf: String(data.as_of ?? ""),
     scheduleMonth: String(data.schedule_month ?? ""),
-    defaultPeriod: normalizedPeriod,
+    defaultPeriod: "day",
     periods
   };
 }
@@ -2197,8 +2193,6 @@ function ManagerResultsDashboard({
 type CoveragePeriodSelectionMode = "preset" | "range";
 
 function CoveragePeriodPicker({
-  scheduleMin,
-  scheduleMax,
   period,
   periodMode,
   rangeFrom,
@@ -2211,11 +2205,8 @@ function CoveragePeriodPicker({
   onPresetSelect,
   onRangeFromChange,
   onRangeToChange,
-  onApplyRange,
   formatDate
 }: {
-  scheduleMin: string;
-  scheduleMax: string;
   period: CoveragePeriodKey;
   periodMode: CoveragePeriodSelectionMode;
   rangeFrom: string;
@@ -2228,7 +2219,6 @@ function CoveragePeriodPicker({
   onPresetSelect: (nextPeriod: CoveragePeriodKey) => void;
   onRangeFromChange: (value: string) => void;
   onRangeToChange: (value: string) => void;
-  onApplyRange: () => void;
   formatDate: (iso: string | null | undefined) => string;
 }) {
   const menuRef = useRef<HTMLDivElement>(null);
@@ -2294,52 +2284,40 @@ function CoveragePeriodPicker({
 
           <div className={styles.coveragePeriodMenuRange}>
             <label className={styles.coveragePeriodMenuField}>
-              <span>С</span>
+              <span>Дата начала</span>
               <input
                 type="date"
                 className={styles.coveragePeriodMenuDateInput}
                 value={rangeFrom}
-                min={scheduleMin}
-                max={rangeTo || scheduleMax}
                 onChange={(event) => {
                   if (event.target.value) onRangeFromChange(event.target.value);
                 }}
-                aria-label="Начало периода"
+                aria-label="Дата начала"
               />
             </label>
-            <span className={styles.coveragePeriodMenuDash} aria-hidden="true">
-              —
-            </span>
             <label className={styles.coveragePeriodMenuField}>
-              <span>По</span>
+              <span>Дата окончания</span>
               <input
                 type="date"
                 className={styles.coveragePeriodMenuDateInput}
                 value={rangeTo}
-                min={rangeFrom || scheduleMin}
-                max={scheduleMax}
                 onChange={(event) => {
                   if (event.target.value) onRangeToChange(event.target.value);
                 }}
-                aria-label="Конец периода"
+                aria-label="Дата окончания"
               />
             </label>
           </div>
+
+          {rangeLoading ? (
+            <p className={styles.coveragePeriodMenuStatus}>Пересчёт дашборда…</p>
+          ) : null}
 
           {rangeInvalid ? (
             <p className={styles.coveragePeriodMenuError}>Дата начала не может быть позже даты окончания.</p>
           ) : rangeError ? (
             <p className={styles.coveragePeriodMenuError}>{rangeError}</p>
           ) : null}
-
-          <button
-            type="button"
-            className={styles.coveragePeriodMenuApply}
-            disabled={rangeLoading || rangeInvalid || !rangeFrom || !rangeTo}
-            onClick={onApplyRange}
-          >
-            {rangeLoading ? "Считаем…" : "Применить период"}
-          </button>
         </div>
       ) : null}
     </div>
@@ -2367,18 +2345,18 @@ export function CoverageDashboardTiles({
   const hasTasksSide =
     !hasManagerResultsSide && (Boolean(managerTasks) || Boolean(managerTasksNotice));
   const hasExtraSide = hasTasksSide || hasManagerResultsSide;
-  const [period, setPeriod] = useState<CoveragePeriodKey>(dashboard.defaultPeriod ?? "week");
+  const [period, setPeriod] = useState<CoveragePeriodKey>(dashboard.defaultPeriod ?? "day");
   const [periodMode, setPeriodMode] = useState<CoveragePeriodSelectionMode>("preset");
   const [customPeriodData, setCustomPeriodData] = useState<CoveragePeriodPayload | null>(null);
   const scheduleBounds = useMemo(() => resolveCoverageScheduleBounds(dashboard), [dashboard]);
   const [rangeFrom, setRangeFrom] = useState(
     () =>
-      rangeFromPeriodDays(dashboard.periods[dashboard.defaultPeriod ?? "week"]?.days)?.from ??
+      rangeFromPeriodDays(dashboard.periods[dashboard.defaultPeriod ?? "day"]?.days)?.from ??
       scheduleBounds.min
   );
   const [rangeTo, setRangeTo] = useState(
     () =>
-      rangeFromPeriodDays(dashboard.periods[dashboard.defaultPeriod ?? "week"]?.days)?.to ??
+      rangeFromPeriodDays(dashboard.periods[dashboard.defaultPeriod ?? "day"]?.days)?.to ??
       scheduleBounds.max
   );
   const [periodMenuOpen, setPeriodMenuOpen] = useState(false);
@@ -2447,9 +2425,10 @@ export function CoverageDashboardTiles({
   }, []);
 
   useEffect(() => {
-    const nextPeriod = dashboard.defaultPeriod ?? "week";
+    const nextPeriod = dashboard.defaultPeriod ?? "day";
     const nextRange =
       rangeFromPeriodDays(dashboard.periods[nextPeriod]?.days) ??
+      rangeFromPeriodDays(dashboard.periods.day?.days) ??
       rangeFromPeriodDays(dashboard.periods.week?.days) ??
       rangeFromPeriodDays(dashboard.periods.month?.days);
     setPeriod(nextPeriod);
@@ -2530,7 +2509,7 @@ export function CoverageDashboardTiles({
   const rawPeriodData =
     periodMode === "range" && customPeriodData
       ? customPeriodData
-      : dashboard.periods[period] ?? dashboard.periods.week ?? dashboard.periods.month;
+      : dashboard.periods[period] ?? dashboard.periods.day ?? dashboard.periods.week ?? dashboard.periods.month;
   const periodData = rawPeriodData;
 
   const tileValues = useMemo(() => {
@@ -2640,10 +2619,6 @@ export function CoverageDashboardTiles({
     }, 350);
     return () => window.clearTimeout(timer);
   }, [applyDateRange, dashboard, period, periodMode, rangeFrom, rangeTo]);
-
-  const handleApplyCustomRange = useCallback(() => {
-    void applyDateRange(rangeFrom, rangeTo);
-  }, [applyDateRange, rangeFrom, rangeTo]);
 
   const selectDashboardSide = useCallback(
     (nextSide: CoverageDashboardSide) => {
@@ -2879,8 +2854,6 @@ export function CoverageDashboardTiles({
   const periodNav = (
     <div className={styles.coverageToolbar} role="toolbar" aria-label="Управление дашбордом обеспеченности">
       <CoveragePeriodPicker
-        scheduleMin={scheduleBounds.min}
-        scheduleMax={scheduleBounds.max}
         period={period}
         periodMode={periodMode}
         rangeFrom={rangeFrom}
@@ -2893,9 +2866,6 @@ export function CoverageDashboardTiles({
         onPresetSelect={handlePeriodChange}
         onRangeFromChange={setRangeFrom}
         onRangeToChange={setRangeTo}
-        onApplyRange={() => {
-          void handleApplyCustomRange();
-        }}
         formatDate={formatDate}
       />
       <div className={styles.coverageToolbarTrailing}>{dashboardModeSwitch}</div>

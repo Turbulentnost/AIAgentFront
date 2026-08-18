@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import type { ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { authApi } from "@/api/endpoints";
+import { platformAuthApi } from "@/auth/platformAuthApi";
 import {
   clearOneCSession,
   getOneCCredentials,
@@ -9,6 +10,7 @@ import {
 } from "@/auth/onecSession";
 import type { LoginPayload, User } from "@/types";
 import { AuthProfileError } from "@/auth/errors";
+import { clearAuthTokens, readAccessToken, writeAuthTokens } from "@/auth/authStorage";
 
 export type AuthMode = "platform" | "onec";
 
@@ -34,21 +36,22 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 function detectAuthMode(): AuthMode | null {
-  if (localStorage.getItem("access_token")) return "platform";
+  if (readAccessToken()) return "platform";
   return null;
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [authMode, setAuthMode] = useState<AuthMode | null>(detectAuthMode);
+  const [accessToken, setAccessToken] = useState<string | null>(() => readAccessToken());
   const [onecCredentials, setOnecCredentials] = useState(() => getOneCCredentials());
   const onecLoginPromise = useRef<Promise<void> | null>(null);
 
-  const hasPlatformToken = Boolean(localStorage.getItem("access_token"));
+  const hasPlatformToken = Boolean(accessToken);
 
   const meQuery = useQuery({
     queryKey: ["auth", "me"],
-    queryFn: authApi.me,
+    queryFn: () => platformAuthApi().me(),
     enabled: hasPlatformToken,
     retry: false
   });
@@ -57,8 +60,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!meQuery.isError || !hasPlatformToken) return;
     if (isOneCSessionAuthError(meQuery.error)) return;
 
-    localStorage.removeItem("access_token");
-    localStorage.removeItem("token_expires_at");
+    clearAuthTokens();
+    setAccessToken(null);
     setAuthMode(null);
     queryClient.removeQueries({ queryKey: ["auth"] });
   }, [hasPlatformToken, meQuery.error, meQuery.isError, queryClient]);
@@ -76,13 +79,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [queryClient]);
 
   const loginMutation = useMutation({
-    mutationFn: authApi.login,
+    mutationFn: (payload: LoginPayload) => platformAuthApi().login(payload),
     onSuccess: async (token) => {
       clearOneCSession();
-      localStorage.setItem("access_token", token.access_token);
-      if (token.expires_at) localStorage.setItem("token_expires_at", token.expires_at);
+      writeAuthTokens(token.access_token, token.expires_at);
       setOnecCredentials(null);
-      setAuthMode("platform");
       await queryClient.invalidateQueries({ queryKey: ["auth"] });
       await queryClient.invalidateQueries({ queryKey: ["meetings"] });
       await queryClient.invalidateQueries({ queryKey: ["porucheniya"] });
@@ -94,10 +95,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     onSuccess: async (result, credentials) => {
       saveOneCCredentials(credentials);
       setOnecCredentials(credentials);
-      localStorage.setItem("access_token", result.access_token);
-      if (result.expires_at) {
-        localStorage.setItem("token_expires_at", result.expires_at);
-      }
+      writeAuthTokens(result.access_token, result.expires_at);
+      setAccessToken(result.access_token);
       setAuthMode("platform");
       await queryClient.invalidateQueries({ queryKey: ["auth"] });
       await queryClient.invalidateQueries({ queryKey: ["onec", "tasks"] });
@@ -125,10 +124,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       login: async (payload) => {
         await loginMutation.mutateAsync(payload);
         try {
-          await queryClient.fetchQuery({ queryKey: ["auth", "me"], queryFn: authApi.me });
+          const profile = await platformAuthApi().me();
+          setAccessToken(readAccessToken());
+          setAuthMode("platform");
+          queryClient.setQueryData(["auth", "me"], profile);
         } catch (error) {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("token_expires_at");
+          clearAuthTokens();
+          setAccessToken(null);
           queryClient.removeQueries({ queryKey: ["auth"] });
           if (error instanceof Error && (error.message.includes("timeout") || error.message.includes("Timeout"))) {
             throw new AuthProfileError("Сервер не ответил на запрос профиля за 30 секунд. Проверьте бэкенд /auth/me");
@@ -151,12 +153,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       },
       logout: async () => {
         try {
-          if (hasPlatformToken) await authApi.logout();
+          if (hasPlatformToken) await platformAuthApi().logout();
         } catch {
           // ignore logout errors
         } finally {
-          localStorage.removeItem("access_token");
-          localStorage.removeItem("token_expires_at");
+          clearAuthTokens();
+          setAccessToken(null);
           clearOneCSession();
           setOnecCredentials(null);
           setAuthMode(null);
@@ -166,6 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [
     authMode,
+    accessToken,
     hasPlatformToken,
     login1CMutation,
     loginMutation,
