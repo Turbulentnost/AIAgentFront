@@ -32,6 +32,50 @@
   border-bottom: 1px solid var(--color-border, #2a2f3a);
 }
 
+.headerActions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.mergeBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 6px 12px;
+  color: var(--color-text-strong, #f3f4f6);
+  font-size: 12px;
+  font-weight: 700;
+  background: color-mix(in srgb, #22c55e 12%, transparent);
+  border: 1px solid color-mix(in srgb, #22c55e 34%, var(--color-border, #2a2f3a));
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mergeBtn:hover {
+  background: color-mix(in srgb, #22c55e 18%, transparent);
+  border-color: color-mix(in srgb, #22c55e 52%, var(--color-border, #2a2f3a));
+}
+
+.mergeBtnActive {
+  color: #dcfce7;
+  background: color-mix(in srgb, #22c55e 24%, transparent);
+  border-color: color-mix(in srgb, #22c55e 58%, var(--color-border, #2a2f3a));
+}
+
+.sheetTabMerged {
+  color: #bbf7d0;
+}
+
+.tableSectionRow td {
+  font-weight: 700;
+  color: #86efac;
+  background: color-mix(in srgb, #22c55e 10%, transparent);
+}
+
 .headerMain {
   min-width: 0;
 }

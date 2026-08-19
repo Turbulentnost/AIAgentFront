@@ -2,8 +2,15 @@
  * TEMP(Aveon Google Sheets viewer) — удалить вместе с кнопкой на DocumentAnalysisAgent.
  */
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, Loader2, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Layers, Loader2, X } from "lucide-react";
 import styles from "./TempGoogleSheetsViewer.module.css";
+import {
+  buildMergedChinaHongKongSheet,
+  canMergeChinaHongKongSheets,
+  findChinaSheet,
+  findHongKongSheet,
+  MERGED_CHINA_HONG_KONG_SHEET_GID,
+} from "./mergeChinaHongKongSheets";
 
 export type GoogleSheetTab = {
   title: string;
@@ -54,15 +61,31 @@ export default function TempGoogleSheetsViewer({
   onClose,
 }: Props) {
   const [internalSheetIndex, setInternalSheetIndex] = useState(0);
+  const [mergedTabVisible, setMergedTabVisible] = useState(false);
 
   const resolvedSheets = useMemo(() => {
     if (sheets?.length) return sheets;
     return buildLegacySheets(sheetTitle, legacyValues);
   }, [sheetTitle, sheets, legacyValues]);
 
+  const mergedChinaHongKongSheet = useMemo(() => {
+    const chinaSheet = findChinaSheet(resolvedSheets);
+    const hongKongSheet = findHongKongSheet(resolvedSheets);
+    if (!chinaSheet || !hongKongSheet) return null;
+    return buildMergedChinaHongKongSheet(chinaSheet, hongKongSheet);
+  }, [resolvedSheets]);
+
+  const displaySheets = useMemo(() => {
+    if (!mergedTabVisible || !mergedChinaHongKongSheet) return resolvedSheets;
+    return [...resolvedSheets, mergedChinaHongKongSheet];
+  }, [mergedChinaHongKongSheet, mergedTabVisible, resolvedSheets]);
+
+  const mergeAvailable = canMergeChinaHongKongSheets(resolvedSheets);
+
   useEffect(() => {
     if (open) {
       setInternalSheetIndex(0);
+      setMergedTabVisible(false);
     }
   }, [open]);
 
@@ -71,17 +94,30 @@ export default function TempGoogleSheetsViewer({
   const currentSheetIndex = activeSheetIndex ?? internalSheetIndex;
   const setSheetIndex = onSheetChange ?? setInternalSheetIndex;
 
-  const safeIndex = resolvedSheets.length
-    ? Math.min(Math.max(currentSheetIndex, 0), resolvedSheets.length - 1)
+  const safeIndex = displaySheets.length
+    ? Math.min(Math.max(currentSheetIndex, 0), displaySheets.length - 1)
     : 0;
-  const activeSheet = resolvedSheets[safeIndex];
+  const activeSheet = displaySheets[safeIndex];
+  const isMergedSheetActive = activeSheet?.gid === MERGED_CHINA_HONG_KONG_SHEET_GID;
+
+  const openMergedSheet = () => {
+    if (!mergedChinaHongKongSheet) return;
+    setMergedTabVisible(true);
+    setSheetIndex(resolvedSheets.length);
+  };
+
   const sheetValues = activeSheet?.values ?? [];
   const header = sheetValues[0] ?? [];
   const body = sheetValues.length > 1 ? sheetValues.slice(1) : [];
   const colCount = Math.max(header.length, ...body.map((row) => row.length), 0);
 
   const goPrev = () => setSheetIndex(Math.max(0, safeIndex - 1));
-  const goNext = () => setSheetIndex(Math.min(resolvedSheets.length - 1, safeIndex + 1));
+  const goNext = () => setSheetIndex(Math.min(displaySheets.length - 1, safeIndex + 1));
+
+  function isSectionMarkerRow(row: string[]): boolean {
+    const marker = String(row[0] ?? "").trim();
+    return marker.startsWith("—") && marker.endsWith("—");
+  }
 
   return (
     <div
@@ -110,14 +146,28 @@ export default function TempGoogleSheetsViewer({
                 : resolvedSheets.length
                   ? ` · ${resolvedSheets.length} листов`
                   : ""}
+              {mergeAvailable ? " · доступно объединение Китай + Гонконг" : ""}
             </p>
           </div>
-          <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
-            <X size={18} aria-hidden />
-          </button>
+          <div className={styles.headerActions}>
+            {mergeAvailable ? (
+              <button
+                type="button"
+                className={`${styles.mergeBtn} ${isMergedSheetActive ? styles.mergeBtnActive : ""}`}
+                onClick={openMergedSheet}
+                title="Объединить листы «КИТАЙ» и «Гонконг В РАБОТЕ» в один просмотр"
+              >
+                <Layers size={15} strokeWidth={2.2} aria-hidden="true" />
+                <span>Китай + Гонконг</span>
+              </button>
+            ) : null}
+            <button type="button" className={styles.closeBtn} onClick={onClose} aria-label="Закрыть">
+              <X size={18} aria-hidden />
+            </button>
+          </div>
         </div>
 
-        {resolvedSheets.length > 1 ? (
+        {displaySheets.length > 1 ? (
           <div className={styles.sheetNav} role="navigation" aria-label="Листы Google Sheets">
             <button
               type="button"
@@ -129,13 +179,15 @@ export default function TempGoogleSheetsViewer({
               <ChevronLeft size={16} aria-hidden />
             </button>
             <div className={styles.sheetTabs} role="tablist">
-              {resolvedSheets.map((sheet, index) => (
+              {displaySheets.map((sheet, index) => (
                 <button
                   key={`${sheet.gid ?? sheet.title}-${index}`}
                   type="button"
                   role="tab"
                   aria-selected={index === safeIndex}
-                  className={`${styles.sheetTab} ${index === safeIndex ? styles.sheetTabActive : ""}`}
+                  className={`${styles.sheetTab} ${index === safeIndex ? styles.sheetTabActive : ""} ${
+                    sheet.gid === MERGED_CHINA_HONG_KONG_SHEET_GID ? styles.sheetTabMerged : ""
+                  }`}
                   onClick={() => setSheetIndex(index)}
                   title={sheet.title}
                 >
@@ -147,13 +199,13 @@ export default function TempGoogleSheetsViewer({
               type="button"
               className={styles.sheetNavBtn}
               onClick={goNext}
-              disabled={loading || safeIndex >= resolvedSheets.length - 1}
+              disabled={loading || safeIndex >= displaySheets.length - 1}
               aria-label="Следующий лист"
             >
               <ChevronRight size={16} aria-hidden />
             </button>
             <span className={styles.sheetCounter}>
-              {safeIndex + 1} / {resolvedSheets.length}
+              {safeIndex + 1} / {displaySheets.length}
             </span>
           </div>
         ) : null}
@@ -177,7 +229,9 @@ export default function TempGoogleSheetsViewer({
               <p className={styles.sheetMeta}>
                 <strong>{activeSheet.title}</strong>
                 <span>
-                  {sheetValues.length} строк · {colCount} кол.
+                  {isMergedSheetActive
+                    ? `${sheetValues.length} строк · ${colCount} кол. · объединение Китай + Гонконг`
+                    : `${sheetValues.length} строк · ${colCount} кол.`}
                 </span>
               </p>
               <div className={styles.tableWrap}>
@@ -191,7 +245,14 @@ export default function TempGoogleSheetsViewer({
                   </thead>
                   <tbody>
                     {body.map((row, rowIndex) => (
-                      <tr key={`r-${rowIndex}`}>
+                      <tr
+                        key={`r-${rowIndex}`}
+                        className={
+                          isMergedSheetActive && isSectionMarkerRow(row)
+                            ? styles.tableSectionRow
+                            : undefined
+                        }
+                      >
                         {Array.from({ length: colCount }, (_, colIndex) => (
                           <td key={`c-${rowIndex}-${colIndex}`}>{row[colIndex] ?? ""}</td>
                         ))}

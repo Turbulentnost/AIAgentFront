@@ -1226,6 +1226,27 @@ export const agentsApi = {
       }>(`/agents/document-analysis/resource-specs/${encodeURIComponent(refKey)}`)
       .then((r) => r.data),
 
+  calculateAveonMaterials: (items: Array<{ spec_ref_key: string; quantity: number }>) =>
+    apiClient
+      .post<{
+        ok: boolean;
+        warnings: string[];
+        lines: Array<{
+          nomenclature_key: string;
+          code: string;
+          name: string;
+          unit: string;
+          total_qty: number;
+          breakdown: Array<{
+            spec_ref_key: string;
+            spec_label: string;
+            product_qty: number;
+            material_qty: number;
+          }>;
+        }>;
+      }>("/agents/document-analysis/material-calculator", { items })
+      .then((r) => r.data),
+
   mergeShipmentSchedules: (files: File[], options?: { includeGoogleSheets?: boolean }) => {
     const formData = new FormData();
     for (const file of files) {
@@ -1553,11 +1574,23 @@ export const agentsApi = {
       })
       .then((r) => r.data),
 
-  getShiftCompletionDashboard: (params?: { reportDate?: string }) =>
+  getShiftCompletionDashboard: (params?: {
+    reportDate?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    periodMode?: "day" | "range" | "all";
+  }) =>
     apiClient
       .get<{
         ok: boolean;
         report_date: string;
+        period_mode?: "day" | "range" | "all";
+        period_label?: string;
+        date_from?: string;
+        date_to?: string;
+        days_in_period?: number;
+        submitted_shift_days?: number;
+        expected_shift_days?: number;
         summary: {
           total: number;
           resolved: number;
@@ -1580,6 +1613,7 @@ export const agentsApi = {
           report_date: string;
           report_status: "submitted" | "missing" | "in_progress";
           region_label: string;
+          days_with_reports?: number;
           stats: {
             total: number;
             resolved: number;
@@ -1596,10 +1630,22 @@ export const agentsApi = {
           live_updated_at?: string | null;
         }>;
       }>("/agents/document-analysis/shift-assignment/completion-dashboard", {
-        params: params?.reportDate ? { report_date: params.reportDate } : undefined
+        params: {
+          ...(params?.reportDate ? { report_date: params.reportDate } : {}),
+          ...(params?.dateFrom ? { date_from: params.dateFrom } : {}),
+          ...(params?.dateTo ? { date_to: params.dateTo } : {}),
+          ...(params?.periodMode ? { period_mode: params.periodMode } : {})
+        }
       })
       .then((r) => ({
         reportDate: r.data.report_date,
+        periodMode: r.data.period_mode ?? "day",
+        periodLabel: r.data.period_label ?? r.data.report_date,
+        dateFrom: r.data.date_from ?? r.data.report_date,
+        dateTo: r.data.date_to ?? r.data.report_date,
+        daysInPeriod: r.data.days_in_period,
+        submittedShiftDays: r.data.submitted_shift_days,
+        expectedShiftDays: r.data.expected_shift_days,
         liveMode: Boolean(r.data.live_mode),
         roster: {
           total: r.data.roster?.total ?? r.data.managers?.length ?? 0,
@@ -1622,6 +1668,7 @@ export const agentsApi = {
           reportDate: manager.report_date,
           reportStatus: manager.report_status ?? "submitted",
           regionLabel: manager.region_label ?? "",
+          daysWithReports: manager.days_with_reports,
           stats: {
             total: manager.stats.total ?? 0,
             resolved: manager.stats.resolved ?? 0,

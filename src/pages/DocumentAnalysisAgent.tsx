@@ -889,7 +889,8 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
   );
   const [managerCompletionDashboard, setManagerCompletionDashboard] =
     useState<ManagerCompletionDashboard | null>(null);
-  const [managerReportDate, setManagerReportDate] = useState(() => todayMskIso());
+  const [managerReportDateFrom, setManagerReportDateFrom] = useState(() => todayMskIso());
+  const [managerReportDateTo, setManagerReportDateTo] = useState(() => todayMskIso());
   const [managerCompletionToday, setManagerCompletionToday] = useState(() => todayMskIso());
   const [managerCompletionDates, setManagerCompletionDates] = useState<ManagerCompletionDateEntry[]>(
     []
@@ -1019,15 +1020,19 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
     }
   }, []);
 
-  const loadManagerCompletionDashboard = useCallback(async (reportDate: string) => {
+  const loadManagerCompletionDashboard = useCallback(async (dateFrom: string, dateTo: string) => {
     setManagerCompletionLoading(true);
     setManagerCompletionError(null);
     try {
-      const dashboard = await agentsApi.getShiftCompletionDashboard({ reportDate });
+      const dashboard = await agentsApi.getShiftCompletionDashboard(
+        dateFrom === dateTo
+          ? { reportDate: dateFrom, periodMode: "day" }
+          : { dateFrom, dateTo, periodMode: "range" }
+      );
       setManagerCompletionDashboard(dashboard);
     } catch {
       setManagerCompletionDashboard(null);
-      setManagerCompletionError("Не удалось загрузить аналитику за выбранную дату.");
+      setManagerCompletionError("Не удалось загрузить аналитику за выбранный период.");
     } finally {
       setManagerCompletionLoading(false);
     }
@@ -1046,25 +1051,8 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
 
   useEffect(() => {
     if (managerScope) return;
-    void loadManagerCompletionDashboard(managerReportDate);
-  }, [managerScope, managerReportDate, loadManagerCompletionDashboard]);
-
-  useEffect(() => {
-    if (managerScope) return;
-    if (managerReportDate !== managerCompletionToday) return;
-    if (!managerCompletionDashboard?.liveMode) return;
-
-    const timer = window.setInterval(() => {
-      void loadManagerCompletionDashboard(managerReportDate);
-    }, 30_000);
-    return () => window.clearInterval(timer);
-  }, [
-    managerScope,
-    managerReportDate,
-    managerCompletionToday,
-    managerCompletionDashboard?.liveMode,
-    loadManagerCompletionDashboard
-  ]);
+    void loadManagerCompletionDashboard(managerReportDateFrom, managerReportDateTo);
+  }, [managerScope, managerReportDateFrom, managerReportDateTo, loadManagerCompletionDashboard]);
 
   const managerTasksNotice = useMemo(() => {
     if (!shiftDayExpired) return null;
@@ -1082,13 +1070,13 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
     try {
       const report = await agentsApi.downloadExecutiveProcurementReport({
         periodMode: params.mode,
-        reportDate: params.mode === "day" ? params.reportDate ?? managerReportDate : undefined,
+        reportDate: params.mode === "day" ? params.reportDate ?? managerReportDateTo : undefined,
         dateFrom: params.mode === "range" ? params.dateFrom : undefined,
         dateTo: params.mode === "range" ? params.dateTo : undefined
       });
       const filename =
         params.mode === "day"
-          ? `aveon_executive_procurement_report_${params.reportDate ?? managerReportDate}.xlsx`
+          ? `aveon_executive_procurement_report_${params.reportDate ?? managerReportDateTo}.xlsx`
           : params.mode === "all"
             ? `aveon_executive_procurement_report_all.xlsx`
             : `aveon_executive_procurement_report_${params.dateFrom}_${params.dateTo}.xlsx`;
@@ -1100,39 +1088,48 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
     } finally {
       setExecutiveReportLoading(false);
     }
-  }, [managerScope, managerReportDate]);
+  }, [managerScope, managerReportDateTo]);
+
+  const handleManagerPeriodChange = useCallback((dateFrom: string, dateTo: string) => {
+    setManagerReportDateFrom(dateFrom);
+    setManagerReportDateTo(dateTo);
+  }, []);
 
   const managerResultsBundle = useMemo<ManagerResultsBundle | null>(() => {
     if (managerScope) return null;
     return {
       dashboard: managerCompletionDashboard,
-      selectedDate: managerReportDate,
+      dateFrom: managerReportDateFrom,
+      dateTo: managerReportDateTo,
+      selectedDate: managerReportDateTo,
       availableDates: managerCompletionDates,
       today: managerCompletionToday,
       loading: managerCompletionLoading,
       error: managerCompletionError,
       executiveReportLoading,
       executiveReportError,
-      onDateChange: setManagerReportDate,
+      onPeriodChange: handleManagerPeriodChange,
       onRetry: () => {
-        void loadManagerCompletionDashboard(managerReportDate);
+        void loadManagerCompletionDashboard(managerReportDateFrom, managerReportDateTo);
       },
       onRefresh: () => {
         void loadManagerCompletionDates();
-        void loadManagerCompletionDashboard(managerReportDate);
+        void loadManagerCompletionDashboard(managerReportDateFrom, managerReportDateTo);
       },
       onExecutiveReportDownload: handleExecutiveReportDownload
     };
   }, [
     managerScope,
     managerCompletionDashboard,
-    managerReportDate,
+    managerReportDateFrom,
+    managerReportDateTo,
     managerCompletionDates,
     managerCompletionToday,
     managerCompletionLoading,
     managerCompletionError,
     executiveReportLoading,
     executiveReportError,
+    handleManagerPeriodChange,
     loadManagerCompletionDashboard,
     loadManagerCompletionDates,
     handleExecutiveReportDownload
@@ -3414,6 +3411,7 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
           dashboard={coverageDashboard}
           formatDate={formatRuDate}
           onFetchCustomPeriod={fetchCustomCoveragePeriod}
+          stockBalances={referenceCache.stockBalances}
           managerTasks={
             visibleTaskBoard
               ? {

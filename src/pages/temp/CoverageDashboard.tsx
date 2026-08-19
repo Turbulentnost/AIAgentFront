@@ -7,10 +7,10 @@ import {
   type CSSProperties,
   type MouseEvent as ReactMouseEvent
 } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   CircleHelp,
   ClipboardList,
@@ -26,6 +26,16 @@ import {
 } from "lucide-react";
 import styles from "../DocumentAnalysisAgent.module.css";
 import { exportTableToExcel } from "@/utils/exportTableToExcel";
+import type { StockBalancesCache } from "./useAveonReferenceCache";
+import stockStyles from "./TempStockBalancesModal.module.css";
+import {
+  buildStockWarehousesByName,
+  normalizeStockNomenclatureName,
+  StockWarehouseCell,
+  StockWarehousePopover,
+  warehouseExportLabel,
+  type WarehouseBreakdown,
+} from "./stockWarehouseUi";
 import ShiftTaskBoard, { ShiftTasksNewDayNotice, type ShiftTaskBoardProps } from "./ShiftTaskBoard";
 
 type CoverageDashboardSide = "products" | "nomenclatures" | "tasks" | "manager_results";
@@ -48,6 +58,7 @@ export type ManagerCompletionReport = {
   reportDate: string;
   reportStatus: "submitted" | "missing" | "in_progress";
   regionLabel: string;
+  daysWithReports?: number;
   stats: ManagerCompletionStats;
   tasks: ManagerCompletionTask[];
   incompleteTasks: ManagerCompletionTask[];
@@ -65,6 +76,13 @@ export type ManagerCompletionRoster = {
 
 export type ManagerCompletionDashboard = {
   reportDate: string;
+  periodMode?: "day" | "range" | "all";
+  periodLabel?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  daysInPeriod?: number;
+  submittedShiftDays?: number;
+  expectedShiftDays?: number;
   liveMode: boolean;
   summary: ManagerCompletionStats;
   roster: ManagerCompletionRoster;
@@ -95,6 +113,8 @@ export type ExecutiveReportDownloadParams = {
 
 export type ManagerResultsBundle = {
   dashboard: ManagerCompletionDashboard | null;
+  dateFrom: string;
+  dateTo: string;
   selectedDate: string;
   availableDates: ManagerCompletionDateEntry[];
   today: string;
@@ -102,7 +122,7 @@ export type ManagerResultsBundle = {
   error: string | null;
   executiveReportLoading?: boolean;
   executiveReportError?: string | null;
-  onDateChange: (date: string) => void;
+  onPeriodChange: (dateFrom: string, dateTo: string) => void;
   onRetry: () => void;
   onRefresh: () => void;
   onExecutiveReportDownload?: (params: ExecutiveReportDownloadParams) => void;
@@ -746,13 +766,22 @@ type CoverageProductBomModalProps = {
   row: CoverageRow;
   periodLabel: string;
   tileLabel: string;
+  stockByName: Map<string, WarehouseBreakdown[]>;
   onClose: () => void;
 };
+
+function lookupMaterialWarehouses(
+  stockByName: Map<string, WarehouseBreakdown[]>,
+  materialName: string
+): WarehouseBreakdown[] {
+  return stockByName.get(normalizeStockNomenclatureName(materialName)) ?? [];
+}
 
 function CoverageProductBomModal({
   row,
   periodLabel,
   tileLabel,
+  stockByName,
   onClose
 }: CoverageProductBomModalProps) {
   const materials = productMaterialLines(row);
@@ -760,7 +789,17 @@ function CoverageProductBomModal({
   const [selectedStatuses, setSelectedStatuses] = useState<Set<MaterialCoverageStatusKey>>(
     () => new Set(MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => option.key))
   );
-  const statusFilterRef = useRef<HTMLDivElement | null>(null);
+  const [expandedWarehouseKey, setExpandedWarehouseKey] = useState<string | null>(null);
+  const [warehousePopoverPos, setWarehousePopoverPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const [statusFilterMenuPos, setStatusFilterMenuPos] = useState<{
+    top: number;
+    right: number;
+  } | null>(null);
+  const statusFilterBtnRef = useRef<HTMLButtonElement | null>(null);
+  const statusFilterMenuRef = useRef<HTMLDivElement | null>(null);
 
   const materialsWithStatus = useMemo(
     () =>
@@ -801,12 +840,62 @@ function CoverageProductBomModal({
     });
   }, []);
 
+  const closeStatusFilter = useCallback(() => {
+    setStatusFilterOpen(false);
+    setStatusFilterMenuPos(null);
+  }, []);
+
+  const toggleStatusFilter = useCallback(() => {
+    if (statusFilterOpen) {
+      closeStatusFilter();
+      return;
+    }
+    const rect = statusFilterBtnRef.current?.getBoundingClientRect();
+    if (rect) {
+      setStatusFilterMenuPos({
+        top: rect.bottom + 8,
+        right: window.innerWidth - rect.right,
+      });
+    }
+    setStatusFilterOpen(true);
+  }, [closeStatusFilter, statusFilterOpen]);
+
+  const closeWarehousePopover = useCallback(() => {
+    setExpandedWarehouseKey(null);
+    setWarehousePopoverPos(null);
+  }, []);
+
+  const toggleWarehousePopover = useCallback((rowKey: string, anchor: DOMRect) => {
+    if (expandedWarehouseKey === rowKey) {
+      closeWarehousePopover();
+      return;
+    }
+    setExpandedWarehouseKey(rowKey);
+    setWarehousePopoverPos({
+      top: anchor.bottom + 6,
+      left: anchor.left,
+    });
+  }, [closeWarehousePopover, expandedWarehouseKey]);
+
+  const expandedWarehouseMaterial = useMemo(() => {
+    if (!expandedWarehouseKey) return null;
+    const entry = filteredMaterials.find(
+      ({ material }) => material.name === expandedWarehouseKey
+    );
+    if (!entry) return null;
+    return {
+      name: entry.material.name,
+      warehouses: lookupMaterialWarehouses(stockByName, entry.material.name),
+    };
+  }, [expandedWarehouseKey, filteredMaterials, stockByName]);
+
   const handleExport = useCallback(() => {
     if (filteredMaterials.length === 0) return;
     exportTableToExcel(
       `obespechennost_${sanitizeCoverageExportFileName(row.name)}.csv`,
       [
         { key: "name", title: "Номенклатура" },
+        { key: "warehouses", title: "Склады" },
         { key: "plan", title: "План" },
         { key: "stock", title: "Остаток" },
         { key: "expected", title: "Ожид. поступление" },
@@ -815,6 +904,7 @@ function CoverageProductBomModal({
       ],
       filteredMaterials.map(({ material, status }) => ({
         name: material.name,
+        warehouses: warehouseExportLabel(lookupMaterialWarehouses(stockByName, material.name)),
         plan: material.plan,
         stock: material.stock,
         expected: material.expected,
@@ -822,13 +912,17 @@ function CoverageProductBomModal({
         status: statusLabel(status)
       }))
     );
-  }, [filteredMaterials, row.name]);
+  }, [filteredMaterials, row.name, stockByName]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        if (expandedWarehouseKey) {
+          closeWarehousePopover();
+          return;
+        }
         if (statusFilterOpen) {
-          setStatusFilterOpen(false);
+          closeStatusFilter();
           return;
         }
         onClose();
@@ -836,18 +930,27 @@ function CoverageProductBomModal({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [onClose, statusFilterOpen]);
+  }, [closeStatusFilter, closeWarehousePopover, expandedWarehouseKey, onClose, statusFilterOpen]);
+
+  useEffect(() => {
+    closeWarehousePopover();
+  }, [closeWarehousePopover, row.name, selectedStatuses]);
+
+  useEffect(() => {
+    closeStatusFilter();
+  }, [closeStatusFilter, row.name]);
 
   useEffect(() => {
     if (!statusFilterOpen) return;
     const onMouseDown = (event: MouseEvent) => {
-      if (!statusFilterRef.current?.contains(event.target as Node)) {
-        setStatusFilterOpen(false);
-      }
+      const target = event.target as Node;
+      if (statusFilterBtnRef.current?.contains(target)) return;
+      if (statusFilterMenuRef.current?.contains(target)) return;
+      closeStatusFilter();
     };
     document.addEventListener("mousedown", onMouseDown);
     return () => document.removeEventListener("mousedown", onMouseDown);
-  }, [statusFilterOpen]);
+  }, [closeStatusFilter, statusFilterOpen]);
 
   return (
     <div
@@ -879,15 +982,16 @@ function CoverageProductBomModal({
           <div className={styles.coverageProductModalActions}>
             {materials.length > 0 ? (
               <>
-                <div className={styles.coverageProductModalFilterWrap} ref={statusFilterRef}>
+                <div className={styles.coverageProductModalFilterWrap}>
                   <button
+                    ref={statusFilterBtnRef}
                     type="button"
                     className={`${styles.coverageProductModalFilterBtn} ${
                       statusFilterActive ? styles.coverageProductModalFilterBtnActive : ""
                     }`}
                     aria-haspopup="menu"
                     aria-expanded={statusFilterOpen}
-                    onClick={() => setStatusFilterOpen((open) => !open)}
+                    onClick={toggleStatusFilter}
                   >
                     <ListFilter size={15} strokeWidth={2.2} aria-hidden="true" />
                     <span>Статус</span>
@@ -898,56 +1002,6 @@ function CoverageProductBomModal({
                     ) : null}
                     <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
                   </button>
-                  {statusFilterOpen ? (
-                    <div className={styles.coverageProductModalFilterMenu} role="menu">
-                      <div className={styles.coverageProductModalFilterMenuHead}>
-                        <strong>Показать по статусу</strong>
-                        <span>
-                          {filteredMaterials.length}/{materialsWithStatus.length}
-                        </span>
-                      </div>
-                      <div className={styles.coverageProductModalFilterMenuList}>
-                        {MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => {
-                          const checked = selectedStatuses.has(option.key);
-                          return (
-                            <label
-                              key={option.key}
-                              className={styles.coverageProductModalFilterMenuItem}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={checked}
-                                onChange={() => toggleMaterialStatus(option.key)}
-                              />
-                              <span
-                                className={`${styles.coverageStatusBadge} ${statusClass(option.key)}`}
-                              >
-                                {option.label}
-                              </span>
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <div className={styles.coverageProductModalFilterMenuActions}>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setSelectedStatuses(
-                              new Set(MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => option.key))
-                            )
-                          }
-                        >
-                          Все
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedStatuses(new Set())}
-                        >
-                          Снять
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
                 </div>
                 <button
                   type="button"
@@ -993,6 +1047,7 @@ function CoverageProductBomModal({
               <thead>
                 <tr>
                   <th>Номенклатура</th>
+                  <th>Склады</th>
                   <th>План</th>
                   <th>Остаток</th>
                   <th>Ожид. поступление</th>
@@ -1003,12 +1058,21 @@ function CoverageProductBomModal({
               <tbody>
                 {filteredMaterials.map(({ material, status: materialStatus }) => {
                   const hasShortage = material.shortage > 1e-9;
+                  const warehouses = lookupMaterialWarehouses(stockByName, material.name);
                   return (
                     <tr
                       key={material.name}
                       className={hasShortage ? styles.coverageBomRowShortage : undefined}
                     >
                       <td className={styles.coverageProblemMaterialName}>{material.name}</td>
+                      <td className={stockStyles.warehouseCell}>
+                        <StockWarehouseCell
+                          warehouses={warehouses}
+                          rowKey={material.name}
+                          isExpanded={expandedWarehouseKey === material.name}
+                          onToggle={toggleWarehousePopover}
+                        />
+                      </td>
                       <td>{formatQty(material.plan)}</td>
                       <td>{formatQty(material.stock)}</td>
                       <td>{formatQty(material.expected)}</td>
@@ -1029,7 +1093,67 @@ function CoverageProductBomModal({
             </table>
           </div>
         )}
+        {expandedWarehouseMaterial ? (
+          <StockWarehousePopover
+            nomenclatureName={expandedWarehouseMaterial.name}
+            warehouses={expandedWarehouseMaterial.warehouses}
+            position={warehousePopoverPos}
+            onClose={closeWarehousePopover}
+          />
+        ) : null}
       </section>
+      {statusFilterOpen && statusFilterMenuPos ? (
+        <div
+          ref={statusFilterMenuRef}
+          className={styles.coverageProductModalFilterMenu}
+          role="menu"
+          style={{ top: statusFilterMenuPos.top, right: statusFilterMenuPos.right }}
+        >
+          <div className={styles.coverageProductModalFilterMenuHead}>
+            <strong>Показать по статусу</strong>
+            <span>
+              {filteredMaterials.length}/{materialsWithStatus.length}
+            </span>
+          </div>
+          <div className={styles.coverageProductModalFilterMenuList}>
+            {MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => {
+              const checked = selectedStatuses.has(option.key);
+              return (
+                <label
+                  key={option.key}
+                  className={styles.coverageProductModalFilterMenuItem}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => toggleMaterialStatus(option.key)}
+                  />
+                  <span
+                    className={`${styles.coverageStatusBadge} ${statusClass(option.key)}`}
+                  >
+                    {option.label}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <div className={styles.coverageProductModalFilterMenuActions}>
+            <button
+              type="button"
+              onClick={() =>
+                setSelectedStatuses(
+                  new Set(MATERIAL_COVERAGE_STATUS_OPTIONS.map((option) => option.key))
+                )
+              }
+            >
+              Все
+            </button>
+            <button type="button" onClick={() => setSelectedStatuses(new Set())}>
+              Снять
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -1039,6 +1163,7 @@ type CoverageDetailTableProps = {
   side: "products" | "nomenclatures";
   rows: CoverageRow[];
   periodLabel: string;
+  stockByName: Map<string, WarehouseBreakdown[]>;
   animateIn?: boolean;
 };
 
@@ -1046,7 +1171,14 @@ type CoverageProblemMaterial = CoverageMaterialShortage & {
   products: string[];
 };
 
-function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false }: CoverageDetailTableProps) {
+function CoverageDetailTable({
+  tile,
+  side,
+  rows,
+  periodLabel,
+  stockByName,
+  animateIn = false
+}: CoverageDetailTableProps) {
   const sideLabel = side === "products" ? "изделия" : "номенклатуры";
   const tileLabel = coverageTileLabel(tile.key, side);
   const explanation = tileExplanation(tile, side);
@@ -1058,12 +1190,38 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
   const [selectedProblemProducts, setSelectedProblemProducts] = useState<Set<string>>(
     () => new Set()
   );
+  const [expandedProblemWarehouseKey, setExpandedProblemWarehouseKey] = useState<string | null>(
+    null
+  );
+  const [problemWarehousePopoverPos, setProblemWarehousePopoverPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
 
   useEffect(() => {
     setProductModalRow(null);
     setProblemMenuOpen(false);
     setProblemModalOpen(false);
+    setExpandedProblemWarehouseKey(null);
+    setProblemWarehousePopoverPos(null);
   }, [tile.key, side, periodLabel]);
+
+  const closeProblemWarehousePopover = useCallback(() => {
+    setExpandedProblemWarehouseKey(null);
+    setProblemWarehousePopoverPos(null);
+  }, []);
+
+  const toggleProblemWarehousePopover = useCallback((rowKey: string, anchor: DOMRect) => {
+    if (expandedProblemWarehouseKey === rowKey) {
+      closeProblemWarehousePopover();
+      return;
+    }
+    setExpandedProblemWarehouseKey(rowKey);
+    setProblemWarehousePopoverPos({
+      top: anchor.bottom + 6,
+      left: anchor.left,
+    });
+  }, [closeProblemWarehousePopover, expandedProblemWarehouseKey]);
 
   useEffect(() => {
     if (side !== "products" || tile.key !== "red") {
@@ -1129,6 +1287,16 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
     }
     return [...byName.values()].sort((left, right) => right.shortage - left.shortage);
   }, [rows, selectedProblemProducts, side, tile.key]);
+
+  const expandedProblemWarehouseMaterial = useMemo(() => {
+    if (!expandedProblemWarehouseKey) return null;
+    const item = problemMaterials.find((entry) => entry.name === expandedProblemWarehouseKey);
+    if (!item) return null;
+    return {
+      name: item.name,
+      warehouses: lookupMaterialWarehouses(stockByName, item.name),
+    };
+  }, [expandedProblemWarehouseKey, problemMaterials, stockByName]);
 
   const showProblemSelector = side === "products" && tile.key === "red" && rows.length > 0;
   const selectedProblemCount = selectedProblemProducts.size;
@@ -1294,6 +1462,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
           row={activeProductModalRow}
           periodLabel={periodLabel}
           tileLabel={tileLabel}
+          stockByName={stockByName}
           onClose={closeProductModal}
         />
       ) : null}
@@ -1341,6 +1510,7 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                   <thead>
                     <tr>
                       <th>Номенклатура</th>
+                      <th>Склады</th>
                       <th>Изделия</th>
                       <th>План</th>
                       <th>Остаток</th>
@@ -1349,20 +1519,39 @@ function CoverageDetailTable({ tile, side, rows, periodLabel, animateIn = false 
                     </tr>
                   </thead>
                   <tbody>
-                    {problemMaterials.map((item) => (
-                      <tr key={item.name}>
-                        <td className={styles.coverageProblemMaterialName}>{item.name}</td>
-                        <td>{item.products.join("; ")}</td>
-                        <td>{formatQty(item.plan)}</td>
-                        <td>{formatQty(item.stock)}</td>
-                        <td>{formatQty(item.expected)}</td>
-                        <td className={styles.coverageShortageValue}>{formatQty(item.shortage)}</td>
-                      </tr>
-                    ))}
+                    {problemMaterials.map((item) => {
+                      const warehouses = lookupMaterialWarehouses(stockByName, item.name);
+                      return (
+                        <tr key={item.name}>
+                          <td className={styles.coverageProblemMaterialName}>{item.name}</td>
+                          <td className={stockStyles.warehouseCell}>
+                            <StockWarehouseCell
+                              warehouses={warehouses}
+                              rowKey={item.name}
+                              isExpanded={expandedProblemWarehouseKey === item.name}
+                              onToggle={toggleProblemWarehousePopover}
+                            />
+                          </td>
+                          <td>{item.products.join("; ")}</td>
+                          <td>{formatQty(item.plan)}</td>
+                          <td>{formatQty(item.stock)}</td>
+                          <td>{formatQty(item.expected)}</td>
+                          <td className={styles.coverageShortageValue}>{formatQty(item.shortage)}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
             )}
+            {expandedProblemWarehouseMaterial ? (
+              <StockWarehousePopover
+                nomenclatureName={expandedProblemWarehouseMaterial.name}
+                warehouses={expandedProblemWarehouseMaterial.warehouses}
+                position={problemWarehousePopoverPos}
+                onClose={closeProblemWarehousePopover}
+              />
+            ) : null}
           </section>
         </div>
       ) : null}
@@ -1423,13 +1612,6 @@ function CoverageTileBackFace({ tile, side, onClose }: CoverageTileExplainPanelP
       <p className={styles.coverageTileExplainMeta}>Режим: {sideLabel}</p>
     </div>
   );
-}
-
-function formatLiveUpdatedAt(iso: string | null | undefined): string | null {
-  if (!iso) return null;
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return null;
-  return date.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 
 function splitTasksByResolved(tasks: ManagerCompletionTask[]) {
@@ -1535,16 +1717,224 @@ function taskValue(task: ManagerCompletionTask, key: string): string {
 function managerResultStatusLabel(status: string): string {
   switch (status) {
     case "resolved":
-      return "Выполнено";
+      return "Выполнена";
     case "partial":
-      return "Частично";
+      return "Частично выполнена";
     case "not_resolved":
-      return "Не выполнено";
+      return "Не выполнена";
     case "active":
-      return "Активно";
+      return "Активная задача";
     default:
       return status || "—";
   }
+}
+
+function managerTaskPriorityLabel(priority: string): string {
+  switch (priority) {
+    case "urgent":
+      return "Срочная задача";
+    case "today":
+      return "На сегодня";
+    case "week":
+      return "На неделю";
+    default:
+      return priority || "—";
+  }
+}
+
+function formatManagerTaskDeadline(deadline: string): string {
+  const value = deadline.trim();
+  if (!value) return "";
+  return `Обязательно до ${value}`;
+}
+
+function formatManagerTaskDeficit(task: ManagerCompletionTask): string {
+  const deficit = taskValue(task, "deficit").trim();
+  if (!deficit) return "";
+  const unit = taskValue(task, "unit").trim();
+  const hasUnitSuffix = /^\d[\d\s.,]*\s+[A-Za-zА-Яа-яёЁ%/]+/.test(deficit);
+  if (hasUnitSuffix) {
+    return `Дефицит: ${deficit}`;
+  }
+  if (unit) {
+    return `Дефицит: ${deficit} ${unit}`;
+  }
+  return `Дефицит: ${deficit}`;
+}
+
+function managerTaskPriorityClass(priority: string): string {
+  switch (priority) {
+    case "urgent":
+      return styles.managerResultTaskModalChipUrgent;
+    case "today":
+      return styles.managerResultTaskModalChipToday;
+    default:
+      return "";
+  }
+}
+
+function managerReportStatusLabel(status: ManagerCompletionReport["reportStatus"]): string {
+  switch (status) {
+    case "in_progress":
+      return "Смена в работе";
+    case "submitted":
+      return "Смена завершена";
+    default:
+      return "Смена не завершена";
+  }
+}
+
+function ManagerResultTaskModal({
+  task,
+  manager,
+  formatDate,
+  onClose
+}: {
+  task: ManagerCompletionTask;
+  manager: ManagerCompletionReport;
+  formatDate: (iso: string | null | undefined) => string;
+  onClose: () => void;
+}) {
+  const status = taskValue(task, "status");
+  const tone = managerResultStatusTone(status);
+  const priority = taskValue(task, "priority");
+  const shiftDate = taskValue(task, "shift_date");
+  const problem = taskValue(task, "problem");
+  const solution = taskValue(task, "solution");
+  const resultText = taskValue(task, "result_text");
+  const evalComment = taskValue(task, "eval_comment");
+  const reason = taskValue(task, "reason");
+  const deadline = taskValue(task, "deadline");
+  const taskType = taskValue(task, "task_type");
+  const nomenclature = taskValue(task, "nomenclature") || "Задание";
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [onClose]);
+
+  return createPortal(
+    <div
+      className={styles.managerResultTaskModalBackdrop}
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <section
+        className={styles.managerResultTaskModal}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="manager-result-task-modal-title"
+        onMouseDown={(event) => event.stopPropagation()}
+      >
+        <header className={styles.managerResultTaskModalHead}>
+          <div className={styles.managerResultTaskModalHeadMain}>
+            <p className={styles.managerResultTaskModalEyebrow}>{taskType || "Задание смены"}</p>
+            <h3 id="manager-result-task-modal-title">{nomenclature}</h3>
+            <div className={styles.managerResultTaskModalChips}>
+              <span
+                className={`${styles.managerResultStatusPill} ${managerResultStatusPillClass(tone)} ${styles.managerResultTaskModalStatusPill}`}
+              >
+                {managerResultStatusLabel(status)}
+              </span>
+              {priority ? (
+                <span
+                  className={`${styles.managerResultTaskModalChip} ${managerTaskPriorityClass(priority)}`}
+                >
+                  {managerTaskPriorityLabel(priority)}
+                </span>
+              ) : null}
+              {deadline ? (
+                <span className={styles.managerResultTaskModalChip}>
+                  {formatManagerTaskDeadline(deadline)}
+                </span>
+              ) : null}
+              {taskValue(task, "deficit") ? (
+                <span className={styles.managerResultTaskModalChip}>
+                  {formatManagerTaskDeficit(task)}
+                </span>
+              ) : null}
+              {shiftDate ? (
+                <span className={styles.managerResultTaskModalChip}>
+                  Смена {formatDate(shiftDate)}
+                </span>
+              ) : null}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={styles.managerResultTaskModalClose}
+            aria-label="Закрыть"
+            onClick={onClose}
+          >
+            <X size={24} strokeWidth={2.2} aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className={styles.managerResultTaskModalBody}>
+          <article className={styles.managerResultTaskModalCard}>
+            <p className={styles.managerResultTaskModalSectionLabel}>Исполнитель</p>
+            <div className={styles.managerResultTaskModalExecutor}>
+              <div>
+                <strong>{manager.managerName}</strong>
+                {manager.regionLabel ? (
+                  <span className={styles.managerResultTaskModalExecutorRegion}>
+                    {manager.regionLabel}
+                  </span>
+                ) : null}
+              </div>
+              <span className={styles.managerResultTaskModalExecutorMeta}>
+                {managerReportStatusLabel(manager.reportStatus)}
+                {shiftDate
+                  ? ` · смена ${formatDate(shiftDate)}`
+                  : manager.reportDate
+                    ? ` · ${formatDate(manager.reportDate)}`
+                    : ""}
+              </span>
+            </div>
+          </article>
+
+          <div className={styles.managerResultTaskModalSection}>
+            <p className={styles.managerResultTaskModalSectionLabel}>Проблема</p>
+            <p className={styles.managerResultTaskModalSectionText}>{problem || "—"}</p>
+          </div>
+
+          <div className={styles.managerResultTaskModalSection}>
+            <p className={styles.managerResultTaskModalSectionLabel}>Что сделать</p>
+            <p className={styles.managerResultTaskModalSectionText}>{solution || "—"}</p>
+          </div>
+
+          <div
+            className={`${styles.managerResultTaskModalSection} ${styles.managerResultTaskModalSectionHighlight}`}
+          >
+            <p className={styles.managerResultTaskModalSectionLabel}>Результат работы менеджера</p>
+            <p className={styles.managerResultTaskModalSectionText}>
+              {resultText || "Менеджер ещё не зафиксировал результат по этому заданию."}
+            </p>
+            {evalComment ? (
+              <p className={styles.managerResultTaskModalEval}>
+                <span>Оценка системы:</span> {evalComment}
+              </p>
+            ) : null}
+          </div>
+
+          {reason && status !== "resolved" ? (
+            <div className={`${styles.managerResultTaskModalSection} ${styles.managerResultTaskModalSectionReason}`}>
+              <p className={styles.managerResultTaskModalSectionLabel}>
+                Основание невыполнения
+              </p>
+              <blockquote className={styles.managerResultTaskModalReason}>{reason}</blockquote>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    </div>,
+    document.body
+  );
 }
 
 function ManagerProgressRing({
@@ -1622,18 +2012,34 @@ function formatExecutiveReportRangeLabel(from: string, to: string): string {
   return `${fromLabel} — ${toLabel}`;
 }
 
-const EXECUTIVE_REPORT_MODE_OPTIONS: Array<{ key: ExecutiveReportMode; label: string }> = [
-  { key: "day", label: "День" },
-  { key: "range", label: "Период" },
-  { key: "all", label: "Всё время" }
-];
-
 const EXECUTIVE_REPORT_PRESETS = [
   { key: "week", label: "Эта неделя" },
   { key: "prev-week", label: "Прошлая неделя" },
   { key: "month", label: "Этот месяц" },
   { key: "30d", label: "30 дней" }
 ] as const;
+
+function formatManagerResultsPeriodLabel(
+  from: string,
+  to: string,
+  formatDate: (iso: string | null | undefined) => string
+): string {
+  if (from === to) {
+    return `${formatDate(from)}, ${formatWeekdayShort(from)}`;
+  }
+  return formatExecutiveReportRangeLabel(from, to);
+}
+
+function countReportsInRange(
+  availableDates: ManagerCompletionDateEntry[],
+  from: string,
+  to: string
+): number {
+  if (!from || !to || from > to) return 0;
+  return availableDates.filter(
+    (entry) => entry.reportDate >= from && entry.reportDate <= to && entry.reportsCount > 0
+  ).length;
+}
 
 function ExecutiveReportBar({
   bundle,
@@ -1642,17 +2048,12 @@ function ExecutiveReportBar({
   bundle: ManagerResultsBundle;
   formatDate: (iso: string | null | undefined) => string;
 }) {
-  const [mode, setMode] = useState<ExecutiveReportMode>("day");
-  const [rangeFrom, setRangeFrom] = useState(() => startOfIsoWeek(bundle.today));
-  const [rangeTo, setRangeTo] = useState(bundle.today);
-  const rangeFromRef = useRef<HTMLInputElement>(null);
-  const rangeToRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (mode !== "range") return;
-    setRangeTo((current) => (current > bundle.today ? bundle.today : current));
-  }, [bundle.today, mode]);
-
+  const isSingleDay = bundle.dateFrom === bundle.dateTo;
+  const isPeriodMode = !isSingleDay;
+  const daysWithReportsInRange = useMemo(
+    () => countReportsInRange(bundle.availableDates, bundle.dateFrom, bundle.dateTo),
+    [bundle.availableDates, bundle.dateFrom, bundle.dateTo]
+  );
   const earliestReportDate = useMemo(() => {
     if (bundle.availableDates.length === 0) return bundle.today;
     return bundle.availableDates.reduce(
@@ -1661,79 +2062,31 @@ function ExecutiveReportBar({
     );
   }, [bundle.availableDates, bundle.today]);
 
-  const daysWithReportsInRange = useMemo(() => {
-    if (mode !== "range" || !rangeFrom || !rangeTo || rangeFrom > rangeTo) return 0;
-    return bundle.availableDates.filter(
-      (entry) => entry.reportDate >= rangeFrom && entry.reportDate <= rangeTo && entry.reportsCount > 0
-    ).length;
-  }, [bundle.availableDates, mode, rangeFrom, rangeTo]);
-
-  const rangeInvalid = mode === "range" && Boolean(rangeFrom && rangeTo && rangeFrom > rangeTo);
-  const rangeTooLong =
-    mode === "range" &&
-    Boolean(rangeFrom && rangeTo && rangeFrom <= rangeTo) &&
-    Math.floor(
-      (new Date(`${rangeTo}T12:00:00`).getTime() - new Date(`${rangeFrom}T12:00:00`).getTime()) /
-        86400000
-    ) +
-      1 >
-      365;
-
-  const applyPreset = (preset: (typeof EXECUTIVE_REPORT_PRESETS)[number]["key"]) => {
-    switch (preset) {
-      case "week":
-        setRangeFrom(startOfIsoWeek(bundle.today));
-        setRangeTo(bundle.today);
-        break;
-      case "prev-week": {
-        const prevWeekEnd = addIsoDays(startOfIsoWeek(bundle.today), -1);
-        setRangeFrom(addIsoDays(prevWeekEnd, -6));
-        setRangeTo(prevWeekEnd);
-        break;
-      }
-      case "month":
-        setRangeFrom(startOfIsoMonth(bundle.today));
-        setRangeTo(bundle.today);
-        break;
-      case "30d":
-        setRangeFrom(addIsoDays(bundle.today, -29));
-        setRangeTo(bundle.today);
-        break;
-      default:
-        break;
-    }
-  };
-
   const buttonLabel = useMemo(() => {
     if (bundle.executiveReportLoading) return "Формируем…";
-    if (mode === "day") return `Сформировать Excel · ${formatDate(bundle.selectedDate)}`;
-    if (mode === "all") return "Сформировать Excel · всё время";
-    if (rangeFrom && rangeTo && !rangeInvalid) {
-      return `Сформировать Excel · ${formatExecutiveReportRangeLabel(rangeFrom, rangeTo)}`;
-    }
-    return "Сформировать Excel";
-  }, [
-    bundle.executiveReportLoading,
-    bundle.selectedDate,
-    formatDate,
-    mode,
-    rangeFrom,
-    rangeTo,
-    rangeInvalid
-  ]);
+    return `Сформировать Excel · ${formatManagerResultsPeriodLabel(
+      bundle.dateFrom,
+      bundle.dateTo,
+      formatDate
+    )}`;
+  }, [bundle.dateFrom, bundle.dateTo, bundle.executiveReportLoading, formatDate]);
 
   const handleDownload = () => {
     if (!bundle.onExecutiveReportDownload || bundle.executiveReportLoading) return;
-    if (mode === "day") {
-      bundle.onExecutiveReportDownload({ mode, reportDate: bundle.selectedDate });
+    if (isSingleDay) {
+      bundle.onExecutiveReportDownload({ mode: "day", reportDate: bundle.dateFrom });
       return;
     }
-    if (mode === "all") {
-      bundle.onExecutiveReportDownload({ mode });
-      return;
-    }
-    if (!rangeFrom || !rangeTo || rangeInvalid || rangeTooLong) return;
-    bundle.onExecutiveReportDownload({ mode, dateFrom: rangeFrom, dateTo: rangeTo });
+    bundle.onExecutiveReportDownload({
+      mode: "range",
+      dateFrom: bundle.dateFrom,
+      dateTo: bundle.dateTo
+    });
+  };
+
+  const handleDownloadAll = () => {
+    if (!bundle.onExecutiveReportDownload || bundle.executiveReportLoading) return;
+    bundle.onExecutiveReportDownload({ mode: "all" });
   };
 
   return (
@@ -1741,160 +2094,68 @@ function ExecutiveReportBar({
       <div className={styles.managerResultsActionsMain}>
         <div className={styles.managerResultsActionsHead}>
           <p className={styles.managerResultsActionsTitle}>Сводный отчёт руководителя</p>
-            <p className={styles.managerResultsActionsHint}>
-              Краткая управленческая сводка: KPI, работа менеджеров, обеспеченность производства и TOP-риски.
-            </p>
+          <p className={styles.managerResultsActionsHint}>
+            Краткая управленческая сводка: KPI, работа менеджеров, обеспеченность производства и TOP-риски.
+          </p>
         </div>
 
-        <div className={styles.managerResultsReportModeNav} role="tablist" aria-label="Период сводного отчёта">
-          {EXECUTIVE_REPORT_MODE_OPTIONS.map((option) => (
-            <button
-              key={option.key}
-              type="button"
-              role="tab"
-              aria-selected={mode === option.key}
-              className={`${styles.coveragePeriodBtn} ${
-                mode === option.key ? styles.coveragePeriodBtnActive : ""
-              }`}
-              onClick={() => setMode(option.key)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        {mode === "day" ? (
-          <div className={styles.managerResultsReportModePanel}>
-            <p className={styles.managerResultsReportModeSummary}>
-              За день{" "}
-              <strong>
-                {formatDate(bundle.selectedDate)}, {formatWeekdayShort(bundle.selectedDate)}
-              </strong>
-            </p>
-            <p className={styles.managerResultsReportModeMeta}>
-              Синхронизировано с датой в панели выше. Обеспеченность — на этот же день.
-            </p>
-          </div>
-        ) : null}
-
-        {mode === "range" ? (
-          <div className={styles.managerResultsReportModePanel}>
-            <div className={styles.managerResultsReportRangeRow}>
-              <label className={styles.managerResultsReportRangeField}>
-                <span>С</span>
-                <button
-                  type="button"
-                  className={styles.managerResultsReportRangeBtn}
-                  onClick={() => {
-                    rangeFromRef.current?.showPicker?.();
-                    rangeFromRef.current?.focus();
-                  }}
-                >
-                  <CalendarDays size={14} strokeWidth={2.2} aria-hidden="true" />
-                  <span>{formatDate(rangeFrom)}</span>
-                  <input
-                    ref={rangeFromRef}
-                    type="date"
-                    className={styles.managerResultsDateInputHidden}
-                    value={rangeFrom}
-                    max={rangeTo || bundle.today}
-                    onChange={(event) => {
-                      if (event.target.value) setRangeFrom(event.target.value);
-                    }}
-                    aria-label="Начало периода"
-                  />
-                </button>
-              </label>
-              <span className={styles.managerResultsReportRangeDash} aria-hidden="true">
-                —
-              </span>
-              <label className={styles.managerResultsReportRangeField}>
-                <span>По</span>
-                <button
-                  type="button"
-                  className={styles.managerResultsReportRangeBtn}
-                  onClick={() => {
-                    rangeToRef.current?.showPicker?.();
-                    rangeToRef.current?.focus();
-                  }}
-                >
-                  <CalendarDays size={14} strokeWidth={2.2} aria-hidden="true" />
-                  <span>{formatDate(rangeTo)}</span>
-                  <input
-                    ref={rangeToRef}
-                    type="date"
-                    className={styles.managerResultsDateInputHidden}
-                    value={rangeTo}
-                    min={rangeFrom}
-                    max={bundle.today}
-                    onChange={(event) => {
-                      if (event.target.value) setRangeTo(event.target.value);
-                    }}
-                    aria-label="Конец периода"
-                  />
-                </button>
-              </label>
-            </div>
-            <div className={styles.managerResultsReportPresetRow}>
-              {EXECUTIVE_REPORT_PRESETS.map((preset) => (
-                <button
-                  key={preset.key}
-                  type="button"
-                  className={styles.managerResultsReportPresetBtn}
-                  onClick={() => applyPreset(preset.key)}
-                >
-                  {preset.label}
-                </button>
-              ))}
-            </div>
-            {rangeInvalid ? (
-              <p className={styles.managerResultsReportModeError}>Дата начала не может быть позже даты окончания.</p>
-            ) : rangeTooLong ? (
-              <p className={styles.managerResultsReportModeError}>Максимальная длина периода — 365 дней.</p>
+        <div className={styles.managerResultsReportModePanel}>
+          <p className={styles.managerResultsReportModeSummary}>
+            {isPeriodMode ? (
+              <>
+                За период{" "}
+                <strong>
+                  {formatManagerResultsPeriodLabel(bundle.dateFrom, bundle.dateTo, formatDate)}
+                </strong>
+              </>
             ) : (
-              <p className={styles.managerResultsReportModeMeta}>
-                {daysWithReportsInRange > 0
-                  ? `${daysWithReportsInRange} ${
-                      daysWithReportsInRange === 1
-                        ? "день"
-                        : daysWithReportsInRange < 5
-                          ? "дня"
-                          : "дней"
-                    } с отчётами менеджеров в выбранном диапазоне.`
-                  : "В выбранном диапазоне пока нет закрытых смен — отчёт всё равно можно сформировать."}
-              </p>
+              <>
+                За день{" "}
+                <strong>
+                  {formatDate(bundle.dateFrom)}, {formatWeekdayShort(bundle.dateFrom)}
+                </strong>
+              </>
             )}
-          </div>
-        ) : null}
-
-        {mode === "all" ? (
-          <div className={styles.managerResultsReportModePanel}>
-            <p className={styles.managerResultsReportModeSummary}>
-              Все смены с <strong>{formatDate(earliestReportDate)}</strong> по{" "}
-              <strong>{formatDate(bundle.today)}</strong>
-            </p>
-            <p className={styles.managerResultsReportModeMeta}>
-              Агрегируются все закрытые смены менеджеров. Обеспеченность и закупки — на сегодня.
-            </p>
-          </div>
-        ) : null}
+          </p>
+          <p className={styles.managerResultsReportModeMeta}>
+            {isPeriodMode
+              ? daysWithReportsInRange > 0
+                ? `${daysWithReportsInRange} ${
+                    daysWithReportsInRange === 1
+                      ? "день"
+                      : daysWithReportsInRange < 5
+                        ? "дня"
+                        : "дней"
+                  } с отчётами менеджеров в выбранном диапазоне. Excel формируется за тот же период, что и дашборд.`
+                : "В выбранном диапазоне пока нет закрытых смен — отчёт всё равно можно сформировать."
+              : "Синхронизировано с периодом в панели выше. Обеспеченность — на этот же день."}
+          </p>
+        </div>
       </div>
 
-      {bundle.onExecutiveReportDownload ? (
-        <button
-          type="button"
-          className={styles.managerResultsReportBtn}
-          disabled={
-            bundle.executiveReportLoading ||
-            rangeInvalid ||
-            rangeTooLong ||
-            (mode === "range" && (!rangeFrom || !rangeTo))
-          }
-          onClick={handleDownload}
-        >
-          {buttonLabel}
-        </button>
-      ) : null}
+      <div className={styles.managerResultsReportActions}>
+        {bundle.onExecutiveReportDownload ? (
+          <button
+            type="button"
+            className={styles.managerResultsReportBtn}
+            disabled={bundle.executiveReportLoading}
+            onClick={handleDownload}
+          >
+            {buttonLabel}
+          </button>
+        ) : null}
+        {bundle.onExecutiveReportDownload ? (
+          <button
+            type="button"
+            className={styles.managerResultsReportAllBtn}
+            disabled={bundle.executiveReportLoading}
+            onClick={handleDownloadAll}
+            title={`Все смены с ${formatDate(earliestReportDate)} по ${formatDate(bundle.today)}`}
+          >
+            Всё время
+          </button>
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -1927,62 +2188,177 @@ function managerResultStatusPillClass(tone: ReturnType<typeof managerResultStatu
   }
 }
 
-function ManagerResultsDateNav({
+function ManagerResultsPeriodPicker({
   bundle,
   formatDate
 }: {
   bundle: ManagerResultsBundle;
   formatDate: (iso: string | null | undefined) => string;
 }) {
-  const dateInputRef = useRef<HTMLInputElement>(null);
-  const isToday = bundle.selectedDate === bundle.today;
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [draftFrom, setDraftFrom] = useState(bundle.dateFrom);
+  const [draftTo, setDraftTo] = useState(bundle.dateTo);
+
+  useEffect(() => {
+    if (menuOpen) return;
+    setDraftFrom(bundle.dateFrom);
+    setDraftTo(bundle.dateTo);
+  }, [bundle.dateFrom, bundle.dateTo, menuOpen]);
+
+  const rangeInvalid = Boolean(draftFrom && draftTo && draftFrom > draftTo);
+  const rangeTooLong =
+    Boolean(draftFrom && draftTo && draftFrom <= draftTo) &&
+    Math.floor(
+      (new Date(`${draftTo}T12:00:00`).getTime() - new Date(`${draftFrom}T12:00:00`).getTime()) /
+        86400000
+    ) +
+      1 >
+      365;
+  const isTodayRange = bundle.dateFrom === bundle.today && bundle.dateTo === bundle.today;
+
+  const triggerLabel = useMemo(
+    () => formatManagerResultsPeriodLabel(bundle.dateFrom, bundle.dateTo, formatDate),
+    [bundle.dateFrom, bundle.dateTo, formatDate]
+  );
+
+  const applyPreset = (preset: (typeof EXECUTIVE_REPORT_PRESETS)[number]["key"]) => {
+    switch (preset) {
+      case "week":
+        bundle.onPeriodChange(startOfIsoWeek(bundle.today), bundle.today);
+        break;
+      case "prev-week": {
+        const prevWeekEnd = addIsoDays(startOfIsoWeek(bundle.today), -1);
+        bundle.onPeriodChange(addIsoDays(prevWeekEnd, -6), prevWeekEnd);
+        break;
+      }
+      case "month":
+        bundle.onPeriodChange(startOfIsoMonth(bundle.today), bundle.today);
+        break;
+      case "30d":
+        bundle.onPeriodChange(addIsoDays(bundle.today, -29), bundle.today);
+        break;
+      default:
+        break;
+    }
+    setMenuOpen(false);
+  };
+
+  const applyDraft = () => {
+    if (!draftFrom || !draftTo || rangeInvalid || rangeTooLong) return;
+    bundle.onPeriodChange(draftFrom, draftTo);
+    setMenuOpen(false);
+  };
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    const onPointerDown = (event: MouseEvent) => {
+      const root = menuRef.current;
+      if (!root || root.contains(event.target as Node)) return;
+      setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    document.addEventListener("mousedown", onPointerDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+      document.removeEventListener("mousedown", onPointerDown);
+    };
+  }, [menuOpen]);
 
   return (
-    <div className={styles.managerResultsDateNav} role="group" aria-label="Выбор даты отчёта">
-      <button
-        type="button"
-        className={styles.managerResultsDateArrow}
-        aria-label="Предыдущий день"
-        onClick={() => bundle.onDateChange(addIsoDays(bundle.selectedDate, -1))}
-      >
-        <ChevronLeft size={16} strokeWidth={2.4} aria-hidden="true" />
-      </button>
-      <button
-        type="button"
-        className={styles.managerResultsDatePickerBtn}
-        aria-label="Выбрать дату"
-        onClick={() => {
-          dateInputRef.current?.showPicker?.();
-          dateInputRef.current?.focus();
-        }}
-      >
-        <CalendarDays size={15} strokeWidth={2.2} aria-hidden="true" />
-        <span>{formatDate(bundle.selectedDate)}</span>
-        <span className={styles.managerResultsDateWeekday}>{formatWeekdayShort(bundle.selectedDate)}</span>
-        <input
-          ref={dateInputRef}
-          type="date"
-          className={styles.managerResultsDateInputHidden}
-          value={bundle.selectedDate}
-          onChange={(event) => {
-            if (event.target.value) bundle.onDateChange(event.target.value);
-          }}
-          aria-label="Дата отчёта"
-        />
-      </button>
-      <button
-        type="button"
-        className={styles.managerResultsDateArrow}
-        aria-label="Следующий день"
-        onClick={() => bundle.onDateChange(addIsoDays(bundle.selectedDate, 1))}
-      >
-        <ChevronRight size={16} strokeWidth={2.4} aria-hidden="true" />
-      </button>
-      {!isToday ? (
+    <div className={styles.managerResultsPeriodNav} ref={menuRef}>
+      <div className={styles.coveragePeriodPicker}>
+        <button
+          type="button"
+          className={`${styles.coveragePeriodTrigger} ${menuOpen ? styles.coveragePeriodTriggerOpen : ""}`}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          <CalendarDays size={14} strokeWidth={2.2} aria-hidden="true" />
+          <span>{bundle.loading ? "Загружаем…" : triggerLabel}</span>
+          <ChevronDown size={14} strokeWidth={2.2} aria-hidden="true" />
+        </button>
+
+        {menuOpen ? (
+          <div
+            className={styles.coveragePeriodMenu}
+            role="menu"
+            aria-label="Выбор периода результатов менеджеров"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className={styles.coveragePeriodMenuPresets} role="group" aria-label="Быстрый выбор периода">
+              {EXECUTIVE_REPORT_PRESETS.map((preset) => (
+                <button
+                  key={preset.key}
+                  type="button"
+                  role="menuitem"
+                  className={styles.coveragePeriodBtn}
+                  onClick={() => applyPreset(preset.key)}
+                >
+                  {preset.label}
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.coveragePeriodMenuRange}>
+              <label className={styles.coveragePeriodMenuField}>
+                <span>Дата начала</span>
+                <input
+                  type="date"
+                  className={styles.coveragePeriodMenuDateInput}
+                  value={draftFrom}
+                  max={draftTo || bundle.today}
+                  onChange={(event) => {
+                    if (event.target.value) setDraftFrom(event.target.value);
+                  }}
+                  aria-label="Дата начала"
+                />
+              </label>
+              <label className={styles.coveragePeriodMenuField}>
+                <span>Дата окончания</span>
+                <input
+                  type="date"
+                  className={styles.coveragePeriodMenuDateInput}
+                  value={draftTo}
+                  min={draftFrom}
+                  max={bundle.today}
+                  onChange={(event) => {
+                    if (event.target.value) setDraftTo(event.target.value);
+                  }}
+                  aria-label="Дата окончания"
+                />
+              </label>
+            </div>
+
+            {rangeInvalid ? (
+              <p className={styles.coveragePeriodMenuError}>Дата начала не может быть позже даты окончания.</p>
+            ) : rangeTooLong ? (
+              <p className={styles.coveragePeriodMenuError}>Максимальная длина периода — 365 дней.</p>
+            ) : null}
+
+            <div className={styles.managerResultsPeriodMenuActions}>
+              <button
+                type="button"
+                className={styles.managerResultsPeriodApplyBtn}
+                disabled={!draftFrom || !draftTo || rangeInvalid || rangeTooLong}
+                onClick={applyDraft}
+              >
+                Применить
+              </button>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      {!isTodayRange ? (
         <button
           type="button"
           className={styles.managerResultsTodayBtn}
-          onClick={() => bundle.onDateChange(bundle.today)}
+          onClick={() => bundle.onPeriodChange(bundle.today, bundle.today)}
         >
           Сегодня
         </button>
@@ -1994,62 +2370,13 @@ function ManagerResultsDateNav({
         disabled={bundle.loading}
         onClick={() => bundle.onRefresh()}
       >
-        <RefreshCw size={14} strokeWidth={2.4} className={bundle.loading ? styles.managerResultsSpin : ""} aria-hidden="true" />
+        <RefreshCw
+          size={14}
+          strokeWidth={2.4}
+          className={bundle.loading ? styles.managerResultsSpin : ""}
+          aria-hidden="true"
+        />
       </button>
-    </div>
-  );
-}
-
-function ManagerResultsDateStrip({
-  bundle,
-  formatDate
-}: {
-  bundle: ManagerResultsBundle;
-  formatDate: (iso: string | null | undefined) => string;
-}) {
-  const stripRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    const active = strip.querySelector<HTMLElement>(`[data-report-date="${bundle.selectedDate}"]`);
-    active?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
-  }, [bundle.selectedDate, bundle.availableDates.length]);
-
-  if (bundle.availableDates.length === 0) return null;
-
-  return (
-    <div className={styles.managerResultsDateStripWrap}>
-      <p className={styles.managerResultsDateStripLabel}>Дни с отчётами и live-сменами</p>
-      <div ref={stripRef} className={styles.managerResultsDateStrip} role="listbox" aria-label="Дни с завершёнными сменами">
-        {bundle.availableDates.map((entry) => {
-          const active = entry.reportDate === bundle.selectedDate;
-          const liveOnly = entry.hasLive && entry.reportsCount === 0;
-          return (
-            <button
-              key={entry.reportDate}
-              type="button"
-              role="option"
-              aria-selected={active}
-              data-report-date={entry.reportDate}
-              className={`${styles.managerResultsDateChip} ${
-                active ? styles.managerResultsDateChipActive : ""
-              } ${liveOnly ? styles.managerResultsDateChipLive : ""}`}
-              onClick={() => bundle.onDateChange(entry.reportDate)}
-            >
-              <span>{formatDate(entry.reportDate)}</span>
-              <span className={styles.managerResultsDateChipMeta}>
-                {formatWeekdayShort(entry.reportDate)} ·{" "}
-                {liveOnly
-                  ? "live"
-                  : `${entry.reportsCount}/${entry.rosterTotal || bundle.dashboard?.roster.total || 2} ${
-                      entry.reportsCount === 1 ? "отчёт" : entry.reportsCount < 5 ? "отчёта" : "отчётов"
-                    }`}
-              </span>
-            </button>
-          );
-        })}
-      </div>
     </div>
   );
 }
@@ -2065,7 +2392,17 @@ function ManagerResultsLoadingState() {
   );
 }
 
-function ManagerResultTaskList({ tasks }: { tasks: ManagerCompletionTask[] }) {
+function ManagerResultTaskList({
+  tasks,
+  formatDate,
+  showShiftDate = false,
+  onTaskOpen
+}: {
+  tasks: ManagerCompletionTask[];
+  formatDate?: (iso: string | null | undefined) => string;
+  showShiftDate?: boolean;
+  onTaskOpen: (task: ManagerCompletionTask) => void;
+}) {
   if (tasks.length === 0) {
     return <p className={styles.managerResultsEmpty}>Заданий в отчёте нет.</p>;
   }
@@ -2080,10 +2417,15 @@ function ManagerResultTaskList({ tasks }: { tasks: ManagerCompletionTask[] }) {
         const reason = taskValue(task, "reason");
         const deadline = taskValue(task, "deadline");
         const taskType = taskValue(task, "task_type");
+        const shiftDate = taskValue(task, "shift_date");
+        const taskKey = `${taskValue(task, "key")}-${title}-${taskType}-${shiftDate}`;
         return (
-          <article
-            key={`${taskValue(task, "key")}-${title}-${taskType}`}
+          <button
+            key={taskKey}
+            type="button"
             className={styles.managerResultTaskRow}
+            aria-label={`Открыть задание: ${title}`}
+            onClick={() => onTaskOpen(task)}
           >
             <div className={styles.managerResultTaskMain}>
               <div className={styles.managerResultTaskHead}>
@@ -2096,26 +2438,48 @@ function ManagerResultTaskList({ tasks }: { tasks: ManagerCompletionTask[] }) {
               </div>
               <p className={styles.managerResultTaskMeta}>
                 {taskType || "тип не указан"}
-                {deadline ? ` · срок ${deadline}` : ""}
+                {showShiftDate && shiftDate && formatDate
+                  ? ` · смена ${formatDate(shiftDate)}`
+                  : ""}
+                {deadline ? ` · ${formatManagerTaskDeadline(deadline)}` : ""}
+                {taskValue(task, "deficit") ? ` · ${formatManagerTaskDeficit(task)}` : ""}
               </p>
-              {resultText ? <p className={styles.managerResultTaskResult}>{resultText}</p> : null}
+              {resultText ? (
+                <p className={styles.managerResultTaskResult}>{resultText}</p>
+              ) : (
+                <p className={styles.managerResultTaskPreviewHint}>Нажмите, чтобы открыть карточку задания</p>
+              )}
               {reason && status !== "resolved" ? (
                 <blockquote className={styles.managerResultTaskReason}>{reason}</blockquote>
               ) : null}
             </div>
-          </article>
+            <ChevronRight
+              size={16}
+              strokeWidth={2.4}
+              className={styles.managerResultTaskRowChevron}
+              aria-hidden="true"
+            />
+          </button>
         );
       })}
     </div>
   );
 }
 
-function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
+function ManagerResultPanel({
+  manager,
+  isPeriodMode = false,
+  formatDate
+}: {
+  manager: ManagerCompletionReport;
+  isPeriodMode?: boolean;
+  formatDate: (iso: string | null | undefined) => string;
+}) {
   const [taskFilter, setTaskFilter] = useState<ManagerTaskTileFilter>("remaining");
+  const [selectedTask, setSelectedTask] = useState<ManagerCompletionTask | null>(null);
   const isMissing = manager.reportStatus === "missing";
   const isInProgress = manager.reportStatus === "in_progress";
   const reportKind = isInProgress ? "live" : "submitted";
-  const liveUpdatedLabel = formatLiveUpdatedAt(manager.liveUpdatedAt);
   const filteredTasks = useMemo(
     () => getFilteredManagerTasks(manager, taskFilter, reportKind),
     [manager, reportKind, taskFilter]
@@ -2123,6 +2487,7 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
 
   useEffect(() => {
     setTaskFilter("remaining");
+    setSelectedTask(null);
   }, [manager.id, manager.reportStatus]);
   const sentAtLabel = manager.emailSentAt
     ? new Date(manager.emailSentAt).toLocaleString("ru-RU", {
@@ -2151,7 +2516,9 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
             <ManagerProgressRing stats={manager.stats} missing />
           </div>
           <p className={styles.managerResultMissingHint}>
-            За этот день менеджер не нажал «Завершить смену» — отчёт не поступил. Данные по заданиям недоступны.
+            {isPeriodMode
+              ? "За выбранный период менеджер не завершил ни одной смены — отчёты не поступили."
+              : "За этот день менеджер не нажал «Завершить смену» — отчёт не поступил. Данные по заданиям недоступны."}
           </p>
         </div>
       </article>
@@ -2169,15 +2536,6 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
               {manager.regionLabel ? (
                 <p className={styles.managerResultRegionLabel}>{manager.regionLabel}</p>
               ) : null}
-              <span className={`${styles.managerResultStatusPill} ${styles.managerResultStatusPill_live}`}>
-                <span className={styles.managerResultsLiveDot} aria-hidden="true" />
-                Live · смена не закрыта
-              </span>
-              {liveUpdatedLabel ? (
-                <p className={styles.managerResultsLiveMeta}>Обновлено в {liveUpdatedLabel}</p>
-              ) : (
-                <p className={styles.managerResultsLiveMeta}>Прогресс обновляется автоматически</p>
-              )}
             </div>
             <ManagerProgressRing stats={manager.stats} />
           </div>
@@ -2187,11 +2545,6 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
             remainingLabel="Осталось"
             onFilterChange={setTaskFilter}
           />
-          <div className={styles.managerResultBreakdown}>
-            <span>Активно: {manager.stats.active}</span>
-            <span>Частично: {manager.stats.partial}</span>
-            <span>Не выполнено: {manager.stats.notResolved}</span>
-          </div>
         </div>
 
         <div className={styles.managerResultPanelScroll}>
@@ -2200,11 +2553,18 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
             aria-label={`${managerTaskFilterTitle(taskFilter, "live")} ${manager.managerName}`}
           >
             <div className={styles.managerResultTasksBlockHead}>
-              <h4>{managerTaskFilterTitle(taskFilter, "live")}</h4>
-              <span className={styles.managerResultTasksCount}>{filteredTasks.length}</span>
+              <h4>
+                {managerTaskFilterTitle(taskFilter, "live")}
+                <span className={styles.managerResultTasksCount}> · {filteredTasks.length}</span>
+              </h4>
             </div>
             {filteredTasks.length > 0 ? (
-              <ManagerResultTaskList tasks={filteredTasks} />
+              <ManagerResultTaskList
+                tasks={filteredTasks}
+                formatDate={formatDate}
+                showShiftDate={isPeriodMode}
+                onTaskOpen={setSelectedTask}
+              />
             ) : (
               <p className={styles.managerResultsEmptyCompact}>
                 {managerTaskFilterEmpty(taskFilter, "live")}
@@ -2212,11 +2572,20 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
             )}
           </section>
         </div>
+        {selectedTask ? (
+          <ManagerResultTaskModal
+            task={selectedTask}
+            manager={manager}
+            formatDate={formatDate}
+            onClose={() => setSelectedTask(null)}
+          />
+        ) : null}
       </article>
     );
   }
 
   return (
+    <>
     <article className={styles.managerResultPanel}>
       <div className={styles.managerResultAnalytics}>
         <div className={styles.managerResultCardHead}>
@@ -2225,6 +2594,11 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
             <h3>{manager.managerName}</h3>
             {manager.regionLabel ? (
               <p className={styles.managerResultRegionLabel}>{manager.regionLabel}</p>
+            ) : null}
+            {isPeriodMode && manager.daysWithReports != null && manager.daysWithReports > 0 ? (
+              <p className={styles.managerResultPeriodMeta}>
+                Смен с отчётом: {manager.daysWithReports}
+              </p>
             ) : null}
             {manager.emailSentTo ? (
               <p className={styles.managerResultsEmailMeta}>
@@ -2241,11 +2615,6 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
           remainingLabel="Не закрыто"
           onFilterChange={setTaskFilter}
         />
-        <div className={styles.managerResultBreakdown}>
-          <span>Активно: {manager.stats.active}</span>
-          <span>Частично: {manager.stats.partial}</span>
-          <span>Не выполнено: {manager.stats.notResolved}</span>
-        </div>
       </div>
 
       <div className={styles.managerResultPanelScroll}>
@@ -2254,11 +2623,18 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
           aria-label={`${managerTaskFilterTitle(taskFilter, "submitted")} ${manager.managerName}`}
         >
           <div className={styles.managerResultTasksBlockHead}>
-            <h4>{managerTaskFilterTitle(taskFilter, "submitted")}</h4>
-            <span className={styles.managerResultTasksCount}>{filteredTasks.length}</span>
+            <h4>
+              {managerTaskFilterTitle(taskFilter, "submitted")}
+              <span className={styles.managerResultTasksCount}> · {filteredTasks.length}</span>
+            </h4>
           </div>
           {filteredTasks.length > 0 ? (
-            <ManagerResultTaskList tasks={filteredTasks} />
+            <ManagerResultTaskList
+              tasks={filteredTasks}
+              formatDate={formatDate}
+              showShiftDate={isPeriodMode}
+              onTaskOpen={setSelectedTask}
+            />
           ) : (
             <p className={styles.managerResultsEmptyCompact}>
               {managerTaskFilterEmpty(taskFilter, "submitted")}
@@ -2267,6 +2643,15 @@ function ManagerResultPanel({ manager }: { manager: ManagerCompletionReport }) {
         </section>
       </div>
     </article>
+    {selectedTask ? (
+      <ManagerResultTaskModal
+        task={selectedTask}
+        manager={manager}
+        formatDate={formatDate}
+        onClose={() => setSelectedTask(null)}
+      />
+    ) : null}
+    </>
   );
 }
 
@@ -2278,21 +2663,36 @@ function ManagerResultsDashboard({
   formatDate: (iso: string | null | undefined) => string;
 }) {
   const dashboard = bundle.dashboard;
+  const isSingleDay = bundle.dateFrom === bundle.dateTo;
+  const isPeriodMode = !isSingleDay;
   const hasData = Boolean(dashboard && dashboard.managers.length > 0);
-  const hasReportsForDate = bundle.availableDates.some(
-    (entry) => entry.reportDate === bundle.selectedDate
+  const hasReportsInPeriod = bundle.availableDates.some(
+    (entry) =>
+      entry.reportDate >= bundle.dateFrom &&
+      entry.reportDate <= bundle.dateTo &&
+      (entry.reportsCount > 0 || entry.hasLive)
   );
   const roster = dashboard?.roster ?? { total: 2, submitted: 0, inProgress: 0, missing: 2 };
-  const isLiveDay = Boolean(dashboard?.liveMode && bundle.selectedDate === bundle.today);
+  const submittedShiftsLabel =
+    isPeriodMode &&
+    dashboard?.submittedShiftDays != null &&
+    dashboard?.expectedShiftDays != null
+      ? `${dashboard.submittedShiftDays}/${dashboard.expectedShiftDays}`
+      : `${roster.submitted}/${roster.total}`;
+  const submittedShiftsCaption = isPeriodMode ? "Смен сдано" : "Отчётов сдано";
   const summaryGrid =
     dashboard && !bundle.loading && !bundle.error && hasData ? (
       <div className={styles.managerResultsSummaryGrid}>
         <article className={styles.managerResultsSummaryCard}>
-          <span>Отчётов сдано</span>
-          <strong>
-            {roster.submitted}/{roster.total}
-          </strong>
+          <span>{submittedShiftsCaption}</span>
+          <strong>{submittedShiftsLabel}</strong>
         </article>
+        {isPeriodMode && dashboard.daysInPeriod ? (
+          <article className={styles.managerResultsSummaryCard}>
+            <span>Дней в периоде</span>
+            <strong>{dashboard.daysInPeriod}</strong>
+          </article>
+        ) : null}
         {roster.inProgress > 0 ? (
           <article className={`${styles.managerResultsSummaryCard} ${styles.managerResultsSummaryCardLive}`}>
             <span>В live-режиме</span>
@@ -2322,14 +2722,6 @@ function ManagerResultsDashboard({
         {bundle.executiveReportError ? (
           <p className={styles.managerResultsReportError}>{bundle.executiveReportError}</p>
         ) : null}
-        {isLiveDay ? (
-          <div className={styles.managerResultsLiveBanner} role="status">
-            <span className={styles.managerResultsLiveDot} aria-hidden="true" />
-            <span>
-              Live-режим: смена ещё не закрыта, прогресс менеджеров обновляется автоматически каждые 30 секунд.
-            </span>
-          </div>
-        ) : null}
         {bundle.loading ? (
         <ManagerResultsLoadingState />
       ) : bundle.error ? (
@@ -2342,33 +2734,32 @@ function ManagerResultsDashboard({
       ) : !hasData ? (
         <div className={styles.managerResultsEmptyState}>
           <p className={styles.managerResultsEmpty}>
-            {hasReportsForDate
-              ? "Отчёты за эту дату ещё обрабатываются или данные недоступны."
-              : bundle.selectedDate === bundle.today
+            {hasReportsInPeriod
+              ? "Отчёты за выбранный период ещё обрабатываются или данные недоступны."
+              : isSingleDay && bundle.dateFrom === bundle.today
                 ? "Сменное задание ещё не сформировано — выполните анализ Excel, чтобы менеджеры получили задания."
-                : "За выбранный день менеджеры ещё не завершали смену."}
+                : isPeriodMode
+                  ? "За выбранный период менеджеры ещё не завершали смены."
+                  : "За выбранный день менеджеры ещё не завершали смену."}
           </p>
           {bundle.availableDates.length > 0 ? (
             <p className={styles.managerResultsEmptyHint}>
-              Выберите другую дату в панели выше — доступно {bundle.availableDates.length}{" "}
+              Выберите другой период в панели выше — доступно {bundle.availableDates.length}{" "}
               {bundle.availableDates.length === 1 ? "день" : bundle.availableDates.length < 5 ? "дня" : "дней"} с отчётами.
             </p>
           ) : null}
         </div>
       ) : dashboard ? (
           <>
-            {roster.inProgress > 0 ? (
-              <p className={styles.managerResultsRosterHintLive}>
-                {roster.inProgress === roster.total
-                  ? "Все менеджеры в live-режиме — смена ещё не закрыта, прогресс обновляется в реальном времени."
-                  : `${roster.inProgress} из ${roster.total} менеджеров работают над сменным заданием в live-режиме.`}
-              </p>
-            ) : null}
             {roster.missing > 0 && roster.inProgress === 0 ? (
               <p className={styles.managerResultsRosterHint}>
-                {roster.missing === roster.total
-                  ? "За этот день ни один менеджер не завершил смену."
-                  : `${roster.missing} из ${roster.total} менеджеров не сдали отчёт — карточки отмечены как «Смена не завершена».`}
+                {isPeriodMode
+                  ? roster.missing === roster.total
+                    ? "За выбранный период ни один менеджер не завершил смену."
+                    : `${roster.missing} смен(ы) без отчёта — карточки отмечены как «Смена не завершена».`
+                  : roster.missing === roster.total
+                    ? "За этот день ни один менеджер не завершил смену."
+                    : `${roster.missing} из ${roster.total} менеджеров не сдали отчёт — карточки отмечены как «Смена не завершена».`}
               </p>
             ) : null}
             {roster.missing > 0 && roster.inProgress > 0 ? (
@@ -2386,7 +2777,12 @@ function ManagerResultsDashboard({
           <div className={styles.managerResultsManagerStage}>
             <div className={styles.managerResultsManagerStack}>
               {dashboard.managers.map((manager) => (
-                <ManagerResultPanel key={manager.id} manager={manager} />
+                <ManagerResultPanel
+                  key={manager.id}
+                  manager={manager}
+                  isPeriodMode={isPeriodMode}
+                  formatDate={formatDate}
+                />
               ))}
             </div>
           </div>
@@ -2543,6 +2939,7 @@ type CoverageDashboardTilesProps = {
   dashboard: CoverageDashboardPayload;
   formatDate?: (iso: string | null | undefined) => string;
   onFetchCustomPeriod?: (dateFrom: string, dateTo: string) => Promise<CoveragePeriodPayload | null>;
+  stockBalances?: StockBalancesCache | null;
   managerTasks?: ShiftTaskBoardProps | null;
   managerTasksNotice?: ManagerTasksNotice | null;
   managerResults?: ManagerResultsBundle | null;
@@ -2552,10 +2949,15 @@ export function CoverageDashboardTiles({
   dashboard,
   formatDate = formatRuDate,
   onFetchCustomPeriod,
+  stockBalances = null,
   managerTasks = null,
   managerTasksNotice = null,
   managerResults = null
 }: CoverageDashboardTilesProps) {
+  const stockByName = useMemo(
+    () => buildStockWarehousesByName(stockBalances?.items ?? []),
+    [stockBalances]
+  );
   const hasManagerResultsSide = Boolean(managerResults);
   const hasTasksSide =
     !hasManagerResultsSide && (Boolean(managerTasks) || Boolean(managerTasksNotice));
@@ -2974,6 +3376,7 @@ export function CoverageDashboardTiles({
           side={side}
           rows={detailRowsLocal}
           periodLabel={periodData.label}
+          stockByName={stockByName}
           animateIn={viewTransition?.kind === "period" && dashboardSide === side}
         />
       </>
@@ -3084,7 +3487,9 @@ export function CoverageDashboardTiles({
       role="toolbar"
       aria-label="Аналитика менеджеров"
     >
-      <ManagerResultsDateNav bundle={managerResults} formatDate={formatDate} />
+      <ManagerResultsPeriodPicker bundle={managerResults} formatDate={formatDate} />
+      <span className={styles.coverageToolbarDivider} aria-hidden="true" />
+      {dashboardModeSwitch}
     </div>
   ) : null;
 
@@ -3205,6 +3610,7 @@ type CoverageDashboardProps = {
   dashboard: CoverageDashboardPayload | null;
   formatDate?: (iso: string | null | undefined) => string;
   onFetchCustomPeriod?: (dateFrom: string, dateTo: string) => Promise<CoveragePeriodPayload | null>;
+  stockBalances?: StockBalancesCache | null;
   managerTasks?: ShiftTaskBoardProps | null;
   managerTasksNotice?: ManagerTasksNotice | null;
   managerResults?: ManagerResultsBundle | null;
@@ -3214,6 +3620,7 @@ export function CoverageDashboard({
   dashboard,
   formatDate = formatRuDate,
   onFetchCustomPeriod,
+  stockBalances = null,
   managerTasks = null,
   managerTasksNotice = null,
   managerResults = null
@@ -3226,6 +3633,7 @@ export function CoverageDashboard({
         dashboard={dashboard}
         formatDate={formatDate}
         onFetchCustomPeriod={onFetchCustomPeriod}
+        stockBalances={stockBalances}
         managerTasks={managerTasks}
         managerTasksNotice={managerTasksNotice}
         managerResults={managerResults}

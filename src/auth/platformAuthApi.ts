@@ -24,7 +24,9 @@ async function desktopFetch<T>(path: string, init: RequestInit = {}): Promise<T>
 
   if (!response.ok) {
     const detail = await response.text();
-    throw new Error(detail || `HTTP ${response.status}`);
+    const error = new Error(detail || `HTTP ${response.status}`);
+    (error as Error & { status?: number }).status = response.status;
+    throw error;
   }
 
   if (response.status === 204) {
