@@ -3488,8 +3488,6 @@ export function CoverageDashboardTiles({
       aria-label="Аналитика менеджеров"
     >
       <ManagerResultsPeriodPicker bundle={managerResults} formatDate={formatDate} />
-      <span className={styles.coverageToolbarDivider} aria-hidden="true" />
-      {dashboardModeSwitch}
     </div>
   ) : null;
 
