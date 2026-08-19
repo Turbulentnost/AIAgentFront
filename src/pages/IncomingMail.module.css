@@ -838,7 +838,7 @@
 .primaryButton {
   border: 0;
   background: var(--nav-button-primary-bg);
-  color: var(--nav-button-primary-text);
+  color: var(--nav-button-primary-color, var(--color-on-primary, #ffffff));
 }
 
 .primaryButton:hover:not(:disabled) {

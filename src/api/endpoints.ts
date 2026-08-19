@@ -17,6 +17,8 @@ import type {
   DeveloperFeedbackSendResponse,
   DeveloperFeedbackThread,
   DeveloperFeedbackThreadsResponse,
+  WechatGroup,
+  WechatHistoryItem,
   EmployeeSyncResult,
   Document,
   DocumentChunk,
@@ -774,6 +776,52 @@ export const agentsApi = {
         wsMessage: Record<string, unknown> | null;
         wsUrl: string | null;
       }>("/agents/document-analysis/wechat-utility-test")
+      .then((r) => r.data),
+
+  openWechatUtilitySession: () =>
+    apiClient
+      .post<{
+        ok: boolean;
+        error?: string;
+        health: Record<string, unknown> | null;
+        healthError: string | null;
+        wsUrl: string | null;
+        token: string | null;
+      }>("/agents/document-analysis/wechat-utility-session")
+      .then((r) => r.data),
+
+  getWechatUtilityHistory: () =>
+    apiClient
+      .get<{
+        ok: boolean;
+        count: number;
+        items: WechatHistoryItem[];
+      }>("/agents/document-analysis/wechat-utility-history")
+      .then((r) => r.data),
+
+  listWechatUtilityGroups: () =>
+    apiClient
+      .get<{ ok: boolean; count: number; groups: WechatGroup[] }>(
+        "/agents/document-analysis/wechat-utility-groups"
+      )
+      .then((r) => r.data),
+
+  getWechatUtilityGroupMessages: (params: { groupId?: string | null; groupName?: string | null }) =>
+    apiClient
+      .get<{ ok: boolean; count: number; items: WechatHistoryItem[] }>(
+        "/agents/document-analysis/wechat-utility-groups/messages",
+        {
+          params: {
+            group_id: params.groupId || undefined,
+            group_name: params.groupName || undefined,
+          },
+        }
+      )
+      .then((r) => r.data),
+
+  downloadWechatUtilityFile: (messageId: string) =>
+    apiClient
+      .get<Blob>(`/agents/document-analysis/wechat-utility-files/${messageId}`, { responseType: "blob" })
       .then((r) => r.data),
 
   /** TEMP(Aveon OData ping) — удалить вместе с кнопкой на странице агента */

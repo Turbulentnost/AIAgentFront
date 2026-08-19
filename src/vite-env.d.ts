@@ -11,3 +11,11 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+interface AveonDesktopBridge {
+  platform?: string;
+}
+
+interface Window {
+  aveonDesktop?: AveonDesktopBridge;
+}

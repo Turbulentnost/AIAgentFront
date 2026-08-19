@@ -244,6 +244,41 @@ export interface DeveloperFeedbackSendResponse {
   thread: DeveloperFeedbackThread;
   message: DeveloperFeedbackMessage;
 }
+
+export interface WechatHistoryFile {
+  name: string | null;
+  kind: string | null;
+  mimeType: string | null;
+  size: number | null;
+  storage: string | null;
+  path: string | null;
+  error: string | null;
+}
+
+export interface WechatHistoryItem {
+  id: string;
+  externalId: string | null;
+  receivedAt: string | null;
+  time: string | null;
+  text: string | null;
+  sender: string | null;
+  senderId: string | null;
+  group: string | null;
+  groupId: string | null;
+  type: string | null;
+  hasFile: boolean;
+  file: WechatHistoryFile | null;
+}
+
+export interface WechatGroup {
+  id: string;
+  groupId: string | null;
+  name: string;
+  messageCount: number;
+  lastMessageAt: string | null;
+  lastSender: string | null;
+  lastPreview: string | null;
+}
 export interface TaskStep {
   id: string;
   task_id: string;

@@ -3010,43 +3010,37 @@ export function CoverageDashboardTiles({
   );
 
   const dashboardModeSwitch = (
-    <div className={styles.coverageModeSwitch} role="tablist" aria-label="Тип дашборда">
+    <div className={styles.coverageTabStrip} role="tablist" aria-label="Тип дашборда">
       <button
         type="button"
         role="tab"
         aria-selected={isProductsMode}
-        className={`${styles.coverageModeSwitchBtn} ${
-          isProductsMode ? styles.coverageModeSwitchBtnActive : ""
-        }`}
+        className={`${styles.coverageTab} ${isProductsMode ? styles.coverageTabActive : ""}`}
         onClick={() => selectDashboardSide("products")}
       >
         <Package size={14} strokeWidth={2.2} aria-hidden="true" />
-        Изделия
+        <span>Изделия</span>
       </button>
       <button
         type="button"
         role="tab"
         aria-selected={isNomenclaturesMode}
-        className={`${styles.coverageModeSwitchBtn} ${
-          isNomenclaturesMode ? styles.coverageModeSwitchBtnActive : ""
-        }`}
+        className={`${styles.coverageTab} ${isNomenclaturesMode ? styles.coverageTabActive : ""}`}
         onClick={() => selectDashboardSide("nomenclatures")}
       >
         <Layers size={14} strokeWidth={2.2} aria-hidden="true" />
-        Номенклатуры
+        <span>Номенклатуры</span>
       </button>
       {hasTasksSide ? (
         <button
           type="button"
           role="tab"
           aria-selected={isTasksMode}
-          className={`${styles.coverageModeSwitchBtn} ${
-            isTasksMode ? styles.coverageModeSwitchBtnActive : ""
-          }`}
+          className={`${styles.coverageTab} ${isTasksMode ? styles.coverageTabActive : ""}`}
           onClick={() => selectDashboardSide("tasks")}
         >
           <ClipboardList size={14} strokeWidth={2.2} aria-hidden="true" />
-          Задания
+          <span>Задания</span>
         </button>
       ) : null}
       {hasManagerResultsSide ? (
@@ -3054,13 +3048,11 @@ export function CoverageDashboardTiles({
           type="button"
           role="tab"
           aria-selected={isManagerResultsMode}
-          className={`${styles.coverageModeSwitchBtn} ${
-            isManagerResultsMode ? styles.coverageModeSwitchBtnActive : ""
-          }`}
+          className={`${styles.coverageTab} ${isManagerResultsMode ? styles.coverageTabActive : ""}`}
           onClick={() => selectDashboardSide("manager_results")}
         >
           <ClipboardList size={14} strokeWidth={2.2} aria-hidden="true" />
-          Результаты
+          <span>Результаты</span>
         </button>
       ) : null}
     </div>
@@ -3083,17 +3075,6 @@ export function CoverageDashboardTiles({
         onRangeToChange={setRangeTo}
         formatDate={formatDate}
       />
-      <div className={styles.coverageToolbarTrailing}>{dashboardModeSwitch}</div>
-    </div>
-  );
-
-  const tasksToolbar = (
-    <div
-      className={`${styles.coverageToolbar} ${styles.coverageToolbarTasksOnly}`}
-      role="toolbar"
-      aria-label="Тип дашборда"
-    >
-      {dashboardModeSwitch}
     </div>
   );
 
@@ -3104,12 +3085,8 @@ export function CoverageDashboardTiles({
       aria-label="Аналитика менеджеров"
     >
       <ManagerResultsDateNav bundle={managerResults} formatDate={formatDate} />
-      <span className={styles.coverageToolbarDivider} aria-hidden="true" />
-      {dashboardModeSwitch}
     </div>
-  ) : (
-    tasksToolbar
-  );
+  ) : null;
 
   return (
     <div
@@ -3117,31 +3094,32 @@ export function CoverageDashboardTiles({
         isManagerResultsMode ? styles.coverageEmbeddedBlockManagerResults : ""
       } ${isTasksMode ? styles.coverageEmbeddedBlockTasks : ""}`}
     >
-      <div className={styles.coverageBoardHeader}>
-        <h2 className={styles.coverageBoardTitle}>
-          {isProductsMode
-            ? "Обеспеченность по изделиям"
-            : isNomenclaturesMode
-              ? "Обеспеченность по номенклатурам"
-              : isManagerResultsMode
-                ? "Результаты работы менеджеров"
-                : "Задачи сменного задания"}
-          {coveragePeriodLabel ? ` · ${coveragePeriodLabel}` : ""}
-        </h2>
-        <div className={styles.coverageDashboardControls}>
-          {isManagerResultsMode
-            ? managerResultsToolbar
-            : isTasksMode
-              ? tasksToolbar
-              : periodNav}
-        </div>
-      </div>
+      {dashboardModeSwitch}
 
-      <div
-        className={styles.coverageAnimatedViewport}
-        aria-busy={animatingView}
-        aria-live="polite"
-      >
+      <div className={styles.coverageTabPanel}>
+        <div className={styles.coverageBoardHeader}>
+          <h2 className={styles.coverageBoardTitle}>
+            {isProductsMode
+              ? "Обеспеченность по изделиям"
+              : isNomenclaturesMode
+                ? "Обеспеченность по номенклатурам"
+                : isManagerResultsMode
+                  ? "Результаты работы менеджеров"
+                  : "Задачи сменного задания"}
+            {coveragePeriodLabel ? ` · ${coveragePeriodLabel}` : ""}
+          </h2>
+          {!isTasksMode ? (
+            <div className={styles.coverageDashboardControls}>
+              {isManagerResultsMode ? managerResultsToolbar : periodNav}
+            </div>
+          ) : null}
+        </div>
+
+        <div
+          className={styles.coverageAnimatedViewport}
+          aria-busy={animatingView}
+          aria-live="polite"
+        >
         {hasExtraSide ? (
           <div
             className={`${styles.coverageSideCarouselViewport} ${
@@ -3217,6 +3195,7 @@ export function CoverageDashboardTiles({
         ) : (
           coverageFlipPanel
         )}
+      </div>
       </div>
     </div>
   );

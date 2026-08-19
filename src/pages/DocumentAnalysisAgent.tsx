@@ -46,7 +46,10 @@ import ScheduleFlipModal, { type ScheduleFlipFace } from "./temp/ScheduleFlipMod
 import type { MergedShipmentStats } from "./temp/TempMergedShipmentViewer";
 import ShiftTaskBoard, { ShiftTasksNewDayNotice } from "./temp/ShiftTaskBoard";
 import AvionDeveloperFeedbackWidget from "./temp/AvionDeveloperFeedbackWidget";
-import { runWechatUtilityConnectionTestInConsole } from "./temp/wechatUtilityConnect";
+import {
+  startWechatLiveConsoleLogger,
+  stopWechatLiveConsoleLogger,
+} from "./temp/wechatUtilityConnect";
 import SummaryReferencePanel from "./temp/SummaryReferencePanel";
 import { useAveonReferenceCache } from "./temp/useAveonReferenceCache";
 import {
@@ -986,6 +989,13 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
   useEffect(() => {
     void refreshShipmentSources();
   }, [refreshShipmentSources]);
+
+  useEffect(() => {
+    startWechatLiveConsoleLogger();
+    return () => {
+      stopWechatLiveConsoleLogger();
+    };
+  }, []);
 
   const visibleShiftAssignment = useMemo(() => {
     if (!shiftAssignment) return null;
@@ -2741,16 +2751,6 @@ export default function DocumentAnalysisAgent({ hideCatalogLink = false }: { hid
       <header className={styles.hero}>
         <h1>{mockDocumentAnalysisAgent.name}</h1>
         <p>{documentAnalysisAgentSubtitle}</p>
-        {/* TEMP: удалить весь button ниже — ничего больше не трогать */}
-        <button
-          type="button"
-          className={styles.secondaryButton}
-          onClick={() => {
-            void runWechatUtilityConnectionTestInConsole();
-          }}
-        >
-          test
-        </button>
       </header>
 
       <div className={styles.workspace}>

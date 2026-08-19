@@ -225,9 +225,9 @@
   justify-content: center;
   min-height: var(--nav-button-min-height);
   padding: 0 16px;
-  color: var(--nav-button-secondary-text);
-  background: var(--nav-button-secondary-bg);
-  border: 1px solid var(--color-border);
+  color: var(--nav-button-secondary-color, var(--color-primary-text, #2563eb));
+  background: var(--nav-button-secondary-bg, #eff6ff);
+  border: 1px solid var(--nav-button-secondary-border, var(--color-border));
   border-radius: var(--nav-button-radius);
   font-size: 14px;
   font-weight: 600;
@@ -256,19 +256,27 @@
   gap: 8px;
   min-height: var(--nav-button-min-height);
   padding: 0 18px;
-  color: var(--nav-button-primary-text);
-  background: var(--nav-button-primary-bg);
+  color: var(--nav-button-primary-color, var(--color-on-primary, #ffffff));
+  background: var(--nav-button-primary-bg, #2563eb);
   border: 0;
   border-radius: var(--nav-button-radius);
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  box-shadow: var(--nav-button-primary-shadow, 0 8px 18px rgba(37, 99, 235, 0.18));
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.primaryButton:hover:not(:disabled) {
+  opacity: 0.94;
+  transform: translateY(-1px);
 }
 
 .primaryButton:disabled {
   opacity: 0.55;
   cursor: not-allowed;
+  box-shadow: none;
+  transform: none;
 }
 
 .secondaryButton {
@@ -1145,17 +1153,19 @@
   width: 100%;
   min-height: var(--nav-button-min-height);
   padding: 12px 14px;
-  color: var(--nav-button-primary-text);
+  color: var(--nav-button-primary-color, var(--color-on-primary, #ffffff));
   text-align: left;
-  background: var(--nav-button-primary-bg);
+  background: var(--nav-button-primary-bg, #2563eb);
   border: 0;
   border-radius: var(--nav-button-radius);
+  box-shadow: var(--nav-button-primary-shadow, 0 8px 18px rgba(37, 99, 235, 0.18));
   cursor: pointer;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .shiftAssignmentButton:hover {
-  opacity: 0.92;
+  opacity: 0.94;
+  transform: translateY(-1px);
 }
 
 .shiftAssignmentButton:focus-visible {
@@ -1174,13 +1184,15 @@
   font-size: 14px;
   font-weight: 600;
   line-height: 1.3;
+  color: inherit;
 }
 
 .shiftAssignmentButtonMeta {
   font-size: 12px;
   font-weight: 500;
   line-height: 1.35;
-  opacity: 0.88;
+  color: inherit;
+  opacity: 0.86;
 }
 
 .stagesCompactToggle {
@@ -3181,51 +3193,117 @@
 }
 
 .coverageModeSwitch {
+  display: none;
+}
+
+.coverageTabStrip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 8px 10px 0;
+  background: color-mix(in srgb, var(--color-text-strong) 7%, var(--color-surface));
+  border: 1px solid var(--color-border);
+  border-bottom: 0;
+  border-radius: 12px 12px 0 0;
+}
+
+.coverageTab {
+  position: relative;
+  z-index: 0;
   display: inline-flex;
   align-items: center;
-  padding: 3px;
-  background: var(--color-surface);
+  gap: 7px;
+  min-height: 34px;
+  padding: 7px 14px 9px;
+  color: var(--color-text-secondary);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  line-height: 1.2;
+  background: color-mix(in srgb, var(--color-text-strong) 5%, var(--color-surface));
   border: 1px solid var(--color-border);
-  border-radius: 999px;
+  border-bottom: 0;
+  border-radius: 10px 10px 0 0;
+  cursor: pointer;
+  transition:
+    color 0.16s ease,
+    background 0.16s ease,
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.coverageTab:hover:not(.coverageTabActive) {
+  color: var(--color-text-strong);
+  background: color-mix(in srgb, var(--color-text-strong) 10%, var(--color-surface));
+  border-color: var(--color-border-strong);
+}
+
+.coverageTabActive {
+  z-index: 2;
+  color: var(--color-text-strong);
+  background: var(--color-surface-elevated, var(--color-surface));
+  border-color: var(--color-border-strong);
+  box-shadow: inset 0 2px 0 var(--color-primary-text, #2563eb);
+  margin-bottom: -1px;
+  padding-bottom: 10px;
+}
+
+.coverageTab:focus-visible {
+  outline: 2px solid var(--form-control-focus-border-color);
+  outline-offset: 1px;
+}
+
+.coverageTabPanel {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px 14px 16px;
+  background: var(--color-surface-elevated, var(--color-surface));
+  border: 1px solid var(--color-border-strong);
+  border-radius: 0 0 12px 12px;
+}
+
+[data-theme="dark"] .coverageTabStrip {
+  background: var(--color-surface);
+  border-color: var(--color-border-strong);
+}
+
+[data-theme="dark"] .coverageTab {
+  background: color-mix(in srgb, var(--color-text-strong) 4%, var(--color-surface));
+  border-color: var(--color-border-strong);
+  color: var(--color-text-secondary);
+}
+
+[data-theme="dark"] .coverageTab:hover:not(.coverageTabActive) {
+  background: color-mix(in srgb, var(--color-text-strong) 9%, var(--color-surface));
+  color: var(--color-text-strong);
+}
+
+[data-theme="dark"] .coverageTabActive {
+  background: var(--color-surface-elevated);
+  border-color: var(--color-border-strong);
+  box-shadow:
+    inset 0 2px 0 var(--color-primary-text, #58a6ff),
+    0 -1px 0 var(--color-surface-elevated);
+}
+
+[data-theme="dark"] .coverageTabPanel {
+  border-color: var(--color-border-strong);
+}
+
+.coverageEmbeddedBlockTasks .coverageTabPanel,
+.coverageEmbeddedBlockManagerResults .coverageTabPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .coverageModeSwitchBtn {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 4px 11px;
-  color: var(--color-text-secondary);
-  font-size: 11px;
-  font-weight: 700;
-  background: transparent;
-  border: 0;
-  border-radius: 999px;
-  cursor: pointer;
-  transition:
-    color 0.2s ease,
-    background 0.2s ease,
-    box-shadow 0.2s ease,
-    transform 0.16s ease;
-}
-
-.coverageModeSwitchBtn:hover:not(.coverageModeSwitchBtnActive) {
-  color: var(--color-text-strong);
-  background: color-mix(in srgb, var(--color-text-strong) 5%, transparent);
-}
-
-.coverageModeSwitchBtn:active {
-  transform: scale(0.97);
-}
-
-.coverageModeSwitchBtnActive {
-  color: var(--color-text-strong);
-  background: var(--color-surface-elevated);
-  box-shadow: 0 1px 4px color-mix(in srgb, #000 14%, transparent);
-}
-
-.coverageModeSwitchBtn:focus-visible {
-  outline: 2px solid var(--form-control-focus-border-color);
-  outline-offset: 1px;
+  display: none;
 }
 
 .coveragePeriodNav {
@@ -5344,13 +5422,14 @@
 
 .coverageEmbeddedBlock {
   display: grid;
-  gap: 12px;
+  gap: 0;
+  min-width: 0;
 }
 
 .coverageEmbeddedBlockManagerResults {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -5358,7 +5437,7 @@
 .coverageEmbeddedBlockTasks {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0;
   min-height: 0;
   max-height: calc(100dvh - 24px);
   overflow: hidden;
@@ -6801,7 +6880,7 @@
   }
 
   .coverageModeLead,
-  .coverageModeSwitchBtn {
+  .coverageTab {
     transition: none;
   }
 }
