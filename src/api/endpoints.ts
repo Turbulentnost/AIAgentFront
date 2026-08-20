@@ -1247,6 +1247,19 @@ export const agentsApi = {
       }>("/agents/document-analysis/material-calculator", { items })
       .then((r) => r.data),
 
+  exportAveonMaterialsExcel: (
+    lines: Array<{
+      nomenclature_key: string;
+      code: string;
+      name: string;
+      unit: string;
+      total_qty: number;
+    }>
+  ) =>
+    apiClient
+      .post<Blob>("/agents/document-analysis/material-calculator/export", { lines }, { responseType: "blob" })
+      .then((r) => r.data),
+
   mergeShipmentSchedules: (files: File[], options?: { includeGoogleSheets?: boolean }) => {
     const formData = new FormData();
     for (const file of files) {

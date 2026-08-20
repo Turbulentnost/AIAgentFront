@@ -2,6 +2,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import {
   ArrowLeft,
   Boxes,
+  Calculator,
   CalendarRange,
   ClipboardList,
   FileSpreadsheet,
@@ -11,6 +12,7 @@ import {
   Truck,
 } from "lucide-react";
 import type { ReferenceCacheState } from "./useAveonReferenceCache";
+import MaterialCalculatorModal from "./MaterialCalculatorModal";
 import TempGoogleSheetsViewer from "./TempGoogleSheetsViewer";
 import TempProductionPlanModal from "./TempProductionPlanModal";
 import TempResourceSpecsModal from "./TempResourceSpecsModal";
@@ -26,6 +28,7 @@ export type ReferenceModal =
   | "russiaShipment"
   | "resourceSpecs"
   | "stockBalances"
+  | "materialCalculator"
   | null;
 
 type Props = {
@@ -49,6 +52,12 @@ const PRIMARY_MENU_ITEMS: MenuItem[] = [
     label: "График комплектующих · Россия",
     hint: "Актуальная версия Excel в БД",
     icon: Truck,
+  },
+  {
+    id: "materialCalculator",
+    label: "Калькулятор материалов",
+    hint: "Потребность в материалах по спецификациям",
+    icon: Calculator,
   },
   {
     id: "chinaSheets",
@@ -102,13 +111,14 @@ function MenuSection({
       <div className={styles.menuList} role="list">
         {items.map((item) => {
           const Icon = item.icon;
+          const disabled = loading && item.id !== "materialCalculator";
           return (
             <button
               key={item.id}
               type="button"
               className={styles.menuBtn}
               role="listitem"
-              disabled={loading}
+              disabled={disabled}
               onClick={() => onOpen(item.id)}
             >
               <span className={styles.menuBtnIcon} aria-hidden>
@@ -153,8 +163,12 @@ export default function SummaryReferencePanel({
     setActiveModal(null);
   }
 
+  function openMaterialCalculator() {
+    setActiveModal("materialCalculator");
+  }
+
   useEffect(() => {
-    if (activeModal) {
+    if (activeModal && activeModal !== "materialCalculator") {
       setFlipped(true);
     }
   }, [activeModal]);
@@ -168,6 +182,19 @@ export default function SummaryReferencePanel({
   return (
     <>
       <div className={styles.wrap}>
+        <button
+          type="button"
+          className={styles.menuBtn}
+          onClick={openMaterialCalculator}
+        >
+          <span className={styles.menuBtnIcon} aria-hidden>
+            <Calculator size={18} strokeWidth={2} />
+          </span>
+          <span className={styles.menuBtnText}>
+            <span className={styles.menuBtnLabel}>Калькулятор материалов</span>
+          </span>
+        </button>
+
         <div className={styles.panelHeader}>
           <h2 className={styles.panelTitle}>Сводка</h2>
           <button
@@ -278,6 +305,11 @@ export default function SummaryReferencePanel({
         open={activeModal === "stockBalances"}
         loading={cache.loading}
         data={cache.stockBalances}
+        onClose={closeModal}
+      />
+
+      <MaterialCalculatorModal
+        open={activeModal === "materialCalculator"}
         onClose={closeModal}
       />
     </>

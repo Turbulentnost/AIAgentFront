@@ -3466,6 +3466,11 @@
   box-shadow: 0 12px 32px color-mix(in srgb, #000 18%, transparent);
 }
 
+.coverageDashboardControls .coveragePeriodMenu {
+  left: auto;
+  right: 0;
+}
+
 .coveragePeriodMenuPresets {
   display: flex;
   flex-wrap: wrap;
